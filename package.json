@@ -1,0 +1,21 @@
+{
+  "name": "discord-translation-bot",
+  "version": "1.0.0",
+  "description": "Prototyp bota Discord do tłumaczeń w embedach",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
