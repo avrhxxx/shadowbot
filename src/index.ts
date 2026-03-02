@@ -5,8 +5,7 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder,
-    InteractionCollector
+    EmbedBuilder
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -35,10 +34,6 @@ const LANGUAGES = [
     { code: "fr", label: "French", emoji: "🇫🇷" },
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
-
-/* =========================
-   REACTION QUEUE
-========================= */
 
 const reactionQueue: string[] = [];
 let processingQueue = false;
@@ -70,17 +65,9 @@ async function processReactionQueue() {
     processingQueue = false;
 }
 
-/* =========================
-   READY
-========================= */
-
 client.once("clientReady", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
-
-/* =========================
-   AUTO REACTION
-========================= */
 
 client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
@@ -89,10 +76,6 @@ client.on("messageCreate", async (message) => {
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
-
-/* =========================
-   REACTION CLICK - TRANSLATION PANEL
-========================= */
 
 const translationEmbeds = new Map<string, string>();
 
@@ -106,8 +89,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     if (!reaction.message.inGuild()) return;
 
     const message = reaction.message;
-
-    if (translationEmbeds.has(message.id)) return; // unikamy wielokrotnego tworzenia
+    if (translationEmbeds.has(message.id)) return;
 
     const embed = new EmbedBuilder()
         .setTitle("Translation Panel (Beta)")
@@ -116,7 +98,8 @@ client.on("messageReactionAdd", async (reaction, user) => {
             iconURL: message.author.displayAvatarURL()
         })
         .setDescription(`"${message.content}"`)
-        .setColor("Blue");
+        .setColor("Blue")
+        .setFooter({ text: `Embed will auto-delete when timer reaches 0. You have 60s.` });
 
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -136,6 +119,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     const sent = await message.channel.send({ embeds: [embed], components: rows });
     translationEmbeds.set(message.id, sent.id);
 
+    // licznik i automatyczne usuwanie
     let secondsLeft = 60;
     const timer = setInterval(async () => {
         secondsLeft--;
@@ -144,17 +128,12 @@ client.on("messageReactionAdd", async (reaction, user) => {
             try { await sent.delete(); } catch {}
             translationEmbeds.delete(message.id);
         } else {
-            // aktualizacja embedu z licznikiem sekund
             const updatedEmbed = EmbedBuilder.from(embed)
-                .setFooter({ text: `You have ${secondsLeft}s to click a button.` });
+                .setFooter({ text: `Embed will auto-delete when timer reaches 0. You have ${secondsLeft}s.` });
             try { await sent.edit({ embeds: [updatedEmbed], components: rows }); } catch {}
         }
     }, 1000);
 });
-
-/* =========================
-   BUTTON INTERACTION
-========================= */
 
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
@@ -216,9 +195,5 @@ client.on("interactionCreate", async (interaction) => {
         console.error("Interaction reply error:", err);
     }
 });
-
-/* =========================
-   LOGIN
-========================= */
 
 client.login(BOT_TOKEN);
