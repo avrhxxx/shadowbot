@@ -1,126 +1,116 @@
 import {
-    Client,
-    GatewayIntentBits,
-    Partials,
-    TextChannel,
-    MessageReaction,
-    User,
-    ActionRowBuilder,
-    StringSelectMenuBuilder,
-    EmbedBuilder
+  Client,
+  GatewayIntentBits,
+  Partials,
+  TextChannel,
+  MessageReaction,
+  User,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  Interaction
 } from "discord.js";
 import fetch from "node-fetch";
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions
-    ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessageReactions
+  ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User]
 });
 
 const reactionEmoji = "🌐";
-const languageMap = ["Polish", "German", "Russian", "French", "Spanish", "English"];
-const disabledUsers = new Map<string, Set<string>>(); // messageId -> userId set
+const languages = [
+  { label: "Polish", emoji: "🇵🇱", code: "pl" },
+  { label: "German", emoji: "🇩🇪", code: "de" },
+  { label: "Russian", emoji: "🇷🇺", code: "ru" },
+  { label: "French", emoji: "🇫🇷", code: "fr" },
+  { label: "Spanish", emoji: "🇪🇸", code: "es" },
+  { label: "English", emoji: "🇬🇧", code: "en" }
+];
 
-async function translateMessage(text: string, language: string): Promise<string> {
-    try {
-        const targetMap: Record<string, string> = {
-            Polish: "pl",
-            German: "de",
-            Russian: "ru",
-            French: "fr",
-            Spanish: "es",
-            English: "en"
-        };
-        const target = targetMap[language] ?? "en";
-
-        const response = await fetch("https://libretranslate.com/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
-        });
-
-        const data = (await response.json()) as { translatedText?: string };
-        return data.translatedText ?? `[${language}] ${text}`;
-    } catch (err) {
-        console.error("LibreTranslate error:", err);
-        return `[${language}] ${text}`;
-    }
+// Funkcja tłumaczenia przez LibreTranslate
+async function translateMessage(text: string, targetCode: string) {
+  try {
+    const res = await fetch("https://libretranslate.com/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: text, source: "auto", target: targetCode, format: "text" })
+    });
+    const data = (await res.json()) as { translatedText?: string };
+    return data.translatedText ?? text;
+  } catch {
+    return text;
+  }
 }
 
-// Dodawanie automatycznej reakcji 🌐
-client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    try {
-        await message.react(reactionEmoji);
-    } catch (err) {
-        console.error("Reaction failed:", err);
-    }
+// Dodawanie reakcji 🌐 do każdej nowej wiadomości
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
+  try {
+    await msg.react(reactionEmoji);
+  } catch {}
 });
 
-// Obsługa kliknięcia reakcji (partial safe)
+// Kliknięcie reakcji 🌐
 client.on(
-    "messageReactionAdd",
-    async (
-        reaction: MessageReaction | import("discord.js").PartialMessageReaction,
-        user: User | import("discord.js").PartialUser,
-        _details?: import("discord.js").MessageReactionEventDetails
-    ) => {
-        if (user.bot) return;
+  "messageReactionAdd",
+  async (
+    reaction: MessageReaction | import("discord.js").PartialMessageReaction,
+    user: User | import("discord.js").PartialUser
+  ) => {
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.emoji.name !== reactionEmoji) return;
 
-        if (reaction.partial) {
-            try { await reaction.fetch(); } 
-            catch (err) { console.error("Fetch reaction failed:", err); return; }
-        }
+    const message = reaction.message;
+    if (!(message.channel instanceof TextChannel)) return;
 
-        const message = reaction.message;
-        if (!message.guild) return;
+    // Tworzymy ephemeral embed z przyciskami flag
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    languages.forEach((lang) => {
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`translate-${message.id}-${lang.code}`)
+          .setLabel(lang.label)
+          .setEmoji(lang.emoji)
+          .setStyle(ButtonStyle.Primary)
+      );
+    });
 
-        if (reaction.emoji.name !== reactionEmoji) return;
-        if (!(message.channel instanceof TextChannel)) return;
-
-        // Disable check
-        if (disabledUsers.get(message.id)?.has(user.id)) return;
-
-        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId(`select-lang-${message.id}-${user.id}`)
-                .setPlaceholder("Choose a language")
-                .addOptions(languageMap.map((lang) => ({ label: lang, value: lang })))
-        );
-
-        await message.channel.send({
-            content: `<@${user.id}> select a language for translation:`,
-            components: [row],
-        });
-    }
+    await (message.channel as TextChannel).send({
+      content: `<@${user.id}> choose language to translate:`,
+      components: [row],
+      ephemeral: true // widoczne tylko dla klikającego
+    });
+  }
 );
 
-// Obsługa dropdown wyboru języka
-client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
+// Kliknięcie przycisku flagi
+client.on("interactionCreate", async (interaction: Interaction) => {
+  if (!interaction.isButton()) return;
 
-    const [prefix, messageId, userId] = interaction.customId.split("-");
-    if (prefix !== "select" || userId !== interaction.user.id) return;
+  const [action, messageId, langCode] = interaction.customId.split("-");
+  if (action !== "translate") return;
 
-    const language = interaction.values[0];
-    const channel = interaction.channel;
-    if (!channel || !(channel instanceof TextChannel)) return;
+  const channel = interaction.channel;
+  if (!channel || !(channel instanceof TextChannel)) return;
 
-    const msg = await channel.messages.fetch(messageId).catch(() => null);
-    if (!msg) return;
+  const msg = await channel.messages.fetch(messageId).catch(() => null);
+  if (!msg) return;
 
-    const translatedText = await translateMessage(msg.content, language);
+  const translated = await translateMessage(msg.content, langCode);
 
-    const embed = new EmbedBuilder()
-        .setTitle(`Translation (${language})`)
-        .setColor("Blue")
-        .setDescription(translatedText);
+  const embed = new EmbedBuilder()
+    .setTitle(`Translation (${langCode})`)
+    .setColor("Blue")
+    .setDescription(translated);
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 });
 
 client.once("ready", () => console.log(`Logged in as ${client.user?.tag}`));
