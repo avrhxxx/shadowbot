@@ -36,9 +36,11 @@ const LANGUAGES = [
 ];
 
 export function initTranslationModule(client: Client) {
-    // Auto reakcja 🌍
+    // Auto reakcja 🌍, ale ignoruj komendy
     client.on("messageCreate", async (message: Message) => {
         if (message.author.bot || !message.inGuild()) return;
+        if (message.content.startsWith("!")) return; // nie reaguj na komendy
+
         try { await message.react("🌍"); } catch {}
     });
 
@@ -109,7 +111,6 @@ export function initTranslationModule(client: Client) {
         });
     });
 
-    // Funkcja tłumaczenia z Libre + Google fallback
     async function translateText(text: string, target: string): Promise<string> {
         // Libre
         try {
