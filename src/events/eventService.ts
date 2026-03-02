@@ -1,81 +1,163 @@
-import { TextChannel, ButtonInteraction } from "discord.js";
-import { loadEvents, saveEvents } from "./eventStorage";
+// src/events/eventService.ts
+import fs from "fs";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
 
-interface EventData {
-    id: string;
-    title: string;
-    description?: string;
-    timestamp: number;
-    participants: string[];
-    createdBy: string;
+const EVENTS_FILE = path.resolve("./data/events.json");
+const CONFIG_FILE = path.resolve("./data/config.json");
+
+export type EventStatus = "ACTIVE" | "PAST" | "CANCELLED";
+
+export interface EventObject {
+  id: string;
+  name: string;
+  day: number;
+  month: number;
+  hour: number;
+  minute: number;
+  reminderBefore: number; // min
+  status: EventStatus;
+  participants: string[];
+  createdAt: number;
+  guildId: string;
+  reminderSent?: boolean;
 }
 
-// Generate simple ID
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+export interface GuildEvents {
+  [guildId: string]: {
+    events: EventObject[];
+  };
 }
 
-/* ===== CREATE EVENT ===== */
-export function createEvent(title: string, description: string, timestamp: number, creatorId: string) {
-    const data = loadEvents();
-    const event: EventData = {
-        id: generateId(),
-        title,
-        description,
-        timestamp,
-        participants: [],
-        createdBy: creatorId
-    };
-    data.events.push(event);
-    saveEvents(data);
-    return event;
+export interface ConfigObject {
+  [guildId: string]: {
+    defaultChannelId?: string;
+  };
 }
 
-/* ===== EXPORT PARTICIPANTS ===== */
-export async function exportParticipants(eventId: string, channel: TextChannel) {
-    const data = loadEvents();
-    const event = data.events.find((e: EventData) => e.id === eventId);
-    if (!event || !event.participants.length) return false;
-
-    const list = event.participants.map((id, i) => `${i + 1}. <@${id}>`).join("\n");
-    await channel.send(`📋 Participants for **${event.title}**\n\n${list}`);
-    return true;
+// ======= EVENTS JSON =======
+export function loadEvents(): GuildEvents {
+  if (!fs.existsSync(EVENTS_FILE)) {
+    fs.writeFileSync(EVENTS_FILE, JSON.stringify({}, null, 2));
+  }
+  return JSON.parse(fs.readFileSync(EVENTS_FILE, "utf-8"));
 }
 
-/* ===== ATTENDANCE STATISTICS ===== */
-export function calculateAttendance(events: EventData[]) {
-    const stats: Record<string, number> = {};
-    for (const e of events) {
-        for (const user of e.participants) {
-            stats[user] = (stats[user] || 0) + 1;
-        }
+export function saveEvents(data: GuildEvents) {
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2));
+}
+
+// ======= CONFIG JSON =======
+export function loadConfig(): ConfigObject {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({}, null, 2));
+  }
+  return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+}
+
+export function saveConfig(config: ConfigObject) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+// ======= EVENT CREATION =======
+export function createEvent(
+  guildId: string,
+  name: string,
+  day: number,
+  month: number,
+  hour: number,
+  minute: number,
+  reminderBefore: number
+): EventObject {
+  const now = new Date();
+  let year = now.getFullYear();
+
+  const eventDate = new Date(year, month - 1, day, hour, minute);
+  if (eventDate.getTime() < Date.now()) {
+    year += 1; // jeśli przeszłość, ustaw następny rok
+  }
+
+  const timestamp = new Date(year, month - 1, day, hour, minute).getTime();
+
+  const newEvent: EventObject = {
+    id: uuidv4(),
+    name,
+    day,
+    month,
+    hour,
+    minute,
+    reminderBefore,
+    status: "ACTIVE",
+    participants: [],
+    createdAt: Date.now(),
+    guildId,
+    reminderSent: false,
+  };
+
+  const allEvents = loadEvents();
+  if (!allEvents[guildId]) allEvents[guildId] = { events: [] };
+  allEvents[guildId].events.push(newEvent);
+  saveEvents(allEvents);
+
+  return newEvent;
+}
+
+// ======= GET EVENTS =======
+export function getEvents(guildId: string): EventObject[] {
+  const all = loadEvents();
+  return all[guildId]?.events || [];
+}
+
+export function getActiveEvents(guildId: string): EventObject[] {
+  return getEvents(guildId).filter(e => e.status === "ACTIVE");
+}
+
+export function getPastEvents(guildId: string): EventObject[] {
+  return getEvents(guildId).filter(e => e.status === "PAST");
+}
+
+// ======= CANCEL EVENT =======
+export function cancelEvent(guildId: string, eventId: string) {
+  const all = loadEvents();
+  const event = all[guildId]?.events.find(e => e.id === eventId);
+  if (event) {
+    event.status = "CANCELLED";
+    saveEvents(all);
+  }
+}
+
+// ======= UPDATE STATUS (PAST / REMINDERS) =======
+export function updateEventStatuses(guildId: string) {
+  const now = Date.now();
+  const all = loadEvents();
+  const events = all[guildId]?.events || [];
+
+  for (const e of events) {
+    const eventDate = new Date(
+      new Date().getFullYear(),
+      e.month - 1,
+      e.day,
+      e.hour,
+      e.minute
+    ).getTime();
+
+    if (e.status === "ACTIVE" && now >= eventDate) {
+      e.status = "PAST";
     }
-    return stats;
+  }
+
+  saveEvents(all);
 }
 
-/* ===== SMART SUGGESTION (inactive last 3 events) ===== */
-export function findInactiveMembers(events: EventData[]) {
-    const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp);
-    const lastThree = sorted.slice(0, 3);
-    if (!lastThree.length) return [];
-
-    const allParticipants = new Set(events.flatMap(e => e.participants));
-    const inactive: string[] = [];
-
-    for (const user of allParticipants) {
-        const attended = lastThree.some(e => e.participants.includes(user));
-        if (!attended) inactive.push(user);
-    }
-    return inactive;
+// ======= CONFIG =======
+export function setDefaultChannel(guildId: string, channelId: string) {
+  const config = loadConfig();
+  if (!config[guildId]) config[guildId] = {};
+  config[guildId].defaultChannelId = channelId;
+  saveConfig(config);
 }
 
-/* ===== PIN ACTIVE EVENT ===== */
-export async function pinActiveEvent(event: EventData, channel: TextChannel) {
-    const message = await channel.send(`📌 **${event.title}**\n<t:${Math.floor(event.timestamp / 1000)}:F>`);
-    await message.pin();
-
-    const pins = await channel.messages.fetchPinned();
-    for (const msg of pins.values()) {
-        if (msg.id !== message.id) await msg.unpin();
-    }
+export function getDefaultChannel(guildId: string): string | undefined {
+  const config = loadConfig();
+  return config[guildId]?.defaultChannelId;
 }
