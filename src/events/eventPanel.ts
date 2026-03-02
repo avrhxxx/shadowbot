@@ -10,9 +10,9 @@ import {
     TextInputStyle,
     StringSelectMenuBuilder,
     StringSelectMenuInteraction,
-    Interaction
+    Interaction,
+    EmbedBuilder
 } from "discord.js";
-
 import fs from "fs";
 import path from "path";
 
@@ -42,163 +42,297 @@ function saveEvents(events: EventData[]) {
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-export async function initEventPanel(client: Client) {
-    client.once("clientReady", async () => {
-        const guild = client.guilds.cache.first();
-        if (!guild) return;
+export async function handleEventButton(interaction: Interaction) {
+    if (!interaction.isButton()) return;
 
-        let channel = guild.channels.cache.find(
-            c => c.name === "moderation-panel" && c.isTextBased()
-        ) as TextChannel;
+    const embed = new EmbedBuilder()
+        .setTitle("📌 Event Panel")
+        .setDescription("Select an action:");
 
-        if (!channel) {
-            channel = await guild.channels.create({
-                name: "moderation-panel",
-                type: 0
-            }) as TextChannel;
-        }
-
-        // Sprawdzenie czy panel już istnieje
-        const messages = await channel.messages.fetch({ limit: 20 });
-        const existingPanel = messages.find(m =>
-            m.author.id === client.user?.id &&
-            m.content.includes("Event Management Panel")
+    const row = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId("create_event")
+                .setLabel("Create Event")
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId("list_events")
+                .setLabel("List Events")
+                .setStyle(ButtonStyle.Secondary)
         );
-        if (existingPanel) return;
 
-        // 🔹 Panel z jednym przyciskiem
-        const row = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId("event_create")
-                    .setLabel("Event")
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await channel.send({
-            content: "📌 Event Management Panel",
-            components: [row]
-        });
+    await interaction.reply({
+        embeds: [embed],
+        components: [row],
+        ephemeral: true
     });
+}
 
+export async function initEventPanel(client: Client) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
-        // BUTTON "Event"
-        if (interaction.isButton() && interaction.customId === "event_create") {
-
-            // 🔹 Select menu z dniem
-            const dayMenu = new StringSelectMenuBuilder()
-                .setCustomId("select_day")
-                .setPlaceholder("Select day");
-
-            for (let i = 1; i <= 31; i++) {
-                dayMenu.addOptions({
-                    label: `${i}`,
-                    value: `${i}` // musi być string
-                });
-            }
-
-            await interaction.reply({
-                content: "Select day:",
-                components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(dayMenu)],
-                ephemeral: true
-            });
-            return;
-        }
-
-        // SELECT DAY
-        if (interaction.isStringSelectMenu() && interaction.customId === "select_day") {
-            const day = interaction.values[0];
-
-            // 🔹 Select menu z miesiącem
-            const monthMenu = new StringSelectMenuBuilder()
-                .setCustomId(`select_month_${day}`)
-                .setPlaceholder("Select month");
-
-            const months = [
-                "January","February","March","April","May","June",
-                "July","August","September","October","November","December"
-            ];
-
-            months.forEach((m, idx) => {
-                monthMenu.addOptions({ label: m, value: `${idx + 1}` }); // string!
-            });
-
-            await interaction.update({
-                content: `Selected day: ${day}. Now select month:`,
-                components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(monthMenu)]
-            });
-            return;
-        }
-
-        // SELECT MONTH
-        if (interaction.isStringSelectMenu() && interaction.customId.startsWith("select_month_")) {
-            const day = interaction.customId.split("_")[2];
-            const month = interaction.values[0];
-
-            // 🔹 Modal do wpisania nazwy eventu i godziny
+        // ===== BUTTON: Create Event =====
+        if (interaction.isButton() && interaction.customId === "create_event") {
+            // 🔹 Modal 1: Event Name
             const modal = new ModalBuilder()
-                .setCustomId(`modal_create_event_${day}_${month}`)
-                .setTitle("Create Event");
+                .setCustomId("modal_event_name")
+                .setTitle("Event Name");
 
             const nameInput = new TextInputBuilder()
                 .setCustomId("event_name")
-                .setLabel("Event Name")
+                .setLabel("Enter event name")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
-            const hourInput = new TextInputBuilder()
-                .setCustomId("event_hour")
-                .setLabel("Hour (HH:MM)")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            modal.addComponents(
-                new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(hourInput)
-            );
-
+            modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
             await interaction.showModal(modal);
             return;
         }
 
-        // MODAL SUBMIT
-        if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_create_event_")) {
-            const parts = interaction.customId.split("_");
-            const day = Number(parts[3]);
-            const month = Number(parts[4]);
+        // ===== MODAL SUBMITS =====
+        if (interaction.isModalSubmit()) {
 
-            const name = interaction.fields.getTextInputValue("event_name");
-            const hourStr = interaction.fields.getTextInputValue("event_hour");
-            const [hour, minute] = hourStr.split(":").map(Number);
+            // 🔹 Event Name → ask for Month
+            if (interaction.customId === "modal_event_name") {
+                const name = interaction.fields.getTextInputValue("event_name");
+                await interaction.reply({ content: "Enter month (1-12):", ephemeral: true });
 
-            const now = new Date();
-            const timestamp = new Date(
-                now.getFullYear(),
-                month - 1,
-                day,
-                hour,
-                minute
-            ).getTime();
+                // 🔹 Store temporary data in interaction ephemeral for next modal
+                await interaction.followUp({
+                    content: "Month:",
+                    ephemeral: true
+                });
 
+                const modalMonth = new ModalBuilder()
+                    .setCustomId(`modal_event_month_${name}`)
+                    .setTitle("Event Month");
+
+                const monthInput = new TextInputBuilder()
+                    .setCustomId("event_month")
+                    .setLabel("Month number (1-12)")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modalMonth.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput));
+                await interaction.showModal(modalMonth);
+                return;
+            }
+
+            // 🔹 Month → ask for Day
+            if (interaction.customId.startsWith("modal_event_month_")) {
+                const name = interaction.customId.split("_").slice(3).join("_");
+                const month = Number(interaction.fields.getTextInputValue("event_month"));
+
+                const modalDay = new ModalBuilder()
+                    .setCustomId(`modal_event_day_${name}_${month}`)
+                    .setTitle("Event Day");
+
+                const dayInput = new TextInputBuilder()
+                    .setCustomId("event_day")
+                    .setLabel("Day number (1-31)")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modalDay.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput));
+                await interaction.showModal(modalDay);
+                return;
+            }
+
+            // 🔹 Day → ask for Hour
+            if (interaction.customId.startsWith("modal_event_day_")) {
+                const parts = interaction.customId.split("_");
+                const name = parts[3];
+                const month = Number(parts[4]);
+                const day = Number(interaction.fields.getTextInputValue("event_day"));
+
+                const modalHour = new ModalBuilder()
+                    .setCustomId(`modal_event_hour_${name}_${month}_${day}`)
+                    .setTitle("Event Hour");
+
+                const hourInput = new TextInputBuilder()
+                    .setCustomId("event_hour")
+                    .setLabel("Hour (HH:MM)")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modalHour.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(hourInput));
+                await interaction.showModal(modalHour);
+                return;
+            }
+
+            // 🔹 Hour → final save
+            if (interaction.customId.startsWith("modal_event_hour_")) {
+                const parts = interaction.customId.split("_");
+                const name = parts[3];
+                const month = Number(parts[4]);
+                const day = Number(parts[5]);
+                const hourStr = interaction.fields.getTextInputValue("event_hour");
+                const [hour, minute] = hourStr.split(":").map(Number);
+
+                const now = new Date();
+                const timestamp = new Date(
+                    now.getFullYear(),
+                    month - 1,
+                    day,
+                    hour,
+                    minute
+                ).getTime();
+
+                const events = loadEvents();
+                const id = Date.now().toString();
+
+                events.push({
+                    id,
+                    name,
+                    timestamp,
+                    participants: []
+                });
+
+                saveEvents(events);
+
+                await interaction.reply({
+                    content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}.`,
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+
+        // ===== BUTTON: List Events =====
+        if (interaction.isButton() && interaction.customId === "list_events") {
             const events = loadEvents();
-            const id = Date.now().toString();
+            if (events.length === 0) {
+                await interaction.reply({ content: "No events yet.", ephemeral: true });
+                return;
+            }
 
-            events.push({
-                id,
-                name,
-                timestamp,
-                participants: []
+            const row = new ActionRowBuilder<ButtonBuilder>();
+            const embed = new EmbedBuilder().setTitle("Event List").setDescription("Select an event:");
+
+            events.forEach(e => {
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`event_${e.id}`)
+                        .setLabel(e.name)
+                        .setStyle(ButtonStyle.Secondary)
+                );
             });
 
-            saveEvents(events);
-
-            await interaction.reply({
-                content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}.`,
-                ephemeral: true
-            });
-
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
             return;
+        }
+
+        // ===== BUTTONS FOR SINGLE EVENT =====
+        if (interaction.isButton() && interaction.customId.startsWith("event_")) {
+            const id = interaction.customId.split("_")[1];
+            const events = loadEvents();
+            const event = events.find(e => e.id === id);
+            if (!event) {
+                await interaction.reply({ content: "Event not found.", ephemeral: true });
+                return;
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle(`Event: ${event.name}`)
+                .setDescription(`Date: ${new Date(event.timestamp).toLocaleString()}`);
+
+            const row = new ActionRowBuilder<ButtonBuilder>()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`add_${id}`)
+                        .setLabel("Add Participant")
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`remove_${id}`)
+                        .setLabel("Remove Participant")
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId(`absent_${id}`)
+                        .setLabel("Mark Absent")
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`list_${id}`)
+                        .setLabel("List Participants")
+                        .setStyle(ButtonStyle.Success)
+                );
+
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+
+        // ===== BUTTONS: Add / Remove / Absent / List Participants =====
+        if (interaction.isButton()) {
+            const parts = interaction.customId.split("_");
+            if (parts.length === 2) return; // ignore main buttons
+
+            const action = parts[0];
+            const id = parts[1];
+            const events = loadEvents();
+            const event = events.find(e => e.id === id);
+            if (!event) {
+                await interaction.reply({ content: "Event not found.", ephemeral: true });
+                return;
+            }
+
+            // Add / Remove / Absent → modal
+            if (["add", "remove", "absent"].includes(action)) {
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_${action}_${id}`)
+                    .setTitle(`${action.toUpperCase()} Participant`);
+
+                const nickInput = new TextInputBuilder()
+                    .setCustomId("participant_nick")
+                    .setLabel("Participant Nick")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput));
+                await interaction.showModal(modal);
+                return;
+            }
+
+            // List participants
+            if (action === "list") {
+                const present = event.participants.filter(p => p.present).map(p => p.nick);
+                const absent = event.participants.filter(p => !p.present).map(p => p.nick);
+
+                await interaction.reply({
+                    content: `**${event.name}**\n\n✅ Present: ${present.join(", ") || "none"}\n❌ Absent: ${absent.join(", ") || "none"}`,
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+
+        // ===== MODAL SUBMITS FOR PARTICIPANTS =====
+        if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith("modal_")) {
+                const parts = interaction.customId.split("_");
+                const action = parts[1];
+                const id = parts[2];
+                const events = loadEvents();
+                const event = events.find(e => e.id === id);
+                if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+
+                const nick = interaction.fields.getTextInputValue("participant_nick");
+
+                if (action === "add") {
+                    if (!event.participants.some(p => p.nick === nick)) {
+                        event.participants.push({ nick, present: true });
+                    }
+                }
+                if (action === "remove") {
+                    event.participants = event.participants.filter(p => p.nick !== nick);
+                }
+                if (action === "absent") {
+                    const p = event.participants.find(p => p.nick === nick);
+                    if (p) p.present = false;
+                }
+
+                saveEvents(events);
+                await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
+                return;
+            }
         }
 
     });
