@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./modules/ModeratorPanel";
-import { initEventPanel } from "./events/eventPanel";
+// import Event Panel nie jest wywoływany globalnie, tylko po kliknięciu przycisku Event Menu
 
 const client = new Client({
   intents: [
@@ -23,7 +23,6 @@ client.once("clientReady", () => {
   // Root panel i moduły
   initTranslationModule(client); // moduł placeholder
   initModeratorPanel(client);     // tworzy kanał + root panel + obsługa przycisków
-  initEventPanel(client);         // inicjalizacja EventPanel – nasłuchuje customId event_*
 });
 
 client.login(BOT_TOKEN);
