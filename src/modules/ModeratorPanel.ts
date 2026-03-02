@@ -1,11 +1,8 @@
 // src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction, ButtonInteraction } from "discord.js";
-import { initEventPanel } from "../events/eventPanel"; // inicjalizacja EventPanel
+import { initEventPanel } from "../events/eventPanel";
 
 export async function initModeratorPanel(client: Client) {
-  // Inicjalizacja EventPanel (samowystarczalny)
-  initEventPanel(client);
-
   client.once("clientReady", async () => {
     const guild = client.guilds.cache.first();
     if (!guild) return;
@@ -18,7 +15,7 @@ export async function initModeratorPanel(client: Client) {
     if (!channel) {
       channel = await guild.channels.create({
         name: "moderation-panel",
-        type: 0, // GUILD_TEXT
+        type: 0 // GUILD_TEXT
       }) as TextChannel;
     }
 
@@ -30,12 +27,24 @@ export async function initModeratorPanel(client: Client) {
     );
 
     if (!existingPanel) {
-      // Tworzymy root panel moderatora (tylko 4 przyciski)
+      // Root panel moderatora — tylko moduły
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("event_menu").setLabel("Event Menu").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("points_menu").setLabel("Points Menu").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("translator_menu").setLabel("Translator Menu").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("help_menu").setLabel("Help").setStyle(ButtonStyle.Success)
+        new ButtonBuilder()
+          .setCustomId("event_menu")
+          .setLabel("Event Menu")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId("points_menu")
+          .setLabel("Points Menu")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId("translator_menu")
+          .setLabel("Translator Menu")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId("help_menu")
+          .setLabel("Help")
+          .setStyle(ButtonStyle.Success)
       );
 
       await channel.send({
@@ -45,13 +54,14 @@ export async function initModeratorPanel(client: Client) {
     }
   });
 
-  // Obsługa kliknięć w panelu
+  // Obsługa kliknięć w root panelu
   client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
 
     switch (interaction.customId) {
       case "event_menu":
-        await renderEventPanel(interaction);
+        // Delegujemy EventPanel, który wygeneruje własne przyciski
+        await initEventPanel(client, interaction);
         break;
 
       case "points_menu":
@@ -66,14 +76,5 @@ export async function initModeratorPanel(client: Client) {
         await interaction.reply({ content: "Help menu not implemented yet.", ephemeral: true });
         break;
     }
-  });
-}
-
-// Funkcja wywołująca EventPanel (przekazuje przycisk dalej do eventPanel)
-async function renderEventPanel(interaction: ButtonInteraction) {
-  // Wywołujemy EventPanel i pozwalamy mu samemu wyrenderować swoje przyciski
-  await interaction.reply({
-    content: "📌 **Event Panel**",
-    ephemeral: true
   });
 }
