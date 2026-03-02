@@ -1,6 +1,8 @@
+// src/index.ts
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
-import { initEventPanel } from "./events/eventPanel"; // <-- tutaj initEventPanel
+import { initModeratorPanel } from "./modules/ModeratorPanel";
+import { initEventPanel } from "./events/eventPanel";
 
 const client = new Client({
     intents: [
@@ -17,8 +19,11 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // Inicjalizacja modułów
 initTranslationModule(client);
-initEventPanel(client); // <-- inicjalizacja EventModule (panel + interakcje)
+initModeratorPanel(client); // tworzy Moderation Panel + główny wybór przycisków
+initEventPanel(client);     // obsługuje Event Panel i wszystkie interakcje związane z eventami
 
-client.once("ready", () => console.log(`Logged in as ${client.user?.tag}`));
+client.once("clientReady", () => {
+    console.log(`Logged in as ${client.user?.tag}`);
+});
 
 client.login(BOT_TOKEN);
