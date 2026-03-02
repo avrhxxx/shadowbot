@@ -66,7 +66,7 @@ export async function handleEventButton(interaction: Interaction) {
     });
 }
 
-// ===== Init Event Panel =====
+// ===== Obsługa workflow Create Event i List Events + uczestnicy =====
 export async function initEventPanel(client: any) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
@@ -102,7 +102,7 @@ export async function initEventPanel(client: any) {
 
             const reminderInput = new TextInputBuilder()
                 .setCustomId("event_reminder")
-                .setLabel("Reminder (HH:MM before event)")
+                .setLabel("Reminder (minutes before event)")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(false);
 
@@ -115,50 +115,6 @@ export async function initEventPanel(client: any) {
             );
 
             await interaction.showModal(modal);
-            return;
-        }
-
-        // ===== MODAL SUBMIT: Create Event =====
-        if (interaction.isModalSubmit() && interaction.customId === "modal_create_event") {
-            const name = interaction.fields.getTextInputValue("event_name");
-            const day = Number(interaction.fields.getTextInputValue("event_day"));
-            const month = Number(interaction.fields.getTextInputValue("event_month"));
-            const hourStr = interaction.fields.getTextInputValue("event_hour");
-            const [hour, minute] = hourStr.split(":").map(Number);
-
-            const reminderStr = interaction.fields.getTextInputValue("event_reminder");
-            let reminderMinutes = 0;
-            if (reminderStr) {
-                const [h, m] = reminderStr.split(":").map(Number);
-                reminderMinutes = h * 60 + m;
-            }
-
-            const now = new Date();
-            const timestamp = new Date(
-                now.getFullYear(),
-                month - 1,
-                day,
-                hour,
-                minute
-            ).getTime();
-
-            const events = loadEvents();
-            const id = Date.now().toString();
-
-            events.push({
-                id,
-                name,
-                timestamp,
-                participants: [],
-                reminderMinutes
-            });
-
-            saveEvents(events);
-
-            await interaction.reply({
-                content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}. Reminder: ${reminderMinutes} minutes before.`,
-                ephemeral: true
-            });
             return;
         }
 
@@ -226,7 +182,6 @@ export async function initEventPanel(client: any) {
             const parts = interaction.customId.split("_");
             const action = parts[0];
             const id = parts[1];
-
             if (!["add","remove","absent","list"].includes(action)) return;
 
             const events = loadEvents();
@@ -261,33 +216,94 @@ export async function initEventPanel(client: any) {
             }
         }
 
-        // ===== MODAL SUBMITS: Add/Remove/Absent Participants =====
-        if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_")) {
-            const parts = interaction.customId.split("_");
-            const action = parts[1];
-            const id = parts[2];
-            const events = loadEvents();
-            const event = events.find(e => e.id === id);
-            if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+        // ===== MODAL SUBMITS =====
+        if (interaction.isModalSubmit()) {
+            try {
+                // Create Event workflow
+                if (interaction.customId === "modal_create_event") {
+                    await interaction.deferReply({ ephemeral: true });
 
-            const nick = interaction.fields.getTextInputValue("participant_nick");
+                    const name = interaction.fields.getTextInputValue("event_name");
+                    const day = Number(interaction.fields.getTextInputValue("event_day"));
+                    const month = Number(interaction.fields.getTextInputValue("event_month"));
+                    const hourStr = interaction.fields.getTextInputValue("event_hour");
+                    const [hour, minute] = hourStr.split(":").map(Number);
+                    const reminderStr = interaction.fields.getTextInputValue("event_reminder");
 
-            if (action === "add") {
-                if (!event.participants.some(p => p.nick === nick)) {
-                    event.participants.push({ nick, present: true });
+                    let reminderMinutes = 0;
+                    if (reminderStr) {
+                        const [h, m] = reminderStr.split(":").map(Number);
+                        if (!isNaN(h) && !isNaN(m)) reminderMinutes = h * 60 + m;
+                    }
+
+                    if (
+                        day < 1 || day > 31 ||
+                        month < 1 || month > 12 ||
+                        hour < 0 || hour > 23 ||
+                        minute < 0 || minute > 59
+                    ) {
+                        return await interaction.editReply({ content: "❌ Invalid date or time." });
+                    }
+
+                    const now = new Date();
+                    const timestamp = new Date(now.getFullYear(), month - 1, day, hour, minute).getTime();
+
+                    const events = loadEvents();
+                    const id = Date.now().toString();
+
+                    events.push({
+                        id,
+                        name,
+                        timestamp,
+                        participants: [],
+                        reminderMinutes
+                    });
+
+                    saveEvents(events);
+
+                    await interaction.editReply({
+                        content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}. Reminder: ${reminderMinutes} minutes before.`
+                    });
+                    return;
+                }
+
+                // Add/Remove/Absent participants
+                if (interaction.customId.startsWith("modal_")) {
+                    const parts = interaction.customId.split("_");
+                    const action = parts[1];
+                    const id = parts[2];
+
+                    const events = loadEvents();
+                    const event = events.find(e => e.id === id);
+                    if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+
+                    const nick = interaction.fields.getTextInputValue("participant_nick");
+
+                    if (action === "add") {
+                        if (!event.participants.some(p => p.nick === nick)) {
+                            event.participants.push({ nick, present: true });
+                        }
+                    }
+                    if (action === "remove") {
+                        event.participants = event.participants.filter(p => p.nick !== nick);
+                    }
+                    if (action === "absent") {
+                        const p = event.participants.find(p => p.nick === nick);
+                        if (p) p.present = false;
+                    }
+
+                    saveEvents(events);
+                    await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
+                    return;
+                }
+
+            } catch (err) {
+                console.error("Error in modal submit:", err);
+                if (!interaction.replied) {
+                    await interaction.reply({ content: "❌ Something went wrong, try again.", ephemeral: true });
                 }
             }
-            if (action === "remove") {
-                event.participants = event.participants.filter(p => p.nick !== nick);
-            }
-            if (action === "absent") {
-                const p = event.participants.find(p => p.nick === nick);
-                if (p) p.present = false;
-            }
-
-            saveEvents(events);
-            await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
-            return;
         }
+
     });
 }
