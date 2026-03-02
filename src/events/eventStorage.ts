@@ -1,67 +1,14 @@
 import fs from "fs";
-import path from "path";
+const FILE_PATH = "./data/events.json";
 
-const filePath = path.join(__dirname, "..", "data", "events.json");
-
-export interface StoredEvent {
-  id: string;
-  title: string;
-  description: string;
-  timestamp: number;
-  channelId: string;
-  participants: string[];
-  createdAt: number;
-  cancelled?: boolean;
+export function loadEvents() {
+    if (!fs.existsSync(FILE_PATH)) {
+        fs.writeFileSync(FILE_PATH, JSON.stringify({ events: [] }, null, 2));
+    }
+    const raw = fs.readFileSync(FILE_PATH);
+    return JSON.parse(raw.toString());
 }
 
-interface EventFileSchema {
-  events: StoredEvent[];
-  config: {
-    defaultChannelId: string | null;
-  };
+export function saveEvents(data: any) {
+    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
 }
-
-function ensureFileExists() {
-  if (!fs.existsSync(filePath)) {
-    const initialData: EventFileSchema = {
-      events: [],
-      config: {
-        defaultChannelId: null,
-      },
-    };
-
-    fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2));
-  }
-}
-
-function readFile(): EventFileSchema {
-  ensureFileExists();
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw);
-}
-
-function writeFile(data: EventFileSchema) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-
-export const eventStorage = {
-  getAllEvents(): StoredEvent[] {
-    return readFile().events;
-  },
-
-  saveAllEvents(events: StoredEvent[]) {
-    const file = readFile();
-    file.events = events;
-    writeFile(file);
-  },
-
-  getConfig() {
-    return readFile().config;
-  },
-
-  setDefaultChannel(channelId: string | null) {
-    const file = readFile();
-    file.config.defaultChannelId = channelId;
-    writeFile(file);
-  },
-};
