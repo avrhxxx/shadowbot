@@ -1,179 +1,197 @@
-import fs from 'fs';
-import path from 'path';
 import {
   Client,
-  Interaction,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  GatewayIntentBits,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  StringSelectMenuBuilder,
-  ComponentType,
-  Colors,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  SelectMenuBuilder,
+  Interaction,
+  ButtonInteraction,
+  ModalSubmitInteraction,
+  TextChannel,
+  ChannelType
 } from 'discord.js';
+import fs from 'fs';
+import path from 'path';
 
-const eventsFile = path.join(__dirname, '../data/events.json');
+const EVENTS_FILE = path.join(__dirname, '../data/events.json');
+let events: any[] = [];
+let defaultNotifyChannelId: string | null = null;
 
-interface Event {
-  id: string;
-  name: string;
-  day: number;
-  month: number;
-  time: string; // HH:MM
-  channelId?: string;
-  reminderMinutes?: number;
-  participants: string[];
+// Wczytaj eventy przy starcie
+if (fs.existsSync(EVENTS_FILE)) {
+  events = JSON.parse(fs.readFileSync(EVENTS_FILE, 'utf-8'));
+} else {
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify([]));
 }
 
-let events: Event[] = [];
+function saveEvents() {
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2));
+}
 
-export function loadEvents() {
-  if (fs.existsSync(eventsFile)) {
-    events = JSON.parse(fs.readFileSync(eventsFile, 'utf8'));
-  } else {
-    events = [];
+// Tworzymy modal do utworzenia eventu
+function createEventModal() {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_create_event')
+    .setTitle('Create Event');
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_name')
+        .setLabel('Event Name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_day')
+        .setLabel('Day')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_month')
+        .setLabel('Month')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_time')
+        .setLabel('Hour:Minute (24h)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_reminder')
+        .setLabel('Reminder minutes before event')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    )
+  );
+
+  return modal;
+}
+
+// Generuje główny panel z przyciskami
+function createMainPanel() {
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId('btn_create_event')
+        .setLabel('Create Event')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('btn_manual_reminder')
+        .setLabel('🔔 Manual Reminder')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('btn_delete_event')
+        .setLabel('🗑️ Delete Active Event')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('btn_default_channel')
+        .setLabel('⚙️ Set Notify Channel')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('btn_download_list')
+        .setLabel('⬇️ Download Participants')
+        .setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
+
+// Obsługa przycisków
+async function handleButton(interaction: ButtonInteraction) {
+  switch (interaction.customId) {
+    case 'btn_create_event':
+      await interaction.showModal(createEventModal());
+      break;
+
+    case 'btn_manual_reminder':
+      // Wyświetl listę aktywnych eventów i pozwól wywołać przypomnienie
+      await interaction.reply({
+        content: 'Manual reminder triggered for active events (placeholder)',
+        ephemeral: true
+      });
+      break;
+
+    case 'btn_delete_event':
+      // Wyświetl listę aktywnych eventów do usunięcia
+      await interaction.reply({
+        content: 'Choose event to delete (placeholder)',
+        ephemeral: true
+      });
+      break;
+
+    case 'btn_default_channel':
+      if (!interaction.guild) return;
+      // Tworzymy select menu dla wszystkich kanałów tekstowych w serwerze
+      const channels = interaction.guild.channels.cache
+        .filter(c => c.type === ChannelType.GuildText)
+        .map(c => ({ label: c.name, value: c.id }));
+
+      const selectMenu = new ActionRowBuilder<SelectMenuBuilder>().addComponents(
+        new SelectMenuBuilder()
+          .setCustomId('select_notify_channel')
+          .setPlaceholder('Choose default notify channel')
+          .addOptions(channels)
+      );
+
+      await interaction.reply({ content: 'Select default notify channel:', components: [selectMenu], ephemeral: true });
+      break;
+
+    case 'btn_download_list':
+      await interaction.reply({
+        content: 'Download participants for past events (placeholder)',
+        ephemeral: true
+      });
+      break;
   }
 }
 
-export function saveEvents() {
-  fs.writeFileSync(eventsFile, JSON.stringify(events, null, 2));
+// Obsługa select menu
+async function handleSelectMenu(interaction: Interaction) {
+  if (!interaction.isSelectMenu()) return;
+
+  if (interaction.customId === 'select_notify_channel') {
+    defaultNotifyChannelId = interaction.values[0];
+    await interaction.reply({ content: `Default notification channel set!`, ephemeral: true });
+  }
 }
 
-export async function handleEventButton(client: Client, interaction: Interaction) {
-  if (!interaction.isButton()) return;
+// Obsługa submitu modala
+async function handleModalSubmit(interaction: ModalSubmitInteraction) {
+  if (interaction.customId !== 'modal_create_event') return;
 
-  // Tworzenie eventu
-  if (interaction.customId === 'create_event') {
-    const modal = new ModalBuilder()
-      .setCustomId('modal_create_event')
-      .setTitle('Create Event');
+  const name = interaction.fields.getTextInputValue('event_name');
+  const day = interaction.fields.getTextInputValue('event_day');
+  const month = interaction.fields.getTextInputValue('event_month');
+  const time = interaction.fields.getTextInputValue('event_time');
+  const reminder = interaction.fields.getTextInputValue('event_reminder');
 
-    modal.addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId('event_name')
-          .setLabel('Event Name')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId('event_day')
-          .setLabel('Day')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId('event_month')
-          .setLabel('Month')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId('event_time')
-          .setLabel('Time (HH:MM)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      )
-    );
+  const newEvent = { name, day, month, time, reminder, createdAt: Date.now() };
+  events.push(newEvent);
+  saveEvents();
 
-    await interaction.showModal(modal);
-    return;
-  }
+  await interaction.reply({ content: `Event "${name}" created!`, ephemeral: true });
+}
 
-  // Obsługa dzwoneczka, kosza i śrubki
-  if (interaction.customId.startsWith('active_event_')) {
-    const [prefix, eventId, action] = interaction.customId.split('_');
-
-    const ev = events.find(e => e.id === eventId);
-    if (!ev) {
-      await interaction.reply({ content: 'Event not found.', ephemeral: true });
-      return;
+// Inicjalizacja event panel w kliencie
+export function initEventPanel(client: Client) {
+  client.on('interactionCreate', async interaction => {
+    if (interaction.isButton()) {
+      await handleButton(interaction);
+    } else if (interaction.isModalSubmit()) {
+      await handleModalSubmit(interaction);
+    } else if (interaction.isSelectMenu()) {
+      await handleSelectMenu(interaction);
     }
-
-    switch (action) {
-      case 'bell':
-        // Wyślij przypomnienie do kanału eventu
-        if (ev.channelId) {
-          const channel = interaction.guild?.channels.cache.get(ev.channelId as string);
-          if (channel && 'send' in channel) {
-            await (channel as any).send(`Reminder: ${ev.name} starts at ${ev.time}`);
-          }
-        }
-        await interaction.reply({ content: 'Reminder sent.', ephemeral: true });
-        break;
-
-      case 'trash':
-        events = events.filter(e => e.id !== eventId);
-        saveEvents();
-        await interaction.reply({ content: 'Event deleted.', ephemeral: true });
-        break;
-
-      case 'gear':
-        // Śrubka: wybór kanału i przypomnienia automatycznego
-        const channelSelect = new StringSelectMenuBuilder()
-          .setCustomId(`select_channel_${eventId}`)
-          .setPlaceholder('Select channel for notifications')
-          .addOptions(
-            interaction.guild?.channels.cache
-              .filter(c => c.isTextBased())
-              .map(c => ({ label: c.name, value: c.id })) || []
-          );
-
-        const reminderSelect = new StringSelectMenuBuilder()
-          .setCustomId(`select_reminder_${eventId}`)
-          .setPlaceholder('Select reminder minutes')
-          .addOptions(
-            Array.from({ length: 12 }, (_, i) => (i + 1) * 5).map(min => ({
-              label: `${min} minutes before`,
-              value: min.toString(),
-            }))
-          );
-
-        await interaction.reply({
-          content: 'Configure event:',
-          components: [
-            new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect),
-            new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(reminderSelect),
-          ],
-          ephemeral: true,
-        });
-        break;
-    }
-    return;
-  }
-
-  // Minione eventy: tylko pobranie listy uczestników
-  if (interaction.customId.startsWith('past_event_')) {
-    const [prefix, eventId] = interaction.customId.split('_');
-    const ev = events.find(e => e.id === eventId);
-    if (!ev) return;
-    await interaction.reply({
-      content: `Participants for ${ev.name}:\n${ev.participants.join('\n')}`,
-      ephemeral: true,
-    });
-  }
-}
-
-export async function handleModalSubmit(interaction: any) {
-  if (!interaction.isModalSubmit()) return;
-
-  if (interaction.customId === 'modal_create_event') {
-    const name = interaction.fields.getTextInputValue('event_name');
-    const day = parseInt(interaction.fields.getTextInputValue('event_day'));
-    const month = parseInt(interaction.fields.getTextInputValue('event_month'));
-    const time = interaction.fields.getTextInputValue('event_time');
-
-    const id = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
-    const newEvent: Event = { id, name, day, month, time, participants: [] };
-    events.push(newEvent);
-    saveEvents();
-
-    await interaction.reply({ content: `Event ${name} created.`, ephemeral: true });
-  }
+  });
 }
