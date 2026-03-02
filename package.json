@@ -1,16 +1,16 @@
 {
   "name": "discord-translation-bot",
   "version": "1.0.0",
-  "description": "Discord bot z tłumaczeniami LibreTranslate",
+  "description": "Discord bot z przewijalnym embedem tłumaczeń",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "build": "tsc"
   },
   "dependencies": {
     "discord.js": "^14.11.0",
-    "dotenv": "^16.3.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "typescript": "^5.2.2"
