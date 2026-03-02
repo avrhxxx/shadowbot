@@ -7,6 +7,7 @@ import {
     ButtonStyle,
     EmbedBuilder,
     TextChannel,
+    User,
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -15,13 +16,13 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMessageReactions
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
+if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 
 const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
@@ -45,11 +46,9 @@ async function processReactionQueue() {
         if (!item) continue;
 
         const [channelId, messageId] = item.split(":");
-
         try {
             const channel = await client.channels.fetch(channelId);
-            if (!channel?.isTextBased()) continue;
-
+            if (!channel || !channel.isTextBased()) continue;
             const message = await channel.messages.fetch(messageId);
             if (!message) continue;
 
@@ -68,7 +67,9 @@ client.once("ready", () => {
 });
 
 client.on("messageCreate", async (message) => {
-    if (message.author.bot || !message.inGuild()) return;
+    if (message.author.bot) return;
+    if (!message.inGuild()) return;
+
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
@@ -77,6 +78,7 @@ const translationEmbeds = new Map<string, string>();
 
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
+
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
     if (reaction.emoji.name !== "🌐") return;
@@ -97,7 +99,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
             .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
             .setDescription(`"${message.content}"`)
             .setColor("Blue")
-            .setFooter({ text: "60s remaining to click a button" });
+            .setFooter({ text: "You have 60s to click a button. Embed will disappear afterwards." });
 
         const rows: ActionRowBuilder<ButtonBuilder>[] = [];
         for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -117,27 +119,57 @@ client.on("messageReactionAdd", async (reaction, user) => {
         const sent = await message.channel.send({ embeds: [embed], components: rows });
         translationEmbeds.set(message.id, sent.id);
 
-        // Odliczanie i odświeżanie przycisków
+        // Automatyczne usuwanie embeda po 60s
         let remaining = 60;
         const interval = setInterval(async () => {
             remaining -= 1;
-            if (remaining <= 0) {
-                clearInterval(interval);
-                try { await sent.delete(); } catch {}
-                translationEmbeds.delete(message.id);
-            } else {
-                const updatedEmbed = EmbedBuilder.from(embed).setFooter({ text: `${remaining}s remaining to click a button` });
-                try { await sent.edit({ embeds: [updatedEmbed], components: rows }); } catch {}
-            }
+            if (!sent.editable) return clearInterval(interval);
+            try {
+                const updatedEmbed = EmbedBuilder.from(embed).setFooter({ text: `You have ${remaining}s to click a button.` });
+                await sent.edit({ embeds: [updatedEmbed] });
+            } catch {}
         }, 1000);
 
-        // Odświeżanie przycisków co 10s, żeby nie wygasły
-        const refreshInterval = setInterval(async () => {
-            if (remaining <= 0) return clearInterval(refreshInterval);
-            try { await sent.edit({ components: rows }); } catch {}
+        setTimeout(async () => {
+            clearInterval(interval);
+            try { await sent.delete(); translationEmbeds.delete(message.id); } catch {}
+        }, 60000);
+
+        // Odświeżanie przycisków co 10 sekund
+        const buttonRefresh = setInterval(async () => {
+            try {
+                await sent.edit({ components: rows });
+            } catch { clearInterval(buttonRefresh); }
         }, 10000);
     }
 });
+
+async function translateText(text: string, target: string) {
+    // Primary: LibreTranslate
+    try {
+        const res = await fetch(LIBRE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
+        });
+        if (!res.ok) throw new Error(`Libre status: ${res.status}`);
+        const data = await res.json() as { translatedText?: string };
+        if (data.translatedText) return data.translatedText;
+    } catch (err) {
+        console.error("LibreTranslate error:", err);
+    }
+
+    // Fallback: Google Translate (unofficial)
+    try {
+        const googleRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(text)}`);
+        const googleData = await googleRes.json() as any[];
+        return googleData[0].map((part: any) => part[0]).join("");
+    } catch (err) {
+        console.error("Google Translate error:", err);
+    }
+
+    return "Translation failed.";
+}
 
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
@@ -157,34 +189,22 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
-    let translatedText = "Translation failed.";
-    try {
-        const res = await fetch(LIBRE_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ q: originalMessage.content, source: "auto", target: langCode, format: "text" }),
-        });
-        if (!res.ok) {
-            console.error("Libre status:", res.status);
-            translatedText = "Translation service error.";
-        } else {
-            const data = await res.json() as { translatedText?: string };
-            translatedText = data.translatedText ?? translatedText;
-        }
-    } catch (err) {
-        console.error("LibreTranslate error:", err);
-        translatedText = "Translation service unreachable.";
-    }
+    let translatedText = await translateText(originalMessage.content, langCode as string);
 
-    await interaction.reply({
-        embeds: [
-            new EmbedBuilder()
-                .setTitle(`Translation (${langCode.toUpperCase()})`)
-                .setDescription(translatedText)
-                .setColor("Green")
-        ],
-        ephemeral: true
-    });
+    try {
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(`Translation (${langCode.toUpperCase()})`)
+                    .setAuthor({ name: originalMessage.author.username, iconURL: originalMessage.author.displayAvatarURL() })
+                    .setDescription(translatedText)
+                    .setColor("Green")
+            ],
+            ephemeral: true
+        });
+    } catch (err) {
+        console.error("Interaction reply error:", err);
+    }
 });
 
 client.login(BOT_TOKEN);
