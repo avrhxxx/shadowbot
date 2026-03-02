@@ -49,10 +49,10 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed z tytułem NA GÓRZE i autorem w treści
+        // Embed z tytułem NA GÓRZE, nick + avatar w treści
         const embed = new EmbedBuilder()
-            .setTitle("🌍 Translation Panel") // Tytuł na górze
-            .setDescription(`**${message.author.username}**\n${message.content}`) // Autor i treść pod tytułem
+            .setTitle("🌍 Translation Panel")
+            .setDescription(`![avatar](${message.author.displayAvatarURL()}) **${message.author.username}**\n${message.content}`)
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
