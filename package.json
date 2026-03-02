@@ -10,9 +10,11 @@
   "dependencies": {
     "discord.js": "^14.11.0",
     "node-fetch": "^3.3.2",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "@types/uuid": "^9.0.0"
   }
 }
