@@ -22,20 +22,21 @@ import {
   updateEventStatuses,
   setDefaultChannel,
   getDefaultChannel,
+  generateParticipantsFile,
   EventObject
 } from "./eventService";
 
-// ======= PENDING CREATION STORAGE =======
+// ===== PENDING EVENT CREATION =====
 const pendingEvents: Map<string, Partial<EventObject>> = new Map();
 
-// ======= HANDLER =======
+// ===== EVENT INTERACTION HANDLER =====
 export async function handleEventInteraction(interaction: Interaction) {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const guildId = interaction.guildId!;
-  updateEventStatuses(guildId); // Aktualizacja statusów przy każdym wywołaniu
+  updateEventStatuses(guildId); // Aktualizacja statusów przy każdej interakcji
 
-  // ======= BUTTONS =======
+  // ===== BUTTONS =====
   if (interaction.isButton()) {
     switch (interaction.customId) {
 
@@ -90,16 +91,14 @@ export async function handleEventInteraction(interaction: Interaction) {
       // ----- LIST EVENTS -----
       case "event_list": {
         const events = getEvents(guildId);
-
         if (!events.length) {
           await interaction.reply({ content: "No events found.", ephemeral: true });
           return;
         }
 
         const embed = new EmbedBuilder().setTitle("📅 Events").setColor("Blue");
-
         for (const e of events) {
-          let statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "🔴" : "⚪";
+          const statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "🔴" : "⚪";
           embed.addFields({
             name: `${statusEmoji} ${e.name}`,
             value: `📆 ${e.day}-${e.month} ${e.hour}:${e.minute} | Participants: ${e.participants.length}`
@@ -107,6 +106,93 @@ export async function handleEventInteraction(interaction: Interaction) {
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+
+      // ----- SETTINGS -----
+      case "event_settings": {
+        // Pobieramy kanały guild
+        const channels = interaction.guild?.channels.cache
+          .filter(c => c.isTextBased())
+          .map(c => ({ label: c.name, value: c.id })) || [];
+
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_settings_select")
+          .setPlaceholder("Select default channel")
+          .addOptions(channels);
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
+        await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
+        return;
+      }
+
+      // ----- MANUAL REMINDER -----
+      case "event_manual_reminder": {
+        const channelId = getDefaultChannel(guildId);
+        if (!channelId) {
+          await interaction.reply({ content: "Default channel not set.", ephemeral: true });
+          return;
+        }
+
+        const activeEvents = getActiveEvents(guildId);
+        if (!activeEvents.length) {
+          await interaction.reply({ content: "No active events.", ephemeral: true });
+          return;
+        }
+
+        const channel = interaction.guild?.channels.cache.get(channelId) as TextChannel;
+        if (!channel) {
+          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
+          return;
+        }
+
+        for (const e of activeEvents) {
+          const embed = new EmbedBuilder()
+            .setTitle(`🔔 Reminder: ${e.name}`)
+            .setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
+          await channel.send({ embeds: [embed] });
+        }
+
+        await interaction.reply({ content: "Reminders sent.", ephemeral: true });
+        return;
+      }
+
+      // ----- CANCEL EVENT -----
+      case "event_cancel": {
+        const activeEvents = getActiveEvents(guildId);
+        if (!activeEvents.length) {
+          await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
+          return;
+        }
+
+        const options = activeEvents.map(e => ({ label: e.name, value: e.id }));
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_cancel_select")
+          .setPlaceholder("Select event to cancel")
+          .addOptions(options);
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select event to cancel:", components: [row], ephemeral: true });
+        return;
+      }
+
+      // ----- DOWNLOAD PARTICIPANTS -----
+      case "event_download": {
+        const pastEvents = getPastEvents(guildId);
+        if (!pastEvents.length) {
+          await interaction.reply({ content: "No past events found.", ephemeral: true });
+          return;
+        }
+
+        const options = pastEvents.map(e => ({ label: e.name, value: e.id }));
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_download_select")
+          .setPlaceholder("Select past event")
+          .addOptions(options);
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select past event to download participants:", components: [row], ephemeral: true });
         return;
       }
 
@@ -129,7 +215,7 @@ export async function handleEventInteraction(interaction: Interaction) {
     }
   }
 
-  // ======= MODAL SUBMIT =======
+  // ===== MODAL SUBMIT =====
   if (interaction.isModalSubmit()) {
     if (interaction.customId === "event_create_modal") {
       const name = interaction.fields.getTextInputValue("event_name");
@@ -138,21 +224,46 @@ export async function handleEventInteraction(interaction: Interaction) {
       const [hour, minute] = interaction.fields.getTextInputValue("event_time").split(":").map(Number);
       const reminderBefore = Number(interaction.fields.getTextInputValue("event_reminder"));
 
-      // Walidacja
-      if (day < 1 || day > 31 || month < 1 || month > 12 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || reminderBefore < 0) {
-        await interaction.reply({ content: "Invalid input values.", ephemeral: true });
-        return;
-      }
-
       const event = createEvent(guildId, name, day, month, hour, minute, reminderBefore);
       await interaction.reply({ content: `✅ Event **${name}** created.`, ephemeral: true });
       return;
     }
   }
 
-  // ======= SELECT MENU =======
+  // ===== SELECT MENU SUBMIT =====
   if (interaction.isStringSelectMenu()) {
-    // Tu pójdą np. ustawienia kanału, anulowanie eventów, pobieranie uczestników
-    // Będzie prosty routing wg customId np. event_settings_select / event_cancel_select
+    const [action] = interaction.customId.split("_");
+
+    switch (interaction.customId) {
+
+      case "event_settings_select": {
+        const channelId = interaction.values[0];
+        setDefaultChannel(guildId, channelId);
+        await interaction.reply({ content: `Default channel set.`, ephemeral: true });
+        return;
+      }
+
+      case "event_cancel_select": {
+        const eventId = interaction.values[0];
+        cancelEvent(guildId, eventId);
+        await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
+        return;
+      }
+
+      case "event_download_select": {
+        const eventId = interaction.values[0];
+        const filePath = generateParticipantsFile(guildId, eventId);
+        const channelId = getDefaultChannel(guildId);
+        const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
+
+        if (channel) {
+          await channel.send({ content: `📥 Participants file for event`, files: [filePath] });
+          await interaction.reply({ content: "File sent to default channel.", ephemeral: true });
+        } else {
+          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
+        }
+        return;
+      }
+    }
   }
 }
