@@ -17,14 +17,13 @@ const client = new Client({
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// Inicjalizacja modułów
-initTranslationModule(client);
-initModeratorPanel(client); // Moderation Panel + główny wybór przycisków
-initEventPanel(client);     // Event Panel i wszystkie interakcje z eventami
-
-// Poprawny event ready
-client.once("ready", () => {
+// Inicjalizacja modułów po zalogowaniu klienta
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user?.tag}`);
+
+    initTranslationModule(client);
+    initModeratorPanel(client); // tworzy Moderation Panel + główny wybór przycisków
+    initEventPanel(client);     // obsługuje Event Panel i wszystkie interakcje związane z eventami
 });
 
 client.login(BOT_TOKEN);
