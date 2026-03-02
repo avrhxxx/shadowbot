@@ -49,6 +49,7 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
+        // Embed z tytułem nad autorem
         const embed = new EmbedBuilder()
             .setTitle("🌍 Translation Panel")
             .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
@@ -94,6 +95,7 @@ export function initTranslationModule(client: Client) {
             } catch (err) { console.error("Interaction error:", err); }
         });
 
+        // Po 60s wyłączamy przyciski i usuwamy embed
         collector.on("end", async () => {
             const disabledRows = rows.map(row => { row.components.forEach(c => c.setDisabled(true)); return row; });
             try {
@@ -105,28 +107,33 @@ export function initTranslationModule(client: Client) {
         });
     });
 
+    // Funkcja tłumaczenia z rotacją Libre ↔ Google
     async function translateText(text: string, target: string): Promise<string> {
-        try {
-            const res = await fetch(LIBRE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
-            });
-            if (res.ok) {
-                const data = (await res.json()) as Partial<LibreResponse>;
-                if (typeof data.translatedText === "string") return data.translatedText;
+        const servers: ("libre" | "google")[] = ["libre", "google"];
+        for (const server of servers) {
+            if (server === "libre") {
+                try {
+                    const res = await fetch(LIBRE_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
+                    });
+                    if (res.ok) {
+                        const data = (await res.json()) as Partial<LibreResponse>;
+                        if (typeof data.translatedText === "string") return data.translatedText;
+                    }
+                } catch {}
+            } else if (server === "google") {
+                try {
+                    const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
+                    const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
+                    const data = (await res.json()) as GoogleResponse;
+                    if (Array.isArray(data) && Array.isArray(data[0]) && Array.isArray(data[0][0]) && typeof data[0][0][0] === "string") {
+                        return data[0][0][0];
+                    }
+                } catch {}
             }
-        } catch {}
-
-        try {
-            const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
-            const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
-            const data = (await res.json()) as GoogleResponse;
-            if (Array.isArray(data) && Array.isArray(data[0]) && Array.isArray(data[0][0]) && typeof data[0][0][0] === "string") {
-                return data[0][0][0];
-            }
-        } catch {}
-
+        }
         return "Translation failed.";
     }
 }
