@@ -5,7 +5,8 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder
+    EmbedBuilder,
+    Interaction
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -26,7 +27,8 @@ const client = new Client({
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
+const LIBRE_URL =
+    process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
@@ -37,7 +39,7 @@ const LANGUAGES = [
 ];
 
 // -------------------------
-// Reaction queue (delayed add to avoid API spam)
+// Reaction Queue (delayed reacts)
 // -------------------------
 const reactionQueue: string[] = [];
 let processingQueue = false;
@@ -71,38 +73,34 @@ async function processReactionQueue() {
 // -------------------------
 // Ready
 // -------------------------
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
 // -------------------------
-// Auto reaction to messages
+// Auto Reaction
 // -------------------------
 client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.inGuild()) return;
+
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
 
 // -------------------------
-// Translation Panel map
+// Reaction Click → Show Translation Panel
 // -------------------------
-const translationPanels = new Map<string, string>();
+const translationPanels = new Map<string, string>(); // messageId → panelId
 
-// -------------------------
-// Handle reaction click
-// -------------------------
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
-
     if (reaction.emoji.name !== "🌐" || !reaction.message.inGuild()) return;
 
     const message = reaction.message;
-
-    // If panel already exists, fetch it
     let existingPanel;
+
     if (translationPanels.has(message.id)) {
         try {
             existingPanel = await message.channel.messages.fetch(
@@ -111,72 +109,60 @@ client.on("messageReactionAdd", async (reaction, user) => {
         } catch {}
     }
 
-    if (!existingPanel) {
-        // Build embed with author info
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: message.author.username,
-                iconURL: message.author.displayAvatarURL()
-            })
-            .setTitle("Translation Panel")
-            .setDescription(`Click a flag to translate:\n\n"${message.content}"`)
-            .setColor("Blue")
-            .setFooter({ text: "You have 30s to click a button." });
+    if (existingPanel) return; // panel już jest
 
-        // Build button rows
-        const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-        for (let i = 0; i < LANGUAGES.length; i += 5) {
-            const row = new ActionRowBuilder<ButtonBuilder>();
-            for (const lang of LANGUAGES.slice(i, i + 5)) {
-                row.addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`translate_${message.id}_${lang.code}`)
-                        .setLabel(lang.label)
-                        .setEmoji(lang.emoji)
-                        .setStyle(ButtonStyle.Primary)
-                );
-            }
-            rows.push(row);
+    // Embed
+    const embed = new EmbedBuilder()
+        .setTitle("Translation Panel (Beta)")
+        .setAuthor({
+            name: message.author.username,
+            iconURL: message.author.displayAvatarURL()
+        })
+        .setDescription(`"${message.content}"`)
+        .setColor("Blue")
+        .setFooter({ text: `You have 30 seconds to click a button (message will expire)` });
+
+    // Buttons
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    for (let i = 0; i < LANGUAGES.length; i += 5) {
+        const row = new ActionRowBuilder<ButtonBuilder>();
+        for (const lang of LANGUAGES.slice(i, i + 5)) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`translate_${message.id}_${lang.code}`)
+                    .setLabel(lang.label)
+                    .setEmoji(lang.emoji)
+                    .setStyle(ButtonStyle.Primary)
+            );
         }
-
-        // Send panel as reply
-        const panelMessage = await message.reply({
-            embeds: [embed],
-            components: rows
-        });
-
-        translationPanels.set(message.id, panelMessage.id);
-
-        // Timer to remove panel after 30s
-        let remaining = 30;
-        const timer = setInterval(async () => {
-            remaining--;
-            if (remaining <= 0) {
-                clearInterval(timer);
-                try { await panelMessage.delete(); } catch {}
-                translationPanels.delete(message.id);
-            } else {
-                embed.setFooter({ text: `You have ${remaining}s to click a button.` });
-                try { await panelMessage.edit({ embeds: [embed] }); } catch {}
-            }
-        }, 1000);
+        rows.push(row);
     }
+
+    const sent = await message.channel.send({ embeds: [embed], components: rows });
+    translationPanels.set(message.id, sent.id);
+
+    // Auto-delete after 30s
+    setTimeout(async () => {
+        try {
+            await sent.delete().catch(() => {});
+            translationPanels.delete(message.id);
+        } catch {}
+    }, 30_000);
 });
 
 // -------------------------
-// Handle button interactions
+// Button Interaction → Translate
 // -------------------------
-client.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
     if (!interaction.customId.startsWith("translate_")) return;
 
-    // Defer reply to avoid unknown interaction
-    await interaction.deferReply({ ephemeral: true });
+    const parts = interaction.customId.split("_");
+    const messageId = parts[1];
+    const langCode = parts[2];
 
-    const [, messageId, langCode] = interaction.customId.split("_");
-
-    if (!interaction.channel?.isTextBased()) {
-        await interaction.editReply({ content: "Channel not supported." });
+    if (!interaction.channel || !interaction.channel.isTextBased()) {
+        await interaction.reply({ content: "Channel not supported.", ephemeral: true });
         return;
     }
 
@@ -184,12 +170,11 @@ client.on("interactionCreate", async (interaction) => {
     try {
         originalMessage = await interaction.channel.messages.fetch(messageId);
     } catch {
-        await interaction.editReply({ content: "Original message not found." });
+        await interaction.reply({ content: "Original message not found.", ephemeral: true });
         return;
     }
 
     let translatedText = "Translation failed.";
-
     try {
         const res = await fetch(LIBRE_URL, {
             method: "POST",
@@ -214,16 +199,19 @@ client.on("interactionCreate", async (interaction) => {
         translatedText = "Translation service unreachable.";
     }
 
-    const embed = new EmbedBuilder()
-        .setAuthor({
-            name: originalMessage.author.username,
-            iconURL: originalMessage.author.displayAvatarURL()
-        })
-        .setTitle(`Translation (${langCode.toUpperCase()})`)
-        .setDescription(`"${translatedText}"`)
-        .setColor("Green");
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle(`Translation (${langCode.toUpperCase()})`)
+                .setAuthor({
+                    name: originalMessage.author.username,
+                    iconURL: originalMessage.author.displayAvatarURL()
+                })
+                .setDescription(`"${translatedText}"`)
+                .setColor("Green")
+        ],
+        ephemeral: true
+    });
 });
 
 // -------------------------
