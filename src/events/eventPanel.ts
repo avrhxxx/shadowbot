@@ -26,9 +26,6 @@ import {
   EventObject
 } from "./eventService";
 
-// ===== PENDING EVENT CREATION =====
-const pendingEvents: Map<string, Partial<EventObject>> = new Map();
-
 // ===== EVENT HANDLER =====
 export async function handleEventInteraction(interaction: Interaction) {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
@@ -121,7 +118,6 @@ export async function handleEventInteraction(interaction: Interaction) {
           .addOptions(channels);
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-
         await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
         return;
       }
