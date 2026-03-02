@@ -1,7 +1,7 @@
 // src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { handleEventButton } from "../events/eventPanel"; // logika Event Menu
-import { handleHelpButton } from "./HelpPanel"; // logika Help
+import { handleEventButton } from "../events/eventPanel"; // logika przycisków event
+import { handleHelpButton } from "./HelpPanel"; // logika help, np. opis przycisków
 
 export async function initModeratorPanel(client: Client) {
     client.once("clientReady", async () => {
@@ -29,7 +29,7 @@ export async function initModeratorPanel(client: Client) {
 
         if (existingPanel) return;
 
-        // Tworzymy panel z przyciskami głównymi
+        // Tworzymy główny panel
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
                 new ButtonBuilder()
@@ -66,17 +66,17 @@ export async function initModeratorPanel(client: Client) {
                 break;
 
             case "points_menu":
-                // placeholder Points Menu
-                await interaction.reply({ content: "Points Menu not implemented yet.", ephemeral: true });
+                // placeholder
+                await interaction.reply({ content: "Points menu not implemented yet.", ephemeral: true });
                 break;
 
             case "translator_menu":
-                // placeholder Translator Menu
-                await interaction.reply({ content: "Translator Menu not implemented yet.", ephemeral: true });
+                // placeholder
+                await interaction.reply({ content: "Translator menu not implemented yet.", ephemeral: true });
                 break;
 
             case "help_menu":
-                await handleHelpButton(interaction); // wyświetlenie pomocy
+                await handleHelpButton(interaction); // np. wyświetlenie prostego opisu przycisków
                 break;
         }
     });
