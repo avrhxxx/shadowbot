@@ -1,7 +1,7 @@
+// src/index.ts
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./modules/ModeratorPanel";
-import { initEventPanel } from "./events/eventPanel";
 
 const client = new Client({
   intents: [
@@ -17,13 +17,13 @@ if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // Wywołujemy moduły dopiero po zalogowaniu
-client.once("ready", async () => {
+client.once("clientReady", () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
   // Root panel i moduły
   initTranslationModule(client); // moduł placeholder
-  await initModeratorPanel(client); // tworzy kanał + root panel + obsługa przycisków
-  initEventPanel(client);         // inicjalizacja EventPanel – nasłuchuje customId event_*
+  initModeratorPanel(client);     // tworzy kanał + root panel + obsługa przycisków
+  // Event Panel NIE jest inicjalizowany tutaj, tylko po kliknięciu przycisku "Event Menu"
 });
 
 client.login(BOT_TOKEN);
