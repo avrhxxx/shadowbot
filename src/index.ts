@@ -61,8 +61,8 @@ async function translateMessage(text: string, language: string): Promise<string>
             body: JSON.stringify({ q: text, source: "auto", target: targetLang, format: "text" })
         });
 
-        // TS poprawka: jawne typowanie odpowiedzi
-        const data: { translatedText?: string } = await response.json();
+        // TS poprawka: jawne castowanie
+        const data = (await response.json()) as { translatedText?: string };
         return data.translatedText ?? `[${language}] ${text}`;
     } catch (err) {
         console.error("LibreTranslate error:", err);
