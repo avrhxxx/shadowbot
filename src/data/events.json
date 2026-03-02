@@ -1,6 +1,19 @@
 {
-  "events": [],
-  "config": {
-    "defaultChannelId": null
+  "guildId": {
+    "events": [
+      {
+        "id": "uuid",
+        "name": "Event Name",
+        "day": 15,
+        "month": 3,
+        "hour": 20,
+        "minute": 0,
+        "reminderBefore": 30,
+        "status": "ACTIVE",
+        "participants": [],
+        "createdAt": 1678890000000,
+        "reminderSent": false
+      }
+    ]
   }
 }
