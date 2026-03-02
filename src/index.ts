@@ -1,8 +1,17 @@
-import { Client, GatewayIntentBits, EmbedBuilder, Message, MessageReaction, User, Partials, TextChannel, PartialUser, PartialMessage, PartialMessageReaction } from "discord.js";
-import dotenv from "dotenv";
-import DeepL from "deepl-node";
-
-dotenv.config();
+import {
+    Client,
+    GatewayIntentBits,
+    EmbedBuilder,
+    Message,
+    MessageReaction,
+    User,
+    Partials,
+    TextChannel,
+    PartialUser,
+    PartialMessage,
+    PartialMessageReaction
+} from "discord.js";
+import fetch from "node-fetch";
 
 const client = new Client({
     intents: [
@@ -14,14 +23,13 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User]
 });
 
-// DeepL translator
-const translator = new DeepL.Translator(process.env.DEEPL_API_KEY!);
-
 type Translation = { language: string; text: string };
 type TranslationData = { embedMessage: Message | null; translations: Map<string, Translation>; currentIndex: number };
 
+// Przechowuje oryginalne wiadomości i tłumaczenia
 const translationMessages = new Map<string, TranslationData>();
 
+// Mapowanie emoji na języki
 function getLanguageFromEmoji(emoji: string): string | null {
     const map: Record<string, string> = {
         "🇵🇱": "Polish",
@@ -34,17 +42,33 @@ function getLanguageFromEmoji(emoji: string): string | null {
     return map[emoji] || null;
 }
 
+// Funkcja tłumaczenia przy użyciu LibreTranslate
 async function translateMessage(text: string, language: string): Promise<string> {
     try {
-        const targetLang = language.slice(0, 2).toUpperCase(); // PL, DE, EN...
-        const result = await translator.translateText(text, undefined, targetLang);
-        return result.text;
+        const targetMap: Record<string, string> = {
+            "Polish": "pl",
+            "German": "de",
+            "Russian": "ru",
+            "French": "fr",
+            "Spanish": "es",
+            "English": "en"
+        };
+        const targetLang = targetMap[language] || "en";
+
+        const response = await fetch("https://libretranslate.com/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: text, source: "auto", target: targetLang, format: "text" })
+        });
+        const data = await response.json();
+        return data.translatedText ?? `[${language}] ${text}`;
     } catch (err) {
-        console.error("Błąd tłumaczenia:", err);
+        console.error("LibreTranslate error:", err);
         return `[${language}] ${text}`;
     }
 }
 
+// Budowanie embeda z aktualnym tłumaczeniem
 function buildEmbed(original: Message, translations: Translation[], currentIndex: number): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setTitle("Translations")
@@ -66,13 +90,12 @@ client.on("messageCreate", (message) => {
     translationMessages.set(message.id, { embedMessage: null, translations: new Map(), currentIndex: 0 });
 });
 
-// Listener z trzema parametrami dla TS + partial handling
+// Listener reakcji z obsługą partiali
 client.on(
     "messageReactionAdd",
     async (
         reaction: MessageReaction | PartialMessageReaction,
-        user: User | PartialUser,
-        _event: any
+        user: User | PartialUser
     ) => {
         try {
             if (user.partial) await user.fetch();
@@ -81,13 +104,12 @@ client.on(
             if (reaction.partial) await reaction.fetch();
             const msg = reaction.message;
             if (msg.partial) await msg.fetch();
-
             if (!msg || !msg.id || !msg.channel) return;
 
             const data = translationMessages.get(msg.id);
             if (!data) return;
 
-            // Przewijanie embedów
+            // Obsługa przewijania
             if (reaction.emoji?.name === "⬅️") {
                 if (data.translations.size === 0) return;
                 data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
@@ -128,4 +150,5 @@ client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// Logowanie bota
+client.login(process.env.BOT_TOKEN);
