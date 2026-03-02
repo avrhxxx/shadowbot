@@ -1,6 +1,6 @@
-// src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction, ButtonInteraction } from "discord.js";
 import { initEventPanel } from "../events/eventPanel";
+import { handleHelpButton } from "./HelpPanel";
 
 export async function initModeratorPanel(client: Client) {
   client.once("clientReady", async () => {
@@ -61,7 +61,7 @@ export async function initModeratorPanel(client: Client) {
     switch (interaction.customId) {
       case "event_menu":
         // Delegujemy EventPanel, który wygeneruje własne przyciski
-        await initEventPanel(client, interaction);
+        await initEventPanel(client, interaction as ButtonInteraction);
         break;
 
       case "points_menu":
@@ -73,7 +73,7 @@ export async function initModeratorPanel(client: Client) {
         break;
 
       case "help_menu":
-        await interaction.reply({ content: "Help menu not implemented yet.", ephemeral: true });
+        await handleHelpButton(interaction);
         break;
     }
   });
