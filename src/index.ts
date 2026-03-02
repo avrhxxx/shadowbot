@@ -1,127 +1,125 @@
-import { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, Message } from "discord.js";
+import { Client, GatewayIntentBits, Partials, MessageReaction, User, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, EmbedBuilder } from "discord.js";
 import fetch from "node-fetch";
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+});
 
-// Środowiskowe
-const TOKEN = process.env.BOT_TOKEN;
-const LIBRE_API = process.env.LIBRE_TRANSLATE_API || "https://libretranslate.de/translate";
-
-// Lista dostępnych języków
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate.de/translate"; // endpoint LibreTranslate
 const LANGUAGES = [
-  { code: "en", emoji: "🇬🇧", name: "English" },
-  { code: "pl", emoji: "🇵🇱", name: "Polish" },
-  { code: "de", emoji: "🇩🇪", name: "German" },
-  { code: "fr", emoji: "🇫🇷", name: "French" },
-  { code: "es", emoji: "🇪🇸", name: "Spanish" },
+    { code: "en", label: "English", emoji: "🇬🇧" },
+    { code: "pl", label: "Polish", emoji: "🇵🇱" },
+    { code: "de", label: "German", emoji: "🇩🇪" },
+    { code: "fr", label: "French", emoji: "🇫🇷" },
+    { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-// Pomocnicza funkcja tłumaczenia
-async function translateText(text: string, targetLang: string) {
-  const res = await fetch(LIBRE_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ q: text, source: "auto", target: targetLang, format: "text" }),
-  });
-  const data = await res.json();
-  return data.translatedText as string;
-}
+client.on("ready", () => {
+    console.log(`Logged in as ${client.user?.tag}`);
+});
 
-// Obsługa kliknięcia przycisku "Translate"
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isButton()) return;
+// Map do śledzenia embedów do każdej wiadomości
+const translationEmbeds = new Map<string, string>(); // messageId -> embedMessageId
 
-  if (interaction.customId === "translate_button") {
-    const message = interaction.message;
+// 1️⃣ Dodawanie reakcji do każdej wiadomości
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    try {
+        await message.react("🌐"); // tutaj emoji, które użytkownik kliknie, żeby poprosić o tłumaczenie
+    } catch (err) {
+        console.error("Failed to add reaction:", err);
+    }
+});
 
-    if (!("content" in message)) {
-      await interaction.reply({ content: "Cannot translate this message.", ephemeral: true });
-      return;
+// 2️⃣ Kliknięcie reakcji – tworzymy lub edytujemy publiczny embed z przyciskami językowymi
+client.on("messageReactionAdd", async (reaction: MessageReaction, user: User) => {
+    if (user.bot) return;
+    if (!reaction.message.partial) await reaction.message.fetch();
+    if (reaction.emoji.name !== "🌐") return;
+
+    const messageId = reaction.message.id;
+    let embedMessage = undefined;
+
+    // sprawdzamy, czy embed już istnieje
+    if (translationEmbeds.has(messageId)) {
+        const embedId = translationEmbeds.get(messageId)!;
+        try {
+            embedMessage = await reaction.message.channel.messages.fetch(embedId);
+        } catch {}
     }
 
-    // ephemeral embed z loaderem
-    const embed = new EmbedBuilder()
-      .setTitle("Translation")
-      .setDescription("Translating… ⏳")
-      .setColor("Blue");
+    // Tworzymy embed jeśli nie istnieje
+    if (!embedMessage) {
+        const embed = new EmbedBuilder()
+            .setTitle("Translation Panel")
+            .setDescription(`Click a flag to translate the message:\n"${reaction.message.content}"`)
+            .setColor("Blue");
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+        const row = new ActionRowBuilder<ButtonBuilder>();
+        for (const lang of LANGUAGES) {
+            const btn = new ButtonBuilder()
+                .setCustomId(`translate_${messageId}_${lang.code}`)
+                .setLabel(lang.label)
+                .setEmoji(lang.emoji)
+                .setStyle(ButtonStyle.Primary);
+            row.addComponents(btn);
+        }
 
-    // Domyślnie tłumaczymy na język klikającego lub polski
-    const translated = await translateText(message.content, "pl");
+        const sent = await reaction.message.channel.send({ embeds: [embed], components: [row] });
+        translationEmbeds.set(messageId, sent.id);
+    }
+});
 
-    const finalEmbed = new EmbedBuilder()
-      .setTitle("Translation")
-      .setColor("Blue")
-      .addFields(
-        { name: "Original", value: message.content },
-        { name: "Translated (Polish)", value: translated }
-      )
-      .setFooter({ text: "Click a flag to change language" });
+// 3️⃣ Kliknięcie przycisku – tłumaczenie wiadomości i ephemeral reply
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
 
-    // Przyciski z flagami
-    const buttons = new ActionRowBuilder<ButtonBuilder>();
-    LANGUAGES.forEach(lang => {
-      buttons.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`lang_${lang.code}_${interaction.user.id}`)
-          .setLabel(lang.emoji)
-          .setStyle(ButtonStyle.Primary)
-      );
+    const customId = interaction.customId; // format: translate_messageId_lang
+    if (!customId.startsWith("translate_")) return;
+
+    const parts = customId.split("_");
+    const messageId = parts[1];
+    const langCode = parts[2];
+
+    let originalMessage;
+    try {
+        originalMessage = await interaction.channel?.messages.fetch(messageId);
+        if (!originalMessage) throw new Error("Original message not found");
+    } catch {
+        await interaction.reply({ content: "Original message not found.", ephemeral: true });
+        return;
+    }
+
+    // Wywołanie LibreTranslate
+    let translatedText = "Translation failed.";
+    try {
+        const res = await fetch(LIBRE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                q: originalMessage.content,
+                source: "auto",
+                target: langCode,
+                format: "text"
+            })
+        });
+        const data = await res.json();
+        translatedText = (data.translatedText as string) || translatedText;
+    } catch (err) {
+        console.error("LibreTranslate error:", err);
+    }
+
+    await interaction.reply({
+        content: `**Translation (${langCode.toUpperCase()}):**\n${translatedText}`,
+        ephemeral: true
     });
-
-    await interaction.editReply({ embeds: [finalEmbed], components: [buttons] });
-  }
 });
 
-// Obsługa kliknięcia flagi w ephemeral embed
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isButton()) return;
-
-  if (interaction.customId.startsWith("lang_")) {
-    const parts = interaction.customId.split("_");
-    const langCode = parts[1];
-    const userId = parts[2];
-
-    // Tylko właściciel ephemeral może zmieniać język
-    if (interaction.user.id !== userId) {
-      await interaction.reply({ content: "This is not your translation session.", ephemeral: true });
-      return;
-    }
-
-    const message = interaction.message;
-    const original = message.embeds[0].fields?.find(f => f.name === "Original")?.value;
-    if (!original) {
-      await interaction.reply({ content: "Original message not found.", ephemeral: true });
-      return;
-    }
-
-    await interaction.deferUpdate();
-
-    const translated = await translateText(original, langCode);
-
-    const updatedEmbed = EmbedBuilder.from(message.embeds[0])
-      .spliceFields(1, 1, { name: `Translated (${langCode.toUpperCase()})`, value: translated });
-
-    await interaction.editReply({ embeds: [updatedEmbed] });
-  }
-});
-
-// Nasłuchiwanie wiadomości – dodajemy przycisk Translate pod każdą wiadomością
-client.on("messageCreate", async message => {
-  if (message.author.bot) return;
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("translate_button")
-      .setLabel("Translate")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  await message.react("🟢"); // przykładowa reakcja, nie jest wymagana
-  // nie wysyłamy embed do wszystkich, bo przycisk działa per wiadomość
-  // opcjonalnie można dodać row z buttonem pod wiadomość, ale Discord API nie pozwala automatycznie dodawać button do istniejącej wiadomości innej osoby
-});
-
-// Logowanie
-client.login(TOKEN);
+client.login(BOT_TOKEN);
