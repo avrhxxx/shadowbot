@@ -1,137 +1,144 @@
 // src/modules/EventModule.ts
-import { Client, Message } from "discord.js";
+import { Client, Message, TextChannel } from "discord.js";
 import fs from "fs";
 import path from "path";
 
-const DATA_PATH = path.join(__dirname, "../../data/events.json");
+interface EventParticipant {
+    nick: string;
+    present: boolean;
+}
 
-interface Event {
+interface EventData {
     id: string;
+    alliance: string;
     name: string;
-    guild: string;
-    time: string;
-    participants: string[];
+    timestamp: number;
+    participants: EventParticipant[];
 }
 
-interface EventsData {
-    events: Event[];
-}
+const DATA_PATH = path.join(__dirname, "../data/events.json");
 
-function readEvents(): EventsData {
+// Wczytanie istniejących eventów
+function loadEvents(): EventData[] {
     try {
-        if (!fs.existsSync(DATA_PATH)) {
-            fs.writeFileSync(DATA_PATH, JSON.stringify({ events: [] }, null, 2));
-        }
         const raw = fs.readFileSync(DATA_PATH, "utf-8");
-        return JSON.parse(raw) as EventsData;
-    } catch (err) {
-        console.error("Failed to read events.json:", err);
-        return { events: [] };
+        return JSON.parse(raw);
+    } catch {
+        return [];
     }
 }
 
-function writeEvents(data: EventsData) {
-    try {
-        fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-    } catch (err) {
-        console.error("Failed to write events.json:", err);
-    }
+// Zapis eventów
+function saveEvents(events: EventData[]) {
+    fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
 export function initEventModule(client: Client) {
     client.on("messageCreate", async (message: Message) => {
-        if (message.author.bot || !message.inGuild()) return;
+        if (!message.guild || message.author.bot) return;
 
-        const content = message.content.trim();
-        const args = content.split(/\s+/);
+        const args = message.content.trim().split(/\s+/);
         const command = args.shift()?.toLowerCase();
 
-        if (command === "!event") {
-            const sub = args.shift()?.toLowerCase();
+        if (!command) return;
 
-            if (sub === "create") {
-                const guild = args.shift();
-                const name = args.join(" ");
+        // Tworzenie eventu: !event create <alliance> <name> <YYYY-MM-DD_HH:MM>
+        if (command === "!event" && args[0]?.toLowerCase() === "create") {
+            const [ , alliance, name, datetime ] = args;
+            if (!alliance || !name || !datetime) {
+                return message.channel.send("Usage: !event create <alliance> <name> <YYYY-MM-DD_HH:MM>");
+            }
 
-                if (!guild || !name) {
-                    message.reply("Usage: !event create <guild> <name>");
-                    return;
-                }
+            const timestamp = new Date(datetime.replace("_","T")).getTime();
+            if (isNaN(timestamp)) return message.channel.send("Invalid date format.");
 
-                const eventsData = readEvents();
-                const id = `event${Date.now()}`;
+            const events = loadEvents();
+            const id = `event_${Date.now()}`;
+            events.push({ id, alliance, name, timestamp, participants: [] });
+            saveEvents(events);
 
-                const newEvent: Event = {
-                    id,
-                    name,
-                    guild,
-                    time: new Date().toISOString(),
-                    participants: []
-                };
+            message.channel.send(`Event **${name}** for alliance **${alliance}** created!`);
 
-                eventsData.events.push(newEvent);
-                writeEvents(eventsData);
+            // Przypomnienia 1h i 10min przed
+            const now = Date.now();
+            const channel = message.channel as TextChannel;
 
-                message.reply(`Event "${name}" created for guild "${guild}"!`);
-            } else if (sub === "add") {
-                const guild = args.shift();
-                const nick = args.join(" ");
+            const scheduleReminder = (delay: number, text: string) => {
+                setTimeout(() => {
+                    channel.send(text);
+                }, delay);
+            };
 
-                if (!guild || !nick) {
-                    message.reply("Usage: !event add <guild> <nick>");
-                    return;
-                }
+            const delay1h = timestamp - now - 3600_000;
+            if (delay1h > 0) scheduleReminder(delay1h, `Reminder: Event **${name}** starts in 1 hour!`);
 
-                const eventsData = readEvents();
-                const event = eventsData.events.find(e => e.guild === guild);
-                if (!event) {
-                    message.reply(`No event found for guild "${guild}".`);
-                    return;
-                }
+            const delay10min = timestamp - now - 600_000;
+            if (delay10min > 0) scheduleReminder(delay10min, `Reminder: Event **${name}** starts in 10 minutes!`);
+        }
 
-                if (!event.participants.includes(nick)) {
-                    event.participants.push(nick);
-                    writeEvents(eventsData);
-                    message.reply(`Added ${nick} to event "${event.name}"`);
-                } else {
-                    message.reply(`${nick} is already in the event.`);
-                }
-            } else if (sub === "remove") {
-                const guild = args.shift();
-                const nick = args.join(" ");
+        // Dodawanie uczestników: !event add <eventID> <nick>
+        if (command === "!event" && args[0]?.toLowerCase() === "add") {
+            const [ , eventId, nick ] = args;
+            if (!eventId || !nick) return message.channel.send("Usage: !event add <eventID> <nick>");
 
-                if (!guild || !nick) {
-                    message.reply("Usage: !event remove <guild> <nick>");
-                    return;
-                }
+            const events = loadEvents();
+            const event = events.find(e => e.id === eventId);
+            if (!event) return message.channel.send("Event not found.");
 
-                const eventsData = readEvents();
-                const event = eventsData.events.find(e => e.guild === guild);
-                if (!event) {
-                    message.reply(`No event found for guild "${guild}".`);
-                    return;
-                }
-
-                event.participants = event.participants.filter(p => p !== nick);
-                writeEvents(eventsData);
-                message.reply(`Removed ${nick} from event "${event.name}"`);
-            } else if (sub === "list") {
-                const guild = args.shift();
-                if (!guild) {
-                    message.reply("Usage: !event list <guild>");
-                    return;
-                }
-
-                const eventsData = readEvents();
-                const event = eventsData.events.find(e => e.guild === guild);
-                if (!event) {
-                    message.reply(`No event found for guild "${guild}".`);
-                    return;
-                }
-
-                message.reply(`Participants for "${event.name}": ${event.participants.join(", ") || "none"}`);
+            if (!event.participants.some(p => p.nick === nick)) {
+                event.participants.push({ nick, present: true });
+                saveEvents(events);
+                message.channel.send(`${nick} added to event **${event.name}**.`);
             } else {
-                message.reply("Unknown subcommand. Use create/add/remove/list.");
+                message.channel.send(`${nick} is already in this event.`);
+            }
+        }
+
+        // Usuwanie uczestników: !event remove <eventID> <nick>
+        if (command === "!event" && args[0]?.toLowerCase() === "remove") {
+            const [ , eventId, nick ] = args;
+            if (!eventId || !nick) return message.channel.send("Usage: !event remove <eventID> <nick>");
+
+            const events = loadEvents();
+            const event = events.find(e => e.id === eventId);
+            if (!event) return message.channel.send("Event not found.");
+
+            event.participants = event.participants.filter(p => p.nick !== nick);
+            saveEvents(events);
+            message.channel.send(`${nick} removed from event **${event.name}**.`);
+        }
+
+        // Lista uczestników: !event list <eventID>
+        if (command === "!event" && args[0]?.toLowerCase() === "list") {
+            const [ , eventId ] = args;
+            if (!eventId) return message.channel.send("Usage: !event list <eventID>");
+
+            const events = loadEvents();
+            const event = events.find(e => e.id === eventId);
+            if (!event) return message.channel.send("Event not found.");
+
+            const present = event.participants.filter(p => p.present).map(p => p.nick);
+            const absent = event.participants.filter(p => !p.present).map(p => p.nick);
+
+            message.channel.send(`**${event.name}** Participants:\nPresent: ${present.join(", ") || "none"}\nAbsent: ${absent.join(", ") || "none"}`);
+        }
+
+        // Oznaczanie nieobecnych: !event markabsent <eventID> <nick>
+        if (command === "!event" && args[0]?.toLowerCase() === "markabsent") {
+            const [ , eventId, nick ] = args;
+            if (!eventId || !nick) return message.channel.send("Usage: !event markabsent <eventID> <nick>");
+
+            const events = loadEvents();
+            const event = events.find(e => e.id === eventId);
+            if (!event) return message.channel.send("Event not found.");
+
+            const participant = event.participants.find(p => p.nick === nick);
+            if (participant) {
+                participant.present = false;
+                saveEvents(events);
+                message.channel.send(`${nick} marked as absent for event **${event.name}**.`);
+            } else {
+                message.channel.send(`${nick} is not part of this event.`);
             }
         }
     });
