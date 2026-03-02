@@ -11,31 +11,8 @@ import {
     TextInputStyle,
     Interaction
 } from "discord.js";
-import fs from "fs";
-import path from "path";
+import { addEvent, getUpcomingEvents } from "./eventService";
 
-interface EventData {
-    id: string;
-    name: string;
-    timestamp: number;
-    createdBy: string;
-}
-
-const DATA_PATH = path.join(__dirname, "../data/events.json");
-
-function loadEvents(): EventData[] {
-    try {
-        return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
-    } catch {
-        return [];
-    }
-}
-
-function saveEvents(events: EventData[]) {
-    fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
-}
-
-// Pending selections per user
 const pendingEvents = new Map<string, { day?: string; month?: string; userId: string }>();
 
 export async function initEventPanel(client: Client) {
@@ -166,10 +143,7 @@ export async function initEventPanel(client: Client) {
             const hourStr = interaction.fields.getTextInputValue("event_time"); // HH:MM
 
             const [hour, minute] = hourStr.split(":").map(Number);
-            if (
-                isNaN(hour) || isNaN(minute) ||
-                hour < 0 || hour > 23 || minute < 0 || minute > 59
-            ) {
+            if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
                 await interaction.reply({ content: "Invalid time format. Use HH:MM", ephemeral: true });
                 return;
             }
@@ -185,7 +159,6 @@ export async function initEventPanel(client: Client) {
                 minute
             ).getTime();
 
-            // Jeśli data już minęła → ustaw kolejny rok
             if (timestamp < Date.now()) {
                 year += 1;
                 timestamp = new Date(
@@ -197,40 +170,17 @@ export async function initEventPanel(client: Client) {
                 ).getTime();
             }
 
-            // Zapis do JSON
-            const events = loadEvents();
             const id = Date.now().toString();
-
-            events.push({
-                id,
-                name,
-                timestamp,
-                createdBy: userId
-            });
-
-            saveEvents(events);
+            addEvent({ id, name, timestamp, createdBy: userId });
 
             pendingEvents.delete(userId);
 
-            // Wyślij panel eventu
             const row = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`add_${id}`)
-                        .setLabel("Add")
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`remove_${id}`)
-                        .setLabel("Remove")
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`absent_${id}`)
-                        .setLabel("Mark Absent")
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId(`list_${id}`)
-                        .setLabel("List")
-                        .setStyle(ButtonStyle.Success)
+                    new ButtonBuilder().setCustomId(`add_${id}`).setLabel("Add").setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`remove_${id}`).setLabel("Remove").setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`absent_${id}`).setLabel("Mark Absent").setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`list_${id}`).setLabel("List").setStyle(ButtonStyle.Success)
                 );
 
             await interaction.reply({
