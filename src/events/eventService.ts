@@ -1,79 +1,81 @@
-// src/events/eventService.ts
-import { eventStorage, StoredEvent } from "./eventStorage";
-import { randomUUID } from "crypto";
+import { TextChannel, ButtonInteraction } from "discord.js";
+import { loadEvents, saveEvents } from "./eventStorage";
 
-export const eventService = {
-  createEvent(data: {
+interface EventData {
+    id: string;
     title: string;
-    description: string;
+    description?: string;
     timestamp: number;
-    channelId: string;
-  }): StoredEvent {
-    const newEvent: StoredEvent = {
-      id: randomUUID(),
-      title: data.title,
-      description: data.description,
-      timestamp: data.timestamp,
-      channelId: data.channelId,
-      participants: [],
-      createdAt: Date.now(),
-      cancelled: false,
+    participants: string[];
+    createdBy: string;
+}
+
+// Generate simple ID
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+}
+
+/* ===== CREATE EVENT ===== */
+export function createEvent(title: string, description: string, timestamp: number, creatorId: string) {
+    const data = loadEvents();
+    const event: EventData = {
+        id: generateId(),
+        title,
+        description,
+        timestamp,
+        participants: [],
+        createdBy: creatorId
     };
+    data.events.push(event);
+    saveEvents(data);
+    return event;
+}
 
-    const events = eventStorage.getAllEvents();
-    events.push(newEvent);
-    eventStorage.saveAllEvents(events);
+/* ===== EXPORT PARTICIPANTS ===== */
+export async function exportParticipants(eventId: string, channel: TextChannel) {
+    const data = loadEvents();
+    const event = data.events.find((e: EventData) => e.id === eventId);
+    if (!event || !event.participants.length) return false;
 
-    return newEvent;
-  },
-
-  listAllEvents(): StoredEvent[] {
-    return eventStorage
-      .getAllEvents()
-      .sort((a, b) => a.timestamp - b.timestamp);
-  },
-
-  listUpcomingEvents(): StoredEvent[] {
-    const now = Date.now();
-    return this.listAllEvents().filter(
-      (e) => e.timestamp > now && !e.cancelled
-    );
-  },
-
-  findById(id: string): StoredEvent | undefined {
-    return eventStorage.getAllEvents().find((e) => e.id === id);
-  },
-
-  cancelEvent(id: string): boolean {
-    const events = eventStorage.getAllEvents();
-    const event = events.find((e) => e.id === id);
-    if (!event) return false;
-
-    event.cancelled = true;
-    eventStorage.saveAllEvents(events);
+    const list = event.participants.map((id, i) => `${i + 1}. <@${id}>`).join("\n");
+    await channel.send(`📋 Participants for **${event.title}**\n\n${list}`);
     return true;
-  },
+}
 
-  addParticipant(eventId: string, userId: string) {
-    const events = eventStorage.getAllEvents();
-    const event = events.find((e) => e.id === eventId);
-    if (!event) return;
-
-    if (!event.participants.includes(userId)) {
-      event.participants.push(userId);
-      eventStorage.saveAllEvents(events);
+/* ===== ATTENDANCE STATISTICS ===== */
+export function calculateAttendance(events: EventData[]) {
+    const stats: Record<string, number> = {};
+    for (const e of events) {
+        for (const user of e.participants) {
+            stats[user] = (stats[user] || 0) + 1;
+        }
     }
-  },
+    return stats;
+}
 
-  removeParticipant(eventId: string, userId: string) {
-    const events = eventStorage.getAllEvents();
-    const event = events.find((e) => e.id === eventId);
-    if (!event) return;
+/* ===== SMART SUGGESTION (inactive last 3 events) ===== */
+export function findInactiveMembers(events: EventData[]) {
+    const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp);
+    const lastThree = sorted.slice(0, 3);
+    if (!lastThree.length) return [];
 
-    event.participants = event.participants.filter(
-      (id) => id !== userId
-    );
+    const allParticipants = new Set(events.flatMap(e => e.participants));
+    const inactive: string[] = [];
 
-    eventStorage.saveAllEvents(events);
-  },
-};
+    for (const user of allParticipants) {
+        const attended = lastThree.some(e => e.participants.includes(user));
+        if (!attended) inactive.push(user);
+    }
+    return inactive;
+}
+
+/* ===== PIN ACTIVE EVENT ===== */
+export async function pinActiveEvent(event: EventData, channel: TextChannel) {
+    const message = await channel.send(`📌 **${event.title}**\n<t:${Math.floor(event.timestamp / 1000)}:F>`);
+    await message.pin();
+
+    const pins = await channel.messages.fetchPinned();
+    for (const msg of pins.values()) {
+        if (msg.id !== message.id) await msg.unpin();
+    }
+}
