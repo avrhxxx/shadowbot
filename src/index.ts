@@ -5,10 +5,8 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder,
-    Interaction
+    EmbedBuilder
 } from "discord.js";
-
 import fetch from "node-fetch";
 
 const client = new Client({
@@ -25,14 +23,10 @@ const client = new Client({
     ]
 });
 
-if (!process.env.BOT_TOKEN) {
-    throw new Error("BOT_TOKEN is not defined");
-}
-
+if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const LIBRE_URL =
-    process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
+const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
@@ -42,6 +36,9 @@ const LANGUAGES = [
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
+// -------------------------
+// Reaction queue (delayed add to avoid API spam)
+// -------------------------
 const reactionQueue: string[] = [];
 let processingQueue = false;
 
@@ -54,10 +51,9 @@ async function processReactionQueue() {
         if (!item) continue;
 
         const [channelId, messageId] = item.split(":");
-
         try {
             const channel = await client.channels.fetch(channelId);
-            if (!channel || !channel.isTextBased()) continue;
+            if (!channel?.isTextBased()) continue;
 
             const message = await channel.messages.fetch(messageId);
             if (!message) continue;
@@ -72,48 +68,63 @@ async function processReactionQueue() {
     processingQueue = false;
 }
 
-client.once("clientReady", () => {
+// -------------------------
+// Ready
+// -------------------------
+client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
+// -------------------------
+// Auto reaction to messages
+// -------------------------
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.inGuild()) return;
-
+    if (message.author.bot || !message.inGuild()) return;
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
 
-const translationEmbeds = new Map<string, string>();
+// -------------------------
+// Translation Panel map
+// -------------------------
+const translationPanels = new Map<string, string>();
 
+// -------------------------
+// Handle reaction click
+// -------------------------
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
-
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
-    if (reaction.emoji.name !== "🌐") return;
-    if (!reaction.message.inGuild()) return;
+
+    if (reaction.emoji.name !== "🌐" || !reaction.message.inGuild()) return;
 
     const message = reaction.message;
 
+    // If panel already exists, fetch it
     let existingPanel;
-    if (translationEmbeds.has(message.id)) {
+    if (translationPanels.has(message.id)) {
         try {
-            existingPanel = await message.channel.messages.fetch(translationEmbeds.get(message.id)!);
+            existingPanel = await message.channel.messages.fetch(
+                translationPanels.get(message.id)!
+            );
         } catch {}
     }
 
     if (!existingPanel) {
+        // Build embed with author info
         const embed = new EmbedBuilder()
             .setAuthor({
-                name: `${message.author.tag}`,
+                name: message.author.username,
                 iconURL: message.author.displayAvatarURL()
             })
-            .setDescription(`Click a flag to translate:\n\n"${message.content}"\n*You have 30 seconds to click a button*`)
-            .setColor("Blue");
+            .setTitle("Translation Panel")
+            .setDescription(`Click a flag to translate:\n\n"${message.content}"`)
+            .setColor("Blue")
+            .setFooter({ text: "You have 30s to click a button." });
 
+        // Build button rows
         const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-
         for (let i = 0; i < LANGUAGES.length; i += 5) {
             const row = new ActionRowBuilder<ButtonBuilder>();
             for (const lang of LANGUAGES.slice(i, i + 5)) {
@@ -128,32 +139,57 @@ client.on("messageReactionAdd", async (reaction, user) => {
             rows.push(row);
         }
 
-        const sent = await message.channel.send({ embeds: [embed], components: rows });
-        translationEmbeds.set(message.id, sent.id);
+        // Send panel as reply
+        const panelMessage = await message.reply({
+            embeds: [embed],
+            components: rows
+        });
 
-        // Timer: po 30 sekundach embed znika
-        setTimeout(() => sent.delete().catch(() => {}), 30000);
+        translationPanels.set(message.id, panelMessage.id);
+
+        // Timer to remove panel after 30s
+        let remaining = 30;
+        const timer = setInterval(async () => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(timer);
+                try { await panelMessage.delete(); } catch {}
+                translationPanels.delete(message.id);
+            } else {
+                embed.setFooter({ text: `You have ${remaining}s to click a button.` });
+                try { await panelMessage.edit({ embeds: [embed] }); } catch {}
+            }
+        }, 1000);
     }
 });
 
-client.on("interactionCreate", async (interaction: Interaction) => {
+// -------------------------
+// Handle button interactions
+// -------------------------
+client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     if (!interaction.customId.startsWith("translate_")) return;
-    if (!interaction.channel || !interaction.channel.isTextBased()) return;
 
-    const parts = interaction.customId.split("_");
-    const messageId = parts[1];
-    const langCode = parts[2];
+    // Defer reply to avoid unknown interaction
+    await interaction.deferReply({ ephemeral: true });
+
+    const [, messageId, langCode] = interaction.customId.split("_");
+
+    if (!interaction.channel?.isTextBased()) {
+        await interaction.editReply({ content: "Channel not supported." });
+        return;
+    }
 
     let originalMessage;
     try {
         originalMessage = await interaction.channel.messages.fetch(messageId);
     } catch {
-        await interaction.reply({ content: "Original message not found.", ephemeral: true });
+        await interaction.editReply({ content: "Original message not found." });
         return;
     }
 
     let translatedText = "Translation failed.";
+
     try {
         const res = await fetch(LIBRE_URL, {
             method: "POST",
@@ -170,7 +206,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
             console.error("Libre status:", res.status);
             translatedText = "Translation service error.";
         } else {
-            const data = await res.json() as { translatedText?: string };
+            const data = (await res.json()) as { translatedText?: string };
             translatedText = data.translatedText ?? translatedText;
         }
     } catch (err) {
@@ -178,15 +214,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
         translatedText = "Translation service unreachable.";
     }
 
-    await interaction.reply({
-        embeds: [
-            new EmbedBuilder()
-                .setTitle(`Translation (${langCode.toUpperCase()})`)
-                .setDescription(translatedText)
-                .setColor("Green")
-        ],
-        ephemeral: true
-    });
+    const embed = new EmbedBuilder()
+        .setAuthor({
+            name: originalMessage.author.username,
+            iconURL: originalMessage.author.displayAvatarURL()
+        })
+        .setTitle(`Translation (${langCode.toUpperCase()})`)
+        .setDescription(`"${translatedText}"`)
+        .setColor("Green");
+
+    await interaction.editReply({ embeds: [embed] });
 });
 
+// -------------------------
+// Login
+// -------------------------
 client.login(BOT_TOKEN);
