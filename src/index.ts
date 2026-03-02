@@ -135,7 +135,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
             try { await sent.delete(); translationEmbeds.delete(message.id); } catch {}
         }, 60000);
 
-        // Odświeżanie przycisków co 10 sekund
+        // **Odświeżanie przycisków co 10 sekund – tak, żeby mogły być klikane wielokrotnie**
         const buttonRefresh = setInterval(async () => {
             try {
                 await sent.edit({ components: rows });
