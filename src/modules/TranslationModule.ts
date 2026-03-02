@@ -11,14 +11,8 @@ import {
 } from "discord.js";
 import fetch from "node-fetch";
 
-const LIBRE_URL = process.env.LIBRE_URL; // obowiązkowe ustawienie w zmiennych środowiskowych
-const GOOGLE_URL =
-    process.env.GOOGLE_URL ||
-    "https://translate.googleapis.com/translate_a/single";
-
-if (!LIBRE_URL) {
-    throw new Error("LIBRE_URL is not defined in environment variables");
-}
+const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
+const GOOGLE_URL = process.env.GOOGLE_URL || "https://translate.googleapis.com/translate_a/single";
 
 interface LibreResponse {
     translatedText: string;
@@ -26,7 +20,7 @@ interface LibreResponse {
 
 type GoogleResponse = string[][][];
 
-export const LANGUAGES = [
+const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
     { code: "pl", label: "Polish", emoji: "🇵🇱" },
     { code: "de", label: "German", emoji: "🇩🇪" },
@@ -36,8 +30,8 @@ export const LANGUAGES = [
     { code: "sv", label: "Swedish", emoji: "🇸🇪" },
     { code: "es", label: "Spanish", emoji: "🇪🇸" },
     { code: "it", label: "Italian", emoji: "🇮🇹" },
-    { code: "pt", label: "Portuguese", emoji: "🇵🇹" },
     { code: "nl", label: "Dutch", emoji: "🇳🇱" },
+    { code: "pt", label: "Portuguese", emoji: "🇵🇹" },
     { code: "ja", label: "Japanese", emoji: "🇯🇵" }
 ];
 
@@ -57,9 +51,12 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed bez tytułu, tylko nick + avatar + treść wiadomości
+        // Embed bez tytułu, tylko avatar i nick
         const embed = new EmbedBuilder()
-            .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
+            .setAuthor({
+                name: message.author.username,
+                iconURL: message.author.displayAvatarURL()
+            })
             .setDescription(`"${message.content}"`)
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
@@ -98,18 +95,13 @@ export function initTranslationModule(client: Client) {
                             .setColor("Green")
                     ]
                 });
-            } catch (err) {
-                console.error("Interaction error:", err);
-            }
+            } catch (err) { console.error("Interaction error:", err); }
         });
 
         collector.on("end", async () => {
             const disabledRows = rows.map(row => { row.components.forEach(c => c.setDisabled(true)); return row; });
             try {
-                await panel.edit({
-                    components: disabledRows,
-                    embeds: [embed.setFooter({ text: "Translation panel expired." })]
-                });
+                await panel.edit({ components: disabledRows, embeds: [embed.setFooter({ text: "Translation panel expired." })] });
                 setTimeout(async () => {
                     try { await panel.delete().catch(() => {}); } catch {}
                 }, 1000);
@@ -117,8 +109,9 @@ export function initTranslationModule(client: Client) {
         });
     });
 
-    // Funkcja tłumaczenia: Libre → fallback Google
+    // Funkcja tłumaczenia z Libre + Google fallback
     async function translateText(text: string, target: string): Promise<string> {
+        // Libre
         try {
             const res = await fetch(LIBRE_URL, {
                 method: "POST",
@@ -131,6 +124,7 @@ export function initTranslationModule(client: Client) {
             }
         } catch {}
 
+        // Google fallback
         try {
             const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
             const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
