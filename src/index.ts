@@ -7,7 +7,8 @@ import {
     ButtonStyle,
     EmbedBuilder,
     ComponentType,
-    Message
+    Message,
+    MessageFlags
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -49,7 +50,7 @@ const LANGUAGES = [
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
@@ -73,7 +74,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
     const message = reaction.message;
 
-    // ---------- EMBED ----------
     const embed = new EmbedBuilder()
         .setTitle("🌍 Translation Panel")
         .setAuthor({
@@ -86,7 +86,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
             text: "You have 60 seconds to choose a language."
         });
 
-    // ---------- BUTTONS ----------
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
 
     for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -110,29 +109,35 @@ client.on("messageReactionAdd", async (reaction, user) => {
         components: rows
     });
 
-    // ---------- COLLECTOR 60s ----------
     const collector = panel.createMessageComponentCollector({
         componentType: ComponentType.Button,
         time: 60_000
     });
 
     collector.on("collect", async interaction => {
-        const [, , langCode] = interaction.customId.split("_");
+        try {
+            await interaction.deferReply({
+                flags: MessageFlags.Ephemeral
+            });
 
-        const translated = await translateText(
-            message.content,
-            langCode
-        );
+            const [, , langCode] = interaction.customId.split("_");
 
-        await interaction.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle(`🌍 Translation (${langCode.toUpperCase()})`)
-                    .setDescription(`"${translated}"`)
-                    .setColor("Green")
-            ],
-            ephemeral: true
-        });
+            const translated = await translateText(
+                message.content,
+                langCode
+            );
+
+            await interaction.editReply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle(`🌍 Translation (${langCode.toUpperCase()})`)
+                        .setDescription(`"${translated}"`)
+                        .setColor("Green")
+                ]
+            });
+        } catch (err) {
+            console.error("Interaction error:", err);
+        }
     });
 
     collector.on("end", async () => {
@@ -156,13 +161,12 @@ client.on("messageReactionAdd", async (reaction, user) => {
     });
 });
 
-// ---------- TRANSLATION FUNCTION ----------
 async function translateText(
     text: string,
     target: string
 ): Promise<string> {
 
-    // 1️⃣ Libre
+    // Libre
     try {
         const res = await fetch(LIBRE_URL, {
             method: "POST",
@@ -184,7 +188,7 @@ async function translateText(
         }
     } catch {}
 
-    // 2️⃣ Google fallback
+    // Google fallback
     try {
         const params = new URLSearchParams({
             client: "gtx",
