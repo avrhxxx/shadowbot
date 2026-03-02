@@ -60,7 +60,9 @@ async function translateMessage(text: string, language: string): Promise<string>
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ q: text, source: "auto", target: targetLang, format: "text" })
         });
-        const data = await response.json();
+
+        // TS poprawka: jawne typowanie odpowiedzi
+        const data: { translatedText?: string } = await response.json();
         return data.translatedText ?? `[${language}] ${text}`;
     } catch (err) {
         console.error("LibreTranslate error:", err);
@@ -109,7 +111,7 @@ client.on(
             const data = translationMessages.get(msg.id);
             if (!data) return;
 
-            // Obsługa przewijania
+            // Obsługa przewijania ⬅️ / ➡️
             if (reaction.emoji?.name === "⬅️") {
                 if (data.translations.size === 0) return;
                 data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
@@ -117,7 +119,11 @@ client.on(
                 if (data.translations.size === 0) return;
                 data.currentIndex = (data.currentIndex + 1) % data.translations.size;
             } else {
-                const language = reaction.emoji?.name ? getLanguageFromEmoji(reaction.emoji.name) : null;
+                // TS poprawka: jawne sprawdzenie emoji
+                const emojiName = reaction.emoji?.name;
+                if (!emojiName) return;
+
+                const language = getLanguageFromEmoji(emojiName);
                 if (!language) return;
 
                 if (data.translations.size >= 10 && !data.translations.has((user as User).id)) return;
