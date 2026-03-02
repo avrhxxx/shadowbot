@@ -2,24 +2,19 @@
 import fs from "fs";
 import path from "path";
 
-export interface EventParticipant {
-    nick: string;
-    present: boolean;
-}
-
 export interface EventData {
     id: string;
     name: string;
     timestamp: number;
-    participants: EventParticipant[];
+    createdBy: string;
+    participants?: { nick: string; present: boolean }[];
 }
 
-const DATA_PATH = path.join(__dirname, "../../data/events.json");
+const DATA_PATH = path.join(__dirname, "../data/events.json");
 
 export function loadEvents(): EventData[] {
     try {
-        if (!fs.existsSync(DATA_PATH)) fs.writeFileSync(DATA_PATH, "[]", "utf-8");
-        return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8")) as EventData[];
+        return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
     } catch {
         return [];
     }
