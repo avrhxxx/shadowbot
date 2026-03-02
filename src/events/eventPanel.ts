@@ -1,7 +1,6 @@
 import {
   Client,
   Interaction,
-  ButtonInteraction,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -10,7 +9,8 @@ import {
   TextInputStyle,
   StringSelectMenuBuilder,
   EmbedBuilder,
-  TextChannel
+  TextChannel,
+  ButtonInteraction
 } from "discord.js";
 
 import {
@@ -32,11 +32,8 @@ export async function handleEventInteraction(interaction: Interaction) {
   const guildId = interaction.guildId!;
   updateEventStatuses(guildId);
 
-  // ===== BUTTONS =====
   if (interaction.isButton()) {
     switch (interaction.customId) {
-
-      // ----- CREATE EVENT -----
       case "event_create": {
         const modal = new ModalBuilder().setCustomId("event_create_modal").setTitle("Create Event");
         modal.addComponents(
@@ -60,7 +57,6 @@ export async function handleEventInteraction(interaction: Interaction) {
         return;
       }
 
-      // ----- LIST EVENTS -----
       case "event_list": {
         const events = getEvents(guildId);
         if (!events.length) {
@@ -81,30 +77,18 @@ export async function handleEventInteraction(interaction: Interaction) {
         return;
       }
 
-      // ----- MANUAL REMINDER -----
       case "event_manual_reminder": {
         const channelId = getDefaultChannel(guildId);
-        if (!channelId) {
-          await interaction.reply({ content: "Default channel not set.", ephemeral: true });
-          return;
-        }
+        if (!channelId) return await interaction.reply({ content: "Default channel not set.", ephemeral: true });
 
         const activeEvents = getActiveEvents(guildId);
-        if (!activeEvents.length) {
-          await interaction.reply({ content: "No active events.", ephemeral: true });
-          return;
-        }
+        if (!activeEvents.length) return await interaction.reply({ content: "No active events.", ephemeral: true });
 
         const channel = interaction.guild?.channels.cache.get(channelId) as TextChannel;
-        if (!channel) {
-          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
-          return;
-        }
+        if (!channel) return await interaction.reply({ content: "Default channel not found.", ephemeral: true });
 
         for (const e of activeEvents) {
-          const embed = new EmbedBuilder()
-            .setTitle(`🔔 Reminder: ${e.name}`)
-            .setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
+          const embed = new EmbedBuilder().setTitle(`🔔 Reminder: ${e.name}`).setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
           await channel.send({ embeds: [embed] });
         }
 
@@ -112,13 +96,9 @@ export async function handleEventInteraction(interaction: Interaction) {
         return;
       }
 
-      // ----- CANCEL EVENT -----
       case "event_cancel": {
         const activeEvents = getActiveEvents(guildId);
-        if (!activeEvents.length) {
-          await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
-          return;
-        }
+        if (!activeEvents.length) return await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
 
         const options = activeEvents.map(e => ({ label: e.name, value: e.id }));
         const select = new StringSelectMenuBuilder().setCustomId("event_cancel_select").setPlaceholder("Select event to cancel").addOptions(options);
@@ -127,13 +107,9 @@ export async function handleEventInteraction(interaction: Interaction) {
         return;
       }
 
-      // ----- DOWNLOAD PARTICIPANTS -----
       case "event_download": {
         const pastEvents = getPastEvents(guildId);
-        if (!pastEvents.length) {
-          await interaction.reply({ content: "No past events found.", ephemeral: true });
-          return;
-        }
+        if (!pastEvents.length) return await interaction.reply({ content: "No past events found.", ephemeral: true });
 
         const options = pastEvents.map(e => ({ label: e.name, value: e.id }));
         const select = new StringSelectMenuBuilder().setCustomId("event_download_select").setPlaceholder("Select past event").addOptions(options);
@@ -142,30 +118,27 @@ export async function handleEventInteraction(interaction: Interaction) {
         return;
       }
 
-      // ----- SETTINGS -----
       case "event_settings": {
         const channels = interaction.guild?.channels.cache
           .filter(c => c.isTextBased())
           .map(c => ({ label: c.name, value: c.id })) || [];
-
         const select = new StringSelectMenuBuilder().setCustomId("event_settings_select").setPlaceholder("Select default channel").addOptions(channels);
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
         await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
         return;
       }
 
-      // ----- HELP -----
       case "event_help": {
-        const embed = new EmbedBuilder().setTitle("Event Panel Help")
-          .setDescription("📌 **Buttons:**\n" +
-            "🟢 → Create a new event\n" +
-            "📄 → List all events\n" +
-            "⬇️ → Download participants\n" +
-            "⚙️ → Set default channel\n" +
-            "🔔 → Send reminder for active events\n" +
-            "🗑️ → Cancel an active event\n" +
-            "❓ → Help info"
-          );
+        const embed = new EmbedBuilder().setTitle("Event Panel Help").setDescription(
+          "📌 **Buttons:**\n" +
+          "🟢 → Create a new event\n" +
+          "📄 → List all events\n" +
+          "⬇️ → Download participants\n" +
+          "⚙️ → Settings\n" +
+          "🔔 → Manual reminder\n" +
+          "🗑️ → Cancel event\n" +
+          "❓ → Help info"
+        );
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
@@ -192,16 +165,13 @@ export async function handleEventInteraction(interaction: Interaction) {
         setDefaultChannel(guildId, interaction.values[0]);
         await interaction.reply({ content: `Default channel set.`, ephemeral: true });
         return;
-
       case "event_cancel_select":
         cancelEvent(guildId, interaction.values[0]);
         await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
         return;
-
-      case "event_download_select":
+      case "event_download_select": {
         const eventId = interaction.values[0];
         const filePath = generateParticipantsFile(guildId, eventId);
-
         const channelId = getDefaultChannel(guildId);
         const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
         if (channel) {
@@ -211,22 +181,21 @@ export async function handleEventInteraction(interaction: Interaction) {
           await interaction.reply({ content: "Default channel not found.", ephemeral: true });
         }
         return;
+      }
     }
   }
 }
 
 // ===== INIT EVENT PANEL =====
 export async function initEventPanel(client: Client, interaction: ButtonInteraction) {
-  // Row 1: operacyjne
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("event_create").setEmoji("🟢").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("event_list").setEmoji("📄").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("event_cancel").setEmoji("🗑️").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("event_download").setEmoji("⬇️").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("event_manual_reminder").setEmoji("🔔").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("event_download").setEmoji("⬇️").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("event_cancel").setEmoji("🗑️").setStyle(ButtonStyle.Danger)
   );
 
-  // Row 2: ustawienia i pomoc
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("event_settings").setEmoji("⚙️").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("event_help").setEmoji("❓").setStyle(ButtonStyle.Success)
