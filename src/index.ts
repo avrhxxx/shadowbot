@@ -1,4 +1,13 @@
-import { Client, GatewayIntentBits, Partials, MessageReaction, User, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, EmbedBuilder } from "discord.js";
+import {
+    Client,
+    GatewayIntentBits,
+    Partials,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    EmbedBuilder
+} from "discord.js";
+
 import fetch from "node-fetch";
 
 const client = new Client({
@@ -8,11 +17,26 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction
+    ]
 });
 
+if (!process.env.BOT_TOKEN) {
+    throw new Error("BOT_TOKEN is not defined");
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate.de/translate"; // endpoint LibreTranslate
+const LIBRE_URL =
+    process.env.LIBRE_URL ||
+    "https://libretranslate.de/translate";
+
+/* =========================
+   JĘZYKI
+========================= */
+
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
     { code: "pl", label: "Polish", emoji: "🇵🇱" },
@@ -21,84 +45,168 @@ const LANGUAGES = [
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-client.on("ready", () => {
+/* =========================
+   REACTION QUEUE
+========================= */
+
+const reactionQueue: string[] = [];
+let processingQueue = false;
+
+async function processReactionQueue() {
+    if (processingQueue) return;
+    processingQueue = true;
+
+    while (reactionQueue.length > 0) {
+        const item = reactionQueue.shift();
+        if (!item) continue;
+
+        const [channelId, messageId] = item.split(":");
+
+        try {
+            const channel = await client.channels.fetch(channelId);
+            if (!channel || !channel.isTextBased()) continue;
+
+            const message = await channel.messages.fetch(messageId);
+            if (!message) continue;
+
+            await message.react("🌐");
+
+            // 900ms odstępu
+            await new Promise(res => setTimeout(res, 900));
+
+        } catch (err) {
+            console.error("Reaction queue error:", err);
+        }
+    }
+
+    processingQueue = false;
+}
+
+/* =========================
+   READY
+========================= */
+
+client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-// Map do śledzenia embedów do każdej wiadomości
-const translationEmbeds = new Map<string, string>(); // messageId -> embedMessageId
+/* =========================
+   AUTO REACTION
+========================= */
 
-// 1️⃣ Dodawanie reakcji do każdej wiadomości
 client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
-    try {
-        await message.react("🌐"); // tutaj emoji, które użytkownik kliknie, żeby poprosić o tłumaczenie
-    } catch (err) {
-        console.error("Failed to add reaction:", err);
-    }
+    if (!message.inGuild()) return;
+
+    reactionQueue.push(`${message.channelId}:${message.id}`);
+    processReactionQueue();
 });
 
-// 2️⃣ Kliknięcie reakcji – tworzymy lub edytujemy publiczny embed z przyciskami językowymi
-client.on("messageReactionAdd", async (reaction: MessageReaction, user: User) => {
+/* =========================
+   REACTION CLICK
+========================= */
+
+const translationEmbeds = new Map<string, string>();
+
+client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
-    if (!reaction.message.partial) await reaction.message.fetch();
+
+    if (reaction.partial) {
+        await reaction.fetch();
+    }
+
+    if (reaction.message.partial) {
+        await reaction.message.fetch();
+    }
+
     if (reaction.emoji.name !== "🌐") return;
+    if (!reaction.message.inGuild()) return;
 
-    const messageId = reaction.message.id;
-    let embedMessage = undefined;
+    const message = reaction.message;
 
-    // sprawdzamy, czy embed już istnieje
-    if (translationEmbeds.has(messageId)) {
-        const embedId = translationEmbeds.get(messageId)!;
+    let existingPanel;
+
+    if (translationEmbeds.has(message.id)) {
         try {
-            embedMessage = await reaction.message.channel.messages.fetch(embedId);
+            existingPanel = await message.channel.messages.fetch(
+                translationEmbeds.get(message.id)!
+            );
         } catch {}
     }
 
-    // Tworzymy embed jeśli nie istnieje
-    if (!embedMessage) {
+    if (!existingPanel) {
         const embed = new EmbedBuilder()
             .setTitle("Translation Panel")
-            .setDescription(`Click a flag to translate the message:\n"${reaction.message.content}"`)
+            .setDescription(
+                `Click a flag to translate:\n\n"${message.content}"`
+            )
             .setColor("Blue");
 
-        const row = new ActionRowBuilder<ButtonBuilder>();
-        for (const lang of LANGUAGES) {
-            const btn = new ButtonBuilder()
-                .setCustomId(`translate_${messageId}_${lang.code}`)
-                .setLabel(lang.label)
-                .setEmoji(lang.emoji)
-                .setStyle(ButtonStyle.Primary);
-            row.addComponents(btn);
+        const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
+        for (let i = 0; i < LANGUAGES.length; i += 5) {
+            const row = new ActionRowBuilder<ButtonBuilder>();
+
+            for (const lang of LANGUAGES.slice(i, i + 5)) {
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(
+                            `translate_${message.id}_${lang.code}`
+                        )
+                        .setLabel(lang.label)
+                        .setEmoji(lang.emoji)
+                        .setStyle(ButtonStyle.Primary)
+                );
+            }
+
+            rows.push(row);
         }
 
-        const sent = await reaction.message.channel.send({ embeds: [embed], components: [row] });
-        translationEmbeds.set(messageId, sent.id);
+        const sent = await message.channel.send({
+            embeds: [embed],
+            components: rows
+        });
+
+        translationEmbeds.set(message.id, sent.id);
     }
 });
 
-// 3️⃣ Kliknięcie przycisku – tłumaczenie wiadomości i ephemeral reply
+/* =========================
+   BUTTON INTERACTION
+========================= */
+
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
-    const customId = interaction.customId; // format: translate_messageId_lang
-    if (!customId.startsWith("translate_")) return;
+    if (!interaction.customId.startsWith("translate_")) return;
 
-    const parts = customId.split("_");
+    const parts = interaction.customId.split("_");
     const messageId = parts[1];
     const langCode = parts[2];
 
-    let originalMessage;
-    try {
-        originalMessage = await interaction.channel?.messages.fetch(messageId);
-        if (!originalMessage) throw new Error("Original message not found");
-    } catch {
-        await interaction.reply({ content: "Original message not found.", ephemeral: true });
+    if (!interaction.channel || !interaction.channel.isTextBased()) {
+        await interaction.reply({
+            content: "Channel not supported.",
+            ephemeral: true
+        });
         return;
     }
 
-    // Wywołanie LibreTranslate
+    let originalMessage;
+
+    try {
+        originalMessage =
+            await interaction.channel.messages.fetch(messageId);
+    } catch {
+        await interaction.reply({
+            content: "Original message not found.",
+            ephemeral: true
+        });
+        return;
+    }
+
     let translatedText = "Translation failed.";
+
     try {
         const res = await fetch(LIBRE_URL, {
             method: "POST",
@@ -110,16 +218,30 @@ client.on("interactionCreate", async (interaction) => {
                 format: "text"
             })
         });
-        const data = await res.json();
-        translatedText = (data.translatedText as string) || translatedText;
+
+        const data =
+            (await res.json()) as { translatedText?: string };
+
+        translatedText =
+            data.translatedText ?? translatedText;
+
     } catch (err) {
         console.error("LibreTranslate error:", err);
     }
 
     await interaction.reply({
-        content: `**Translation (${langCode.toUpperCase()}):**\n${translatedText}`,
+        embeds: [
+            new EmbedBuilder()
+                .setTitle(`Translation (${langCode.toUpperCase()})`)
+                .setDescription(translatedText)
+                .setColor("Green")
+        ],
         ephemeral: true
     });
 });
+
+/* =========================
+   LOGIN
+========================= */
 
 client.login(BOT_TOKEN);
