@@ -1,4 +1,3 @@
-// src/modules/HelpPanel.ts
 import { Interaction } from "discord.js";
 
 export async function handleHelpButton(interaction: Interaction) {
