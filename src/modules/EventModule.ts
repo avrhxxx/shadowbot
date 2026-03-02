@@ -1,5 +1,5 @@
 // src/modules/EventModule.ts
-import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Interaction, Message } from "discord.js";
+import { Client, Message, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, InteractionCollector, ModalBuilder, TextInputBuilder, TextInputStyle, ModalSubmitInteraction } from "discord.js";
 import fs from "fs";
 import path from "path";
 
@@ -17,10 +17,11 @@ interface EventData {
 
 const DATA_PATH = path.join(__dirname, "../data/events.json");
 
-// Wczytywanie eventów
+// Wczytanie istniejących eventów
 function loadEvents(): EventData[] {
     try {
-        return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
+        const raw = fs.readFileSync(DATA_PATH, "utf-8");
+        return JSON.parse(raw);
     } catch {
         return [];
     }
@@ -31,105 +32,183 @@ function saveEvents(events: EventData[]) {
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-// Tworzenie panelu głównego w kanale Moderation Panel
-async function ensureModerationPanelChannel(client: Client): Promise<TextChannel> {
-    const guild = client.guilds.cache.first();
-    if (!guild) throw new Error("No guild found.");
-
-    let channel = guild.channels.cache.find(c => c.name === "moderation-panel" && c.isTextBased()) as TextChannel;
-    if (!channel) {
-        channel = await guild.channels.create({
-            name: "moderation-panel",
-            type: 0, // GUILD_TEXT
-            reason: "Moderation panel channel"
-        }) as TextChannel;
-    }
-
-    return channel;
-}
-
 export async function initEventModule(client: Client) {
-    const channel = await ensureModerationPanelChannel(client);
-
-    // Tworzymy główny panel z przyciskiem Event
-    const mainRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("event_panel").setLabel("Event").setStyle(ButtonStyle.Primary)
-    );
-
-    await channel.send({ content: "Moderation Panel", components: [mainRow] });
-
-    client.on("interactionCreate", async (interaction: Interaction) => {
-        if (!interaction.isButton()) return;
-
-        // Panel Event: Create, List, Help
-        if (interaction.customId === "event_panel") {
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId("event_create").setLabel("Create").setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId("event_list").setLabel("List").setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId("event_help").setLabel("Help").setStyle(ButtonStyle.Secondary)
-            );
-            await interaction.reply({ content: "Event Panel", components: [row], ephemeral: true });
+    // Stworzenie dedykowanego kanału
+    let modChannel: TextChannel | undefined;
+    client.on("ready", async () => {
+        const guild = client.guilds.cache.first();
+        if (!guild) return;
+        modChannel = guild.channels.cache.find(c => c.name === "moderation-panel" && c.isTextBased()) as TextChannel;
+        if (!modChannel) {
+            modChannel = await guild.channels.create({
+                name: "moderation-panel",
+                type: 0 // GUILD_TEXT
+            }) as TextChannel;
         }
+
+        // Wyślij główny panel eventów
+        const row = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+                new ButtonBuilder().setCustomId("event_create").setLabel("Create Event").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId("event_list").setLabel("List Events").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("event_compare").setLabel("Compare").setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId("event_help").setLabel("Help").setStyle(ButtonStyle.Success)
+            );
+        await modChannel.send({ content: "Event Management Panel", components: [row] });
+    });
+
+    client.on("interactionCreate", async interaction => {
+        if (!interaction.isButton()) return;
+        if (!modChannel || interaction.channelId !== modChannel.id) return;
+
+        const events = loadEvents();
 
         // Tworzenie eventu
         if (interaction.customId === "event_create") {
-            await interaction.reply({ content: "Send the event name and date (DD-MM_HH:MM), e.g., `Raid 15-03_20:00`", ephemeral: true });
-
-            const filter = (m: Message) => m.author.id === interaction.user.id;
-            const collector = interaction.channel?.createMessageCollector({ filter, time: 60_000, max: 1 });
-            collector?.on("collect", m => {
-                const [name, datetime] = m.content.trim().split(/\s+/);
-                if (!name || !datetime) return m.channel.send("Invalid format.");
-
-                const [day, monthHour] = datetime.split("-");
-                const [month, hourMinute] = monthHour.split("_");
-                const [hour, minute] = hourMinute.split(":");
-                const date = new Date();
-                date.setMonth(parseInt(month)-1, parseInt(day));
-                date.setHours(parseInt(hour), parseInt(minute), 0, 0);
-
-                const events = loadEvents();
-                const id = `event_${Date.now()}`;
-                events.push({ id, name, timestamp: date.getTime(), participants: [] });
-                saveEvents(events);
-
-                m.channel.send(`Event **${name}** created!`);
-            });
+            await interaction.deferReply({ ephemeral: true });
+            const modal = new ModalBuilder()
+                .setCustomId("modal_create_event")
+                .setTitle("Create Event")
+                .addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(
+                        new TextInputBuilder().setCustomId("event_name").setLabel("Event Name").setStyle(TextInputStyle.Short).setRequired(true)
+                    ),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(
+                        new TextInputBuilder().setCustomId("event_date").setLabel("Date (DD-MM_HH:MM)").setStyle(TextInputStyle.Short).setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
         }
 
         // Lista eventów
         if (interaction.customId === "event_list") {
-            const events = loadEvents();
-            if (events.length === 0) return interaction.reply({ content: "No events found.", ephemeral: true });
-
-            const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-            for (const ev of events) {
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                    new ButtonBuilder().setCustomId(`event_select_${ev.id}`).setLabel(ev.name).setStyle(ButtonStyle.Primary)
-                );
-                rows.push(row);
+            await interaction.deferReply({ ephemeral: true });
+            if (events.length === 0) {
+                await interaction.editReply("No events created yet.");
+                return;
             }
-            await interaction.reply({ content: "Select an event", components: rows, ephemeral: true });
+            const listText = events.map(e => `**${e.name}** (${new Date(e.timestamp).toLocaleString()})`).join("\n");
+            await interaction.editReply(`Events:\n${listText}`);
         }
 
-        // Po wybraniu konkretnego eventu
-        if (interaction.customId.startsWith("event_select_")) {
-            const eventId = interaction.customId.replace("event_select_", "");
+        // Compare (placeholder)
+        if (interaction.customId === "event_compare") {
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply("Compare feature not implemented yet.");
+        }
+
+        // Help
+        if (interaction.customId === "event_help") {
+            await interaction.deferReply({ ephemeral: true });
+            const helpText = `
+**Event Panel Help**
+- **Create Event**: Create a new event by entering name and date.
+- **List Events**: Shows all scheduled events.
+- **Compare**: Compare weekly participant lists.
+- **Add/Remove/Mark Absent**: Manage participants (after selecting event).
+`;
+            await interaction.editReply(helpText);
+        }
+    });
+
+    // Obsługa modali
+    client.on("interactionCreate", async interaction => {
+        if (!interaction.isModalSubmit()) return;
+
+        // Tworzenie eventu z modala
+        if (interaction.customId === "modal_create_event") {
+            const name = interaction.fields.getTextInputValue("event_name");
+            const dateStr = interaction.fields.getTextInputValue("event_date");
+
+            const [day, month, hourMin] = dateStr.split(/[-_]/);
+            const [hour, min] = hourMin.split(":");
+            const now = new Date();
+            const timestamp = new Date(now.getFullYear(), Number(month)-1, Number(day), Number(hour), Number(min)).getTime();
+
+            if (isNaN(timestamp)) {
+                await interaction.reply({ content: "Invalid date format.", ephemeral: true });
+                return;
+            }
+
             const events = loadEvents();
-            const ev = events.find(e => e.id === eventId);
-            if (!ev) return interaction.reply({ content: "Event not found.", ephemeral: true });
+            const id = `event_${Date.now()}`;
+            events.push({ id, name, timestamp, participants: [] });
+            saveEvents(events);
 
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`add_${eventId}`).setLabel("Add").setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`remove_${eventId}`).setLabel("Remove").setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId(`absent_${eventId}`).setLabel("Mark Absent").setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`list_${eventId}`).setLabel("List").setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`compare_${eventId}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`help_${eventId}`).setLabel("Help").setStyle(ButtonStyle.Secondary)
-            );
-            await interaction.reply({ content: `Event **${ev.name}** actions:`, components: [row], ephemeral: true });
+            await interaction.reply({ content: `Event **${name}** created!`, ephemeral: true });
+
+            // Przyciski Add/Remove/Absent/List dla tego eventu
+            const row = new ActionRowBuilder<ButtonBuilder>()
+                .addComponents(
+                    new ButtonBuilder().setCustomId(`add_${id}`).setLabel("Add").setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`remove_${id}`).setLabel("Remove").setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`absent_${id}`).setLabel("Mark Absent").setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`list_${id}`).setLabel("List").setStyle(ButtonStyle.Secondary)
+                );
+            if (modChannel) await modChannel.send({ content: `Event: **${name}**`, components: [row] });
+        }
+    });
+
+    // Obsługa przycisków Add/Remove/Absent/List
+    client.on("interactionCreate", async interaction => {
+        if (!interaction.isButton()) return;
+        if (!modChannel || interaction.channelId !== modChannel.id) return;
+
+        const [action, eventId] = interaction.customId.split("_");
+        const events = loadEvents();
+        const event = events.find(e => e.id === eventId);
+        if (!event) {
+            await interaction.reply({ content: "Event not found.", ephemeral: true });
+            return;
         }
 
-        // Tutaj możesz dalej implementować obsługę add/remove/absent/list/compare/help po kliknięciu przycisków
+        // Add participant
+        if (action === "add") {
+            await interaction.reply({ content: "Send the participant nick:", ephemeral: true });
+            const collector = interaction.channel!.createMessageCollector({ filter: m => m.author.id === interaction.user.id, max: 1, time: 60_000 });
+            collector.on("collect", m => {
+                if (!event.participants.some(p => p.nick === m.content)) {
+                    event.participants.push({ nick: m.content, present: true });
+                    saveEvents(events);
+                    m.reply(`Added **${m.content}** to event **${event.name}**.`);
+                } else {
+                    m.reply(`${m.content} is already in event **${event.name}**.`);
+                }
+            });
+        }
+
+        // Remove participant
+        if (action === "remove") {
+            await interaction.reply({ content: "Send the participant nick to remove:", ephemeral: true });
+            const collector = interaction.channel!.createMessageCollector({ filter: m => m.author.id === interaction.user.id, max: 1, time: 60_000 });
+            collector.on("collect", m => {
+                event.participants = event.participants.filter(p => p.nick !== m.content);
+                saveEvents(events);
+                m.reply(`Removed **${m.content}** from event **${event.name}**.`);
+            });
+        }
+
+        // Mark absent
+        if (action === "absent") {
+            await interaction.reply({ content: "Send the participant nick to mark as absent:", ephemeral: true });
+            const collector = interaction.channel!.createMessageCollector({ filter: m => m.author.id === interaction.user.id, max: 1, time: 60_000 });
+            collector.on("collect", m => {
+                const p = event.participants.find(p => p.nick === m.content);
+                if (p) {
+                    p.present = false;
+                    saveEvents(events);
+                    m.reply(`Marked **${m.content}** as absent for event **${event.name}**.`);
+                } else {
+                    m.reply(`${m.content} not in event.`);
+                }
+            });
+        }
+
+        // List participants
+        if (action === "list") {
+            const present = event.participants.filter(p => p.present).map(p => p.nick);
+            const absent = event.participants.filter(p => !p.present).map(p => p.nick);
+            await interaction.reply({ content: `**${event.name}** Participants:\nPresent: ${present.join(", ") || "none"}\nAbsent: ${absent.join(", ") || "none"}`, ephemeral: true });
+        }
     });
 }
