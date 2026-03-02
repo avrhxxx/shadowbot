@@ -3,246 +3,230 @@ import {
   Interaction,
   ButtonInteraction,
   ModalSubmitInteraction,
-  TextChannel,
-  MessageActionRow,
-  MessageButton,
-  MessageSelectMenu,
-  Modal,
-  TextInputComponent,
-  TextInputStyle,
   CacheType,
-  Guild
-} from 'discord.js';
-import fs from 'fs';
-import path from 'path';
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  TextChannel,
+  StringSelectMenuBuilder,
+} from "discord.js";
 
-type EventData = {
-  id: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  reminderMinutes: number;
-  active: boolean;
-  participants: string[];
-};
-
-const eventsFile = path.join(__dirname, '../data/events.json');
-let events: EventData[] = [];
-
-function loadEvents() {
-  if (fs.existsSync(eventsFile)) {
-    events = JSON.parse(fs.readFileSync(eventsFile, 'utf8'));
-  }
-}
-
-function saveEvents() {
-  fs.writeFileSync(eventsFile, JSON.stringify(events, null, 2));
-}
+import { eventService } from "./eventService";
+import { eventStorage } from "./eventStorage";
 
 export function initEventPanel(client: Client) {
-  loadEvents();
-
-  client.on('interactionCreate', async (interaction: Interaction<CacheType>) => {
+  client.on("interactionCreate", async (interaction: Interaction<CacheType>) => {
     if (interaction.isButton()) await handleButton(interaction);
     if (interaction.isModalSubmit()) await handleModal(interaction);
-    if (interaction.isSelectMenu()) await handleSelectMenu(interaction);
+    if (interaction.isStringSelectMenu()) await handleSelect(interaction);
   });
 }
 
 async function handleButton(interaction: ButtonInteraction) {
   switch (interaction.customId) {
-    case 'create_event':
-      await showCreateEventModal(interaction);
-      break;
-    case 'list_events':
-      await showEventList(interaction);
-      break;
-    case 'settings_channel':
-      await showChannelSelectMenu(interaction);
-      break;
-    case 'manual_reminder':
-      await triggerManualReminder(interaction);
-      break;
-    case 'cancel_event':
-      await showCancellableEvents(interaction);
-      break;
-    case 'download_list':
-      await downloadPastEventParticipants(interaction);
-      break;
-    case 'help':
-      await showHelp(interaction);
-      break;
+    case "create_event":
+      return showCreateModal(interaction);
+    case "list_events":
+      return showList(interaction);
+    case "cancel_event":
+      return showCancelMenu(interaction);
+    case "manual_reminder":
+      return manualReminder(interaction);
+    case "settings_channel":
+      return showChannelSelect(interaction);
   }
 }
 
-// --- Modal do tworzenia eventu ---
-async function showCreateEventModal(interaction: ButtonInteraction) {
-  const modal = new Modal()
-    .setCustomId('modal_create_event')
-    .setTitle('Create Event');
+async function showCreateModal(interaction: ButtonInteraction) {
+  const modal = new ModalBuilder()
+    .setCustomId("create_event_modal")
+    .setTitle("Create Event");
 
-  const nameInput = new TextInputComponent()
-    .setCustomId('event_name')
-    .setLabel('Event Name')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+  const title = new TextInputBuilder()
+    .setCustomId("title")
+    .setLabel("Title")
+    .setStyle(TextInputStyle.Short);
 
-  const dayInput = new TextInputComponent()
-    .setCustomId('event_day')
-    .setLabel('Day (1-31)')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+  const description = new TextInputBuilder()
+    .setCustomId("description")
+    .setLabel("Description")
+    .setStyle(TextInputStyle.Paragraph);
 
-  const monthInput = new TextInputComponent()
-    .setCustomId('event_month')
-    .setLabel('Month (1-12)')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const timeInput = new TextInputComponent()
-    .setCustomId('event_time')
-    .setLabel('Time (HH:MM)')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const reminderInput = new TextInputComponent()
-    .setCustomId('reminder_minutes')
-    .setLabel('Minutes before event for auto reminder')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(false);
+  const timestamp = new TextInputBuilder()
+    .setCustomId("timestamp")
+    .setLabel("Unix Timestamp (ms)")
+    .setStyle(TextInputStyle.Short);
 
   modal.addComponents(
-    new MessageActionRow<TextInputComponent>().addComponents(nameInput),
-    new MessageActionRow<TextInputComponent>().addComponents(dayInput),
-    new MessageActionRow<TextInputComponent>().addComponents(monthInput),
-    new MessageActionRow<TextInputComponent>().addComponents(timeInput),
-    new MessageActionRow<TextInputComponent>().addComponents(reminderInput)
+    new ActionRowBuilder<TextInputBuilder>().addComponents(title),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(description),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(timestamp)
   );
 
   await interaction.showModal(modal);
 }
 
-// --- Obsługa submitu modala ---
 async function handleModal(interaction: ModalSubmitInteraction) {
-  if (interaction.customId !== 'modal_create_event') return;
+  if (interaction.customId !== "create_event_modal") return;
 
-  const name = interaction.fields.getTextInputValue('event_name');
-  const day = parseInt(interaction.fields.getTextInputValue('event_day'));
-  const month = parseInt(interaction.fields.getTextInputValue('event_month'));
-  const [hour, minute] = interaction.fields
-    .getTextInputValue('event_time')
-    .split(':')
-    .map(Number);
-  const reminderMinutes = parseInt(
-    interaction.fields.getTextInputValue('reminder_minutes') || '0'
+  const title = interaction.fields.getTextInputValue("title");
+  const description = interaction.fields.getTextInputValue("description");
+  const timestamp = Number(
+    interaction.fields.getTextInputValue("timestamp")
   );
 
-  const id = Date.now().toString();
-  const newEvent: EventData = {
-    id,
-    name,
-    day,
-    month,
-    hour,
-    minute,
-    reminderMinutes,
-    active: true,
-    participants: []
-  };
+  const config = eventStorage.getConfig();
+  if (!config.defaultChannelId) {
+    return interaction.reply({
+      content: "Default channel not set. Use ⚙️ first.",
+      ephemeral: true,
+    });
+  }
 
-  events.push(newEvent);
-  saveEvents();
+  eventService.createEvent({
+    title,
+    description,
+    timestamp,
+    channelId: config.defaultChannelId,
+  });
 
   await interaction.reply({
-    content: `Event **${name}** created successfully!`,
-    ephemeral: true
+    content: `Event **${title}** created.`,
+    ephemeral: true,
   });
 }
 
-// --- Listowanie eventów ---
-async function showEventList(interaction: ButtonInteraction) {
-  loadEvents();
+async function showList(interaction: ButtonInteraction) {
+  const events = eventService.listAllEvents();
 
   if (!events.length) {
-    await interaction.reply({ content: 'No events found.', ephemeral: true });
-    return;
+    return interaction.reply({
+      content: "No events found.",
+      ephemeral: true,
+    });
   }
 
-  const components: MessageActionRow<MessageButton>[] = [];
+  const formatted = events
+    .map(
+      (e) =>
+        `• ${e.title} - <t:${Math.floor(
+          e.timestamp / 1000
+        )}:F> ${e.cancelled ? "(CANCELLED)" : ""}`
+    )
+    .join("\n");
 
-  for (const ev of events) {
-    const color = ev.active ? 'SUCCESS' : 'DANGER';
-    components.push(
-      new MessageActionRow<MessageButton>().addComponents(
-        new MessageButton()
-          .setCustomId(`view_event_${ev.id}`)
-          .setLabel(`${ev.name} (${ev.day}/${ev.month} ${ev.hour}:${ev.minute})`)
-          .setStyle(color)
-      )
+  await interaction.reply({
+    content: formatted,
+    ephemeral: true,
+  });
+}
+
+async function showCancelMenu(interaction: ButtonInteraction) {
+  const events = eventService.listUpcomingEvents();
+
+  if (!events.length) {
+    return interaction.reply({
+      content: "No active events.",
+      ephemeral: true,
+    });
+  }
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("cancel_select")
+    .setPlaceholder("Select event to cancel")
+    .addOptions(
+      events.map((e) => ({
+        label: e.title,
+        value: e.id,
+      }))
+    );
+
+  await interaction.reply({
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    ],
+    ephemeral: true,
+  });
+}
+
+async function handleSelect(interaction: any) {
+  if (interaction.customId === "cancel_select") {
+    const id = interaction.values[0];
+    eventService.cancelEvent(id);
+
+    await interaction.reply({
+      content: "Event cancelled.",
+      ephemeral: true,
+    });
+  }
+
+  if (interaction.customId === "channel_select") {
+    const channelId = interaction.values[0];
+    eventStorage.setDefaultChannel(channelId);
+
+    await interaction.reply({
+      content: "Default channel updated.",
+      ephemeral: true,
+    });
+  }
+}
+
+async function showChannelSelect(interaction: ButtonInteraction) {
+  if (!interaction.guild) return;
+
+  const channels = interaction.guild.channels.cache
+    .filter((c) => c.isTextBased())
+    .map((c) => ({
+      label: c.name,
+      value: c.id,
+    }));
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("channel_select")
+    .setPlaceholder("Select notification channel")
+    .addOptions(channels);
+
+  await interaction.reply({
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    ],
+    ephemeral: true,
+  });
+}
+
+async function manualReminder(interaction: ButtonInteraction) {
+  const events = eventService.listUpcomingEvents();
+  const config = eventStorage.getConfig();
+
+  if (!config.defaultChannelId)
+    return interaction.reply({
+      content: "No default channel set.",
+      ephemeral: true,
+    });
+
+  const channel = interaction.guild?.channels.cache.get(
+    config.defaultChannelId
+  ) as TextChannel;
+
+  if (!channel)
+    return interaction.reply({
+      content: "Channel not found.",
+      ephemeral: true,
+    });
+
+  for (const event of events) {
+    await channel.send(
+      `Reminder: **${event.title}** at <t:${Math.floor(
+        event.timestamp / 1000
+      )}:F>`
     );
   }
 
   await interaction.reply({
-    content: 'Event List:',
-    components: components,
-    ephemeral: true
+    content: "Reminders sent.",
+    ephemeral: true,
   });
-}
-
-// --- Select Menu ustawienia kanału ---
-async function showChannelSelectMenu(interaction: ButtonInteraction) {
-  const guild = interaction.guild;
-  if (!guild) return;
-
-  const channels = guild.channels.cache
-    .filter(c => c.isTextBased())
-    .map(c => ({
-      label: c.name,
-      value: c.id
-    }));
-
-  const menu = new MessageSelectMenu()
-    .setCustomId('select_default_channel')
-    .setPlaceholder('Select default notification channel')
-    .addOptions(channels);
-
-  const row = new MessageActionRow<MessageSelectMenu>().addComponents(menu);
-
-  await interaction.reply({ content: 'Select default channel:', components: [row], ephemeral: true });
-}
-
-// --- Pozostałe przyciski (szkielet funkcji) ---
-async function triggerManualReminder(interaction: ButtonInteraction) {
-  await interaction.reply({ content: 'Manual reminder triggered.', ephemeral: true });
-}
-
-async function showCancellableEvents(interaction: ButtonInteraction) {
-  await interaction.reply({ content: 'List of cancellable events.', ephemeral: true });
-}
-
-async function downloadPastEventParticipants(interaction: ButtonInteraction) {
-  await interaction.reply({ content: 'Downloading participant lists...', ephemeral: true });
-}
-
-async function showHelp(interaction: ButtonInteraction) {
-  const helpText = `
-**Help:**
-⚙️ - Set default notification channel
-🔔 - Trigger manual reminder
-🗑️ - Cancel active event
-⬇️ - Download past event participants
-  `;
-  await interaction.reply({ content: helpText, ephemeral: true });
-}
-
-// --- Select Menu handler ---
-async function handleSelectMenu(interaction: any) {
-  if (interaction.customId === 'select_default_channel') {
-    const selectedChannel = interaction.values[0];
-    // tutaj zapisujemy wybrany kanał jako domyślny dla wszystkich eventów
-    // np. w config.json lub w memory
-    await interaction.reply({ content: `Default channel set!`, ephemeral: true });
-  }
 }
