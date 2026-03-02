@@ -1,7 +1,8 @@
 // src/index.ts
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
-import { initEventModule } from "./modules/EventModule"; // <-- import EventModule
+import { initEventService } from "./events/eventService";
+import { initEventPanel } from "./events/eventPanel";
 
 const client = new Client({
     intents: [
@@ -17,9 +18,10 @@ if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // Inicjalizacja modułów
-initTranslationModule(client);
-initEventModule(client); // <-- tutaj inicjalizacja EventModule
+initTranslationModule(client); // moduł tłumaczeń pozostaje bez zmian
+initEventService(client);      // logika eventów + JSON storage
+initEventPanel(client);        // panel Discord z przyciskami i dropdown
 
-client.once("clientReady", () => console.log(`Logged in as ${client.user?.tag}`));
+client.once("ready", () => console.log(`Logged in as ${client.user?.tag}`));
 
 client.login(BOT_TOKEN);
