@@ -6,7 +6,8 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
-    ComponentType
+    ComponentType,
+    Message
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -20,7 +21,10 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
+if (!process.env.BOT_TOKEN) {
+    throw new Error("BOT_TOKEN not defined");
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 const LIBRE_URL =
@@ -30,6 +34,12 @@ const LIBRE_URL =
 const GOOGLE_URL =
     process.env.GOOGLE_URL ||
     "https://translate.googleapis.com/translate_a/single";
+
+interface LibreResponse {
+    translatedText: string;
+}
+
+type GoogleResponse = string[][][];
 
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
@@ -43,8 +53,10 @@ client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-client.on("messageCreate", async (message) => {
+// Auto reakcja 🌍
+client.on("messageCreate", async (message: Message) => {
     if (message.author.bot || !message.inGuild()) return;
+
     try {
         await message.react("🌍");
     } catch {}
@@ -52,8 +64,10 @@ client.on("messageCreate", async (message) => {
 
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
+
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
+
     if (reaction.emoji.name !== "🌍") return;
     if (!reaction.message.inGuild()) return;
 
@@ -61,19 +75,23 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
     // ---------- EMBED ----------
     const embed = new EmbedBuilder()
-        .setTitle("🌍 Translation Panel") // Tytuł NA GÓRZE
+        .setTitle("🌍 Translation Panel")
         .setAuthor({
             name: message.author.username,
             iconURL: message.author.displayAvatarURL()
         })
         .setDescription(`"${message.content}"`)
         .setColor("Blue")
-        .setFooter({ text: "You have 60 seconds to choose a language." });
+        .setFooter({
+            text: "You have 60 seconds to choose a language."
+        });
 
     // ---------- BUTTONS ----------
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
     for (let i = 0; i < LANGUAGES.length; i += 5) {
         const row = new ActionRowBuilder<ButtonBuilder>();
+
         for (const lang of LANGUAGES.slice(i, i + 5)) {
             row.addComponents(
                 new ButtonBuilder()
@@ -83,6 +101,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
                     .setStyle(ButtonStyle.Primary)
             );
         }
+
         rows.push(row);
     }
 
@@ -91,16 +110,19 @@ client.on("messageReactionAdd", async (reaction, user) => {
         components: rows
     });
 
-    // ---------- COLLECTOR (60s) ----------
+    // ---------- COLLECTOR 60s ----------
     const collector = panel.createMessageComponentCollector({
         componentType: ComponentType.Button,
         time: 60_000
     });
 
     collector.on("collect", async interaction => {
-        const [_, messageId, langCode] = interaction.customId.split("_");
+        const [, , langCode] = interaction.customId.split("_");
 
-        let translated = await translateText(message.content, langCode);
+        const translated = await translateText(
+            message.content,
+            langCode
+        );
 
         await interaction.reply({
             embeds: [
@@ -114,9 +136,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
     });
 
     collector.on("end", async () => {
-        // Wyłączamy przyciski po 60s
         const disabledRows = rows.map(row => {
-            row.components.forEach(btn => btn.setDisabled(true));
+            row.components.forEach(component => {
+                component.setDisabled(true);
+            });
             return row;
         });
 
@@ -133,8 +156,12 @@ client.on("messageReactionAdd", async (reaction, user) => {
     });
 });
 
-// ---------- ROTACJA API ----------
-async function translateText(text: string, target: string): Promise<string> {
+// ---------- TRANSLATION FUNCTION ----------
+async function translateText(
+    text: string,
+    target: string
+): Promise<string> {
+
     // 1️⃣ Libre
     try {
         const res = await fetch(LIBRE_URL, {
@@ -149,8 +176,11 @@ async function translateText(text: string, target: string): Promise<string> {
         });
 
         if (res.ok) {
-            const data = await res.json() as any;
-            if (data.translatedText) return data.translatedText;
+            const data = (await res.json()) as Partial<LibreResponse>;
+
+            if (typeof data.translatedText === "string") {
+                return data.translatedText;
+            }
         }
     } catch {}
 
@@ -164,10 +194,20 @@ async function translateText(text: string, target: string): Promise<string> {
             q: text
         });
 
-        const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
-        const data = await res.json();
+        const res = await fetch(
+            `${GOOGLE_URL}?${params.toString()}`
+        );
 
-        return data[0][0][0];
+        const data = (await res.json()) as GoogleResponse;
+
+        if (
+            Array.isArray(data) &&
+            Array.isArray(data[0]) &&
+            Array.isArray(data[0][0]) &&
+            typeof data[0][0][0] === "string"
+        ) {
+            return data[0][0][0];
+        }
     } catch {}
 
     return "Translation failed.";
