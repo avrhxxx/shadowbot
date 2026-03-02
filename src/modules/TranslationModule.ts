@@ -49,13 +49,13 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed z nagłówkiem w opisie zamiast tytułu
+        // Embed bez tytułu, z separator Unicode w opisie
         const embed = new EmbedBuilder()
             .setAuthor({ 
                 name: message.author.username, 
                 iconURL: message.author.displayAvatarURL({ dynamic: true, size: 64 })
-            }) // Avatar i nick nad treścią
-            .setDescription(`🌍 Translation Panel\n\n"${message.content}"`) // Nagłówek + wiadomość
+            })
+            .setDescription(`🌍─────────────────🌍\n"${message.content}"`) // separator + treść
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
@@ -67,7 +67,7 @@ export function initTranslationModule(client: Client) {
                     new ButtonBuilder()
                         .setCustomId(`translate_${message.id}_${lang.code}`)
                         .setLabel(lang.label)
-                        .setEmoji(lang.emoji)
+                        .setEmoji(lang.emoji) // każda flaga przy przycisku zostaje
                         .setStyle(ButtonStyle.Primary)
                 );
             }
