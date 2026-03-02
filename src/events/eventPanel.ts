@@ -5,18 +5,16 @@ import {
   ButtonBuilder,
   ButtonStyle,
   Interaction,
+  StringSelectMenuBuilder,
 } from "discord.js";
 
 import {
   loadEvents,
-  createEvent,
-  addParticipant,
-  removeParticipant,
-  markAbsent,
   calculateAttendance,
   findInactiveMembers,
   pinActiveEvent,
   getUpcomingEvents,
+  EventData,
 } from "./eventService";
 
 export async function initEventPanel(client: Client) {
@@ -63,6 +61,10 @@ export async function initEventPanel(client: Client) {
           .setCustomId("event_pin_active")
           .setLabel("Pin Active")
           .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId("event_export")
+          .setLabel("Export Participants")
+          .setStyle(ButtonStyle.Secondary)
       );
 
     await channel.send({
@@ -72,12 +74,12 @@ export async function initEventPanel(client: Client) {
   });
 
   client.on("interactionCreate", async (interaction: Interaction) => {
-    if (!interaction.isButton()) return;
+    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
     const events = loadEvents();
 
-    /* ===================== LIST EVENTS ===================== */
-    if (interaction.customId === "event_list") {
+    // ===================== LIST EVENTS =====================
+    if (interaction.isButton() && interaction.customId === "event_list") {
       if (events.length === 0) {
         await interaction.reply({ content: "No events yet.", ephemeral: true });
         return;
@@ -92,8 +94,8 @@ export async function initEventPanel(client: Client) {
       return;
     }
 
-    /* ===================== STATISTICS ===================== */
-    if (interaction.customId === "event_stats") {
+    // ===================== STATISTICS =====================
+    if (interaction.isButton() && interaction.customId === "event_stats") {
       const stats = calculateAttendance(events);
       const sorted = Object.entries(stats).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
@@ -105,8 +107,8 @@ export async function initEventPanel(client: Client) {
       return;
     }
 
-    /* ===================== SMART SUGGESTION ===================== */
-    if (interaction.customId === "event_suggestions") {
+    // ===================== SMART SUGGESTION =====================
+    if (interaction.isButton() && interaction.customId === "event_suggestions") {
       const inactive = findInactiveMembers(events);
 
       await interaction.reply({
@@ -118,8 +120,8 @@ export async function initEventPanel(client: Client) {
       return;
     }
 
-    /* ===================== PIN ACTIVE EVENT ===================== */
-    if (interaction.customId === "event_pin_active") {
+    // ===================== PIN ACTIVE EVENT =====================
+    if (interaction.isButton() && interaction.customId === "event_pin_active") {
       const upcoming = getUpcomingEvents();
       if (upcoming.length === 0) {
         await interaction.reply({ content: "No upcoming events.", ephemeral: true });
@@ -134,6 +136,63 @@ export async function initEventPanel(client: Client) {
         content: `✅ Pinned active event: **${activeEvent.name}**`,
         ephemeral: true
       });
+      return;
+    }
+
+    // ===================== EXPORT PARTICIPANTS =====================
+    if (interaction.isButton() && interaction.customId === "event_export") {
+      const upcoming = getUpcomingEvents();
+      if (upcoming.length === 0) {
+        await interaction.reply({ content: "No upcoming events.", ephemeral: true });
+        return;
+      }
+
+      // Jeśli jest więcej niż jeden nadchodzący event, daj wybór dropdown
+      if (upcoming.length === 1) {
+        const activeEvent = upcoming[0];
+        const channel = interaction.channel as TextChannel;
+        const list = activeEvent.participants
+          .map((p, i) => `${i + 1}. ${p.nick} (${p.present ? "✅" : "❌"})`)
+          .join("\n");
+        await channel.send(`📋 Participants for **${activeEvent.name}**\n\n${list}`);
+        await interaction.reply({ content: "✅ Exported participants.", ephemeral: true });
+        return;
+      }
+
+      // Dropdown select dla wielu eventów
+      const options = upcoming.map(e => ({ label: e.name, value: e.id }));
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId("select_export_event")
+            .setPlaceholder("Select event to export")
+            .addOptions(options)
+        );
+
+      await interaction.reply({
+        content: "Select event to export participants:",
+        components: [row],
+        ephemeral: true
+      });
+      return;
+    }
+
+    // ===================== DROPDOWN EXPORT =====================
+    if (interaction.isStringSelectMenu() && interaction.customId === "select_export_event") {
+      const eventId = interaction.values[0];
+      const event = events.find(e => e.id === eventId);
+      if (!event) {
+        await interaction.reply({ content: "Event not found.", ephemeral: true });
+        return;
+      }
+
+      const list = event.participants
+        .map((p, i) => `${i + 1}. ${p.nick} (${p.present ? "✅" : "❌"})`)
+        .join("\n");
+
+      const channel = interaction.channel as TextChannel;
+      await channel.send(`📋 Participants for **${event.name}**\n\n${list}`);
+      await interaction.reply({ content: "✅ Exported participants.", ephemeral: true });
       return;
     }
   });
