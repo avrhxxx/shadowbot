@@ -1,4 +1,3 @@
-// src/events/eventService.ts
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
@@ -76,8 +75,6 @@ export function createEvent(
   if (eventDate.getTime() < Date.now()) {
     year += 1; // jeśli przeszłość, ustaw następny rok
   }
-
-  const timestamp = new Date(year, month - 1, day, hour, minute).getTime();
 
   const newEvent: EventObject = {
     id: uuidv4(),
@@ -160,4 +157,22 @@ export function setDefaultChannel(guildId: string, channelId: string) {
 export function getDefaultChannel(guildId: string): string | undefined {
   const config = loadConfig();
   return config[guildId]?.defaultChannelId;
+}
+
+// ======= GENERATE PARTICIPANTS FILE =======
+export function generateParticipantsFile(guildId: string, eventId: string): string {
+  const all = loadEvents();
+  const event = all[guildId]?.events.find(e => e.id === eventId);
+  if (!event) throw new Error("Event not found");
+
+  const lines = [
+    `Event: ${event.name}`,
+    `Date: ${event.day}-${event.month} ${event.hour}:${event.minute}`,
+    `Participants (${event.participants.length}):`,
+    ...event.participants.map(id => id)
+  ];
+
+  const filePath = path.resolve(`./data/${event.id}_participants.txt`);
+  fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+  return filePath;
 }
