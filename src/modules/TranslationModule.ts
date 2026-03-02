@@ -12,12 +12,9 @@ import {
 import fetch from "node-fetch";
 
 const LIBRE_URL =
-    process.env.LIBRE_URL ||
-    "https://libretranslate-production-26a3.up.railway.app/translate";
+    process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
-const GOOGLE_URL =
-    process.env.GOOGLE_URL ||
-    "https://translate.googleapis.com/translate_a/single";
+const GOOGLE_URL = "https://translate.googleapis.com/translate_a/single";
 
 interface LibreResponse {
     translatedText: string;
@@ -49,13 +46,13 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed bez tytułu ani nagłówków, tylko avatar, nick i treść
+        // Embed bez tytułu, tylko avatar + nick + treść wiadomości
         const embed = new EmbedBuilder()
             .setAuthor({ 
-                name: message.author.username, 
-                iconURL: message.author.displayAvatarURL({ size: 64 }) // zwykły avatar
+                name: message.author.username,
+                iconURL: message.author.displayAvatarURL()
             })
-            .setDescription(message.content)
+            .setDescription(`${message.content}`)
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
@@ -89,11 +86,13 @@ export function initTranslationModule(client: Client) {
                 await interaction.editReply({
                     embeds: [
                         new EmbedBuilder()
-                            .setDescription(`"${translated}"`)
+                            .setDescription(`🌍 Translation (${langCode.toUpperCase()})\n\n${translated}`)
                             .setColor("Green")
                     ]
                 });
-            } catch (err) { console.error("Interaction error:", err); }
+            } catch (err) {
+                console.error("Interaction error:", err);
+            }
         });
 
         // Po 60s wyłączamy przyciski i usuwamy embed
@@ -109,6 +108,7 @@ export function initTranslationModule(client: Client) {
     });
 
     async function translateText(text: string, target: string): Promise<string> {
+        // Libre
         try {
             const res = await fetch(LIBRE_URL, {
                 method: "POST",
@@ -121,6 +121,7 @@ export function initTranslationModule(client: Client) {
             }
         } catch {}
 
+        // Google fallback
         try {
             const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
             const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
