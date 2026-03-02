@@ -14,7 +14,8 @@ import fetch from "node-fetch";
 const LIBRE_URL =
     process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
-const GOOGLE_URL = "https://translate.googleapis.com/translate_a/single";
+const GOOGLE_URL =
+    process.env.GOOGLE_URL || "https://translate.googleapis.com/translate_a/single";
 
 interface LibreResponse {
     translatedText: string;
@@ -46,16 +47,17 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed bez tytułu, tylko avatar + nick + treść wiadomości
+        // Embed: autor + treść wiadomości, bez tytułu
         const embed = new EmbedBuilder()
             .setAuthor({ 
-                name: message.author.username,
-                iconURL: message.author.displayAvatarURL()
+                name: message.author.username, 
+                iconURL: message.author.displayAvatarURL() 
             })
-            .setDescription(`${message.content}`)
+            .setDescription(`"${message.content}"`)
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
+        // Przygotowanie przycisków
         const rows: ActionRowBuilder<ButtonBuilder>[] = [];
         for (let i = 0; i < LANGUAGES.length; i += 5) {
             const row = new ActionRowBuilder<ButtonBuilder>();
@@ -86,7 +88,7 @@ export function initTranslationModule(client: Client) {
                 await interaction.editReply({
                     embeds: [
                         new EmbedBuilder()
-                            .setDescription(`🌍 Translation (${langCode.toUpperCase()})\n\n${translated}`)
+                            .setDescription(`🌍 Translation (${langCode.toUpperCase()})\n\n"${translated}"`)
                             .setColor("Green")
                     ]
                 });
@@ -107,30 +109,33 @@ export function initTranslationModule(client: Client) {
         });
     });
 
+    // Funkcja tłumaczenia z fallbackiem Libre ↔ Google
     async function translateText(text: string, target: string): Promise<string> {
-        // Libre
-        try {
-            const res = await fetch(LIBRE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
-            });
-            if (res.ok) {
-                const data = (await res.json()) as Partial<LibreResponse>;
-                if (typeof data.translatedText === "string") return data.translatedText;
+        const servers: ("libre" | "google")[] = ["libre", "google"];
+        for (const server of servers) {
+            if (server === "libre") {
+                try {
+                    const res = await fetch(LIBRE_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
+                    });
+                    if (res.ok) {
+                        const data = (await res.json()) as Partial<LibreResponse>;
+                        if (typeof data.translatedText === "string") return data.translatedText;
+                    }
+                } catch {}
+            } else if (server === "google") {
+                try {
+                    const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
+                    const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
+                    const data = (await res.json()) as GoogleResponse;
+                    if (Array.isArray(data) && Array.isArray(data[0]) && Array.isArray(data[0][0]) && typeof data[0][0][0] === "string") {
+                        return data[0][0][0];
+                    }
+                } catch {}
             }
-        } catch {}
-
-        // Google fallback
-        try {
-            const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
-            const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
-            const data = (await res.json()) as GoogleResponse;
-            if (Array.isArray(data) && Array.isArray(data[0]) && Array.isArray(data[0][0]) && typeof data[0][0][0] === "string") {
-                return data[0][0][0];
-            }
-        } catch {}
-
+        }
         return "Translation failed.";
     }
 }
