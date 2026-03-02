@@ -1,5 +1,3 @@
-// src/modules/EventModule.ts
-
 import {
     Client,
     TextChannel,
@@ -44,6 +42,7 @@ function saveEvents(events: EventData[]) {
 export async function initEventModule(client: Client) {
 
     client.once("ready", async () => {
+
         const guild = client.guilds.cache.first();
         if (!guild) return;
 
@@ -57,6 +56,15 @@ export async function initEventModule(client: Client) {
                 type: 0
             }) as TextChannel;
         }
+
+        // 🔥 SPRAWDŹ czy panel już istnieje (żeby nie spamował)
+        const messages = await channel.messages.fetch({ limit: 20 });
+        const existingPanel = messages.find(m =>
+            m.author.id === client.user?.id &&
+            m.content.includes("Event Management Panel")
+        );
+
+        if (existingPanel) return;
 
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
@@ -82,11 +90,14 @@ export async function initEventModule(client: Client) {
 
     client.on("interactionCreate", async (interaction: Interaction) => {
 
+        // =====================
+        // BUTTONS
+        // =====================
         if (interaction.isButton()) {
 
             const events = loadEvents();
 
-            // CREATE EVENT
+            // CREATE EVENT BUTTON
             if (interaction.customId === "event_create") {
 
                 const modal = new ModalBuilder()
@@ -122,7 +133,9 @@ export async function initEventModule(client: Client) {
                     return;
                 }
 
-                const list = events
+                const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
+
+                const list = sorted
                     .map(e => `• **${e.name}** (${new Date(e.timestamp).toLocaleString()})`)
                     .join("\n");
 
@@ -136,24 +149,26 @@ export async function initEventModule(client: Client) {
 
             // HELP
             if (interaction.customId === "event_help") {
+
                 await interaction.reply({
-                    content: `
-**Event Panel Help**
-• Create Event → Create new event  
-• List Events → Show all events  
-• Add → Add participant  
-• Remove → Remove participant  
-• Mark Absent → Set absent  
-• List → Show participants
-`,
+                    content:
+                        `**Event Panel Help**\n\n` +
+                        `• Create Event → Create new event\n` +
+                        `• List Events → Show all events\n` +
+                        `• Add → Add participant\n` +
+                        `• Remove → Remove participant\n` +
+                        `• Mark Absent → Set absent\n` +
+                        `• List → Show participants`,
                     ephemeral: true
                 });
+
                 return;
             }
 
-            // EVENT ACTION BUTTONS (add_remove_absent_list)
+            // EVENT ACTION BUTTONS
             const parts = interaction.customId.split("_");
             if (parts.length === 2) {
+
                 const action = parts[0];
                 const eventId = parts[1];
 
@@ -203,7 +218,9 @@ export async function initEventModule(client: Client) {
             }
         }
 
-        // MODAL SUBMIT
+        // =====================
+        // MODALS
+        // =====================
         if (interaction.isModalSubmit()) {
 
             const events = loadEvents();
@@ -214,8 +231,17 @@ export async function initEventModule(client: Client) {
                 const name = interaction.fields.getTextInputValue("event_name");
                 const dateStr = interaction.fields.getTextInputValue("event_date");
 
-                const [day, month, hourMin] = dateStr.split(/[-_]/);
-                const [hour, minute] = hourMin.split(":");
+                const match = dateStr.match(/^(\d{2})-(\d{2})_(\d{2}):(\d{2})$/);
+
+                if (!match) {
+                    await interaction.reply({
+                        content: "Invalid format. Use DD-MM_HH:MM (example: 15-03_20:00)",
+                        ephemeral: true
+                    });
+                    return;
+                }
+
+                const [, day, month, hour, minute] = match;
 
                 const now = new Date();
                 const timestamp = new Date(
@@ -225,11 +251,6 @@ export async function initEventModule(client: Client) {
                     Number(hour),
                     Number(minute)
                 ).getTime();
-
-                if (isNaN(timestamp)) {
-                    await interaction.reply({ content: "Invalid date format.", ephemeral: true });
-                    return;
-                }
 
                 const id = Date.now().toString();
 
@@ -245,6 +266,34 @@ export async function initEventModule(client: Client) {
                 await interaction.reply({
                     content: `✅ Event **${name}** created!`,
                     ephemeral: true
+                });
+
+                // SEND EVENT PANEL
+                const channel = interaction.channel as TextChannel;
+
+                const row = new ActionRowBuilder<ButtonBuilder>()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`add_${id}`)
+                            .setLabel("Add")
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setCustomId(`remove_${id}`)
+                            .setLabel("Remove")
+                            .setStyle(ButtonStyle.Danger),
+                        new ButtonBuilder()
+                            .setCustomId(`absent_${id}`)
+                            .setLabel("Mark Absent")
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId(`list_${id}`)
+                            .setLabel("List")
+                            .setStyle(ButtonStyle.Success)
+                    );
+
+                await channel.send({
+                    content: `📌 Event: **${name}**`,
+                    components: [row]
                 });
 
                 return;
