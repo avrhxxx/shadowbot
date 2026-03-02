@@ -1,9 +1,9 @@
+// src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { initEventPanel, renderEventPanel } from "../events/eventPanel";
 import { handleHelpButton } from "./HelpPanel";
 
 export async function initModeratorPanel(client: Client) {
-    client.once("clientReady", async () => {
+    client.once("ready", async () => {
         const guild = client.guilds.cache.first();
         if (!guild) return;
 
@@ -61,10 +61,7 @@ export async function initModeratorPanel(client: Client) {
 
         switch (interaction.customId) {
             case "event_menu":
-                initEventPanel(client); // podłączamy EventPanel
-                if (interaction.channel?.isTextBased()) {
-                    await renderEventPanel(interaction.channel as TextChannel); // wysyłamy panel z przyciskami
-                }
+                // Nie wywołujemy żadnej logiki EventPanel bezpośrednio
                 await interaction.reply({ content: "Event Panel opened.", ephemeral: true });
                 break;
 
