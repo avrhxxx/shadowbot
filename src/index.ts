@@ -1,5 +1,6 @@
-import { Client, GatewayIntentBits, EmbedBuilder, Message, MessageReaction, User, Partials, TextChannel } from "discord.js";
+import { Client, GatewayIntentBits, EmbedBuilder, Message, MessageReaction, User, Partials, TextChannel, PartialUser, PartialMessage, PartialMessageReaction } from "discord.js";
 import dotenv from "dotenv";
+import DeepL from "deepl-node";
 
 dotenv.config();
 
@@ -10,23 +11,17 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User]
 });
 
-type Translation = {
-    language: string;
-    text: string;
-};
+// DeepL translator
+const translator = new DeepL.Translator(process.env.DEEPL_API_KEY!);
 
-type TranslationData = {
-    embedMessage: Message | null;
-    translations: Map<string, Translation>; // userId -> Translation
-    currentIndex: number; // do przewijania embedów
-};
+type Translation = { language: string; text: string };
+type TranslationData = { embedMessage: Message | null; translations: Map<string, Translation>; currentIndex: number };
 
-const translationMessages = new Map<string, TranslationData>(); // messageId -> TranslationData
+const translationMessages = new Map<string, TranslationData>();
 
-// Emoji -> język
 function getLanguageFromEmoji(emoji: string): string | null {
     const map: Record<string, string> = {
         "🇵🇱": "Polish",
@@ -39,12 +34,17 @@ function getLanguageFromEmoji(emoji: string): string | null {
     return map[emoji] || null;
 }
 
-// Mock tłumaczenia (zastąp prawdziwym API później)
 async function translateMessage(text: string, language: string): Promise<string> {
-    return `[${language}] ${text}`;
+    try {
+        const targetLang = language.slice(0, 2).toUpperCase(); // PL, DE, EN...
+        const result = await translator.translateText(text, undefined, targetLang);
+        return result.text;
+    } catch (err) {
+        console.error("Błąd tłumaczenia:", err);
+        return `[${language}] ${text}`;
+    }
 }
 
-// Tworzenie/aktualizacja embedu
 function buildEmbed(original: Message, translations: Translation[], currentIndex: number): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setTitle("Translations")
@@ -63,57 +63,66 @@ function buildEmbed(original: Message, translations: Translation[], currentIndex
 // Nasłuchiwanie nowych wiadomości
 client.on("messageCreate", (message) => {
     if (message.author.bot) return;
-
     translationMessages.set(message.id, { embedMessage: null, translations: new Map(), currentIndex: 0 });
 });
 
-// Reakcje: przewijanie lub dodanie tłumaczenia
-client.on("messageReactionAdd", async (reaction: MessageReaction | Partial<MessageReaction>, user: User | Partial<User>) => {
-    if (user.partial) await user.fetch();
-    if (user.bot) return;
+// Listener z trzema parametrami dla TS + partial handling
+client.on(
+    "messageReactionAdd",
+    async (
+        reaction: MessageReaction | PartialMessageReaction,
+        user: User | PartialUser,
+        _event: any
+    ) => {
+        try {
+            if (user.partial) await user.fetch();
+            if ((user as User).bot) return;
 
-    if (reaction.partial) await reaction.fetch();
-    const msg = reaction.message;
-    if (msg.partial) await msg.fetch();
+            if (reaction.partial) await reaction.fetch();
+            const msg = reaction.message;
+            if (msg.partial) await msg.fetch();
 
-    const data = translationMessages.get(msg.id);
-    if (!data) return;
+            if (!msg || !msg.id || !msg.channel) return;
 
-    // Przewijanie embedów
-    if (reaction.emoji.name === "⬅️") {
-        if (data.translations.size === 0) return;
-        data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
-    } else if (reaction.emoji.name === "➡️") {
-        if (data.translations.size === 0) return;
-        data.currentIndex = (data.currentIndex + 1) % data.translations.size;
-    } else {
-        // Dodanie tłumaczenia według flagi
-        const language = reaction.emoji.name ? getLanguageFromEmoji(reaction.emoji.name) : null;
-        if (!language) return;
+            const data = translationMessages.get(msg.id);
+            if (!data) return;
 
-        if (data.translations.size >= 10 && !data.translations.has(user.id)) return;
+            // Przewijanie embedów
+            if (reaction.emoji?.name === "⬅️") {
+                if (data.translations.size === 0) return;
+                data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
+            } else if (reaction.emoji?.name === "➡️") {
+                if (data.translations.size === 0) return;
+                data.currentIndex = (data.currentIndex + 1) % data.translations.size;
+            } else {
+                const language = reaction.emoji?.name ? getLanguageFromEmoji(reaction.emoji.name) : null;
+                if (!language) return;
 
-        const translatedText = await translateMessage(msg.content, language);
-        data.translations.set(user.id, { language, text: translatedText });
-        data.currentIndex = data.translations.size - 1;
+                if (data.translations.size >= 10 && !data.translations.has((user as User).id)) return;
+
+                const translatedText = await translateMessage(msg.content, language);
+                data.translations.set((user as User).id, { language, text: translatedText });
+                data.currentIndex = data.translations.size - 1;
+            }
+
+            const embed = buildEmbed(msg as Message, Array.from(data.translations.values()), data.currentIndex);
+
+            if (!msg.channel.isTextBased()) return;
+            const textChannel = msg.channel as TextChannel;
+
+            if (data.embedMessage) {
+                await data.embedMessage.edit({ embeds: [embed] });
+            } else {
+                const embedMsg = await textChannel.send({ embeds: [embed] });
+                data.embedMessage = embedMsg;
+                await embedMsg.react("⬅️");
+                await embedMsg.react("➡️");
+            }
+        } catch (err) {
+            console.error("Reaction handling error:", err);
+        }
     }
-
-    const embed = buildEmbed(msg, Array.from(data.translations.values()), data.currentIndex);
-
-    const channel = msg.channel;
-    if (!channel.isTextBased()) return;
-
-    if (data.embedMessage) {
-        await data.embedMessage.edit({ embeds: [embed] });
-    } else {
-        const embedMsg = await (channel as TextChannel).send({ embeds: [embed] });
-        data.embedMessage = embedMsg;
-
-        // Reakcje do przewijania
-        await embedMsg.react("⬅️");
-        await embedMsg.react("➡️");
-    }
-});
+);
 
 client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
