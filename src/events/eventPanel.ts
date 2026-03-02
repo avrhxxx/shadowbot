@@ -1,4 +1,3 @@
-// src/events/eventPanel.ts
 import {
     Interaction,
     ButtonBuilder,
@@ -7,7 +6,8 @@ import {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    EmbedBuilder
+    EmbedBuilder,
+    Client
 } from "discord.js";
 import fs from "fs";
 import path from "path";
@@ -25,18 +25,9 @@ interface EventData {
     notifyMinutesBefore?: number;
 }
 
-// ---- Ścieżki do danych ----
-const DATA_DIR = path.join(__dirname, "../data");
-const DATA_PATH = path.join(DATA_DIR, "events.json");
-
-// ---- Pomocnicze funkcje do pliku ----
-function ensureDataFile() {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(DATA_PATH)) fs.writeFileSync(DATA_PATH, "[]", "utf-8");
-}
+const DATA_PATH = path.join(__dirname, "../data/events.json");
 
 function loadEvents(): EventData[] {
-    ensureDataFile();
     try {
         return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
     } catch {
@@ -45,11 +36,13 @@ function loadEvents(): EventData[] {
 }
 
 function saveEvents(events: EventData[]) {
-    ensureDataFile();
+    // Tworzymy folder, jeśli nie istnieje
+    const dir = path.dirname(DATA_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-// ===== Embed z Event Panel (po kliknięciu Event Menu) =====
+// ===== Embed z Event Panel =====
 export async function handleEventButton(interaction: Interaction) {
     if (!interaction.isButton()) return;
 
@@ -76,8 +69,8 @@ export async function handleEventButton(interaction: Interaction) {
     });
 }
 
-// ===== Obsługa workflow Create Event i List Events + uczestnicy =====
-export async function initEventPanel(client: any) {
+// ===== Init Event Panel =====
+export async function initEventPanel(client: Client) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
         // ===== BUTTON: Create Event =====
@@ -112,7 +105,7 @@ export async function initEventPanel(client: any) {
 
             const notifyInput = new TextInputBuilder()
                 .setCustomId("notify_minutes")
-                .setLabel("Minutes before notification (optional)")
+                .setLabel("Notify X minutes before event (optional)")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(false);
 
@@ -131,19 +124,24 @@ export async function initEventPanel(client: any) {
         // ===== MODAL SUBMIT: Create Event =====
         if (interaction.isModalSubmit() && interaction.customId === "modal_create_event") {
             try {
+                await interaction.deferReply({ ephemeral: true });
+
                 const name = interaction.fields.getTextInputValue("event_name");
                 const day = Number(interaction.fields.getTextInputValue("event_day"));
                 const month = Number(interaction.fields.getTextInputValue("event_month"));
                 const hourStr = interaction.fields.getTextInputValue("event_hour");
-                const notifyMinutesStr = interaction.fields.getTextInputValue("notify_minutes");
+                const notifyStr = interaction.fields.getTextInputValue("notify_minutes");
 
-                if (!name || !day || !month || !hourStr) {
-                    return await interaction.reply({ content: "Invalid input. Please try again.", ephemeral: true });
+                if (!name || isNaN(day) || isNaN(month) || !hourStr) {
+                    return await interaction.editReply({ content: "❌ Invalid input. Please try again." });
                 }
 
                 const [hour, minute] = hourStr.split(":").map(Number);
-                const now = new Date();
-                const timestamp = new Date(now.getFullYear(), month - 1, day, hour, minute).getTime();
+                if (isNaN(hour) || isNaN(minute)) {
+                    return await interaction.editReply({ content: "❌ Invalid hour format. Use HH:MM." });
+                }
+
+                const timestamp = new Date(new Date().getFullYear(), month - 1, day, hour, minute).getTime();
 
                 const events = loadEvents();
                 const id = Date.now().toString();
@@ -153,18 +151,21 @@ export async function initEventPanel(client: any) {
                     name,
                     timestamp,
                     participants: [],
-                    notifyMinutesBefore: notifyMinutesStr ? Number(notifyMinutesStr) : undefined
+                    notifyMinutesBefore: notifyStr ? Number(notifyStr) : undefined
                 });
 
                 saveEvents(events);
 
-                await interaction.reply({
-                    content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}.`,
-                    ephemeral: true
+                await interaction.editReply({
+                    content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}.`
                 });
             } catch (err) {
                 console.error("Error creating event:", err);
-                await interaction.reply({ content: "❌ Something went wrong. Try again.", ephemeral: true });
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: "❌ Something went wrong. Try again.", ephemeral: true });
+                } else {
+                    await interaction.editReply({ content: "❌ Something went wrong. Try again." });
+                }
             }
             return;
         }
@@ -193,7 +194,7 @@ export async function initEventPanel(client: any) {
             return;
         }
 
-        // ===== BUTTONS: Event Details / Participants =====
+        // ===== BUTTONS: Single Event & Participants =====
         if (interaction.isButton() && interaction.customId.startsWith("event_")) {
             const id = interaction.customId.split("_")[1];
             const events = loadEvents();
@@ -206,29 +207,57 @@ export async function initEventPanel(client: any) {
 
             const row = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`add_${id}`)
-                        .setLabel("Add Participant")
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`remove_${id}`)
-                        .setLabel("Remove Participant")
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`absent_${id}`)
-                        .setLabel("Mark Absent")
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId(`list_${id}`)
-                        .setLabel("List Participants")
-                        .setStyle(ButtonStyle.Success)
+                    new ButtonBuilder().setCustomId(`add_${id}`).setLabel("Add Participant").setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`remove_${id}`).setLabel("Remove Participant").setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`absent_${id}`).setLabel("Mark Absent").setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`list_${id}`).setLabel("List Participants").setStyle(ButtonStyle.Success)
                 );
 
             await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
             return;
         }
 
-        // ===== MODAL SUBMITS: Participants =====
+        // ===== BUTTONS: Add / Remove / Absent / List Participants =====
+        if (interaction.isButton()) {
+            const parts = interaction.customId.split("_");
+            const action = parts[0];
+            const id = parts[1];
+
+            if (!["add","remove","absent","list"].includes(action)) return;
+
+            const events = loadEvents();
+            const event = events.find(e => e.id === id);
+            if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+
+            if (["add","remove","absent"].includes(action)) {
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_${action}_${id}`)
+                    .setTitle(`${action.toUpperCase()} Participant`);
+
+                const nickInput = new TextInputBuilder()
+                    .setCustomId("participant_nick")
+                    .setLabel("Participant Nick")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput));
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (action === "list") {
+                const present = event.participants.filter(p => p.present).map(p => p.nick);
+                const absent = event.participants.filter(p => !p.present).map(p => p.nick);
+
+                await interaction.reply({
+                    content: `**${event.name}**\n\n✅ Present: ${present.join(", ") || "none"}\n❌ Absent: ${absent.join(", ") || "none"}`,
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+
+        // ===== MODAL SUBMITS: Add/Remove/Absent Participants =====
         if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_")) {
             const parts = interaction.customId.split("_");
             const action = parts[1];
