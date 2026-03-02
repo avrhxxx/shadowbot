@@ -6,6 +6,7 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
+    InteractionType
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -14,34 +15,29 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [
-        Partials.Message,
-        Partials.Channel,
-        Partials.Reaction,
-    ]
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const LIBRE_URL = process.env.LIBRE_URL;
+// Endpoint LibreTranslate
+const LIBRE_URL = process.env.LIBRE_URL || "http://libretranslate-production-26a3.up.railway.app/translate";
 
-if (!LIBRE_URL) throw new Error("LIBRE_URL is not defined! Set only the URL without quotes or const.");
-
+// Języki do wyboru
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
     { code: "pl", label: "Polish", emoji: "🇵🇱" },
     { code: "de", label: "German", emoji: "🇩🇪" },
     { code: "fr", label: "French", emoji: "🇫🇷" },
-    { code: "ru", label: "Russian", emoji: "🇷🇺" },
+    { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-// Kolejka reakcji z cooldown
+// Queue na reakcje
 const reactionQueue: string[] = [];
 let processingQueue = false;
-const reactionCooldown = new Set<string>(); // userId:messageId dla cooldown
 
 async function processReactionQueue() {
     if (processingQueue) return;
@@ -55,13 +51,13 @@ async function processReactionQueue() {
 
         try {
             const channel = await client.channels.fetch(channelId);
-            if (!channel?.isTextBased()) continue;
+            if (!channel || !channel.isTextBased()) continue;
 
             const message = await channel.messages.fetch(messageId);
             if (!message) continue;
 
             await message.react("🌐");
-            await new Promise(res => setTimeout(res, 900));
+            await new Promise(res => setTimeout(res, 900)); // małe opóźnienie
 
         } catch (err) {
             console.error("Reaction queue error:", err);
@@ -71,21 +67,24 @@ async function processReactionQueue() {
     processingQueue = false;
 }
 
-// Ready
+// Logowanie
 client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-// Auto reaction
+// Auto-reaction do każdej wiadomości
 client.on("messageCreate", async (message) => {
-    if (message.author.bot || !message.inGuild()) return;
+    if (message.author.bot) return;
+    if (!message.inGuild()) return;
+
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
 
-const translationEmbeds = new Map<string, string>();
+// Mapowanie wiadomości na panel z przyciskami
+const translationPanels = new Map<string, string>();
 
-// Reaction click
+// Kliknięcie reakcji 🌐
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
 
@@ -94,18 +93,13 @@ client.on("messageReactionAdd", async (reaction, user) => {
     if (reaction.emoji.name !== "🌐") return;
     if (!reaction.message.inGuild()) return;
 
-    const key = `${user.id}:${reaction.message.id}`;
-    if (reactionCooldown.has(key)) return; // cooldown
-    reactionCooldown.add(key);
-    setTimeout(() => reactionCooldown.delete(key), 5000); // 5s cooldown
-
     const message = reaction.message;
 
-    // Sprawdź czy embed już istnieje
+    // Jeżeli panel już istnieje, nie twórz nowego
     let existingPanel;
-    if (translationEmbeds.has(message.id)) {
+    if (translationPanels.has(message.id)) {
         try {
-            existingPanel = await message.channel.messages.fetch(translationEmbeds.get(message.id)!);
+            existingPanel = await message.channel.messages.fetch(translationPanels.get(message.id)!);
         } catch {}
     }
 
@@ -131,19 +125,19 @@ client.on("messageReactionAdd", async (reaction, user) => {
         }
 
         const sent = await message.channel.send({ embeds: [embed], components: rows });
-        translationEmbeds.set(message.id, sent.id);
+        translationPanels.set(message.id, sent.id);
 
-        // Auto-delete panel po 30 sekundach
+        // Usuń panel po 30 sekundach
         setTimeout(async () => {
             try {
                 await sent.delete();
-                translationEmbeds.delete(message.id);
+                translationPanels.delete(message.id);
             } catch {}
         }, 30_000);
     }
 });
 
-// Button interaction
+// Obsługa przycisków
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
     if (!interaction.customId.startsWith("translate_")) return;
@@ -152,7 +146,7 @@ client.on("interactionCreate", async (interaction) => {
     const messageId = parts[1];
     const langCode = parts[2];
 
-    if (!interaction.channel?.isTextBased()) {
+    if (!interaction.channel || !interaction.channel.isTextBased()) {
         await interaction.reply({ content: "Channel not supported.", ephemeral: true });
         return;
     }
@@ -165,8 +159,10 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
-    let translatedText = "Translation failed.";
+    // Odroczenie odpowiedzi na interakcję (uniknięcie 10062)
+    await interaction.deferReply({ ephemeral: true });
 
+    let translatedText = "Translation failed.";
     try {
         const res = await fetch(LIBRE_URL, {
             method: "POST",
@@ -186,21 +182,20 @@ client.on("interactionCreate", async (interaction) => {
             const data = await res.json() as { translatedText?: string };
             translatedText = data.translatedText ?? translatedText;
         }
-
     } catch (err) {
         console.error("LibreTranslate error:", err);
         translatedText = "Translation service unreachable.";
     }
 
-    await interaction.reply({
+    await interaction.editReply({
         embeds: [
             new EmbedBuilder()
                 .setTitle(`Translation (${langCode.toUpperCase()})`)
                 .setDescription(translatedText)
                 .setColor("Green")
-        ],
-        ephemeral: true
+        ]
     });
 });
 
+// Login bota
 client.login(BOT_TOKEN);
