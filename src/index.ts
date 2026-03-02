@@ -26,10 +26,8 @@ const client = new Client({
 type Translation = { language: string; text: string };
 type TranslationData = { embedMessage: Message | null; translations: Map<string, Translation>; currentIndex: number };
 
-// Przechowuje oryginalne wiadomości i tłumaczenia
 const translationMessages = new Map<string, TranslationData>();
 
-// Mapowanie emoji na języki
 function getLanguageFromEmoji(emoji: string): string | null {
     const map: Record<string, string> = {
         "🇵🇱": "Polish",
@@ -42,7 +40,6 @@ function getLanguageFromEmoji(emoji: string): string | null {
     return map[emoji] || null;
 }
 
-// Funkcja tłumaczenia przy użyciu LibreTranslate
 async function translateMessage(text: string, language: string): Promise<string> {
     try {
         const targetMap: Record<string, string> = {
@@ -61,7 +58,6 @@ async function translateMessage(text: string, language: string): Promise<string>
             body: JSON.stringify({ q: text, source: "auto", target: targetLang, format: "text" })
         });
 
-        // TS poprawka: jawne castowanie
         const data = (await response.json()) as { translatedText?: string };
         return data.translatedText ?? `[${language}] ${text}`;
     } catch (err) {
@@ -70,7 +66,6 @@ async function translateMessage(text: string, language: string): Promise<string>
     }
 }
 
-// Budowanie embeda z aktualnym tłumaczeniem
 function buildEmbed(original: Message, translations: Translation[], currentIndex: number): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setTitle("Translations")
@@ -86,13 +81,11 @@ function buildEmbed(original: Message, translations: Translation[], currentIndex
     return embed;
 }
 
-// Nasłuchiwanie nowych wiadomości
 client.on("messageCreate", (message) => {
     if (message.author.bot) return;
     translationMessages.set(message.id, { embedMessage: null, translations: new Map(), currentIndex: 0 });
 });
 
-// Listener reakcji z obsługą partiali
 client.on(
     "messageReactionAdd",
     async (
@@ -111,7 +104,7 @@ client.on(
             const data = translationMessages.get(msg.id);
             if (!data) return;
 
-            // Obsługa przewijania ⬅️ / ➡️
+            // Przewijanie ⬅️ / ➡️
             if (reaction.emoji?.name === "⬅️") {
                 if (data.translations.size === 0) return;
                 data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
@@ -119,12 +112,13 @@ client.on(
                 if (data.translations.size === 0) return;
                 data.currentIndex = (data.currentIndex + 1) % data.translations.size;
             } else {
-                // TS poprawka: jawne sprawdzenie emoji
                 const emojiName = reaction.emoji?.name;
                 if (!emojiName) return;
 
                 const language = getLanguageFromEmoji(emojiName);
                 if (!language) return;
+
+                if (!msg.content) return; // TS2345 fix
 
                 if (data.translations.size >= 10 && !data.translations.has((user as User).id)) return;
 
@@ -156,5 +150,4 @@ client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-// Logowanie bota
 client.login(process.env.BOT_TOKEN);
