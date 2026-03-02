@@ -1,5 +1,5 @@
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { handleEventButton } from "../events/eventPanel";
+import { initEventPanel } from "../events/eventPanel"; // <-- poprawiony import
 import { handleHelpButton } from "./HelpPanel";
 
 export async function initModeratorPanel(client: Client) {
@@ -61,7 +61,9 @@ export async function initModeratorPanel(client: Client) {
 
         switch (interaction.customId) {
             case "event_menu":
-                await handleEventButton(interaction);
+                // uruchamiamy cały EventPanel
+                initEventPanel(client);
+                await interaction.reply({ content: "Event Panel opened.", ephemeral: true });
                 break;
 
             case "points_menu":
