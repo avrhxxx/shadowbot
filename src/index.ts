@@ -39,7 +39,7 @@ const LANGUAGES = [
 ];
 
 // -------------------------
-// Reaction Queue (delayed reacts)
+// Reaction Queue
 // -------------------------
 const reactionQueue: string[] = [];
 let processingQueue = false;
@@ -99,30 +99,18 @@ client.on("messageReactionAdd", async (reaction, user) => {
     if (reaction.emoji.name !== "🌐" || !reaction.message.inGuild()) return;
 
     const message = reaction.message;
-    let existingPanel;
+    if (translationPanels.has(message.id)) return; // panel już istnieje
 
-    if (translationPanels.has(message.id)) {
-        try {
-            existingPanel = await message.channel.messages.fetch(
-                translationPanels.get(message.id)!
-            );
-        } catch {}
-    }
-
-    if (existingPanel) return; // panel już jest
-
-    // Embed
     const embed = new EmbedBuilder()
-        .setTitle("Translation Panel (Beta)")
+        .setTitle("Translation Panel (Beta)") // nad autorem
         .setAuthor({
             name: message.author.username,
             iconURL: message.author.displayAvatarURL()
         })
         .setDescription(`"${message.content}"`)
         .setColor("Blue")
-        .setFooter({ text: `You have 30 seconds to click a button (message will expire)` });
+        .setFooter({ text: `You have 30 seconds to click a button` });
 
-    // Buttons
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     for (let i = 0; i < LANGUAGES.length; i += 5) {
         const row = new ActionRowBuilder<ButtonBuilder>();
@@ -141,13 +129,26 @@ client.on("messageReactionAdd", async (reaction, user) => {
     const sent = await message.channel.send({ embeds: [embed], components: rows });
     translationPanels.set(message.id, sent.id);
 
-    // Auto-delete after 30s
-    setTimeout(async () => {
+    // -------------------------
+    // Dynamic Countdown Footer
+    // -------------------------
+    let secondsLeft = 30;
+    const countdown = setInterval(async () => {
+        if (secondsLeft <= 0) {
+            clearInterval(countdown);
+            try {
+                await sent.delete().catch(() => {});
+                translationPanels.delete(message.id);
+            } catch {}
+            return;
+        }
+        secondsLeft--;
         try {
-            await sent.delete().catch(() => {});
-            translationPanels.delete(message.id);
+            await sent.edit({
+                embeds: [EmbedBuilder.from(embed).setFooter({ text: `You have ${secondsLeft}s to click a button` })]
+            });
         } catch {}
-    }, 30_000);
+    }, 1000);
 });
 
 // -------------------------
