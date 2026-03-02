@@ -33,7 +33,9 @@ const languages = [
   { label: "English", emoji: "🇬🇧", code: "en" }
 ];
 
-// Prosta funkcja tłumaczenia przez LibreTranslate
+// Cooldown per user (ms)
+const cooldown = new Map<string, number>();
+
 async function translateMessage(text: string, targetCode: string) {
   try {
     const res = await fetch("https://libretranslate.com/translate", {
@@ -48,7 +50,7 @@ async function translateMessage(text: string, targetCode: string) {
   }
 }
 
-// Dodajemy reakcję 🌐 do każdej nowej wiadomości
+// Reakcja 🌐 do każdej wiadomości
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
   try {
@@ -56,8 +58,11 @@ client.on("messageCreate", async (msg) => {
   } catch {}
 });
 
-// Paginacja: embed dla tłumaczenia
-const translationEmbeds = new Map<string, { embed: EmbedBuilder; page: number; translations: Map<string, string> }>();
+// Embed + paginacja
+const translationEmbeds = new Map<
+  string,
+  { embed: EmbedBuilder; page: number; translations: Map<string, string> }
+>();
 
 client.on(
   "messageReactionAdd",
@@ -69,22 +74,18 @@ client.on(
     const message = reaction.message;
     if (!(message.channel instanceof TextChannel)) return;
 
-    // Jeśli już istnieje embed dla tej wiadomości, nie twórz nowego
+    // Jeśli embed już istnieje dla tej wiadomości → nie tworzymy nowego
     if (translationEmbeds.has(message.id)) return;
 
-    // Tworzymy embed z oryginalną wiadomością
     const embed = new EmbedBuilder()
       .setTitle("Translation")
       .setDescription(message.content)
       .setColor("Blue")
       .setFooter({ text: "Click a flag to change translation language" });
 
-    // Mapowanie tłumaczeń na języki
     const translations = new Map<string, string>();
-
     translationEmbeds.set(message.id, { embed, page: 0, translations });
 
-    // Tworzymy rząd przycisków z flagami
     const row = new ActionRowBuilder<ButtonBuilder>();
     languages.forEach((lang) => {
       row.addComponents(
@@ -96,7 +97,6 @@ client.on(
       );
     });
 
-    // Wysyłamy embed + flagi
     await message.channel.send({ embeds: [embed], components: [row] });
   }
 );
@@ -108,12 +108,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   const [action, messageId, langCode] = interaction.customId.split("-");
   if (action !== "translate") return;
 
+  // Sprawdzamy cooldown 5s
+  const last = cooldown.get(interaction.user.id);
+  if (last && Date.now() - last < 5000) return;
+  cooldown.set(interaction.user.id, Date.now());
+
   const info = translationEmbeds.get(messageId);
   if (!info) return;
 
   const { embed, translations } = info;
 
-  // Jeśli tłumaczenie jeszcze nie istnieje → pobieramy
+  // Jeśli brak tłumaczenia → pobierz
   if (!translations.has(langCode)) {
     const channel = interaction.channel;
     if (!channel || !(channel instanceof TextChannel)) return;
@@ -126,8 +131,20 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   }
 
   // Aktualizujemy embed na nową stronę
-  embed.setDescription(translations.get(langCode) ?? embed.data.description);
+  embed.setDescription(translations.get(langCode) ?? embed.data.description ?? null);
   info.page = languages.findIndex((l) => l.code === langCode);
+
+  // Usuwamy wszystkie reakcje użytkownika, żeby nie klikał wielu naraz
+  const channel = interaction.channel;
+  if (channel && channel instanceof TextChannel) {
+    const msg = await channel.messages.fetch(messageId).catch(() => null);
+    if (msg) {
+      const userReactions = msg.reactions.cache.filter((r) => r.users.cache.has(interaction.user.id));
+      for (const r of userReactions.values()) {
+        await r.users.remove(interaction.user.id).catch(() => {});
+      }
+    }
+  }
 
   await interaction.update({ embeds: [embed] });
 });
