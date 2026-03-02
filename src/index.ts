@@ -5,8 +5,7 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder,
-    Interaction
+    EmbedBuilder
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -26,11 +25,9 @@ const client = new Client({
 
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!process.env.LIBRE_URL) throw new Error("LIBRE_URL is not defined");
 
-// =========================
-// Languages
-// =========================
+const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
+
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
     { code: "pl", label: "Polish", emoji: "🇵🇱" },
@@ -39,9 +36,6 @@ const LANGUAGES = [
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-// =========================
-// Reaction Queue
-// =========================
 const reactionQueue: string[] = [];
 let processingQueue = false;
 
@@ -57,10 +51,11 @@ async function processReactionQueue() {
 
         try {
             const channel = await client.channels.fetch(channelId);
-            if (!channel || !channel.isTextBased()) continue;
+            if (!channel?.isTextBased()) continue;
             const message = await channel.messages.fetch(messageId);
             if (!message) continue;
-            await message.react("🌐");
+
+            await message.react("🌍"); // Zmienione na ziemię
             await new Promise(res => setTimeout(res, 900));
         } catch (err) {
             console.error("Reaction queue error:", err);
@@ -70,135 +65,110 @@ async function processReactionQueue() {
     processingQueue = false;
 }
 
-// =========================
-// Translators
-// =========================
-type TranslatorProvider = {
-    name: string;
-    translate: (text: string, target: string) => Promise<string>;
-};
-
-// LibreTranslate provider
-const libreTranslate: TranslatorProvider = {
-    name: "Libre",
-    translate: async (text, target) => {
-        const res = await fetch(process.env.LIBRE_URL!, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                q: text,
-                source: "auto",
-                target,
-                format: "text"
-            })
-        });
-        if (!res.ok) throw new Error(`Libre status: ${res.status}`);
-        const data = (await res.json()) as { translatedText?: string };
-        if (!data.translatedText) throw new Error("Libre returned no translation");
-        return data.translatedText;
-    }
-};
-
-// Google unofficial provider
-const googleTranslate: TranslatorProvider = {
-    name: "Google",
-    translate: async (text, target) => {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Google status: ${res.status}`);
-        const data = await res.json() as any;
-        if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error("Google returned invalid format");
-        return data[0].map((t: any) => t[0]).join("");
-    }
-};
-
-const translators: TranslatorProvider[] = [libreTranslate, googleTranslate];
-
-async function translateWithFallback(text: string, target: string): Promise<{ translated: string; provider: string }> {
-    for (const provider of translators) {
-        try {
-            const translated = await provider.translate(text, target);
-            return { translated, provider: provider.name };
-        } catch (err) {
-            console.warn(`${provider.name} failed:`, err);
-        }
-    }
-    throw new Error("All translators failed");
-}
-
-// =========================
-// Translation embeds
-// =========================
-const translationEmbeds = new Map<string, string>();
-
-// =========================
-// Ready
-// =========================
 client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-// =========================
-// Auto reaction
-// =========================
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (!message.inGuild()) return;
+    if (message.author.bot || !message.inGuild()) return;
     reactionQueue.push(`${message.channelId}:${message.id}`);
     processReactionQueue();
 });
 
-// =========================
-// Button interaction
-// =========================
-client.on("interactionCreate", async (interaction: Interaction) => {
-    if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith("translate_")) return;
+const translationEmbeds = new Map<string, string>();
 
-    if (!interaction.channel || !interaction.channel.isTextBased()) {
+client.on("messageReactionAdd", async (reaction, user) => {
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+    if (reaction.emoji.name !== "🌍") return; // filtrujemy po 🌍
+    if (!reaction.message.inGuild()) return;
+
+    const message = reaction.message;
+
+    let existingPanel;
+    if (translationEmbeds.has(message.id)) {
+        try {
+            existingPanel = await message.channel.messages.fetch(translationEmbeds.get(message.id)!);
+        } catch {}
+    }
+
+    if (!existingPanel) {
+        const embed = new EmbedBuilder()
+            .setTitle("Translation Panel (Beta)")
+            .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
+            .setDescription(`"${message.content}"`)
+            .setColor("Blue")
+            .setFooter({ text: "You have 30 seconds to click a button" });
+
+        const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+        for (let i = 0; i < LANGUAGES.length; i += 5) {
+            const row = new ActionRowBuilder<ButtonBuilder>();
+            for (const lang of LANGUAGES.slice(i, i + 5)) {
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`translate_${message.id}_${lang.code}`)
+                        .setLabel(lang.label)
+                        .setEmoji(lang.emoji)
+                        .setStyle(ButtonStyle.Primary)
+                );
+            }
+            rows.push(row);
+        }
+
+        const sent = await message.channel.send({ embeds: [embed], components: rows });
+        translationEmbeds.set(message.id, sent.id);
+
+        // Timer na usunięcie embedu po 30s
+        setTimeout(async () => {
+            try { await sent.delete(); translationEmbeds.delete(message.id); } catch {}
+        }, 30_000);
+    }
+});
+
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton() || !interaction.customId.startsWith("translate_")) return;
+
+    const [_, messageId, langCode] = interaction.customId.split("_");
+
+    if (!interaction.channel?.isTextBased()) {
         await interaction.reply({ content: "Channel not supported.", ephemeral: true });
         return;
     }
 
-    const [_, messageId, langCode] = interaction.customId.split("_");
-
     let originalMessage;
-    try {
-        originalMessage = await interaction.channel.messages.fetch(messageId);
-    } catch {
-        await interaction.reply({ content: "Original message not found.", ephemeral: true });
+    try { originalMessage = await interaction.channel.messages.fetch(messageId); }
+    catch { 
+        await interaction.reply({ content: "Original message not found.", ephemeral: true }); 
         return;
     }
 
     let translatedText = "Translation failed.";
-    let providerName = "none";
-
     try {
-        const { translated, provider } = await translateWithFallback(originalMessage.content, langCode);
-        translatedText = translated;
-        providerName = provider;
-    } catch {
-        translatedText = "All translation services failed.";
-    }
-
-    try {
-        await interaction.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle(`Translation (${langCode.toUpperCase()})`)
-                    .setAuthor({ name: originalMessage.author.username, iconURL: originalMessage.author.displayAvatarURL() })
-                    .setDescription(`"${translatedText}"`)
-                    .setFooter({ text: `Provider: ${providerName}` })
-                    .setColor("Green")
-            ],
-            ephemeral: true
+        const res = await fetch(LIBRE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: originalMessage.content, source: "auto", target: langCode, format: "text" })
         });
+        if (!res.ok) translatedText = "Translation service error.";
+        else {
+            const data = await res.json() as { translatedText?: string };
+            translatedText = data.translatedText ?? translatedText;
+        }
     } catch (err) {
-        console.error("Interaction reply error:", err);
+        console.error("LibreTranslate error:", err);
+        translatedText = "Translation service unreachable.";
     }
+
+    await interaction.reply({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle(`Translation (${langCode.toUpperCase()})`)
+                .setDescription(translatedText)
+                .setColor("Green")
+        ],
+        ephemeral: true
+    });
 });
 
-// =========================
-// Start client
-// =========================
 client.login(BOT_TOKEN);
