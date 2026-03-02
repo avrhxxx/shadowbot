@@ -1,3 +1,4 @@
+// src/events/eventPanel.ts
 import {
     Interaction,
     ButtonBuilder,
@@ -21,6 +22,7 @@ interface EventData {
     name: string;
     timestamp: number;
     participants: EventParticipant[];
+    reminderMinutes?: number;
 }
 
 const DATA_PATH = path.join(__dirname, "../data/events.json");
@@ -64,24 +66,99 @@ export async function handleEventButton(interaction: Interaction) {
     });
 }
 
-// ===== Obsługa workflow Create Event i List Events + uczestnicy =====
+// ===== Init Event Panel =====
 export async function initEventPanel(client: any) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
         // ===== BUTTON: Create Event =====
         if (interaction.isButton() && interaction.customId === "create_event") {
             const modal = new ModalBuilder()
-                .setCustomId("modal_event_name")
-                .setTitle("Event Name");
+                .setCustomId("modal_create_event")
+                .setTitle("Create Event");
 
             const nameInput = new TextInputBuilder()
                 .setCustomId("event_name")
-                .setLabel("Enter event name")
+                .setLabel("Event Name")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
-            modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
+            const dayInput = new TextInputBuilder()
+                .setCustomId("event_day")
+                .setLabel("Day (1-31)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const monthInput = new TextInputBuilder()
+                .setCustomId("event_month")
+                .setLabel("Month (1-12)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const hourInput = new TextInputBuilder()
+                .setCustomId("event_hour")
+                .setLabel("Hour (HH:MM)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            const reminderInput = new TextInputBuilder()
+                .setCustomId("event_reminder")
+                .setLabel("Reminder (HH:MM before event)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(hourInput),
+                new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
+            );
+
             await interaction.showModal(modal);
+            return;
+        }
+
+        // ===== MODAL SUBMIT: Create Event =====
+        if (interaction.isModalSubmit() && interaction.customId === "modal_create_event") {
+            const name = interaction.fields.getTextInputValue("event_name");
+            const day = Number(interaction.fields.getTextInputValue("event_day"));
+            const month = Number(interaction.fields.getTextInputValue("event_month"));
+            const hourStr = interaction.fields.getTextInputValue("event_hour");
+            const [hour, minute] = hourStr.split(":").map(Number);
+
+            const reminderStr = interaction.fields.getTextInputValue("event_reminder");
+            let reminderMinutes = 0;
+            if (reminderStr) {
+                const [h, m] = reminderStr.split(":").map(Number);
+                reminderMinutes = h * 60 + m;
+            }
+
+            const now = new Date();
+            const timestamp = new Date(
+                now.getFullYear(),
+                month - 1,
+                day,
+                hour,
+                minute
+            ).getTime();
+
+            const events = loadEvents();
+            const id = Date.now().toString();
+
+            events.push({
+                id,
+                name,
+                timestamp,
+                participants: [],
+                reminderMinutes
+            });
+
+            saveEvents(events);
+
+            await interaction.reply({
+                content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}. Reminder: ${reminderMinutes} minutes before.`,
+                ephemeral: true
+            });
             return;
         }
 
@@ -150,7 +227,6 @@ export async function initEventPanel(client: any) {
             const action = parts[0];
             const id = parts[1];
 
-            // ignore main buttons
             if (!["add","remove","absent","list"].includes(action)) return;
 
             const events = loadEvents();
@@ -213,7 +289,5 @@ export async function initEventPanel(client: any) {
             await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
             return;
         }
-
-        // ===== MODALE Create Event workflow zostaje jak wcześniej =====
     });
 }
