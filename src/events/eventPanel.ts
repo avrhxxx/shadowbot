@@ -22,8 +22,7 @@ import {
   updateEventStatuses,
   setDefaultChannel,
   getDefaultChannel,
-  generateParticipantsFile,
-  EventObject
+  generateParticipantsFile
 } from "./eventService";
 
 // ===== EVENT HANDLER =====
@@ -39,48 +38,24 @@ export async function handleEventInteraction(interaction: Interaction) {
 
       // ----- CREATE EVENT -----
       case "event_create": {
-        const modal = new ModalBuilder()
-          .setCustomId("event_create_modal")
-          .setTitle("Create Event");
-
+        const modal = new ModalBuilder().setCustomId("event_create_modal").setTitle("Create Event");
         modal.addComponents(
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId("event_name")
-              .setLabel("Event Name")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+            new TextInputBuilder().setCustomId("event_name").setLabel("Event Name").setStyle(TextInputStyle.Short).setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId("event_day")
-              .setLabel("Day (1-31)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+            new TextInputBuilder().setCustomId("event_day").setLabel("Day (1-31)").setStyle(TextInputStyle.Short).setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId("event_month")
-              .setLabel("Month (1-12)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+            new TextInputBuilder().setCustomId("event_month").setLabel("Month (1-12)").setStyle(TextInputStyle.Short).setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId("event_time")
-              .setLabel("Time (HH:MM)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+            new TextInputBuilder().setCustomId("event_time").setLabel("Time (HH:MM)").setStyle(TextInputStyle.Short).setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId("event_reminder")
-              .setLabel("Reminder Before (min)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+            new TextInputBuilder().setCustomId("event_reminder").setLabel("Reminder Before (min)").setStyle(TextInputStyle.Short).setRequired(true)
           )
         );
-
         await interaction.showModal(modal);
         return;
       }
@@ -103,22 +78,6 @@ export async function handleEventInteraction(interaction: Interaction) {
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
-      }
-
-      // ----- SETTINGS -----
-      case "event_settings": {
-        const channels = interaction.guild?.channels.cache
-          .filter(c => c.isTextBased())
-          .map(c => ({ label: c.name, value: c.id })) || [];
-
-        const select = new StringSelectMenuBuilder()
-          .setCustomId("event_settings_select")
-          .setPlaceholder("Select default channel")
-          .addOptions(channels);
-
-        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-        await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
         return;
       }
 
@@ -162,11 +121,7 @@ export async function handleEventInteraction(interaction: Interaction) {
         }
 
         const options = activeEvents.map(e => ({ label: e.name, value: e.id }));
-        const select = new StringSelectMenuBuilder()
-          .setCustomId("event_cancel_select")
-          .setPlaceholder("Select event to cancel")
-          .addOptions(options);
-
+        const select = new StringSelectMenuBuilder().setCustomId("event_cancel_select").setPlaceholder("Select event to cancel").addOptions(options);
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
         await interaction.reply({ content: "Select event to cancel:", components: [row], ephemeral: true });
         return;
@@ -181,28 +136,35 @@ export async function handleEventInteraction(interaction: Interaction) {
         }
 
         const options = pastEvents.map(e => ({ label: e.name, value: e.id }));
-        const select = new StringSelectMenuBuilder()
-          .setCustomId("event_download_select")
-          .setPlaceholder("Select past event")
-          .addOptions(options);
-
+        const select = new StringSelectMenuBuilder().setCustomId("event_download_select").setPlaceholder("Select past event").addOptions(options);
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
         await interaction.reply({ content: "Select past event to download participants:", components: [row], ephemeral: true });
         return;
       }
 
+      // ----- SETTINGS -----
+      case "event_settings": {
+        const channels = interaction.guild?.channels.cache
+          .filter(c => c.isTextBased())
+          .map(c => ({ label: c.name, value: c.id })) || [];
+
+        const select = new StringSelectMenuBuilder().setCustomId("event_settings_select").setPlaceholder("Select default channel").addOptions(channels);
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
+        return;
+      }
+
       // ----- HELP -----
       case "event_help": {
-        const embed = new EmbedBuilder()
-          .setTitle("Event Panel Help")
-          .setDescription(
-            "📌 **Buttons:**\n" +
-            "Create → Create a new event\n" +
-            "List → List all events\n" +
-            "⚙️ Settings → Set default channel\n" +
-            "🔔 Manual Reminder → Send reminder for active events\n" +
-            "🗑️ Cancel → Cancel an active event\n" +
-            "⬇️ Download → Download participants of past events"
+        const embed = new EmbedBuilder().setTitle("Event Panel Help")
+          .setDescription("📌 **Buttons:**\n" +
+            "🟢 → Create a new event\n" +
+            "📄 → List all events\n" +
+            "⚙️ → Set default channel\n" +
+            "🔔 → Send reminder for active events\n" +
+            "🗑️ → Cancel an active event\n" +
+            "⬇️ → Download participants of past events\n" +
+            "❓ → Help info"
           );
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
@@ -226,25 +188,22 @@ export async function handleEventInteraction(interaction: Interaction) {
   // ===== SELECT MENU SUBMIT =====
   if (interaction.isStringSelectMenu()) {
     switch (interaction.customId) {
-      case "event_settings_select": {
+      case "event_settings_select":
         setDefaultChannel(guildId, interaction.values[0]);
         await interaction.reply({ content: `Default channel set.`, ephemeral: true });
         return;
-      }
 
-      case "event_cancel_select": {
+      case "event_cancel_select":
         cancelEvent(guildId, interaction.values[0]);
         await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
         return;
-      }
 
-      case "event_download_select": {
+      case "event_download_select":
         const eventId = interaction.values[0];
         const filePath = generateParticipantsFile(guildId, eventId);
 
         const channelId = getDefaultChannel(guildId);
         const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
-
         if (channel) {
           await channel.send({ content: `📥 Participants file for event`, files: [filePath] });
           await interaction.reply({ content: "File sent to default channel.", ephemeral: true });
@@ -252,12 +211,27 @@ export async function handleEventInteraction(interaction: Interaction) {
           await interaction.reply({ content: "Default channel not found.", ephemeral: true });
         }
         return;
-      }
     }
   }
 }
 
 // ===== INIT EVENT PANEL =====
-export function initEventPanel(client: Client) {
-  console.log(`EventPanel initialized for client ${client.user?.tag}`);
+export async function initEventPanel(client: Client, interaction: ButtonInteraction) {
+  // Row 1: operacyjne
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("event_create").setEmoji("🟢").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("event_list").setEmoji("📄").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_cancel").setEmoji("🗑️").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("event_manual_reminder").setEmoji("🔔").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_download").setEmoji("⬇️").setStyle(ButtonStyle.Secondary)
+  );
+
+  // Row 2: ustawienia i pomoc
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("event_settings").setEmoji("⚙️").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_help").setEmoji("❓").setStyle(ButtonStyle.Success)
+  );
+
+  await interaction.reply({ content: "📌 **Event Panel**", components: [row1, row2], ephemeral: true });
+  console.log(`EventPanel opened for ${client.user?.tag}`);
 }
