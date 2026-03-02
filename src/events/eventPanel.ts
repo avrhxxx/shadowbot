@@ -1,5 +1,6 @@
 // src/events/eventPanel.ts
 import {
+  Client,
   Interaction,
   ActionRowBuilder,
   ButtonBuilder,
@@ -9,8 +10,7 @@ import {
   TextInputStyle,
   StringSelectMenuBuilder,
   EmbedBuilder,
-  TextChannel,
-  Guild
+  TextChannel
 } from "discord.js";
 
 import {
@@ -29,12 +29,12 @@ import {
 // ===== PENDING EVENT CREATION =====
 const pendingEvents: Map<string, Partial<EventObject>> = new Map();
 
-// ===== EVENT INTERACTION HANDLER =====
+// ===== EVENT HANDLER =====
 export async function handleEventInteraction(interaction: Interaction) {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const guildId = interaction.guildId!;
-  updateEventStatuses(guildId); // Aktualizacja statusów przy każdej interakcji
+  updateEventStatuses(guildId);
 
   // ===== BUTTONS =====
   if (interaction.isButton()) {
@@ -111,7 +111,6 @@ export async function handleEventInteraction(interaction: Interaction) {
 
       // ----- SETTINGS -----
       case "event_settings": {
-        // Pobieramy kanały guild
         const channels = interaction.guild?.channels.cache
           .filter(c => c.isTextBased())
           .map(c => ({ label: c.name, value: c.id })) || [];
@@ -216,36 +215,29 @@ export async function handleEventInteraction(interaction: Interaction) {
   }
 
   // ===== MODAL SUBMIT =====
-  if (interaction.isModalSubmit()) {
-    if (interaction.customId === "event_create_modal") {
-      const name = interaction.fields.getTextInputValue("event_name");
-      const day = Number(interaction.fields.getTextInputValue("event_day"));
-      const month = Number(interaction.fields.getTextInputValue("event_month"));
-      const [hour, minute] = interaction.fields.getTextInputValue("event_time").split(":").map(Number);
-      const reminderBefore = Number(interaction.fields.getTextInputValue("event_reminder"));
+  if (interaction.isModalSubmit() && interaction.customId === "event_create_modal") {
+    const name = interaction.fields.getTextInputValue("event_name");
+    const day = Number(interaction.fields.getTextInputValue("event_day"));
+    const month = Number(interaction.fields.getTextInputValue("event_month"));
+    const [hour, minute] = interaction.fields.getTextInputValue("event_time").split(":").map(Number);
+    const reminderBefore = Number(interaction.fields.getTextInputValue("event_reminder"));
 
-      const event = createEvent(guildId, name, day, month, hour, minute, reminderBefore);
-      await interaction.reply({ content: `✅ Event **${name}** created.`, ephemeral: true });
-      return;
-    }
+    createEvent(guildId, name, day, month, hour, minute, reminderBefore);
+    await interaction.reply({ content: `✅ Event **${name}** created.`, ephemeral: true });
+    return;
   }
 
   // ===== SELECT MENU SUBMIT =====
   if (interaction.isStringSelectMenu()) {
-    const [action] = interaction.customId.split("_");
-
     switch (interaction.customId) {
-
       case "event_settings_select": {
-        const channelId = interaction.values[0];
-        setDefaultChannel(guildId, channelId);
+        setDefaultChannel(guildId, interaction.values[0]);
         await interaction.reply({ content: `Default channel set.`, ephemeral: true });
         return;
       }
 
       case "event_cancel_select": {
-        const eventId = interaction.values[0];
-        cancelEvent(guildId, eventId);
+        cancelEvent(guildId, interaction.values[0]);
         await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
         return;
       }
@@ -253,6 +245,7 @@ export async function handleEventInteraction(interaction: Interaction) {
       case "event_download_select": {
         const eventId = interaction.values[0];
         const filePath = generateParticipantsFile(guildId, eventId);
+
         const channelId = getDefaultChannel(guildId);
         const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
 
@@ -266,4 +259,9 @@ export async function handleEventInteraction(interaction: Interaction) {
       }
     }
   }
+}
+
+// ===== INIT EVENT PANEL =====
+export function initEventPanel(client: Client) {
+  console.log(`EventPanel initialized for client ${client.user?.tag}`);
 }
