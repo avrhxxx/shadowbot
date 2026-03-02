@@ -29,9 +29,14 @@ if (!process.env.BOT_TOKEN) {
 }
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
+
+/* =========================
+   🔥 STABILNIEJSZY ENDPOINT
+========================= */
+
 const LIBRE_URL =
     process.env.LIBRE_URL ||
-    "https://libretranslate.de/translate";
+    "https://translate.argosopentech.com/translate";
 
 /* =========================
    JĘZYKI
@@ -71,7 +76,6 @@ async function processReactionQueue() {
 
             await message.react("🌐");
 
-            // 900ms odstępu
             await new Promise(res => setTimeout(res, 900));
 
         } catch (err) {
@@ -177,7 +181,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
-
     if (!interaction.customId.startsWith("translate_")) return;
 
     const parts = interaction.customId.split("_");
@@ -219,14 +222,18 @@ client.on("interactionCreate", async (interaction) => {
             })
         });
 
-        const data =
-            (await res.json()) as { translatedText?: string };
-
-        translatedText =
-            data.translatedText ?? translatedText;
+        if (!res.ok) {
+            console.error("Libre status:", res.status);
+            translatedText = "Translation service error.";
+        } else {
+            const data = await res.json() as { translatedText?: string };
+            translatedText =
+                data.translatedText ?? translatedText;
+        }
 
     } catch (err) {
         console.error("LibreTranslate error:", err);
+        translatedText = "Translation service unreachable.";
     }
 
     await interaction.reply({
