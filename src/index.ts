@@ -11,7 +11,6 @@ import {
     ButtonBuilder,
     ButtonStyle,
     ActionRowBuilder,
-    ComponentType
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -94,70 +93,83 @@ function createNavigationButtons(): ActionRowBuilder<ButtonBuilder> {
     );
 }
 
-// Nasłuchiwanie nowych wiadomości
-client.on("messageCreate", (message) => {
+// Tworzenie przycisku Translate
+function createTranslateButton(messageId: string): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`translate-${messageId}`).setLabel("Translate 🌐").setStyle(ButtonStyle.Primary)
+    );
+}
+
+// Nasłuchiwanie nowych wiadomości – dodajemy przycisk Translate
+client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
     translationMessages.set(message.id, { embedMessage: null, translations: new Map(), currentIndex: 0 });
+
+    const textChannel = message.channel as TextChannel;
+    await textChannel.send({
+        content: "_Want translation? Click the button below!_",
+        components: [createTranslateButton(message.id)]
+    });
 });
 
-// Nasłuchiwanie reakcji emoji w celu tłumaczenia (bez przewijania)
-client.on("messageReactionAdd", async (reaction, user) => {
-    try {
-        if (user.partial) await user.fetch();
-        if ((user as User).bot) return;
-
-        if (reaction.partial) await reaction.fetch();
-        const msg = reaction.message;
-        if (msg.partial) await msg.fetch();
-        if (!msg || !msg.id || !msg.channel || !msg.content) return;
-
-        const data = translationMessages.get(msg.id);
-        if (!data) return;
-
-        const emojiName = reaction.emoji?.name;
-        if (!emojiName) return;
-
-        const language = getLanguageFromEmoji(emojiName);
-        if (!language) return;
-
-        if (data.translations.size >= 10 && !data.translations.has((user as User).id)) return;
-
-        const translatedText = await translateMessage(msg.content, language);
-        data.translations.set((user as User).id, { language, text: translatedText });
-        data.currentIndex = data.translations.size - 1;
-
-        const embed = buildEmbed(msg as Message, Array.from(data.translations.values()), data.currentIndex);
-        const textChannel = msg.channel as TextChannel;
-
-        if (data.embedMessage) {
-            await data.embedMessage.edit({ embeds: [embed] });
-        } else {
-            const embedMsg = await textChannel.send({ embeds: [embed], components: [createNavigationButtons()] });
-            data.embedMessage = embedMsg;
-        }
-    } catch (err) {
-        console.error("Reaction handling error:", err);
-    }
-});
-
-// Obsługa przycisków
+// Obsługa kliknięcia przycisków
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
-    const msg = interaction.message;
-    const data = translationMessages.get(msg.id);
-    if (!data) return;
-    if (data.translations.size === 0) return;
+    const msgId = interaction.customId;
 
-    if (interaction.customId === "prev") {
-        data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
-    } else if (interaction.customId === "next") {
-        data.currentIndex = (data.currentIndex + 1) % data.translations.size;
+    // Obsługa przycisków przewijania
+    if (msgId === "prev" || msgId === "next") {
+        const msg = interaction.message;
+        const data = translationMessages.get(msg.id);
+        if (!data || data.translations.size === 0) return;
+
+        if (msgId === "prev") {
+            data.currentIndex = (data.currentIndex - 1 + data.translations.size) % data.translations.size;
+        } else {
+            data.currentIndex = (data.currentIndex + 1) % data.translations.size;
+        }
+
+        const embed = buildEmbed(msg as Message, Array.from(data.translations.values()), data.currentIndex);
+        await interaction.update({ embeds: [embed], components: [createNavigationButtons()] });
+        return;
     }
 
-    const embed = buildEmbed(msg as Message, Array.from(data.translations.values()), data.currentIndex);
+    // Obsługa przycisku Translate
+    if (msgId.startsWith("translate-")) {
+        const messageId = msgId.replace("translate-", "");
+        const data = translationMessages.get(messageId);
+        if (!data) return;
 
-    await interaction.update({ embeds: [embed] });
+        const channel = interaction.channel as TextChannel;
+        const msg = await channel.messages.fetch(messageId);
+        if (!msg) return;
+
+        // Dodanie tłumaczenia dla użytkownika klikającego
+        const user = interaction.user;
+        if (data.translations.size >= 10 && !data.translations.has(user.id)) {
+            await interaction.reply({ content: "Translation limit reached.", ephemeral: true });
+            return;
+        }
+
+        // Na razie ustawiamy język według użytkownika (tutaj możesz zrobić wybór np. modal / komenda)
+        const language = "Polish"; // przykładowy język
+        const translatedText = await translateMessage(msg.content, language);
+
+        data.translations.set(user.id, { language, text: translatedText });
+        data.currentIndex = data.translations.size - 1;
+
+        const embed = buildEmbed(msg, Array.from(data.translations.values()), data.currentIndex);
+
+        if (data.embedMessage) {
+            await data.embedMessage.edit({ embeds: [embed], components: [createNavigationButtons()] });
+        } else {
+            const embedMsg = await channel.send({ embeds: [embed], components: [createNavigationButtons()] });
+            data.embedMessage = embedMsg;
+        }
+
+        await interaction.deferUpdate();
+    }
 });
 
 client.once("ready", () => {
