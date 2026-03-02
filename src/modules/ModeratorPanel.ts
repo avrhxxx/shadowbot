@@ -1,7 +1,7 @@
 // src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { handleEventButton } from "../events/eventPanel"; // logika przycisków event
-import { handleHelpButton } from "./HelpPanel"; // logika help, np. opis przycisków
+import { handleEventButton } from "../events/eventPanel"; // logika przycisków Event
+import { handleHelpButton } from "./HelpPanel"; // logika przycisku Help
 
 export async function initModeratorPanel(client: Client) {
     client.once("clientReady", async () => {
@@ -20,7 +20,7 @@ export async function initModeratorPanel(client: Client) {
             }) as TextChannel;
         }
 
-        // Sprawdzamy, czy panel już istnieje
+        // Sprawdzenie czy panel już istnieje
         const messages = await channel.messages.fetch({ limit: 20 });
         const existingPanel = messages.find(m =>
             m.author.id === client.user?.id &&
@@ -29,7 +29,7 @@ export async function initModeratorPanel(client: Client) {
 
         if (existingPanel) return;
 
-        // Tworzymy główny panel
+        // Tworzymy główny panel z przyciskami
         const row = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
                 new ButtonBuilder()
@@ -62,21 +62,19 @@ export async function initModeratorPanel(client: Client) {
 
         switch (interaction.customId) {
             case "event_menu":
-                await handleEventButton(interaction); // funkcja z EventPanel.ts
+                await handleEventButton(interaction); // logika EventPanel
                 break;
 
             case "points_menu":
-                // placeholder
                 await interaction.reply({ content: "Points menu not implemented yet.", ephemeral: true });
                 break;
 
             case "translator_menu":
-                // placeholder
                 await interaction.reply({ content: "Translator menu not implemented yet.", ephemeral: true });
                 break;
 
             case "help_menu":
-                await handleHelpButton(interaction); // np. wyświetlenie prostego opisu przycisków
+                await handleHelpButton(interaction); // logika HelpPanel
                 break;
         }
     });
