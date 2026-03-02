@@ -49,14 +49,13 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed z tytułem NA GÓRZE i autorem pod tytułem z avatar
+        // Embed z nagłówkiem w opisie zamiast tytułu
         const embed = new EmbedBuilder()
-            .setTitle("🌍 Translation Panel") // Tytuł na górze
             .setAuthor({ 
                 name: message.author.username, 
-                iconURL: message.author.displayAvatarURL()
-            }) // Avatar i nick pod tytułem
-            .setDescription(`${message.content}`) // Wiadomość pod autorem
+                iconURL: message.author.displayAvatarURL({ dynamic: true, size: 64 })
+            }) // Avatar i nick nad treścią
+            .setDescription(`🌍 Translation Panel\n\n"${message.content}"`) // Nagłówek + wiadomość
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
@@ -90,8 +89,7 @@ export function initTranslationModule(client: Client) {
                 await interaction.editReply({
                     embeds: [
                         new EmbedBuilder()
-                            .setTitle(`🌍 Translation (${langCode.toUpperCase()})`)
-                            .setDescription(`${translated}`)
+                            .setDescription(`🌍 Translation (${langCode.toUpperCase()})\n\n"${translated}"`)
                             .setColor("Green")
                     ]
                 });
