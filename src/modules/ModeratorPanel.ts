@@ -1,7 +1,6 @@
-// src/modules/ModeratorPanel.ts
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { handleEventButton } from "../events/eventPanel"; // logika przycisków Event
-import { handleHelpButton } from "./HelpPanel"; // logika przycisku Help
+import { handleEventButton } from "../events/eventPanel";
+import { handleHelpButton } from "./HelpPanel";
 
 export async function initModeratorPanel(client: Client) {
     client.once("clientReady", async () => {
@@ -20,7 +19,7 @@ export async function initModeratorPanel(client: Client) {
             }) as TextChannel;
         }
 
-        // Sprawdzenie czy panel już istnieje
+        // Sprawdzamy, czy panel już istnieje
         const messages = await channel.messages.fetch({ limit: 20 });
         const existingPanel = messages.find(m =>
             m.author.id === client.user?.id &&
@@ -62,7 +61,7 @@ export async function initModeratorPanel(client: Client) {
 
         switch (interaction.customId) {
             case "event_menu":
-                await handleEventButton(interaction); // logika EventPanel
+                await handleEventButton(interaction);
                 break;
 
             case "points_menu":
@@ -74,7 +73,7 @@ export async function initModeratorPanel(client: Client) {
                 break;
 
             case "help_menu":
-                await handleHelpButton(interaction); // logika HelpPanel
+                await handleHelpButton(interaction);
                 break;
         }
     });
