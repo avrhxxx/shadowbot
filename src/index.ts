@@ -33,7 +33,7 @@ const languages = [
   { label: "English", emoji: "🇬🇧", code: "en" }
 ];
 
-// Funkcja tłumaczenia przez LibreTranslate
+// Prosta funkcja tłumaczenia przez LibreTranslate
 async function translateMessage(text: string, targetCode: string) {
   try {
     const res = await fetch("https://libretranslate.com/translate", {
@@ -48,7 +48,7 @@ async function translateMessage(text: string, targetCode: string) {
   }
 }
 
-// Dodawanie reakcji 🌐 do każdej nowej wiadomości
+// Dodajemy reakcję 🌐 do każdej nowej wiadomości
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
   try {
@@ -56,13 +56,12 @@ client.on("messageCreate", async (msg) => {
   } catch {}
 });
 
-// Kliknięcie reakcji 🌐
+// Paginacja: embed dla tłumaczenia
+const translationEmbeds = new Map<string, { embed: EmbedBuilder; page: number; translations: Map<string, string> }>();
+
 client.on(
   "messageReactionAdd",
-  async (
-    reaction: MessageReaction | import("discord.js").PartialMessageReaction,
-    user: User | import("discord.js").PartialUser
-  ) => {
+  async (reaction: MessageReaction | import("discord.js").PartialMessageReaction, user: User | import("discord.js").PartialUser) => {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.emoji.name !== reactionEmoji) return;
@@ -70,7 +69,22 @@ client.on(
     const message = reaction.message;
     if (!(message.channel instanceof TextChannel)) return;
 
-    // Tworzymy ephemeral embed z przyciskami flag
+    // Jeśli już istnieje embed dla tej wiadomości, nie twórz nowego
+    if (translationEmbeds.has(message.id)) return;
+
+    // Tworzymy embed z oryginalną wiadomością
+    const embed = new EmbedBuilder()
+      .setTitle("Translation")
+      .setDescription(message.content)
+      .setColor("Blue")
+      .setFooter({ text: "Click a flag to change translation language" });
+
+    // Mapowanie tłumaczeń na języki
+    const translations = new Map<string, string>();
+
+    translationEmbeds.set(message.id, { embed, page: 0, translations });
+
+    // Tworzymy rząd przycisków z flagami
     const row = new ActionRowBuilder<ButtonBuilder>();
     languages.forEach((lang) => {
       row.addComponents(
@@ -82,11 +96,8 @@ client.on(
       );
     });
 
-    await (message.channel as TextChannel).send({
-      content: `<@${user.id}> choose language to translate:`,
-      components: [row],
-      ephemeral: true // widoczne tylko dla klikającego
-    });
+    // Wysyłamy embed + flagi
+    await message.channel.send({ embeds: [embed], components: [row] });
   }
 );
 
@@ -97,20 +108,28 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   const [action, messageId, langCode] = interaction.customId.split("-");
   if (action !== "translate") return;
 
-  const channel = interaction.channel;
-  if (!channel || !(channel instanceof TextChannel)) return;
+  const info = translationEmbeds.get(messageId);
+  if (!info) return;
 
-  const msg = await channel.messages.fetch(messageId).catch(() => null);
-  if (!msg) return;
+  const { embed, translations } = info;
 
-  const translated = await translateMessage(msg.content, langCode);
+  // Jeśli tłumaczenie jeszcze nie istnieje → pobieramy
+  if (!translations.has(langCode)) {
+    const channel = interaction.channel;
+    if (!channel || !(channel instanceof TextChannel)) return;
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Translation (${langCode})`)
-    .setColor("Blue")
-    .setDescription(translated);
+    const msg = await channel.messages.fetch(messageId).catch(() => null);
+    if (!msg) return;
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+    const translated = await translateMessage(msg.content, langCode);
+    translations.set(langCode, translated);
+  }
+
+  // Aktualizujemy embed na nową stronę
+  embed.setDescription(translations.get(langCode) ?? embed.data.description);
+  info.page = languages.findIndex((l) => l.code === langCode);
+
+  await interaction.update({ embeds: [embed] });
 });
 
 client.once("ready", () => console.log(`Logged in as ${client.user?.tag}`));
