@@ -6,18 +6,19 @@ export async function handleHelpButton(interaction: Interaction) {
     const helpMessage = `
 📌 **Moderator Panel Help**
 
-**Event Menu** → Opens the Event Panel, where you can:
+**🟢 Event Menu** → Opens the Event Panel, where you can:
 • Create Event
 • List Events
-• Add Participant
-• Remove Participant
-• Mark Absent
+• Download Participants
+• Cancel Event
+• Manual Reminders
+• Settings
 
 **Points Menu** → Placeholder (points system, not implemented yet)
 
 **Translator Menu** → Placeholder (translation management, not implemented yet)
 
-**Help** → Shows this message
+**❓ Help** → Shows this message
 `;
 
     await interaction.reply({
