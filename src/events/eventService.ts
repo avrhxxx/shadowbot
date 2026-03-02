@@ -1,26 +1,79 @@
 // src/events/eventService.ts
-import { EventData, loadEvents, saveEvents } from "./eventStorage";
+import { eventStorage, StoredEvent } from "./eventStorage";
+import { randomUUID } from "crypto";
 
-export function addEvent(event: EventData) {
-    const events = loadEvents();
-    events.push(event);
-    saveEvents(events);
-}
+export const eventService = {
+  createEvent(data: {
+    title: string;
+    description: string;
+    timestamp: number;
+    channelId: string;
+  }): StoredEvent {
+    const newEvent: StoredEvent = {
+      id: randomUUID(),
+      title: data.title,
+      description: data.description,
+      timestamp: data.timestamp,
+      channelId: data.channelId,
+      participants: [],
+      createdAt: Date.now(),
+      cancelled: false,
+    };
 
-export function getUpcomingEvents(): EventData[] {
+    const events = eventStorage.getAllEvents();
+    events.push(newEvent);
+    eventStorage.saveAllEvents(events);
+
+    return newEvent;
+  },
+
+  listAllEvents(): StoredEvent[] {
+    return eventStorage
+      .getAllEvents()
+      .sort((a, b) => a.timestamp - b.timestamp);
+  },
+
+  listUpcomingEvents(): StoredEvent[] {
     const now = Date.now();
-    return loadEvents().filter(e => e.timestamp > now).sort((a, b) => a.timestamp - b.timestamp);
-}
+    return this.listAllEvents().filter(
+      (e) => e.timestamp > now && !e.cancelled
+    );
+  },
 
-export function findEventById(id: string): EventData | undefined {
-    return loadEvents().find(e => e.id === id);
-}
+  findById(id: string): StoredEvent | undefined {
+    return eventStorage.getAllEvents().find((e) => e.id === id);
+  },
 
-export function updateEvent(event: EventData) {
-    const events = loadEvents();
-    const index = events.findIndex(e => e.id === event.id);
-    if (index !== -1) {
-        events[index] = event;
-        saveEvents(events);
+  cancelEvent(id: string): boolean {
+    const events = eventStorage.getAllEvents();
+    const event = events.find((e) => e.id === id);
+    if (!event) return false;
+
+    event.cancelled = true;
+    eventStorage.saveAllEvents(events);
+    return true;
+  },
+
+  addParticipant(eventId: string, userId: string) {
+    const events = eventStorage.getAllEvents();
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+
+    if (!event.participants.includes(userId)) {
+      event.participants.push(userId);
+      eventStorage.saveAllEvents(events);
     }
-}
+  },
+
+  removeParticipant(eventId: string, userId: string) {
+    const events = eventStorage.getAllEvents();
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+
+    event.participants = event.participants.filter(
+      (id) => id !== userId
+    );
+
+    eventStorage.saveAllEvents(events);
+  },
+};
