@@ -44,7 +44,7 @@ interface EventObject {
   reminderSent?: boolean;
 }
 
-// --- Helpers ---
+// --- Helpers do odczytu i zapisu ---
 function getEvents(guildId: string): EventObject[] {
   const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
   return data[guildId]?.events || [];
@@ -65,6 +65,104 @@ function setConfig(guildId: string, config: any) {
   const data = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
   data[guildId] = config;
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2));
+}
+
+// --- Handle Button ---
+async function handleButton(interaction: ButtonInteraction) {
+  switch (interaction.customId) {
+    case "event_create":
+      return showCreateModal(interaction);
+    case "event_list":
+      return showList(interaction);
+    case "event_cancel":
+      return showCancelMenu(interaction);
+    case "event_manual_reminder":
+      return manualReminder(interaction);
+    case "event_settings":
+      return showChannelSelect(interaction);
+    case "event_download":
+      return downloadParticipants(interaction);
+    case "event_help":
+      return showHelp(interaction);
+  }
+}
+
+// --- Handle Modal Submit ---
+async function handleModal(interaction: ModalSubmitInteraction) {
+  if (!interaction.guild || interaction.customId !== "event_create_modal") return;
+
+  const guildId = interaction.guild.id;
+  const config = getConfig(guildId);
+  if (!config.defaultChannelId)
+    return interaction.reply({ content: "Default channel not set.", ephemeral: true });
+
+  const name = interaction.fields.getTextInputValue("event_name");
+  const day = Number(interaction.fields.getTextInputValue("event_day"));
+  const month = Number(interaction.fields.getTextInputValue("event_month"));
+  const time = interaction.fields.getTextInputValue("event_time");
+  const reminderBefore = Number(interaction.fields.getTextInputValue("reminder_before"));
+
+  if (!/^\d{2}:\d{2}$/.test(time)) return interaction.reply({ content: "Invalid time format.", ephemeral: true });
+  if (isNaN(day) || day < 1 || day > 31) return interaction.reply({ content: "Invalid day.", ephemeral: true });
+  if (isNaN(month) || month < 1 || month > 12) return interaction.reply({ content: "Invalid month.", ephemeral: true });
+  if (isNaN(reminderBefore) || reminderBefore < 0) return interaction.reply({ content: "Reminder must be >= 0.", ephemeral: true });
+
+  const [hour, minute] = time.split(":").map(Number);
+  const eventDate = new Date();
+  eventDate.setMonth(month - 1, day);
+  eventDate.setHours(hour, minute, 0, 0);
+  if (eventDate.getTime() < Date.now()) return interaction.reply({ content: "Event is in the past.", ephemeral: true });
+
+  const events = getEvents(guildId);
+  events.push({
+    id: uuidv4(),
+    name,
+    day,
+    month,
+    hour,
+    minute,
+    reminderBefore,
+    status: "ACTIVE",
+    participants: [],
+    createdAt: Date.now(),
+    guildId,
+    reminderSent: false,
+  });
+  saveEvents(guildId, events);
+
+  await interaction.reply({ content: `Event **${name}** created.`, ephemeral: true });
+}
+
+// --- Handle Select Menu ---
+async function handleSelect(interaction: StringSelectMenuInteraction) {
+  if (!interaction.guild) return;
+  const guildId = interaction.guild.id;
+
+  if (interaction.customId === "cancel_select") {
+    const id = interaction.values[0];
+    const events = getEvents(guildId);
+    const event = events.find((e) => e.id === id);
+    if (event) { event.status = "CANCELLED"; saveEvents(guildId, events); }
+    return interaction.reply({ content: "Event cancelled.", ephemeral: true });
+  }
+
+  if (interaction.customId === "channel_select") {
+    const channelId = interaction.values[0];
+    setConfig(guildId, { defaultChannelId: channelId });
+    return interaction.reply({ content: "Default channel updated.", ephemeral: true });
+  }
+
+  if (interaction.customId === "download_select") {
+    const id = interaction.values[0];
+    const events = getEvents(guildId);
+    const event = events.find((e) => e.id === id);
+    if (!event) return interaction.reply({ content: "Event not found.", ephemeral: true });
+
+    const content = `Event: ${event.name}\nDate: ${event.day}/${event.month}\nParticipants:\n${event.participants.join("\n") || "None"}`;
+    const channel = interaction.guild.channels.cache.get(getConfig(guildId).defaultChannelId) as TextChannel;
+    if (channel) await channel.send({ content });
+    return interaction.reply({ content: "Participants sent.", ephemeral: true });
+  }
 }
 
 // --- Init Event Panel ---
@@ -111,14 +209,12 @@ export function initEventPanel(client: Client) {
         }
       }
 
-      if (changed) {
-        saveEvents(guildId, events);
-      }
+      if (changed) saveEvents(guildId, events);
     }
   }, 60 * 1000);
 }
 
-// --- Render Event Panel (Opcja A) ---
+// --- Render Event Panel ---
 export async function renderEventPanel(channel: TextChannel) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("event_create").setLabel("Create Event").setStyle(ButtonStyle.Primary),
@@ -135,6 +231,3 @@ export async function renderEventPanel(channel: TextChannel) {
     components: [row],
   });
 }
-
-// --- Tutaj reszta EventPanel.ts zostaje dokładnie taka, jak była ---
-// handleButton, handleModal, handleSelect, showCreateModal, showList, showCancelMenu, manualReminder itd.
