@@ -1,7 +1,7 @@
-// src/events/eventPanel.ts
 import {
   Client,
   Interaction,
+  ButtonInteraction,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -160,10 +160,10 @@ export async function handleEventInteraction(interaction: Interaction) {
           .setDescription("📌 **Buttons:**\n" +
             "🟢 → Create a new event\n" +
             "📄 → List all events\n" +
+            "⬇️ → Download participants\n" +
             "⚙️ → Set default channel\n" +
             "🔔 → Send reminder for active events\n" +
             "🗑️ → Cancel an active event\n" +
-            "⬇️ → Download participants of past events\n" +
             "❓ → Help info"
           );
         await interaction.reply({ embeds: [embed], ephemeral: true });
