@@ -1,11 +1,6 @@
-
-import fs from "fs";
-import path from "path";
-
-export interface EventParticipant {
-  nick: string;
-  present: boolean;
-}
+import { EventParticipant } from "./eventServiceTypes";
+import { loadEventsFromFile, saveEventsToFile } from "./eventStorage";
+import { TextChannel } from "discord.js";
 
 export interface EventData {
   id: string;
@@ -14,19 +9,13 @@ export interface EventData {
   participants: EventParticipant[];
 }
 
-const DATA_PATH = path.join(__dirname, "../../data/events.json");
-
 /* ===================== LOAD / SAVE ===================== */
 export function loadEvents(): EventData[] {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
-  } catch {
-    return [];
-  }
+  return loadEventsFromFile();
 }
 
 export function saveEvents(events: EventData[]) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
+  saveEventsToFile(events);
 }
 
 /* ===================== EVENT CREATION ===================== */
@@ -112,17 +101,15 @@ export function findInactiveMembers(events: EventData[], last = 3) {
 /* ===================== UPCOMING / PAST ===================== */
 export function getUpcomingEvents(): EventData[] {
   const now = Date.now();
-  return loadEvents().filter(e => e.timestamp > now).sort((a,b)=>a.timestamp-b.timestamp);
+  return loadEvents().filter(e => e.timestamp > now).sort((a, b) => a.timestamp - b.timestamp);
 }
 
 export function getPastEvents(): EventData[] {
   const now = Date.now();
-  return loadEvents().filter(e => e.timestamp <= now).sort((a,b)=>b.timestamp-a.timestamp);
+  return loadEvents().filter(e => e.timestamp <= now).sort((a, b) => b.timestamp - a.timestamp);
 }
 
 /* ===================== PIN ACTIVE EVENT ===================== */
-import { TextChannel, Message } from "discord.js";
-
 export async function pinActiveEvent(channel: TextChannel, event: EventData) {
   const message = await channel.send(`📌 **${event.name}**\n<t:${Math.floor(event.timestamp/1000)}:F>`);
   await message.pin();
