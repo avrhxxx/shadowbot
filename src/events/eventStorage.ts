@@ -1,20 +1,30 @@
+// src/events/eventStorage.ts
 import fs from "fs";
 import path from "path";
-import { EventData } from "./eventService";
+
+export interface EventParticipant {
+    nick: string;
+    present: boolean;
+}
+
+export interface EventData {
+    id: string;
+    name: string;
+    timestamp: number;
+    participants: EventParticipant[];
+}
 
 const DATA_PATH = path.join(__dirname, "../../data/events.json");
 
-export function loadEventsFromFile(): EventData[] {
-  // Tworzy folder i plik jeśli nie istnieje
-  if (!fs.existsSync(DATA_PATH)) {
-    fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
-    fs.writeFileSync(DATA_PATH, JSON.stringify([], null, 2));
-  }
-
-  const raw = fs.readFileSync(DATA_PATH, "utf-8");
-  return JSON.parse(raw) as EventData[];
+export function loadEvents(): EventData[] {
+    try {
+        if (!fs.existsSync(DATA_PATH)) fs.writeFileSync(DATA_PATH, "[]", "utf-8");
+        return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8")) as EventData[];
+    } catch {
+        return [];
+    }
 }
 
-export function saveEventsToFile(events: EventData[]) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
+export function saveEvents(events: EventData[]) {
+    fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
