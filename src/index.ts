@@ -19,10 +19,11 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // Inicjalizacja modułów
 initTranslationModule(client);
-initModeratorPanel(client); // tworzy Moderation Panel + główny wybór przycisków
-initEventPanel(client);     // obsługuje Event Panel i wszystkie interakcje związane z eventami
+initModeratorPanel(client); // Moderation Panel + główny wybór przycisków
+initEventPanel(client);     // Event Panel i wszystkie interakcje z eventami
 
-client.once("clientReady", () => {
+// Poprawny event ready
+client.once("ready", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
