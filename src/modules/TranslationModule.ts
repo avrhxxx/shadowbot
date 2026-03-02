@@ -49,13 +49,13 @@ export function initTranslationModule(client: Client) {
 
         const message = reaction.message;
 
-        // Embed z avatarem i nickiem, tytuł usunięty, nagłówek w opisie
+        // Embed bez tytułu ani nagłówków, tylko avatar, nick i treść
         const embed = new EmbedBuilder()
             .setAuthor({ 
                 name: message.author.username, 
                 iconURL: message.author.displayAvatarURL({ size: 64 }) // zwykły avatar
             })
-            .setDescription(`🌍─────────────────🌍\n"${message.content}"`)
+            .setDescription(message.content)
             .setColor("Blue")
             .setFooter({ text: "You have 60 seconds to choose a language." });
 
@@ -89,7 +89,7 @@ export function initTranslationModule(client: Client) {
                 await interaction.editReply({
                     embeds: [
                         new EmbedBuilder()
-                            .setDescription(`🌍 Translation (${langCode.toUpperCase()})\n\n"${translated}"`)
+                            .setDescription(`"${translated}"`)
                             .setColor("Green")
                     ]
                 });
