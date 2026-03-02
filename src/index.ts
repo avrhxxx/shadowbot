@@ -6,7 +6,9 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
-    InteractionFlags
+    MessageReaction,
+    PartialMessageReaction,
+    User
 } from "discord.js";
 import fetch from "node-fetch";
 
@@ -71,7 +73,7 @@ async function processReactionQueue() {
             if (!message) continue;
 
             await message.react("🌐");
-            await new Promise(res => setTimeout(res, 1200)); // mini delay
+            await new Promise(res => setTimeout(res, 1200));
 
         } catch (err) {
             console.error("Reaction queue error:", err);
@@ -108,10 +110,9 @@ client.on(
     "messageReactionAdd",
     async (
         reaction: MessageReaction | PartialMessageReaction,
-        user: any, // User | PartialUser
-        _details: any
+        user: User
     ) => {
-        if (user?.bot) return;
+        if (user.bot) return;
 
         try {
             if (reaction.partial) await reaction.fetch();
@@ -180,7 +181,7 @@ client.on("interactionCreate", async (interaction) => {
     if (!interaction.channel || !interaction.channel.isTextBased()) {
         await interaction.reply({
             content: "Channel not supported.",
-            flags: InteractionFlags.Ephemeral
+            ephemeral: true
         });
         return;
     }
@@ -191,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
     } catch {
         await interaction.reply({
             content: "Original message not found.",
-            flags: InteractionFlags.Ephemeral
+            ephemeral: true
         });
         return;
     }
@@ -230,7 +231,7 @@ client.on("interactionCreate", async (interaction) => {
                 .setDescription(translatedText)
                 .setColor("Green")
         ],
-        flags: InteractionFlags.Ephemeral
+        ephemeral: true
     });
 });
 
