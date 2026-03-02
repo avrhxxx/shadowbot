@@ -6,8 +6,9 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
-    InteractionType
+    Interaction
 } from "discord.js";
+
 import fetch from "node-fetch";
 
 const client = new Client({
@@ -17,16 +18,22 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction
+    ]
 });
 
-if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
+if (!process.env.BOT_TOKEN) {
+    throw new Error("BOT_TOKEN is not defined");
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// Endpoint LibreTranslate
-const LIBRE_URL = process.env.LIBRE_URL || "http://libretranslate-production-26a3.up.railway.app/translate";
+const LIBRE_URL =
+    process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
 
-// Języki do wyboru
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
     { code: "pl", label: "Polish", emoji: "🇵🇱" },
@@ -35,7 +42,6 @@ const LANGUAGES = [
     { code: "ru", label: "Russian", emoji: "🇷🇺" }
 ];
 
-// Queue na reakcje
 const reactionQueue: string[] = [];
 let processingQueue = false;
 
@@ -57,8 +63,7 @@ async function processReactionQueue() {
             if (!message) continue;
 
             await message.react("🌐");
-            await new Promise(res => setTimeout(res, 900)); // małe opóźnienie
-
+            await new Promise(res => setTimeout(res, 900));
         } catch (err) {
             console.error("Reaction queue error:", err);
         }
@@ -67,12 +72,10 @@ async function processReactionQueue() {
     processingQueue = false;
 }
 
-// Logowanie
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user?.tag}`);
 });
 
-// Auto-reaction do każdej wiadomości
 client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
     if (!message.inGuild()) return;
@@ -81,10 +84,8 @@ client.on("messageCreate", async (message) => {
     processReactionQueue();
 });
 
-// Mapowanie wiadomości na panel z przyciskami
-const translationPanels = new Map<string, string>();
+const translationEmbeds = new Map<string, string>();
 
-// Kliknięcie reakcji 🌐
 client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
 
@@ -95,21 +96,24 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
     const message = reaction.message;
 
-    // Jeżeli panel już istnieje, nie twórz nowego
     let existingPanel;
-    if (translationPanels.has(message.id)) {
+    if (translationEmbeds.has(message.id)) {
         try {
-            existingPanel = await message.channel.messages.fetch(translationPanels.get(message.id)!);
+            existingPanel = await message.channel.messages.fetch(translationEmbeds.get(message.id)!);
         } catch {}
     }
 
     if (!existingPanel) {
         const embed = new EmbedBuilder()
-            .setTitle("Translation Panel")
-            .setDescription(`Click a flag to translate:\n\n"${message.content}"`)
+            .setAuthor({
+                name: `${message.author.tag}`,
+                iconURL: message.author.displayAvatarURL()
+            })
+            .setDescription(`Click a flag to translate:\n\n"${message.content}"\n*You have 30 seconds to click a button*`)
             .setColor("Blue");
 
         const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
         for (let i = 0; i < LANGUAGES.length; i += 5) {
             const row = new ActionRowBuilder<ButtonBuilder>();
             for (const lang of LANGUAGES.slice(i, i + 5)) {
@@ -125,31 +129,21 @@ client.on("messageReactionAdd", async (reaction, user) => {
         }
 
         const sent = await message.channel.send({ embeds: [embed], components: rows });
-        translationPanels.set(message.id, sent.id);
+        translationEmbeds.set(message.id, sent.id);
 
-        // Usuń panel po 30 sekundach
-        setTimeout(async () => {
-            try {
-                await sent.delete();
-                translationPanels.delete(message.id);
-            } catch {}
-        }, 30_000);
+        // Timer: po 30 sekundach embed znika
+        setTimeout(() => sent.delete().catch(() => {}), 30000);
     }
 });
 
-// Obsługa przycisków
-client.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
     if (!interaction.customId.startsWith("translate_")) return;
+    if (!interaction.channel || !interaction.channel.isTextBased()) return;
 
     const parts = interaction.customId.split("_");
     const messageId = parts[1];
     const langCode = parts[2];
-
-    if (!interaction.channel || !interaction.channel.isTextBased()) {
-        await interaction.reply({ content: "Channel not supported.", ephemeral: true });
-        return;
-    }
 
     let originalMessage;
     try {
@@ -158,9 +152,6 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.reply({ content: "Original message not found.", ephemeral: true });
         return;
     }
-
-    // Odroczenie odpowiedzi na interakcję (uniknięcie 10062)
-    await interaction.deferReply({ ephemeral: true });
 
     let translatedText = "Translation failed.";
     try {
@@ -187,15 +178,15 @@ client.on("interactionCreate", async (interaction) => {
         translatedText = "Translation service unreachable.";
     }
 
-    await interaction.editReply({
+    await interaction.reply({
         embeds: [
             new EmbedBuilder()
                 .setTitle(`Translation (${langCode.toUpperCase()})`)
                 .setDescription(translatedText)
                 .setColor("Green")
-        ]
+        ],
+        ephemeral: true
     });
 });
 
-// Login bota
 client.login(BOT_TOKEN);
