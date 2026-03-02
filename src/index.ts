@@ -51,7 +51,7 @@ async function translateMessage(text: string, language: string): Promise<string>
     }
 }
 
-// Dodawanie automatycznej reakcji
+// Dodawanie automatycznej reakcji 🌐
 client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
     try {
@@ -61,38 +61,43 @@ client.on("messageCreate", async (message) => {
     }
 });
 
-// Obsługa kliknięcia reakcji
-client.on("messageReactionAdd", async (reaction: MessageReaction, user: User) => {
-    if (user.bot) return;
-    if (reaction.emoji.name !== reactionEmoji) return;
+// Obsługa kliknięcia reakcji (partial safe)
+client.on(
+    "messageReactionAdd",
+    async (
+        reaction: MessageReaction | import("discord.js").PartialMessageReaction,
+        user: User | import("discord.js").PartialUser,
+        _details?: import("discord.js").MessageReactionEventDetails
+    ) => {
+        if (user.bot) return;
 
-    if (reaction.partial) {
-        try { await reaction.fetch(); } 
-        catch (err) { console.error("Fetch reaction failed:", err); return; }
+        if (reaction.partial) {
+            try { await reaction.fetch(); } 
+            catch (err) { console.error("Fetch reaction failed:", err); return; }
+        }
+
+        const message = reaction.message;
+        if (!message.guild) return;
+
+        if (reaction.emoji.name !== reactionEmoji) return;
+        if (!(message.channel instanceof TextChannel)) return;
+
+        // Disable check
+        if (disabledUsers.get(message.id)?.has(user.id)) return;
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`select-lang-${message.id}-${user.id}`)
+                .setPlaceholder("Choose a language")
+                .addOptions(languageMap.map((lang) => ({ label: lang, value: lang })))
+        );
+
+        await message.channel.send({
+            content: `<@${user.id}> select a language for translation:`,
+            components: [row],
+        });
     }
-
-    const message = reaction.message;
-    if (!message.guild) return;
-
-    // sprawdzamy Disable
-    if (disabledUsers.get(message.id)?.has(user.id)) return;
-
-    // upewniamy się, że channel to TextChannel
-    if (!(message.channel instanceof TextChannel)) return;
-
-    // Dropdown języka dla użytkownika
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder()
-            .setCustomId(`select-lang-${message.id}-${user.id}`)
-            .setPlaceholder("Choose a language")
-            .addOptions(languageMap.map((lang) => ({ label: lang, value: lang })))
-    );
-
-    await message.channel.send({
-        content: `<@${user.id}> select a language for translation:`,
-        components: [row]
-    });
-});
+);
 
 // Obsługa dropdown wyboru języka
 client.on("interactionCreate", async (interaction) => {
