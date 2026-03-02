@@ -1,13 +1,14 @@
 // src/events/eventPanel.ts
 import {
-    Client,
     Interaction,
+    Client,
     ButtonBuilder,
     ButtonStyle,
     ActionRowBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
+    StringSelectMenuBuilder,
     EmbedBuilder,
     TextChannel
 } from "discord.js";
@@ -23,13 +24,14 @@ interface EventData {
     id: string;
     name: string;
     timestamp: number;
+    reminderMinutes: number;
+    notifyChannelId: string;
     participants: EventParticipant[];
-    notifyChannelId?: string;
-    notifyMinutesBefore?: number;
 }
 
 const DATA_PATH = path.join(__dirname, "../data/events.json");
 
+// ===== Utility functions =====
 function loadEvents(): EventData[] {
     try {
         return JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
@@ -39,10 +41,12 @@ function loadEvents(): EventData[] {
 }
 
 function saveEvents(events: EventData[]) {
+    // ensure folder exists
+    fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-// ===== Embed z Event Panel (po kliknięciu Event Menu) =====
+// ===== Event Panel embed =====
 export async function handleEventButton(interaction: Interaction) {
     if (!interaction.isButton()) return;
 
@@ -69,7 +73,7 @@ export async function handleEventButton(interaction: Interaction) {
     });
 }
 
-// ===== Obsługa workflow Create Event i List Events + uczestnicy =====
+// ===== Main workflow =====
 export async function initEventPanel(client: Client) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
@@ -77,7 +81,7 @@ export async function initEventPanel(client: Client) {
         if (interaction.isButton() && interaction.customId === "create_event") {
             const modal = new ModalBuilder()
                 .setCustomId("modal_create_event")
-                .setTitle("Create Event");
+                .setTitle("Create New Event");
 
             const nameInput = new TextInputBuilder()
                 .setCustomId("event_name")
@@ -103,21 +107,82 @@ export async function initEventPanel(client: Client) {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
-            const notifyInput = new TextInputBuilder()
-                .setCustomId("event_notify")
-                .setLabel("Notify X minutes before event (optional)")
+            const reminderInput = new TextInputBuilder()
+                .setCustomId("event_reminder")
+                .setLabel("Reminder (minutes before)")
                 .setStyle(TextInputStyle.Short)
-                .setRequired(false);
+                .setRequired(true);
 
             modal.addComponents(
                 new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(hourInput),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(notifyInput)
+                new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
             );
 
             await interaction.showModal(modal);
+            return;
+        }
+
+        // ===== MODAL SUBMIT: Create Event =====
+        if (interaction.isModalSubmit() && interaction.customId === "modal_create_event") {
+            const name = interaction.fields.getTextInputValue("event_name").trim();
+            const day = parseInt(interaction.fields.getTextInputValue("event_day"));
+            const month = parseInt(interaction.fields.getTextInputValue("event_month"));
+            const hourStr = interaction.fields.getTextInputValue("event_hour");
+            const reminderMinutes = parseInt(interaction.fields.getTextInputValue("event_reminder"));
+
+            const [hour, minute] = hourStr.split(":").map(Number);
+            const now = new Date();
+            const timestamp = new Date(now.getFullYear(), month - 1, day, hour, minute).getTime();
+
+            const events = loadEvents();
+            if (events.some(e => e.name.toLowerCase() === name.toLowerCase())) {
+                await interaction.reply({ content: `❌ Event with name "${name}" already exists.`, ephemeral: true });
+                return;
+            }
+
+            // ===== Channel select for notifications =====
+            const guild = interaction.guild;
+            if (!guild) return;
+
+            const channelOptions = guild.channels.cache
+                .filter(c => c.isTextBased())
+                .map(c => ({ label: c.name, value: c.id }));
+
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`select_notify_channel_${name}_${timestamp}_${reminderMinutes}`)
+                .setPlaceholder("Select channel for notifications")
+                .addOptions(channelOptions);
+
+            const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+            await interaction.reply({ content: "Select channel for notifications:", components: [row], ephemeral: true });
+            return;
+        }
+
+        // ===== SELECT MENU: Choose notification channel =====
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith("select_notify_channel_")) {
+            const [_, __, name, timestampStr, reminderStr] = interaction.customId.split("_");
+            const notifyChannelId = interaction.values[0];
+            const timestamp = parseInt(timestampStr);
+            const reminderMinutes = parseInt(reminderStr);
+
+            const events = loadEvents();
+            const id = Date.now().toString();
+
+            events.push({
+                id,
+                name,
+                timestamp,
+                reminderMinutes,
+                notifyChannelId,
+                participants: []
+            });
+            saveEvents(events);
+
+            await interaction.update({ content: `✅ Event **${name}** created!`, components: [] });
             return;
         }
 
@@ -129,200 +194,142 @@ export async function initEventPanel(client: Client) {
                 return;
             }
 
-            const embed = new EmbedBuilder()
-                .setTitle("Event List")
-                .setDescription("Select an event:");
+            const embed = new EmbedBuilder().setTitle("Event List").setDescription("Select an event:");
 
-            const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-
-            events.forEach((e, i) => {
+            const row = new ActionRowBuilder<ButtonBuilder>();
+            events.forEach(e => {
                 const isPast = e.timestamp < Date.now();
-                const row = new ActionRowBuilder<ButtonBuilder>();
                 row.addComponents(
                     new ButtonBuilder()
                         .setCustomId(`event_${e.id}`)
                         .setLabel(e.name)
                         .setStyle(isPast ? ButtonStyle.Danger : ButtonStyle.Success)
                 );
-                if (!isPast) {
-                    // 🔔 only for upcoming events
-                    row.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`notify_${e.id}`)
-                            .setLabel("🔔 Notify")
-                            .setStyle(ButtonStyle.Primary)
-                    );
-                    // 🗑 remove only for upcoming events
-                    row.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`delete_${e.id}`)
-                            .setLabel("🗑 Delete")
-                            .setStyle(ButtonStyle.Danger)
-                    );
-                }
-                rows.push(row);
             });
 
-            await interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
             return;
         }
 
-        // ===== BUTTON: Specific Event, Notify, Delete =====
+        // ===== BUTTONS: Specific Event Actions =====
+        if (interaction.isButton() && interaction.customId.startsWith("event_")) {
+            const id = interaction.customId.split("_")[1];
+            const events = loadEvents();
+            const event = events.find(e => e.id === id);
+            if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+
+            const embed = new EmbedBuilder()
+                .setTitle(`Event: ${event.name}`)
+                .setDescription(`Date: ${new Date(event.timestamp).toLocaleString()}`);
+
+            const row = new ActionRowBuilder<ButtonBuilder>()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`add_${id}`)
+                        .setLabel("Add Participant")
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`remove_${id}`)
+                        .setLabel("Remove Participant")
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId(`absent_${id}`)
+                        .setLabel("Mark Absent")
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`list_${id}`)
+                        .setLabel("List Participants")
+                        .setStyle(ButtonStyle.Success),
+                    ...(event.timestamp > Date.now()
+                        ? [new ButtonBuilder()
+                            .setCustomId(`notify_${id}`)
+                            .setLabel("🔔 Send Reminder")
+                            .setStyle(ButtonStyle.Primary)]
+                        : [])
+                );
+
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+
+        // ===== PARTICIPANTS: Add / Remove / Absent / List =====
         if (interaction.isButton()) {
             const parts = interaction.customId.split("_");
             const action = parts[0];
             const id = parts[1];
+
+            if (!["add","remove","absent","list","notify"].includes(action)) return;
+
             const events = loadEvents();
             const event = events.find(e => e.id === id);
-
             if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
 
-            if (action === "event") {
-                const embed = new EmbedBuilder()
-                    .setTitle(`Event: ${event.name}`)
-                    .setDescription(`Date: ${new Date(event.timestamp).toLocaleString()}`);
+            if (["add","remove","absent"].includes(action)) {
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_${action}_${id}`)
+                    .setTitle(`${action.toUpperCase()} Participant`);
 
-                const row = new ActionRowBuilder<ButtonBuilder>()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`add_${id}`)
-                            .setLabel("Add Participant")
-                            .setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder()
-                            .setCustomId(`remove_${id}`)
-                            .setLabel("Remove Participant")
-                            .setStyle(ButtonStyle.Danger),
-                        new ButtonBuilder()
-                            .setCustomId(`absent_${id}`)
-                            .setLabel("Mark Absent")
-                            .setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder()
-                            .setCustomId(`list_${id}`)
-                            .setLabel("List Participants")
-                            .setStyle(ButtonStyle.Success)
-                    );
+                const nickInput = new TextInputBuilder()
+                    .setCustomId("participant_nick")
+                    .setLabel("Participant Nick")
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
 
-                await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+                modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput));
+                await interaction.showModal(modal);
+                return;
+            }
+
+            if (action === "list") {
+                const present = event.participants.filter(p => p.present).map(p => p.nick);
+                const absent = event.participants.filter(p => !p.present).map(p => p.nick);
+                await interaction.reply({
+                    content: `**${event.name}**\n\n✅ Present: ${present.join(", ") || "none"}\n❌ Absent: ${absent.join(", ") || "none"}`,
+                    ephemeral: true
+                });
                 return;
             }
 
             if (action === "notify") {
-                const channel = event.notifyChannelId
-                    ? interaction.guild?.channels.cache.get(event.notifyChannelId) as TextChannel
-                    : interaction.channel;
+                const channel = interaction.guild?.channels.cache.get(event.notifyChannelId) as TextChannel;
                 if (channel) {
-                    await channel.send(`Reminder: Event **${event.name}** starts at ${new Date(event.timestamp).toLocaleString()}`);
-                    await interaction.reply({ content: "Notification sent.", ephemeral: true });
+                    await channel.send(`🔔 Reminder: Event **${event.name}** starts in ${event.reminderMinutes} minutes!`);
+                    await interaction.reply({ content: "Reminder sent!", ephemeral: true });
                 } else {
-                    await interaction.reply({ content: "Notification channel not found.", ephemeral: true });
+                    await interaction.reply({ content: "Channel not found.", ephemeral: true });
                 }
                 return;
-            }
-
-            if (action === "delete") {
-                const index = events.findIndex(ev => ev.id === id);
-                if (index !== -1) {
-                    events.splice(index, 1);
-                    saveEvents(events);
-                    await interaction.reply({ content: `✅ Event **${event.name}** deleted.`, ephemeral: true });
-                }
-                return;
-            }
-
-            // Add / Remove / Absent / List Participants buttons
-            if (["add", "remove", "absent", "list"].includes(action)) {
-                if (action === "list") {
-                    const present = event.participants.filter(p => p.present).map(p => p.nick);
-                    const absent = event.participants.filter(p => !p.present).map(p => p.nick);
-                    await interaction.reply({
-                        content: `**${event.name}**\n\n✅ Present: ${present.join(", ") || "none"}\n❌ Absent: ${absent.join(", ") || "none"}`,
-                        ephemeral: true
-                    });
-                    return;
-                } else {
-                    const modal = new ModalBuilder()
-                        .setCustomId(`modal_${action}_${id}`)
-                        .setTitle(`${action.toUpperCase()} Participant`);
-
-                    const nickInput = new TextInputBuilder()
-                        .setCustomId("participant_nick")
-                        .setLabel("Participant Nick")
-                        .setStyle(TextInputStyle.Short)
-                        .setRequired(true);
-
-                    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput));
-                    await interaction.showModal(modal);
-                    return;
-                }
             }
         }
 
-        // ===== MODAL SUBMITS =====
-        if (interaction.isModalSubmit()) {
-            const cid = interaction.customId;
+        // ===== MODAL SUBMITS: Participants =====
+        if (interaction.isModalSubmit() && interaction.customId.startsWith("modal_")) {
+            const parts = interaction.customId.split("_");
+            const action = parts[1];
+            const id = parts[2];
+            const events = loadEvents();
+            const event = events.find(e => e.id === id);
+            if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
 
-            // Create Event modal
-            if (cid === "modal_create_event") {
-                const name = interaction.fields.getTextInputValue("event_name");
-                const day = Number(interaction.fields.getTextInputValue("event_day"));
-                const month = Number(interaction.fields.getTextInputValue("event_month"));
-                const hourStr = interaction.fields.getTextInputValue("event_hour");
-                const notifyMinutes = Number(interaction.fields.getTextInputValue("event_notify")) || 0;
+            const nick = interaction.fields.getTextInputValue("participant_nick");
 
-                const [hour, minute] = hourStr.split(":").map(Number);
-                const now = new Date();
-                const timestamp = new Date(now.getFullYear(), month - 1, day, hour, minute).getTime();
-
-                const events = loadEvents();
-                if (events.some(e => e.name === name)) {
-                    await interaction.reply({ content: "❌ Event with this name already exists.", ephemeral: true });
-                    return;
+            if (action === "add") {
+                if (!event.participants.some(p => p.nick === nick)) {
+                    event.participants.push({ nick, present: true });
                 }
-
-                const newEvent: EventData = {
-                    id: Date.now().toString(),
-                    name,
-                    timestamp,
-                    participants: [],
-                    notifyMinutesBefore: notifyMinutes,
-                    notifyChannelId: interaction.channel?.id
-                };
-
-                events.push(newEvent);
-                saveEvents(events);
-
-                await interaction.reply({ content: `✅ Event **${name}** created for ${day}-${month} at ${hourStr}.`, ephemeral: true });
-                return;
+            }
+            if (action === "remove") {
+                event.participants = event.participants.filter(p => p.nick !== nick);
+            }
+            if (action === "absent") {
+                const p = event.participants.find(p => p.nick === nick);
+                if (p) p.present = false;
             }
 
-            // Add / Remove / Absent Participants modal
-            if (cid.startsWith("modal_")) {
-                const parts = cid.split("_");
-                const action = parts[1];
-                const id = parts[2];
-                const events = loadEvents();
-                const event = events.find(e => e.id === id);
-                if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
-
-                const nick = interaction.fields.getTextInputValue("participant_nick");
-
-                if (action === "add") {
-                    if (!event.participants.some(p => p.nick === nick)) {
-                        event.participants.push({ nick, present: true });
-                    }
-                }
-                if (action === "remove") {
-                    event.participants = event.participants.filter(p => p.nick !== nick);
-                }
-                if (action === "absent") {
-                    const p = event.participants.find(p => p.nick === nick);
-                    if (p) p.present = false;
-                }
-
-                saveEvents(events);
-                await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
-                return;
-            }
+            saveEvents(events);
+            await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
+            return;
         }
+
     });
 }
