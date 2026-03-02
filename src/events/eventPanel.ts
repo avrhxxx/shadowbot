@@ -45,7 +45,6 @@ function saveEvents(events: EventData[]) {
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-// ===== Embed z Event Panel (po kliknięciu Event Menu) =====
 export async function handleEventButton(interaction: Interaction) {
     if (!interaction.isButton()) return;
 
@@ -72,7 +71,6 @@ export async function handleEventButton(interaction: Interaction) {
     });
 }
 
-// ===== Obsługa workflow Create Event i List Events + uczestnicy =====
 export async function initEventPanel(client: any) {
     client.on("interactionCreate", async (interaction: Interaction) => {
 
@@ -106,9 +104,9 @@ export async function initEventPanel(client: any) {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
-            const minuteInput = new TextInputBuilder()
-                .setCustomId("event_minute")
-                .setLabel("Minute before for notification")
+            const reminderInput = new TextInputBuilder()
+                .setCustomId("event_reminder")
+                .setLabel("Reminder (minutes before event)")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
@@ -117,7 +115,7 @@ export async function initEventPanel(client: any) {
                 new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
                 new ActionRowBuilder<TextInputBuilder>().addComponents(timeInput),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(minuteInput)
+                new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
             );
 
             await interaction.showModal(modal);
@@ -130,7 +128,7 @@ export async function initEventPanel(client: any) {
             const day = parseInt(interaction.fields.getTextInputValue("event_day"));
             const month = parseInt(interaction.fields.getTextInputValue("event_month"));
             const time = interaction.fields.getTextInputValue("event_time");
-            const reminder = parseInt(interaction.fields.getTextInputValue("event_minute"));
+            const reminder = parseInt(interaction.fields.getTextInputValue("event_reminder"));
 
             const [hours, minutes] = time.split(":").map(Number);
             const timestamp = new Date(new Date().getFullYear(), month - 1, day, hours, minutes).getTime();
@@ -153,10 +151,9 @@ export async function initEventPanel(client: any) {
             events.push(newEvent);
             saveEvents(events);
 
-            // Od razu odpowiedź, żeby uniknąć Unknown interaction
             await interaction.reply({ content: `✅ Event **${name}** created!`, ephemeral: true });
 
-            // Select menu dla kanału i przypomnienia
+            // Select menu tylko dla kanału powiadomień
             if (interaction.guild) {
                 const channelSelect = new StringSelectMenuBuilder()
                     .setCustomId(`select_channel_${newEvent.id}`)
@@ -170,19 +167,8 @@ export async function initEventPanel(client: any) {
                             )
                     );
 
-                const reminderSelect = new StringSelectMenuBuilder()
-                    .setCustomId(`select_reminder_${newEvent.id}`)
-                    .setPlaceholder("Select reminder time")
-                    .addOptions([10,20,30,40,50,60].map(min =>
-                        new StringSelectMenuOptionBuilder()
-                            .setLabel(`${min} minutes before`)
-                            .setValue(String(min))
-                    ));
-
-                const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect);
-                const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(reminderSelect);
-
-                await interaction.followUp({ content: "Select channel and reminder:", components: [row1, row2], ephemeral: true });
+                const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect);
+                await interaction.followUp({ content: "Select channel for notifications:", components: [row], ephemeral: true });
             }
             return;
         }
@@ -243,7 +229,6 @@ export async function initEventPanel(client: any) {
                         .setStyle(ButtonStyle.Success)
                 );
 
-            // Dzwoneczek tylko dla przyszłych eventów
             if (event.timestamp > Date.now()) {
                 row.addComponents(
                     new ButtonBuilder()
@@ -251,7 +236,6 @@ export async function initEventPanel(client: any) {
                         .setLabel("🔔 Notify")
                         .setStyle(ButtonStyle.Primary)
                 );
-                // Kosz tylko dla aktywnych eventów
                 row.addComponents(
                     new ButtonBuilder()
                         .setCustomId(`delete_${id}`)
@@ -264,7 +248,7 @@ export async function initEventPanel(client: any) {
             return;
         }
 
-        // ===== HANDLE ADD/REMOVE/ABSENT/LIST PARTICIPANTS =====
+        // ===== HANDLE PARTICIPANT BUTTONS =====
         if (interaction.isButton()) {
             const parts = interaction.customId.split("_");
             const action = parts[0];
@@ -353,6 +337,5 @@ export async function initEventPanel(client: any) {
             await interaction.reply({ content: `✅ Updated event **${event.name}**.`, ephemeral: true });
             return;
         }
-
     });
 }
