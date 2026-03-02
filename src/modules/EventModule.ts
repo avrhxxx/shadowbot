@@ -1,5 +1,5 @@
 // src/modules/EventModule.ts
-import { Client, Message, TextChannel, NewsChannel, ThreadChannel } from "discord.js";
+import { Client, Message, TextChannel } from "discord.js";
 import fs from "fs";
 import path from "path";
 
@@ -33,47 +33,42 @@ function saveEvents(events: EventData[]) {
     fs.writeFileSync(DATA_PATH, JSON.stringify(events, null, 2), "utf-8");
 }
 
-// Funkcja wysyłająca wiadomości tylko jeśli kanał ma send()
-async function safeSend(channel: any, content: any) {
-    if (!channel) return;
-    if ("send" in channel && typeof channel.send === "function") {
-        return channel.send(content);
-    }
-}
-
 export function initEventModule(client: Client) {
     client.on("messageCreate", async (message: Message) => {
         if (!message.guild || message.author.bot) return;
-        if (message.content.startsWith("!")) return; // nie reagujemy na komendy innych modułów
 
-        const args = message.content.trim().split(/\s+/);
-        const command = args.shift()?.toLowerCase();
-        if (!command) return;
+        const content = message.content.trim();
+        if (!content.startsWith("!event")) return; // ignorujemy inne wiadomości i komendy od innych botów
 
-        const channel = message.channel as TextChannel | NewsChannel | ThreadChannel;
+        const args = content.slice("!event".length).trim().split(/\s+/);
+        const subcommand = args.shift()?.toLowerCase();
 
         // Tworzenie eventu: !event create <alliance> <name> <YYYY-MM-DD_HH:MM>
-        if (command === "!event" && args[0]?.toLowerCase() === "create") {
-            const [ , alliance, name, datetime ] = args;
+        if (subcommand === "create") {
+            const [alliance, name, datetime] = args;
             if (!alliance || !name || !datetime) {
-                return safeSend(channel, "Usage: !event create <alliance> <name> <YYYY-MM-DD_HH:MM>");
+                return (message.channel as TextChannel).send(
+                    "Usage: !event create <alliance> <name> <YYYY-MM-DD_HH:MM>"
+                );
             }
 
-            const timestamp = new Date(datetime.replace("_","T")).getTime();
-            if (isNaN(timestamp)) return safeSend(channel, "Invalid date format.");
+            const timestamp = new Date(datetime.replace("_", "T")).getTime();
+            if (isNaN(timestamp)) return (message.channel as TextChannel).send("Invalid date format.");
 
             const events = loadEvents();
             const id = `event_${Date.now()}`;
             events.push({ id, alliance, name, timestamp, participants: [] });
             saveEvents(events);
 
-            safeSend(channel, `Event **${name}** for alliance **${alliance}** created!`);
+            const channel = message.channel as TextChannel;
+            channel.send(`Event **${name}** for alliance **${alliance}** created!`);
 
             // Przypomnienia 1h i 10min przed
             const now = Date.now();
-
             const scheduleReminder = (delay: number, text: string) => {
-                setTimeout(() => safeSend(channel, text), delay);
+                setTimeout(() => {
+                    channel.send(text);
+                }, delay);
             };
 
             const delay1h = timestamp - now - 3600_000;
@@ -84,68 +79,78 @@ export function initEventModule(client: Client) {
         }
 
         // Dodawanie uczestników: !event add <eventID> <nick>
-        if (command === "!event" && args[0]?.toLowerCase() === "add") {
-            const [ , eventId, nick ] = args;
-            if (!eventId || !nick) return safeSend(channel, "Usage: !event add <eventID> <nick>");
+        if (subcommand === "add") {
+            const [eventId, nick] = args;
+            if (!eventId || !nick) return (message.channel as TextChannel).send(
+                "Usage: !event add <eventID> <nick>"
+            );
 
             const events = loadEvents();
             const event = events.find(e => e.id === eventId);
-            if (!event) return safeSend(channel, "Event not found.");
+            if (!event) return (message.channel as TextChannel).send("Event not found.");
 
             if (!event.participants.some(p => p.nick === nick)) {
                 event.participants.push({ nick, present: true });
                 saveEvents(events);
-                safeSend(channel, `${nick} added to event **${event.name}**.`);
+                (message.channel as TextChannel).send(`${nick} added to event **${event.name}**.`);
             } else {
-                safeSend(channel, `${nick} is already in this event.`);
+                (message.channel as TextChannel).send(`${nick} is already in this event.`);
             }
         }
 
         // Usuwanie uczestników: !event remove <eventID> <nick>
-        if (command === "!event" && args[0]?.toLowerCase() === "remove") {
-            const [ , eventId, nick ] = args;
-            if (!eventId || !nick) return safeSend(channel, "Usage: !event remove <eventID> <nick>");
+        if (subcommand === "remove") {
+            const [eventId, nick] = args;
+            if (!eventId || !nick) return (message.channel as TextChannel).send(
+                "Usage: !event remove <eventID> <nick>"
+            );
 
             const events = loadEvents();
             const event = events.find(e => e.id === eventId);
-            if (!event) return safeSend(channel, "Event not found.");
+            if (!event) return (message.channel as TextChannel).send("Event not found.");
 
             event.participants = event.participants.filter(p => p.nick !== nick);
             saveEvents(events);
-            safeSend(channel, `${nick} removed from event **${event.name}**.`);
+            (message.channel as TextChannel).send(`${nick} removed from event **${event.name}**.`);
         }
 
         // Lista uczestników: !event list <eventID>
-        if (command === "!event" && args[0]?.toLowerCase() === "list") {
-            const [ , eventId ] = args;
-            if (!eventId) return safeSend(channel, "Usage: !event list <eventID>");
+        if (subcommand === "list") {
+            const [eventId] = args;
+            if (!eventId) return (message.channel as TextChannel).send(
+                "Usage: !event list <eventID>"
+            );
 
             const events = loadEvents();
             const event = events.find(e => e.id === eventId);
-            if (!event) return safeSend(channel, "Event not found.");
+            if (!event) return (message.channel as TextChannel).send("Event not found.");
 
             const present = event.participants.filter(p => p.present).map(p => p.nick);
             const absent = event.participants.filter(p => !p.present).map(p => p.nick);
 
-            safeSend(channel, `**${event.name}** Participants:\nPresent: ${present.join(", ") || "none"}\nAbsent: ${absent.join(", ") || "none"}`);
+            (message.channel as TextChannel).send(
+                `**${event.name}** Participants:\nPresent: ${present.join(", ") || "none"}\nAbsent: ${absent.join(", ") || "none"}`
+            );
         }
 
         // Oznaczanie nieobecnych: !event markabsent <eventID> <nick>
-        if (command === "!event" && args[0]?.toLowerCase() === "markabsent") {
-            const [ , eventId, nick ] = args;
-            if (!eventId || !nick) return safeSend(channel, "Usage: !event markabsent <eventID> <nick>");
+        if (subcommand === "markabsent") {
+            const [eventId, nick] = args;
+            if (!eventId || !nick) return (message.channel as TextChannel).send(
+                "Usage: !event markabsent <eventID> <nick>"
+            );
 
             const events = loadEvents();
             const event = events.find(e => e.id === eventId);
-            if (!event) return safeSend(channel, "Event not found.");
+            if (!event) return (message.channel as TextChannel).send("Event not found.");
 
             const participant = event.participants.find(p => p.nick === nick);
             if (participant) {
                 participant.present = false;
                 saveEvents(events);
-                safeSend(channel, `${nick} marked as absent for event **${event.name}**.`);
+                (message.channel as TextChannel).send(`${nick} marked as absent for event **${event.name}**.`);
             } else {
-                safeSend(channel, `${nick} is not part of this event.`);
+                (message.channel as TextChannel).send(`${nick} is not part of this event.`);
             }
         }
     });
