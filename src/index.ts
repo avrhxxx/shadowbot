@@ -19,11 +19,14 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN is not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
 
-const LIBRE_URL = process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate";
-const GOOGLE_URL = process.env.GOOGLE_URL || "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={lang}&dt=t&q={text}";
+// Endpointy do tłumaczenia
+const TRANSLATORS = [
+    process.env.LIBRE_URL || "https://libretranslate-production-26a3.up.railway.app/translate",
+    process.env.GOOGLE_URL || "https://translate.googleapis.com/translate_a/single"
+];
 
 const LANGUAGES = [
     { code: "en", label: "English", emoji: "🇬🇧" },
@@ -48,7 +51,7 @@ async function processReactionQueue() {
             if (!channel?.isTextBased()) continue;
             const message = await channel.messages.fetch(messageId);
             if (!message) continue;
-            await message.react("🌍");
+            await message.react("🌍"); // zmiana reakcji na ziemię
             await new Promise(res => setTimeout(res, 900));
         } catch (err) { console.error("Reaction queue error:", err); }
     }
@@ -69,17 +72,17 @@ client.on("messageReactionAdd", async (reaction, user) => {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
-    if (reaction.emoji.name !== "🌍") return;
-    if (!reaction.message.inGuild()) return;
+    if (reaction.emoji.name !== "🌍" || !reaction.message.inGuild()) return;
 
     const message = reaction.message;
     if (translationEmbeds.has(message.id)) return;
 
     const embed = new EmbedBuilder()
-        .setTitle("Translation Panel (Beta)")
-        .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
+        .setTitle("Translation Panel")
+        .setAuthor({ name: message.author.username, iconURL: "https://cdn-icons-png.flaticon.com/512/684/684908.png" })
         .setDescription(`"${message.content}"`)
-        .setColor("Blue");
+        .setColor("Blue")
+        .setFooter({ text: "You have 60s to click a button" });
 
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -99,41 +102,41 @@ client.on("messageReactionAdd", async (reaction, user) => {
     const sent = await message.channel.send({ embeds: [embed], components: rows });
     translationEmbeds.set(message.id, sent.id);
 
-    // Dynamiczny licznik sekund i auto-delete
-    let secondsLeft = 60;
+    let elapsed = 0;
     const interval = setInterval(async () => {
-        secondsLeft--;
-        try {
-            await sent.edit({ embeds: [embed.setFooter({ text: `You have ${secondsLeft}s to click a button` })] });
-        } catch {}
-        if (secondsLeft <= 0) {
+        elapsed += 10;
+        if (!sent.editable || elapsed >= 60) {
             clearInterval(interval);
-            try { await sent.delete(); translationEmbeds.delete(message.id); } catch {}
+            try { await sent.delete(); } catch {}
+            translationEmbeds.delete(message.id);
+            return;
         }
-    }, 1000);
+        try { await sent.edit({ components: rows }); } catch {}
+    }, 10000);
 });
 
-async function translateText(text: string, target: string): Promise<string> {
-    try {
-        // Najpierw Libre
-        const res = await fetch(LIBRE_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ q: text, source: "auto", target, format: "text" })
-        });
-        if (res.ok) {
-            const data = await res.json() as { translatedText?: string };
-            if (data.translatedText) return data.translatedText;
-        }
-        throw new Error("Libre failed");
-    } catch {
-        // Fallback na nieoficjalne Google
+async function translateWithRotatingAPI(text: string, target: string) {
+    for (const url of TRANSLATORS) {
         try {
-            const url = GOOGLE_URL.replace("{lang}", target).replace("{text}", encodeURIComponent(text));
-            const gRes = await fetch(url);
-            const json = await gRes.json();
-            if (Array.isArray(json) && json[0] && Array.isArray(json[0]) && json[0][0]) return json[0][0][0];
-        } catch {}
+            let body: any;
+            let headers: any = { "Content-Type": "application/json" };
+            if (url.includes("libretranslate")) {
+                body = JSON.stringify({ q: text, source: "auto", target, format: "text" });
+            } else {
+                // Google nieoficjalne
+                const params = new URLSearchParams({ client: "gtx", sl: "auto", tl: target, dt: "t", q: text });
+                return await fetch(`${url}?${params.toString()}`)
+                    .then(r => r.json())
+                    .then(data => data[0][0][0]);
+            }
+
+            const res = await fetch(url, { method: "POST", headers, body });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data.translatedText) return data.translatedText;
+        } catch (err) {
+            console.warn(`Translator failed: ${url}`, err);
+        }
     }
     return "Translation failed.";
 }
@@ -141,15 +144,28 @@ async function translateText(text: string, target: string): Promise<string> {
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton() || !interaction.customId.startsWith("translate_")) return;
     const [_, messageId, langCode] = interaction.customId.split("_");
-    if (!interaction.channel?.isTextBased()) return interaction.reply({ content: "Channel not supported.", ephemeral: true });
+
+    if (!interaction.channel?.isTextBased()) {
+        await interaction.reply({ content: "Channel not supported.", ephemeral: true });
+        return;
+    }
 
     let originalMessage;
-    try { originalMessage = await interaction.channel.messages.fetch(messageId); }
-    catch { return interaction.reply({ content: "Original message not found.", ephemeral: true }); }
+    try { originalMessage = await interaction.channel.messages.fetch(messageId); } catch {
+        await interaction.reply({ content: "Original message not found.", ephemeral: true });
+        return;
+    }
 
-    const translatedText = await translateText(originalMessage.content, langCode);
+    const translatedText = await translateWithRotatingAPI(originalMessage.content, langCode);
+
     await interaction.reply({
-        embeds: [new EmbedBuilder().setTitle(`Translation (${langCode.toUpperCase()})`).setDescription(translatedText).setColor("Green")],
+        embeds: [
+            new EmbedBuilder()
+                .setTitle(`Translation (${langCode.toUpperCase()})`)
+                .setAuthor({ name: originalMessage.author.username, iconURL: "https://cdn-icons-png.flaticon.com/512/684/684908.png" })
+                .setDescription(`"${translatedText}"`)
+                .setColor("Green")
+        ],
         ephemeral: true
     });
 });
