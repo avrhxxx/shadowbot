@@ -1,4 +1,3 @@
-// src/eventsPanel/eventService.ts
 import * as EventStorage from "./eventStorage";
 import { EmbedBuilder, TextChannel } from "discord.js";
 
@@ -14,10 +13,9 @@ export interface EventObject {
   hour: number;
   minute: number;
   reminderBefore: number;
-  status: "ACTIVE" | "PAST" | "CANCELLED";
+  status: "ACTIVE" | "PAST" | "CANCELED"; // US spelling
   participants: string[];
   createdAt: number;
-  // opcjonalnie absent dla oznaczonych nieobecnych
   absent?: string[];
 }
 
@@ -87,7 +85,7 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
 
-  event.status = "CANCELLED";
+  event.status = "CANCELED"; // US spelling
   await EventStorage.saveEvents(guildId, events);
   return event;
 }
