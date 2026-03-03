@@ -167,8 +167,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       break;
 
     // SELECT MENU
-    case "event_settings_select":
-      if (interaction.isStringSelectMenu()) await handleSettingsSelect(interaction);
+    case "event_settings_notification":
+    case "event_settings_download":
+      if (interaction.isStringSelectMenu()) {
+        await handleSettingsSelect(interaction); // wywołuje nasz handler settings
+      }
       break;
 
     case "event_cancel_select":
