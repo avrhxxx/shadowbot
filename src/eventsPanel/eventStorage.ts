@@ -1,4 +1,3 @@
-// src/eventsPanel/eventStorage.ts
 import fs from "fs";
 import path from "path";
 
@@ -12,7 +11,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, "{}");
 if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, "{}");
 
-// Typ eventu (dla TypeScript)
+// Typ eventu (US spelling)
 export type EventObject = {
   id: string;
   name: string;
@@ -21,7 +20,7 @@ export type EventObject = {
   hour: number;
   minute: number;
   reminderBefore: number;
-  status: "ACTIVE" | "PAST" | "CANCELLED";
+  status: "ACTIVE" | "PAST" | "CANCELED"; // US spelling
   participants: string[];
   createdAt: number;
   guildId: string;
