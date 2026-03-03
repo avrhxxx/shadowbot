@@ -1,9 +1,6 @@
+import { ButtonInteraction, EmbedBuilder } from "discord.js";
 
-import { Interaction, EmbedBuilder } from "discord.js";
-
-export async function handleHelp(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-
+export async function handleHelp(interaction: ButtonInteraction) {
   const embed = new EmbedBuilder()
     .setTitle("Event Help")
     .setDescription(`
