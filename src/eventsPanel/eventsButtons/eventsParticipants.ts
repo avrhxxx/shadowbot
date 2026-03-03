@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsParticipants.ts
 import { 
   ButtonInteraction, 
   ModalSubmitInteraction, 
@@ -5,9 +6,11 @@ import {
   TextInputBuilder, 
   TextInputStyle, 
   ActionRowBuilder, 
-  EmbedBuilder 
+  EmbedBuilder, 
+  Message 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
+import { updateEventEmbed } from "./eventsList"; // funkcja do aktualizacji embedu listy
 
 /* ======================================================
    🔹 ADD PARTICIPANT (BUTTON → MODAL)
@@ -46,6 +49,9 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
     event.participants.push(input);
     await EventStorage.saveEvents(guildId, events);
   }
+
+  // Aktualizacja głównego embedu listy
+  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
     .setTitle(`Participant Added`)
@@ -91,6 +97,9 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   event.participants = event.participants.filter(nick => nick !== input);
   await EventStorage.saveEvents(guildId, events);
 
+  // Aktualizacja głównego embedu listy
+  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
+
   const embed = new EmbedBuilder()
     .setTitle(`Participant Removed`)
     .setDescription(`${input} removed from **${event.name}**`)
@@ -132,11 +141,15 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
+  // Usuń z participants i dodaj do absent
   event.participants = event.participants.filter(nick => nick !== input);
-  if (!("absent" in event)) (event as any).absent = [];
-  (event as any).absent.push(input);
+  if (!event.absent) event.absent = [];
+  event.absent.push(input);
 
   await EventStorage.saveEvents(guildId, events);
+
+  // Aktualizacja głównego embedu listy
+  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
     .setTitle(`Participant Marked Absent`)
