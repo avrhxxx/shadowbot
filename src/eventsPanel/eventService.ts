@@ -1,4 +1,3 @@
-// src/eventsPanel/eventService.ts
 import * as EventStorage from "./eventStorage";
 import { EmbedBuilder, TextChannel } from "discord.js";
 
@@ -99,16 +98,16 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
 }
 
 /**
- * Ustawia globalny kanał do przypomnień
+ * Ustawia kanał powiadomień (notification)
  */
-export async function setGlobalChannel(guildId: string, channelId: string) {
+export async function setNotificationChannel(guildId: string, channelId: string) {
   const config = await EventStorage.getConfig(guildId);
-  config.defaultChannelId = channelId;
+  config.notificationChannelId = channelId;
   await EventStorage.saveConfig(guildId, config);
 }
 
 /**
- * Ustawia kanał do downloadu plików z uczestnikami
+ * Ustawia kanał do downloadu plików
  */
 export async function setDownloadChannel(guildId: string, channelId: string) {
   const config = await EventStorage.getConfig(guildId);
@@ -132,9 +131,9 @@ export async function sendManualReminders(guild: any) {
   const events = await getActiveEvents(guildId);
   const config = await EventStorage.getConfig(guildId);
 
-  if (!config.defaultChannelId) return;
+  if (!config.notificationChannelId) return; // teraz notificationChannelId
 
-  const channel = guild.channels.cache.get(config.defaultChannelId) as TextChannel;
+  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
   for (const event of events) {
