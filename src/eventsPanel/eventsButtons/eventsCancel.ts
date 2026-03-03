@@ -1,14 +1,20 @@
-
-import { Interaction, StringSelectMenuBuilder, ActionRowBuilder } from "discord.js";
+import { 
+  ButtonInteraction, 
+  StringSelectMenuBuilder, 
+  ActionRowBuilder 
+} from "discord.js";
 import * as EventStorage from "../eventStorage";
 
-export async function handleCancel(interaction: Interaction) {
+export async function handleCancel(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
-  const events = await EventStorage.getEvents(interaction.guildId!);
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const events = await EventStorage.getEvents(guildId);
   const activeEvents = events.filter(e => e.status === "ACTIVE");
 
-  if (!activeEvents.length) {
+  if (activeEvents.length === 0) {
     await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
     return;
   }
