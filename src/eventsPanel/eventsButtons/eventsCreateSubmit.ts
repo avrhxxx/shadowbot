@@ -37,7 +37,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const timeRaw = interaction.fields.getTextInputValue("event_time");
   const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
-  // Optional reminder
+  // Optional reminder – pole nie jest wymagane
   const reminderBefore: number | null = reminderRaw ? parseInt(reminderRaw, 10) : null;
 
   // Parse time
@@ -64,10 +64,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     month,
     hour,
     minute,
-    reminderBefore, // can be null
+    reminderBefore, // optional
     status: "ACTIVE",
     participants: [],
-    absent: [], // initialize empty absent list
     createdAt: Date.now()
   };
 
