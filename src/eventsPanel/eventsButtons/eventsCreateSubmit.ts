@@ -1,27 +1,54 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
+
+/**
+ * Convert various time formats into HH:MM
+ */
+function parseTime(input: string): { hour: number; minute: number } | null {
+  input = input.trim();
+  if (!input) return null;
+
+  // HH:MM format
+  if (input.includes(":")) {
+    const [h, m] = input.split(":").map(n => parseInt(n, 10));
+    if (isNaN(h) || isNaN(m)) return null;
+    return { hour: h, minute: m };
+  }
+
+  // Numeric formats like 130, 1100, 1900
+  if (/^\d{1,4}$/.test(input)) {
+    const s = input.padStart(4, "0");
+    const hour = parseInt(s.slice(0, 2), 10);
+    const minute = parseInt(s.slice(2), 10);
+    if (hour > 23 || minute > 59) return null;
+    return { hour, minute };
+  }
+
+  return null;
+}
 
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const guildId = interaction.guildId!;
   const name = interaction.fields.getTextInputValue("event_name");
-  let day = parseInt(interaction.fields.getTextInputValue("event_day"), 10);
-  let month = parseInt(interaction.fields.getTextInputValue("event_month"), 10);
-  const time = interaction.fields.getTextInputValue("event_time"); // HH:MM
-  const reminderBefore = parseInt(interaction.fields.getTextInputValue("reminder_before"), 10);
+  const day = parseInt(interaction.fields.getTextInputValue("event_day"), 10);
+  const month = parseInt(interaction.fields.getTextInputValue("event_month"), 10);
+  const timeRaw = interaction.fields.getTextInputValue("event_time");
+  const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
-  const [hour, minute] = time.split(":").map(n => parseInt(n, 10));
+  const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : null;
 
-  if (!name || isNaN(day) || isNaN(month) || isNaN(hour) || isNaN(minute) || isNaN(reminderBefore)) {
-    await interaction.reply({ content: "Invalid input.", ephemeral: true });
+  const parsedTime = parseTime(timeRaw);
+  if (!name || isNaN(day) || isNaN(month) || !parsedTime) {
+    await interaction.reply({ content: "Invalid input. Please check all fields.", ephemeral: true });
     return;
   }
 
-  // Konwertujemy dzień i miesiąc na format dwucyfrowy
+  const { hour, minute } = parsedTime;
+
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dayStr = pad(day);
   const monthStr = pad(month);
-  const yearStr = new Date().getFullYear(); // bieżący rok
+  const yearStr = new Date().getFullYear();
 
   const events: EventObject[] = await getEvents(guildId);
 
@@ -33,7 +60,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     month,
     hour,
     minute,
-    reminderBefore,
+    reminderBefore, // can be null
     status: "ACTIVE",
     participants: [],
     createdAt: Date.now()
@@ -44,7 +71,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
-    .setDescription(`Event **${name}** scheduled for ${dayStr}/${monthStr}/${yearStr} at ${pad(hour)}:${pad(minute)}`)
+    .setDescription(
+      `Event **${name}** scheduled for ${dayStr}/${monthStr}/${yearStr} at ${pad(hour)}:${pad(minute)}` +
+      (reminderBefore ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
+    )
     .setColor("Green");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
