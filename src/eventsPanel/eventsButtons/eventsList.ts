@@ -1,10 +1,10 @@
-// src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
+import { handleDownload } from "./eventsDownload";
 
 /**
  * Wyświetla listę wszystkich eventów w ephemeral embedach
- * Dodaje przyciski: Add, Remove, Absent, Show List, Download
+ * Dodaje przyciski: Add, Remove, Absent, Show List, Download pojedynczego eventu
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
