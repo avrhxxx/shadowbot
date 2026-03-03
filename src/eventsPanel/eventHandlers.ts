@@ -6,13 +6,15 @@ import {
   ModalSubmitInteraction
 } from "discord.js";
 
-// Importujemy wszystkie handler-y przycisków
+// Importujemy wszystkie handler-y przycisków i select/modals
 import { handleCreate } from "./eventsButtons/eventsCreate";
+import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
 import { handleList } from "./eventsButtons/eventsList";
 import { handleCancel } from "./eventsButtons/eventsCancel";
 import { handleManualReminder } from "./eventsButtons/eventsReminder";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings } from "./eventsButtons/eventsSettings";
+import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
 /**
@@ -22,18 +24,19 @@ import { handleHelp } from "./eventsButtons/eventsHelp";
 export async function handleEventInteraction(
   interaction: Interaction
 ): Promise<void> {
+  // Filtrujemy tylko buttony, modale i select menu
   if (
     !interaction.isButton() &&
     !interaction.isModalSubmit() &&
     !interaction.isStringSelectMenu()
-  )
-    return;
+  ) return;
 
   const { customId } = interaction;
 
   if (!customId.startsWith("event_")) return;
 
   switch (customId) {
+    // BUTTONS
     case "event_create":
       if (interaction.isButton()) await handleCreate(interaction);
       break;
@@ -62,7 +65,16 @@ export async function handleEventInteraction(
       if (interaction.isButton()) await handleHelp(interaction);
       break;
 
-    // Tutaj w przyszłości możesz obsługiwać select menu / modal submit
+    // MODAL SUBMITS
+    case "event_create_modal":
+      if (interaction.isModalSubmit()) await handleCreateSubmit(interaction);
+      break;
+
+    // SELECT MENU
+    case "event_settings_select":
+      if (interaction.isStringSelectMenu()) await handleSettingsSelect(interaction);
+      break;
+
     default:
       console.warn(`Nieobsługiwany event customId: ${customId}`);
   }
