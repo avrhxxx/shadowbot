@@ -1,150 +1,175 @@
-// src/eventsPanel/eventHandlers.ts
-import { Interaction } from "discord.js";
+// src/eventsPanel/eventsButtons/eventsParticipants.ts
+import { 
+  ButtonInteraction, 
+  ModalSubmitInteraction, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  ActionRowBuilder, 
+  EmbedBuilder 
+} from "discord.js";
+import * as EventStorage from "../eventStorage";
 
-// Importy buttonów / modali / selectów
-import { handleCreate } from "./eventsButtons/eventsCreate";
-import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
-import { handleList } from "./eventsButtons/eventsList";
-import {
-  handleCancel,
-  handleCancelSelect,
-  handleCancelConfirm,
-  handleCancelAbort
-} from "./eventsButtons/eventsCancel";
-import { handleManualReminder, handleManualReminderSelect } from "./eventsButtons/eventsReminder";
-import { handleDownload } from "./eventsButtons/eventsDownload";
-import { handleSettings } from "./eventsButtons/eventsSettings";
-import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
-import { handleHelp } from "./eventsButtons/eventsHelp";
+/* ======================================================
+   🔹 ADD PARTICIPANT (BUTTON → MODAL)
+====================================================== */
+export async function handleAddParticipant(interaction: ButtonInteraction, eventId: string) {
+  const modal = new ModalBuilder()
+    .setCustomId(`event_add_modal_${eventId}`)
+    .setTitle("Add Participant");
 
-// Uczestnicy
-import {
-  handleAddParticipant,
-  handleRemoveParticipant,
-  handleAbsentParticipant,
-  handleAddParticipantSubmit,
-  handleRemoveParticipantSubmit,
-  handleAbsentParticipantSubmit
-} from "./eventsButtons/eventsParticipants";
+  const input = new TextInputBuilder()
+    .setCustomId("user_input")
+    .setLabel("Enter user mention, ID or username")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
-/**
- * Główny router Event Panelu
- */
-export async function handleEventInteraction(interaction: Interaction): Promise<void> {
+  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
+  modal.addComponents(row);
+  await interaction.showModal(modal);
+}
 
-  if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
+/* ======================================================
+   🔹 ADD PARTICIPANT (MODAL SUBMIT)
+====================================================== */
+export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  const guild = interaction.guild!;
+  const guildId = guild.id;
+  const input = interaction.fields.getTextInputValue("user_input");
 
-  const { customId } = interaction;
-  if (!customId.startsWith("event_")) return;
+  const member =
+    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
+    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
 
-  /* =======================================================
-     🔥 DYNAMIC – CONFIRM CANCEL
-  ======================================================= */
-  if (interaction.isButton() && customId.startsWith("event_cancel_confirm_")) {
-    const eventId = customId.replace("event_cancel_confirm_", "");
-    await handleCancelConfirm(interaction, eventId);
+  // ✅ Usuwamy walidację "User not found" – dodajemy nawet jeśli nie znaleziono w cache
+
+  const events = await EventStorage.getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  /* =======================================================
-     🔥 DYNAMIC – PARTICIPANT BUTTONS
-  ======================================================= */
-  if (interaction.isButton()) {
-    if (customId.startsWith("event_add_")) {
-      const eventId = customId.replace("event_add_", "");
-      await handleAddParticipant(interaction, eventId);
-      return;
-    }
-    if (customId.startsWith("event_remove_")) {
-      const eventId = customId.replace("event_remove_", "");
-      await handleRemoveParticipant(interaction, eventId);
-      return;
-    }
-    if (customId.startsWith("event_absent_")) {
-      const eventId = customId.replace("event_absent_", "");
-      await handleAbsentParticipant(interaction, eventId);
-      return;
-    }
+  if (member && !event.participants.includes(member.id)) {
+    event.participants.push(member.id);
+    await EventStorage.saveEvents(guildId, events);
   }
 
-  /* =======================================================
-     🔥 DYNAMIC – PARTICIPANT MODALS
-  ======================================================= */
-  if (interaction.isModalSubmit()) {
-    if (customId.startsWith("event_add_modal_")) {
-      const eventId = customId.replace("event_add_modal_", "");
-      await handleAddParticipantSubmit(interaction, eventId);
-      return;
-    }
-    if (customId.startsWith("event_remove_modal_")) {
-      const eventId = customId.replace("event_remove_modal_", "");
-      await handleRemoveParticipantSubmit(interaction, eventId);
-      return;
-    }
-    if (customId.startsWith("event_absent_modal_")) {
-      const eventId = customId.replace("event_absent_modal_", "");
-      await handleAbsentParticipantSubmit(interaction, eventId);
-      return;
-    }
+  const embed = new EmbedBuilder()
+    .setTitle(`Participant Added`)
+    .setDescription(member ? `${member} added to **${event.name}**` : `User added to **${event.name}**`)
+    .setColor("Green");
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/* ======================================================
+   🔹 REMOVE PARTICIPANT (BUTTON → MODAL)
+====================================================== */
+export async function handleRemoveParticipant(interaction: ButtonInteraction, eventId: string) {
+  const modal = new ModalBuilder()
+    .setCustomId(`event_remove_modal_${eventId}`)
+    .setTitle("Remove Participant");
+
+  const input = new TextInputBuilder()
+    .setCustomId("user_input")
+    .setLabel("Enter user mention, ID or username")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
+  modal.addComponents(row);
+  await interaction.showModal(modal);
+}
+
+/* ======================================================
+   🔹 REMOVE PARTICIPANT (MODAL SUBMIT)
+====================================================== */
+export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  const guild = interaction.guild!;
+  const guildId = guild.id;
+  const input = interaction.fields.getTextInputValue("user_input");
+
+  const member =
+    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
+    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
+
+  if (!member) {
+    await interaction.reply({ content: "User not found.", ephemeral: true });
+    return;
   }
 
-  /* =======================================================
-     🔥 STANDARDOWE CUSTOM ID
-  ======================================================= */
-  switch (customId) {
-
-    // BUTTONS
-    case "event_create":
-      if (interaction.isButton()) await handleCreate(interaction);
-      break;
-
-    case "event_list":
-      if (interaction.isButton()) await handleList(interaction);
-      break;
-
-    case "event_cancel":
-      if (interaction.isButton()) await handleCancel(interaction);
-      break;
-
-    case "event_cancel_abort":
-      if (interaction.isButton()) await handleCancelAbort(interaction);
-      break;
-
-    case "event_manual_reminder":
-      if (interaction.isButton()) await handleManualReminder(interaction);
-      break;
-
-    case "event_download":
-      if (interaction.isButton()) await handleDownload(interaction);
-      break;
-
-    case "event_settings":
-      if (interaction.isButton()) await handleSettings(interaction);
-      break;
-
-    case "event_help":
-      if (interaction.isButton()) await handleHelp(interaction);
-      break;
-
-    // MODAL SUBMIT
-    case "event_create_modal":
-      if (interaction.isModalSubmit()) await handleCreateSubmit(interaction);
-      break;
-
-    // SELECT MENU
-    case "event_settings_select":
-      if (interaction.isStringSelectMenu()) await handleSettingsSelect(interaction);
-      break;
-
-    case "event_cancel_select":
-      if (interaction.isStringSelectMenu()) await handleCancelSelect(interaction);
-      break;
-
-    case "event_manual_reminder_select":
-      if (interaction.isStringSelectMenu()) await handleManualReminderSelect(interaction);
-      break;
-
-    default:
-      console.warn(`Nieobsługiwany event customId: ${customId}`);
+  const events = await EventStorage.getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
   }
+
+  event.participants = event.participants.filter(id => id !== member.id);
+  await EventStorage.saveEvents(guildId, events);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`Participant Removed`)
+    .setDescription(`${member} removed from **${event.name}**`)
+    .setColor("Red");
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/* ======================================================
+   🔹 ABSENT PARTICIPANT (BUTTON → MODAL)
+====================================================== */
+export async function handleAbsentParticipant(interaction: ButtonInteraction, eventId: string) {
+  const modal = new ModalBuilder()
+    .setCustomId(`event_absent_modal_${eventId}`)
+    .setTitle("Mark Participant Absent");
+
+  const input = new TextInputBuilder()
+    .setCustomId("user_input")
+    .setLabel("Enter user mention, ID or username")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
+  modal.addComponents(row);
+  await interaction.showModal(modal);
+}
+
+/* ======================================================
+   🔹 ABSENT PARTICIPANT (MODAL SUBMIT)
+====================================================== */
+export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  const guild = interaction.guild!;
+  const guildId = guild.id;
+  const input = interaction.fields.getTextInputValue("user_input");
+
+  const member =
+    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
+    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
+
+  if (!member) {
+    await interaction.reply({ content: "User not found.", ephemeral: true });
+    return;
+  }
+
+  const events = await EventStorage.getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
+  }
+
+  event.participants = event.participants.filter(id => id !== member.id);
+  if (!("absent" in event)) (event as any).absent = [];
+  (event as any).absent.push(member.id);
+
+  await EventStorage.saveEvents(guildId, events);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`Participant Marked Absent`)
+    .setDescription(`${member} marked absent for **${event.name}**`)
+    .setColor("Orange");
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
