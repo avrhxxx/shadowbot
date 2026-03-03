@@ -2,6 +2,9 @@
 import * as EventStorage from "./eventStorage";
 import { EmbedBuilder, TextChannel } from "discord.js";
 
+/**
+ * Interfejs eventu
+ */
 export interface EventObject {
   id: string;
   guildId: string;
@@ -14,10 +17,12 @@ export interface EventObject {
   status: "ACTIVE" | "PAST" | "CANCELLED";
   participants: string[];
   createdAt: number;
+  // opcjonalnie absent dla oznaczonych nieobecnych
+  absent?: string[];
 }
 
 /**
- * Tworzy nowy event i zapisuje do storage
+ * Tworzy nowy event i zapisuje go w storage
  */
 export async function createEvent(data: {
   guildId: string;
@@ -51,6 +56,30 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 /**
+ * Pobiera aktywne eventy
+ */
+export async function getActiveEvents(guildId: string): Promise<EventObject[]> {
+  const events = await EventStorage.getEvents(guildId);
+  return events.filter(e => e.status === "ACTIVE");
+}
+
+/**
+ * Pobiera pojedynczy event po ID
+ */
+export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await EventStorage.getEvents(guildId);
+  return events.find(e => e.id === eventId) || null;
+}
+
+/**
+ * Pobiera przeszłe (PAST) eventy
+ */
+export async function getPastEvents(guildId: string): Promise<EventObject[]> {
+  const events = await EventStorage.getEvents(guildId);
+  return events.filter(e => e.status === "PAST");
+}
+
+/**
  * Anuluje event o danym ID
  */
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -64,7 +93,7 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
 }
 
 /**
- * Ustawia kanał globalny do przypomnień
+ * Ustawia globalny kanał do przypomnień
  */
 export async function setGlobalChannel(guildId: string, channelId: string) {
   const config = await EventStorage.getConfig(guildId);
@@ -73,12 +102,28 @@ export async function setGlobalChannel(guildId: string, channelId: string) {
 }
 
 /**
+ * Ustawia kanał do downloadu plików z uczestnikami
+ */
+export async function setDownloadChannel(guildId: string, channelId: string) {
+  const config = await EventStorage.getConfig(guildId);
+  config.downloadChannelId = channelId;
+  await EventStorage.saveConfig(guildId, config);
+}
+
+/**
+ * Pobiera kanał do downloadu
+ */
+export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
+  const config = await EventStorage.getConfig(guildId);
+  return config.downloadChannelId;
+}
+
+/**
  * Wysyła ręczne przypomnienia o aktywnych eventach
  */
 export async function sendManualReminders(guild: any) {
   const guildId = guild.id;
-  const events = await EventStorage.getEvents(guildId);
-  const activeEvents = events.filter(e => e.status === "ACTIVE");
+  const events = await getActiveEvents(guildId);
   const config = await EventStorage.getConfig(guildId);
 
   if (!config.defaultChannelId) return;
@@ -86,7 +131,7 @@ export async function sendManualReminders(guild: any) {
   const channel = guild.channels.cache.get(config.defaultChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  for (const event of activeEvents) {
+  for (const event of events) {
     const embed = new EmbedBuilder()
       .setTitle(`Reminder: ${event.name}`)
       .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute}`);
@@ -95,7 +140,7 @@ export async function sendManualReminders(guild: any) {
 }
 
 /**
- * Pobiera listę eventów w formie embed
+ * Generuje embed listy eventów w skróconej formie
  */
 export function generateEventListEmbed(events: EventObject[]) {
   return new EmbedBuilder()
@@ -108,9 +153,16 @@ export function generateEventListEmbed(events: EventObject[]) {
 }
 
 /**
- * Pobiera uczestników eventu (do download)
+ * Generuje szczegółowe embedy dla listy eventów
+ * Uwzględnia liczbę uczestników i nieobecnych
  */
-export async function getPastEvents(guildId: string) {
-  const events = await EventStorage.getEvents(guildId);
-  return events.filter(e => e.status === "PAST");
+export function generateEventListEmbedDetailed(events: EventObject[]) {
+  return events.map(e => {
+    return new EmbedBuilder()
+      .setTitle(e.name)
+      .setDescription(
+        `Status: ${e.status}\nParticipants: ${e.participants.length}${e.absent?.length ? `\nAbsent: ${e.absent.length}` : ""}`
+      )
+      .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
+  });
 }
