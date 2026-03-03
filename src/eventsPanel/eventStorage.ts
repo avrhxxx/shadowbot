@@ -2,12 +2,17 @@
 import fs from "fs";
 import path from "path";
 
-const eventsPath = path.join(__dirname, "../data/events.json");
-const configPath = path.join(__dirname, "../data/config.json");
+// Folder danych w root projektu, poza dist, żeby deploy nie nadpisywał plików
+const dataDir = path.join(__dirname, "../../data");
+const eventsPath = path.join(dataDir, "events.json");
+const configPath = path.join(dataDir, "config.json");
 
-// =========================
-// Typ EventObject
-// =========================
+// Tworzymy folder i pliki, jeśli nie istnieją
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, "{}");
+if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, "{}");
+
+// Typ eventu (dla TypeScript)
 export type EventObject = {
   id: string;
   name: string;
@@ -22,9 +27,6 @@ export type EventObject = {
   guildId: string;
 };
 
-// =========================
-// Funkcje Event Storage
-// =========================
 export async function getEvents(guildId: string): Promise<EventObject[]> {
   const data = readJSON(eventsPath);
   return data[guildId]?.events || [];
@@ -48,9 +50,7 @@ export async function saveConfig(guildId: string, config: any) {
   writeJSON(configPath, data);
 }
 
-// =========================
-// Pomocnicze funkcje JSON
-// =========================
+// --- Pomocnicze funkcje ---
 function readJSON(filePath: string) {
   if (!fs.existsSync(filePath)) return {};
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
