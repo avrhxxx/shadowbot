@@ -1,57 +1,116 @@
-import { Interaction, EmbedBuilder } from "discord.js";
+// src/eventsPanel/eventService.ts
 import * as EventStorage from "./eventStorage";
+import { EmbedBuilder, TextChannel } from "discord.js";
 
-// Logika biznesowa Event Panelu
-
-export async function handleCreate(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  await interaction.reply({ content: "Create event – TODO", ephemeral: true });
+export interface EventObject {
+  id: string;
+  guildId: string;
+  name: string;
+  day: number;
+  month: number;
+  hour: number;
+  minute: number;
+  reminderBefore: number;
+  status: "ACTIVE" | "PAST" | "CANCELLED";
+  participants: string[];
+  createdAt: number;
 }
 
-export async function handleList(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  const events = await EventStorage.getEvents(interaction.guildId!);
-  const embed = new EmbedBuilder()
+/**
+ * Tworzy nowy event i zapisuje do storage
+ */
+export async function createEvent(data: {
+  guildId: string;
+  name: string;
+  day: number;
+  month: number;
+  hour: number;
+  minute: number;
+  reminderBefore: number;
+}): Promise<EventObject> {
+  const events = await EventStorage.getEvents(data.guildId);
+
+  const newEvent: EventObject = {
+    id: `${Date.now()}`,
+    ...data,
+    status: "ACTIVE",
+    participants: [],
+    createdAt: Date.now()
+  };
+
+  events.push(newEvent);
+  await EventStorage.saveEvents(data.guildId, events);
+  return newEvent;
+}
+
+/**
+ * Pobiera wszystkie eventy
+ */
+export async function getEvents(guildId: string): Promise<EventObject[]> {
+  return await EventStorage.getEvents(guildId);
+}
+
+/**
+ * Anuluje event o danym ID
+ */
+export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await EventStorage.getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) return null;
+
+  event.status = "CANCELLED";
+  await EventStorage.saveEvents(guildId, events);
+  return event;
+}
+
+/**
+ * Ustawia kanał globalny do przypomnień
+ */
+export async function setGlobalChannel(guildId: string, channelId: string) {
+  const config = await EventStorage.getConfig(guildId);
+  config.defaultChannelId = channelId;
+  await EventStorage.saveConfig(guildId, config);
+}
+
+/**
+ * Wysyła ręczne przypomnienia o aktywnych eventach
+ */
+export async function sendManualReminders(guild: any) {
+  const guildId = guild.id;
+  const events = await EventStorage.getEvents(guildId);
+  const activeEvents = events.filter(e => e.status === "ACTIVE");
+  const config = await EventStorage.getConfig(guildId);
+
+  if (!config.defaultChannelId) return;
+
+  const channel = guild.channels.cache.get(config.defaultChannelId) as TextChannel;
+  if (!channel || !channel.isTextBased()) return;
+
+  for (const event of activeEvents) {
+    const embed = new EmbedBuilder()
+      .setTitle(`Reminder: ${event.name}`)
+      .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute}`);
+    await channel.send({ embeds: [embed] });
+  }
+}
+
+/**
+ * Pobiera listę eventów w formie embed
+ */
+export function generateEventListEmbed(events: EventObject[]) {
+  return new EmbedBuilder()
     .setTitle("Event List")
     .setDescription(
       events.length === 0
         ? "No events found."
-        : events.map((e: any) => `• ${e.name} (${e.status})`).join("\n")
+        : events.map(e => `• ${e.name} (${e.status})`).join("\n")
     );
-  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-export async function handleCancel(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  await interaction.reply({ content: "Cancel event – TODO", ephemeral: true });
-}
-
-export async function handleManualReminder(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  await interaction.reply({ content: "Manual reminder – TODO", ephemeral: true });
-}
-
-export async function handleDownload(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  await interaction.reply({ content: "Download participants – TODO", ephemeral: true });
-}
-
-export async function handleSettings(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  await interaction.reply({ content: "Settings – TODO", ephemeral: true });
-}
-
-export async function handleHelp(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-  const embed = new EmbedBuilder()
-    .setTitle("Event Help")
-    .setDescription(`
-🟢 Create – tworzy event  
-📄 List – lista eventów  
-🗑️ Cancel – anulowanie  
-🔔 Reminder – przypomnienie  
-⬇️ Download – uczestnicy  
-⚙️ Settings – kanał globalny
-`);
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+/**
+ * Pobiera uczestników eventu (do download)
+ */
+export async function getPastEvents(guildId: string) {
+  const events = await EventStorage.getEvents(guildId);
+  return events.filter(e => e.status === "PAST");
 }
