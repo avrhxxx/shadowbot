@@ -7,7 +7,7 @@ import { EventObject } from "../eventStorage";
 
 /**
  * Globalny download – wszystkie eventy lub pojedynczy event
- * singleEventId – jeśli podany, generuje plik tylko dla tego eventu
+ * @param singleEventId jeśli podany, generuje plik tylko dla tego eventu
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -17,7 +17,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
   const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
 
-  // Jeżeli przekazano singleEventId, filtrujemy tylko ten event
+  // Filtrujemy tylko pojedynczy event jeśli podano ID
   const events: EventObject[] = singleEventId
     ? allEvents.filter(e => e.id === singleEventId)
     : allEvents;
@@ -27,8 +27,8 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
+  // Pobieramy kanał do downloadu – musi być ustawiony
   const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
-
   if (!config.downloadChannelId) {
     await interaction.reply({ content: "Download channel not set. Please configure it first.", flags: 64 });
     return;
