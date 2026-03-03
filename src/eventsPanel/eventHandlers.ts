@@ -1,5 +1,6 @@
 // src/eventsPanel/eventHandlers.ts
 import { Interaction } from "discord.js";
+import * as EventStorage from "./eventStorage";
 
 // Importy buttonów / modali / selectów
 import { handleCreate } from "./eventsButtons/eventsCreate";
@@ -67,7 +68,8 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
 
     /* =======================================================
-       🔥 DYNAMIC – LIST BUTTONS (Show List / Download single event)
+       🔥 DYNAMIC – LIST BUTTONS
+       Show List / Download single event
     ======================================================= */
     if (customId.startsWith("event_show_list_")) {
       const eventId = customId.replace("event_show_list_", "");
@@ -95,7 +97,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     if (customId.startsWith("event_download_single_")) {
       const eventId = customId.replace("event_download_single_", "");
-      // handleDownload w eventsDownload.ts musi przyjmować eventId opcjonalnie
       await handleDownload(interaction, eventId);
       return;
     }
@@ -148,7 +149,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       if (interaction.isButton()) await handleManualReminder(interaction);
       break;
 
-    case "event_download":
+    case "event_download": // Globalny download – wszystkie eventy
       if (interaction.isButton()) await handleDownload(interaction);
       break;
 
