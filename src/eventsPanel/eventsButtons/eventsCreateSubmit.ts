@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 
@@ -9,7 +8,6 @@ function parseTime(input: string): { hour: number; minute: number } | null {
   input = input.trim();
   if (!input) return null;
 
-  // HH:MM format
   if (input.includes(":")) {
     const [h, m] = input.split(":").map(n => parseInt(n, 10));
     if (isNaN(h) || isNaN(m)) return null;
@@ -17,7 +15,6 @@ function parseTime(input: string): { hour: number; minute: number } | null {
     return { hour: h, minute: m };
   }
 
-  // Numeric formats like 130, 1100, 1900
   if (/^\d{1,4}$/.test(input)) {
     const s = input.padStart(4, "0");
     const hour = parseInt(s.slice(0, 2), 10);
@@ -37,13 +34,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const timeRaw = interaction.fields.getTextInputValue("event_time");
   const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
-  // Optional reminder – pole nie jest wymagane
-  const reminderBefore: number | null = reminderRaw ? parseInt(reminderRaw, 10) : null;
+  // ✅ Optional reminder (no null)
+  const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : undefined;
 
-  // Parse time
   const parsedTime = parseTime(timeRaw);
   if (!name || isNaN(day) || isNaN(month) || !parsedTime) {
-    await interaction.reply({ content: "Invalid input. Please check all fields.", ephemeral: true });
+    await interaction.reply({
+      content: "Invalid input. Please check all fields.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -64,10 +63,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     month,
     hour,
     minute,
-    reminderBefore, // optional
     status: "ACTIVE",
     participants: [],
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    ...(reminderBefore !== undefined && { reminderBefore })
   };
 
   events.push(newEvent);
@@ -77,7 +76,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     .setTitle("Event Created")
     .setDescription(
       `Event **${name}** scheduled for ${dayStr}/${monthStr}/${yearStr} at ${pad(hour)}:${pad(minute)}` +
-      (reminderBefore ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
+      (reminderBefore !== undefined
+        ? `\nReminder set ${reminderBefore} minutes before.`
+        : "\nNo reminder set.")
     )
     .setColor("Green");
 
