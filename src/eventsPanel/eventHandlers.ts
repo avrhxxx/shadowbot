@@ -1,12 +1,9 @@
 // src/eventsPanel/eventHandlers.ts
 import {
-  Interaction,
-  ButtonInteraction,
-  StringSelectMenuInteraction,
-  ModalSubmitInteraction
+  Interaction
 } from "discord.js";
 
-// Importujemy wszystkie handler-y przycisków i select/modals
+// Importy buttonów / modali / selectów
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
 import { handleList } from "./eventsButtons/eventsList";
@@ -17,6 +14,13 @@ import { handleSettings } from "./eventsButtons/eventsSettings";
 import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
+// NOWE – uczestnicy
+import {
+  handleAddParticipant,
+  handleRemoveParticipant,
+  handleAbsentParticipant
+} from "./eventsButtons/eventsParticipants";
+
 /**
  * Główny router Event Panelu
  * Każdy button / modal / select menu event_* trafia tutaj
@@ -24,7 +28,8 @@ import { handleHelp } from "./eventsButtons/eventsHelp";
 export async function handleEventInteraction(
   interaction: Interaction
 ): Promise<void> {
-  // Filtrujemy tylko buttony, modale i select menu
+
+  // Obsługujemy tylko buttony, modale i select menu
   if (
     !interaction.isButton() &&
     !interaction.isModalSubmit() &&
@@ -35,7 +40,37 @@ export async function handleEventInteraction(
 
   if (!customId.startsWith("event_")) return;
 
+  /* =======================================================
+     🔥 DYNAMICZNE PRZYCISKI UCZESTNIKÓW (ADD/REMOVE/ABSENT)
+     ======================================================= */
+
+  if (interaction.isButton()) {
+
+    if (customId.startsWith("event_add_")) {
+      const eventId = customId.replace("event_add_", "");
+      await handleAddParticipant(interaction, eventId);
+      return;
+    }
+
+    if (customId.startsWith("event_remove_")) {
+      const eventId = customId.replace("event_remove_", "");
+      await handleRemoveParticipant(interaction, eventId);
+      return;
+    }
+
+    if (customId.startsWith("event_absent_")) {
+      const eventId = customId.replace("event_absent_", "");
+      await handleAbsentParticipant(interaction, eventId);
+      return;
+    }
+  }
+
+  /* ======================
+     STANDARDOWE CUSTOM ID
+     ====================== */
+
   switch (customId) {
+
     // BUTTONS
     case "event_create":
       if (interaction.isButton()) await handleCreate(interaction);
@@ -65,14 +100,15 @@ export async function handleEventInteraction(
       if (interaction.isButton()) await handleHelp(interaction);
       break;
 
-    // MODAL SUBMITS
+    // MODAL SUBMIT
     case "event_create_modal":
       if (interaction.isModalSubmit()) await handleCreateSubmit(interaction);
       break;
 
     // SELECT MENU
     case "event_settings_select":
-      if (interaction.isStringSelectMenu()) await handleSettingsSelect(interaction);
+      if (interaction.isStringSelectMenu())
+        await handleSettingsSelect(interaction);
       break;
 
     default:
