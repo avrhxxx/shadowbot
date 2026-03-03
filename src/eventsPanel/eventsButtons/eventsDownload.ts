@@ -12,11 +12,10 @@ export async function handleDownload(interaction: ButtonInteraction) {
   if (!guildId) return;
 
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-  const pastEvents = events.filter(e => e.status === "PAST");
   const config: { defaultChannelId?: string } = await EventStorage.getConfig(guildId);
 
-  if (!pastEvents.length) {
-    await interaction.reply({ content: "No past events to download.", ephemeral: true });
+  if (!events.length) {
+    await interaction.reply({ content: "No events to download.", flags: 64 });
     return;
   }
 
@@ -25,12 +24,13 @@ export async function handleDownload(interaction: ButtonInteraction) {
 
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  for (const event of pastEvents) {
+  for (const event of events) {
+    const statusLabel = event.status === "PAST" ? "[PAST]" : "[ACTIVE]";
     const content = [
-      `Event: ${event.name}`,
-      `Date: ${event.day}/${event.month}`,
+      `Event: ${event.name} ${statusLabel}`,
+      `Date: ${event.day}/${event.month} ${event.hour}:${event.minute}`,
       `Participants:`,
-      ...event.participants
+      event.participants.length ? event.participants.map(id => `<@${id}>`).join("\n") : "None"
     ].join("\n");
 
     const filePath = path.join(tempDir, `${event.id}.txt`);
@@ -39,16 +39,16 @@ export async function handleDownload(interaction: ButtonInteraction) {
   }
 
   if (!config.defaultChannelId) {
-    await interaction.reply({ content: "Default channel not set.", ephemeral: true });
+    await interaction.reply({ content: "Default channel not set.", flags: 64 });
     return;
   }
 
   const channel = interaction.guild!.channels.cache.get(config.defaultChannelId) as TextChannel | undefined;
   if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Default channel not found or not text-based.", ephemeral: true });
+    await interaction.reply({ content: "Default channel not found or not text-based.", flags: 64 });
     return;
   }
 
   await channel.send({ files });
-  await interaction.reply({ content: "Participants files sent.", ephemeral: true });
+  await interaction.reply({ content: "Participants files sent to default channel.", flags: 64 });
 }
