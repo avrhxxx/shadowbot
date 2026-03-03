@@ -1,14 +1,15 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { handleDownload } from "./eventsDownload";
+import { EventObject } from "../eventService";
 
 /**
- * Wyświetla listę wszystkich eventów w ephemeral embedach
- * Dodaje przyciski: Add, Remove, Absent, Show List, Download pojedynczego eventu
+ * Show ephemeral list of events
+ * Each event gets buttons: Add, Remove, Absent, Show List, Download single
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
 
   if (events.length === 0) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
@@ -19,7 +20,7 @@ export async function handleList(interaction: ButtonInteraction) {
     const embed = new EmbedBuilder()
       .setTitle(e.name)
       .setDescription(
-        `Status: ${e.status}\nParticipants: ${e.participants.length}${(e as any).absent?.length ? `\nAbsent: ${(e as any).absent.length}` : ""}`
+        `Status: ${e.status}\nParticipants: ${e.participants.length}${e.absent?.length ? `\nAbsent: ${e.absent.length}` : ""}`
       )
       .setColor(e.status === "ACTIVE" ? "Green" : e.status === "PAST" ? "Grey" : "Red");
 
