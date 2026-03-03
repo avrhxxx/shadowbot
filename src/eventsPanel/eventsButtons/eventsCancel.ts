@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCancel.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -5,25 +6,21 @@ import {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
-  Interaction
+  EmbedBuilder
 } from "discord.js";
-import * as EventStorage from "../eventStorage";
+import { EventObject, getEvents, saveEvents } from "../eventService";
 
 /* ======================================================
    🔹 STEP 1 – BUTTON → SELECT
-   ====================================================== */
-
-export async function handleCancel(
-  interaction: ButtonInteraction
-) {
+====================================================== */
+export async function handleCancel(interaction: ButtonInteraction) {
   const guildId = interaction.guildId;
   if (!guildId) return;
 
-  const events = await EventStorage.getEvents(guildId);
+  const events = await getEvents(guildId);
   const activeEvents = events.filter(e => e.status === "ACTIVE");
 
-  if (activeEvents.length === 0) {
+  if (!activeEvents.length) {
     await interaction.reply({
       content: "No active events to cancel.",
       ephemeral: true
@@ -42,8 +39,7 @@ export async function handleCancel(
       }))
     );
 
-  const row =
-    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
   await interaction.reply({
     content: "Select event to cancel:",
@@ -54,15 +50,12 @@ export async function handleCancel(
 
 /* ======================================================
    🔹 STEP 2 – SELECT → CONFIRMATION
-   ====================================================== */
-
-export async function handleCancelSelect(
-  interaction: StringSelectMenuInteraction
-) {
+====================================================== */
+export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
   const guildId = interaction.guildId!;
   const eventId = interaction.values[0];
 
-  const events = await EventStorage.getEvents(guildId);
+  const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
@@ -91,8 +84,7 @@ export async function handleCancelSelect(
     .setLabel("Abort")
     .setStyle(ButtonStyle.Secondary);
 
-  const row =
-    new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
 
   await interaction.update({
     content: "",
@@ -103,46 +95,33 @@ export async function handleCancelSelect(
 
 /* ======================================================
    🔹 STEP 3 – CONFIRM BUTTON
-   ====================================================== */
-
-export async function handleCancelConfirm(
-  interaction: ButtonInteraction,
-  eventId: string
-) {
+====================================================== */
+export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+  const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
-    await interaction.reply({
-      content: "Event not found.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  event.status = "CANCELLED";
-  await EventStorage.saveEvents(guildId, events);
+  // ✅ US spelling
+  event.status = "CANCELED";
+  await saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
-    .setTitle("Event Cancelled")
-    .setDescription(`**${event.name}** has been cancelled.`)
+    .setTitle("Event Canceled")
+    .setDescription(`**${event.name}** has been canceled.`)
     .setColor("Red");
 
-  await interaction.update({
-    content: "",
-    embeds: [embed],
-    components: []
-  });
+  await interaction.update({ content: "", embeds: [embed], components: [] });
 }
 
 /* ======================================================
    🔹 STEP 4 – ABORT BUTTON
-   ====================================================== */
-
-export async function handleCancelAbort(
-  interaction: ButtonInteraction
-) {
+====================================================== */
+export async function handleCancelAbort(interaction: ButtonInteraction) {
   await interaction.update({
     content: "Cancellation aborted.",
     embeds: [],
