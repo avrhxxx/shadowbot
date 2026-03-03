@@ -1,14 +1,44 @@
-import fs from "fs";
-const FILE_PATH = "./data/events.json";
+// events/EventStorage.ts
 
-export function loadEvents() {
-    if (!fs.existsSync(FILE_PATH)) {
-        fs.writeFileSync(FILE_PATH, JSON.stringify({ events: [] }, null, 2));
-    }
-    const raw = fs.readFileSync(FILE_PATH);
-    return JSON.parse(raw.toString());
+import fs from "fs";
+import path from "path";
+
+const eventsPath = path.join(__dirname, "../data/events.json");
+const configPath = path.join(__dirname, "../data/config.json");
+
+export async function getEvents(guildId: string) {
+  const data = readJSON(eventsPath);
+  return data[guildId]?.events || [];
 }
 
-export function saveEvents(data: any) {
-    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
+export async function saveEvents(guildId: string, events: any[]) {
+  const data = readJSON(eventsPath);
+
+  if (!data[guildId]) data[guildId] = { events: [] };
+
+  data[guildId].events = events;
+
+  writeJSON(eventsPath, data);
+}
+
+export async function getConfig(guildId: string) {
+  const data = readJSON(configPath);
+  return data[guildId] || {};
+}
+
+export async function saveConfig(guildId: string, config: any) {
+  const data = readJSON(configPath);
+
+  data[guildId] = config;
+
+  writeJSON(configPath, data);
+}
+
+function readJSON(filePath: string) {
+  if (!fs.existsSync(filePath)) return {};
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function writeJSON(filePath: string, data: any) {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
