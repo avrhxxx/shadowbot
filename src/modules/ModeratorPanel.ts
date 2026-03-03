@@ -1,5 +1,5 @@
 import { Client, TextChannel, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
-import { initEventPanel } from "../events/eventPanel";
+import { renderEventPanel } from "../events/eventPanel";
 import { handleHelpButton } from "./HelpPanel";
 
 export async function initModeratorPanel(client: Client) {
