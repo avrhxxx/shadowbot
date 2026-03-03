@@ -3,7 +3,7 @@ import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMen
 import * as EventStorage from "../eventStorage";
 
 /**
- * Handler przycisku „Settings” – tworzy select menu
+ * Handler przycisku „Settings” – tworzy dwa select menu
  */
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton()) return;
@@ -40,7 +40,7 @@ export async function handleSettings(interaction: Interaction) {
 }
 
 /**
- * Handler select menu
+ * Handler select menu – zapisuje wybrany kanał w config
  */
 export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
   const guildId = interaction.guildId!;
