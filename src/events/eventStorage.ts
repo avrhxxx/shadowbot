@@ -1,5 +1,3 @@
-// events/EventStorage.ts
-
 import fs from "fs";
 import path from "path";
 
@@ -28,9 +26,7 @@ export async function getConfig(guildId: string) {
 
 export async function saveConfig(guildId: string, config: any) {
   const data = readJSON(configPath);
-
   data[guildId] = config;
-
   writeJSON(configPath, data);
 }
 
