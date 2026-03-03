@@ -1,17 +1,15 @@
 import fs from "fs";
 import path from "path";
 
-// Folder danych w root projektu, poza dist, żeby deploy nie nadpisywał plików
 const dataDir = path.join(__dirname, "../../data");
 const eventsPath = path.join(dataDir, "events.json");
 const configPath = path.join(dataDir, "config.json");
 
-// Tworzymy folder i pliki, jeśli nie istnieją
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, "{}");
 if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, "{}");
 
-// Typ eventu (US spelling)
+// ✅ reminderBefore TERAZ OPCJONALNE
 export type EventObject = {
   id: string;
   name: string;
@@ -19,8 +17,8 @@ export type EventObject = {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore: number;
-  status: "ACTIVE" | "PAST" | "CANCELED"; // US spelling
+  reminderBefore?: number; // ✅ FIX
+  status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   createdAt: number;
   guildId: string;
@@ -49,7 +47,6 @@ export async function saveConfig(guildId: string, config: any) {
   writeJSON(configPath, data);
 }
 
-// --- Pomocnicze funkcje ---
 function readJSON(filePath: string) {
   if (!fs.existsSync(filePath)) return {};
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
