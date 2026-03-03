@@ -7,29 +7,35 @@ import {
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
 import { handleList } from "./eventsButtons/eventsList";
-import { handleCancel } from "./eventsButtons/eventsCancel";
+import {
+  handleCancel,
+  handleCancelSelect,
+  handleCancelConfirm,
+  handleCancelAbort
+} from "./eventsButtons/eventsCancel";
 import { handleManualReminder } from "./eventsButtons/eventsReminder";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings } from "./eventsButtons/eventsSettings";
 import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
-// NOWE – uczestnicy
+// Uczestnicy
 import {
   handleAddParticipant,
   handleRemoveParticipant,
-  handleAbsentParticipant
+  handleAbsentParticipant,
+  handleAddParticipantSubmit,
+  handleRemoveParticipantSubmit,
+  handleAbsentParticipantSubmit
 } from "./eventsButtons/eventsParticipants";
 
 /**
  * Główny router Event Panelu
- * Każdy button / modal / select menu event_* trafia tutaj
  */
 export async function handleEventInteraction(
   interaction: Interaction
 ): Promise<void> {
 
-  // Obsługujemy tylko buttony, modale i select menu
   if (
     !interaction.isButton() &&
     !interaction.isModalSubmit() &&
@@ -37,11 +43,23 @@ export async function handleEventInteraction(
   ) return;
 
   const { customId } = interaction;
-
   if (!customId.startsWith("event_")) return;
 
   /* =======================================================
-     🔥 DYNAMICZNE PRZYCISKI UCZESTNIKÓW (ADD/REMOVE/ABSENT)
+     🔥 DYNAMIC – CONFIRM CANCEL
+     ======================================================= */
+
+  if (
+    interaction.isButton() &&
+    customId.startsWith("event_cancel_confirm_")
+  ) {
+    const eventId = customId.replace("event_cancel_confirm_", "");
+    await handleCancelConfirm(interaction, eventId);
+    return;
+  }
+
+  /* =======================================================
+     🔥 DYNAMIC – PARTICIPANT BUTTONS
      ======================================================= */
 
   if (interaction.isButton()) {
@@ -65,9 +83,34 @@ export async function handleEventInteraction(
     }
   }
 
-  /* ======================
+  /* =======================================================
+     🔥 DYNAMIC – PARTICIPANT MODALS
+     ======================================================= */
+
+  if (interaction.isModalSubmit()) {
+
+    if (customId.startsWith("event_add_modal_")) {
+      const eventId = customId.replace("event_add_modal_", "");
+      await handleAddParticipantSubmit(interaction, eventId);
+      return;
+    }
+
+    if (customId.startsWith("event_remove_modal_")) {
+      const eventId = customId.replace("event_remove_modal_", "");
+      await handleRemoveParticipantSubmit(interaction, eventId);
+      return;
+    }
+
+    if (customId.startsWith("event_absent_modal_")) {
+      const eventId = customId.replace("event_absent_modal_", "");
+      await handleAbsentParticipantSubmit(interaction, eventId);
+      return;
+    }
+  }
+
+  /* =======================================================
      STANDARDOWE CUSTOM ID
-     ====================== */
+     ======================================================= */
 
   switch (customId) {
 
@@ -82,6 +125,10 @@ export async function handleEventInteraction(
 
     case "event_cancel":
       if (interaction.isButton()) await handleCancel(interaction);
+      break;
+
+    case "event_cancel_abort":
+      if (interaction.isButton()) await handleCancelAbort(interaction);
       break;
 
     case "event_manual_reminder":
@@ -109,6 +156,11 @@ export async function handleEventInteraction(
     case "event_settings_select":
       if (interaction.isStringSelectMenu())
         await handleSettingsSelect(interaction);
+      break;
+
+    case "event_cancel_select":
+      if (interaction.isStringSelectMenu())
+        await handleCancelSelect(interaction);
       break;
 
     default:
