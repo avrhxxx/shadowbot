@@ -30,13 +30,15 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   const timeInput = new TextInputBuilder()
     .setCustomId("event_time")
-    .setLabel("Time (HH:MM 24h)")
-    .setStyle(TextInputStyle.Short);
+    .setLabel("Time")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("e.g. 1:30, 130, 1100, 19:00");
 
   const reminderInput = new TextInputBuilder()
     .setCustomId("reminder_before")
-    .setLabel("Reminder before (minutes)")
-    .setStyle(TextInputStyle.Short);
+    .setLabel("Reminder before (minutes, optional)")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Leave empty if no reminder");
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
