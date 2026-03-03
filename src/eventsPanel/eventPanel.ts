@@ -1,4 +1,4 @@
-
+// src/eventsPanel/eventsButtons/eventsPanel.ts
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } from "discord.js";
 
 /**
@@ -25,8 +25,8 @@ export function renderEventPanel(): MessageCreateOptions {
       .setLabel("Manual Reminder")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId("event_download")
-      .setLabel("Download Participants")
+      .setCustomId("event_download") // ten sam customId jak w handleDownload
+      .setLabel("Download All Events") // zmieniona etykieta
       .setStyle(ButtonStyle.Secondary)
   );
 
