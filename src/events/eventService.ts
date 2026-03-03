@@ -1,12 +1,13 @@
-// events/EventService.ts
-
 import { Interaction, EmbedBuilder } from "discord.js";
-import * as EventStorage from "./EventStorage";
+import * as EventStorage from "./eventStorage";
 
 export async function handleCreate(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // TODO: pokaż modal
+  await interaction.reply({
+    content: "Create event – TODO",
+    ephemeral: true
+  });
 }
 
 export async function handleList(interaction: Interaction) {
@@ -16,7 +17,11 @@ export async function handleList(interaction: Interaction) {
 
   const embed = new EmbedBuilder()
     .setTitle("Event List")
-    .setDescription("Lista eventów...");
+    .setDescription(
+      events.length === 0
+        ? "No events found."
+        : events.map((e: any) => `• ${e.name} (${e.status})`).join("\n")
+    );
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
@@ -24,25 +29,37 @@ export async function handleList(interaction: Interaction) {
 export async function handleCancel(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // TODO: select menu + zmiana statusu
+  await interaction.reply({
+    content: "Cancel event – TODO",
+    ephemeral: true
+  });
 }
 
 export async function handleManualReminder(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // TODO: pobierz ACTIVE eventy i wyślij przypomnienie
+  await interaction.reply({
+    content: "Manual reminder – TODO",
+    ephemeral: true
+  });
 }
 
 export async function handleDownload(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // TODO: wygeneruj plik i wyślij
+  await interaction.reply({
+    content: "Download participants – TODO",
+    ephemeral: true
+  });
 }
 
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // TODO: channel select + zapis config
+  await interaction.reply({
+    content: "Settings – TODO",
+    ephemeral: true
+  });
 }
 
 export async function handleHelp(interaction: Interaction) {
@@ -51,11 +68,11 @@ export async function handleHelp(interaction: Interaction) {
   const embed = new EmbedBuilder()
     .setTitle("Event Help")
     .setDescription(`
-🟢 Create – tworzy event
-📄 List – lista eventów
-🗑️ Cancel – anulowanie
-🔔 Reminder – przypomnienie
-⬇️ Download – uczestnicy
+🟢 Create – tworzy event  
+📄 List – lista eventów  
+🗑️ Cancel – anulowanie  
+🔔 Reminder – przypomnienie  
+⬇️ Download – uczestnicy  
 ⚙️ Settings – kanał globalny
 `);
 
