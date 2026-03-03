@@ -1,21 +1,6 @@
 // src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
-import * as EventStorage from "../eventStorage";
-
-// Definicja typu EventObject
-interface EventObject {
-  id: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  reminderBefore: number;
-  status: "ACTIVE" | "PAST" | "CANCELLED";
-  participants: string[];
-  createdAt: number;
-  guildId: string;
-}
+import { EventObject, getEvents, saveEvents } from "../eventService";
 
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const guildId = interaction.guildId!;
@@ -25,31 +10,31 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const time = interaction.fields.getTextInputValue("event_time"); // HH:MM
   const reminderBefore = parseInt(interaction.fields.getTextInputValue("reminder_before"), 10);
 
-  // Walidacja
   const [hour, minute] = time.split(":").map(n => parseInt(n, 10));
+
   if (!name || isNaN(day) || isNaN(month) || isNaN(hour) || isNaN(minute) || isNaN(reminderBefore)) {
     await interaction.reply({ content: "Invalid input.", ephemeral: true });
     return;
   }
 
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await getEvents(guildId);
 
   const newEvent: EventObject = {
-    id: `${Date.now()}`, // prosty unikalny id
+    id: `${Date.now()}`,
+    guildId,
     name,
     day,
     month,
     hour,
     minute,
     reminderBefore,
-    status: "ACTIVE", // literal zgodny z typem
+    status: "ACTIVE", // US spelling
     participants: [],
-    createdAt: Date.now(),
-    guildId
+    createdAt: Date.now()
   };
 
   events.push(newEvent);
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
