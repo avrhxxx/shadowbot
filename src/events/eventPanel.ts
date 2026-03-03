@@ -7,7 +7,7 @@ import {
   Interaction
 } from "discord.js";
 
-import { handleEventInteraction } from "./EventHandlers";
+import { handleEventInteraction } from "./eventHandlers";
 
 export function renderEventPanel() {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
