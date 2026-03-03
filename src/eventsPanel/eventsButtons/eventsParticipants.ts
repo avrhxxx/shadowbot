@@ -18,11 +18,12 @@ import { updateEventEmbed } from "./eventsList"; // funkcja do aktualizacji embe
 export async function handleAddParticipant(interaction: ButtonInteraction, eventId: string) {
   const modal = new ModalBuilder()
     .setCustomId(`event_add_modal_${eventId}`)
-    .setTitle("Add Participant");
+    .setTitle("Add Participant(s)");
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter game nickname")
+    .setLabel("Enter game nickname(s), separated by commas")
+    .setPlaceholder("e.g. Arek, Basia, Kamil")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -33,6 +34,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
 
 /* ======================================================
    🔹 ADD PARTICIPANT (MODAL SUBMIT)
+   – obsługa wielu uczestników na raz
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
   const guildId = interaction.guildId!;
@@ -45,17 +47,29 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
     return;
   }
 
-  if (!event.participants.includes(input)) {
-    event.participants.push(input);
-    await EventStorage.saveEvents(guildId, events);
+  // Split po przecinku, trim, ignorujemy puste
+  const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
+
+  const added: string[] = [];
+  for (const nick of nicknames) {
+    if (!event.participants.includes(nick)) {
+      event.participants.push(nick);
+      added.push(nick);
+    }
   }
+
+  await EventStorage.saveEvents(guildId, events);
 
   // Aktualizacja głównego embedu listy
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
-    .setTitle(`Participant Added`)
-    .setDescription(`${input} added to **${event.name}**`)
+    .setTitle(`Participant(s) Added`)
+    .setDescription(
+      added.length
+        ? `${added.join(", ")} added to **${event.name}**`
+        : `No new participants were added (all already present).`
+    )
     .setColor("Green");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -97,7 +111,6 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   event.participants = event.participants.filter(nick => nick !== input);
   await EventStorage.saveEvents(guildId, events);
 
-  // Aktualizacja głównego embedu listy
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
@@ -148,7 +161,6 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Aktualizacja głównego embedu listy
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
