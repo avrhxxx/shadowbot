@@ -1,26 +1,28 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import { handleDownload } from "./eventsDownload";
 import { EventObject } from "../eventService";
 
 /**
- * Show ephemeral list of events
- * Each event gets buttons: Add, Remove, Absent, Show List, Download single
+ * Show ephemeral list of all events
+ * Each event → separate embed with buttons
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
 
-  if (events.length === 0) {
+  if (!events || events.length === 0) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
+  // Iterujemy po wszystkich eventach i tworzymy dla każdego embed z przyciskami
   for (const e of events) {
     const embed = new EmbedBuilder()
       .setTitle(e.name)
       .setDescription(
-        `Status: ${e.status}\nParticipants: ${e.participants.length}${e.absent?.length ? `\nAbsent: ${e.absent.length}` : ""}`
+        `Status: ${e.status}\n` +
+        `Participants (${e.participants.length}): ${e.participants.length ? e.participants.join(", ") : "None"}\n` +
+        `${e.absent?.length ? `Absent (${e.absent.length}): ${e.absent.join(", ")}` : ""}`
       )
       .setColor(e.status === "ACTIVE" ? "Green" : e.status === "PAST" ? "Grey" : "Red");
 
@@ -47,6 +49,7 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Primary)
     );
 
+    // Wyświetlamy każdy embed osobno, w trybie ephemeral
     await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
   }
 }
