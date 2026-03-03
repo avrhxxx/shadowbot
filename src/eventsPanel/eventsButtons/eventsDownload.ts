@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import fs from "fs";
@@ -5,8 +6,8 @@ import path from "path";
 import { EventObject } from "../eventStorage";
 
 /**
- * Globalny download – wszystkie eventy lub pojedynczy jeśli podano eventId
- * Wymaga ustawionego downloadChannelId w konfiguracji – brak fallbacku
+ * Globalny download – wszystkie eventy lub pojedynczy event
+ * singleEventId – jeśli podany, generuje plik tylko dla tego eventu
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -16,7 +17,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
   const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
 
-  // Filtracja po singleEventId, jeśli podano
+  // Jeżeli przekazano singleEventId, filtrujemy tylko ten event
   const events: EventObject[] = singleEventId
     ? allEvents.filter(e => e.id === singleEventId)
     : allEvents;
@@ -29,14 +30,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
 
   if (!config.downloadChannelId) {
-    await interaction.reply({ content: "Download channel is not set in configuration.", flags: 64 });
-    return;
-  }
-
-  const targetChannelId = config.downloadChannelId;
-  const channel = interaction.guild!.channels.cache.get(targetChannelId) as TextChannel | undefined;
-  if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Download channel not found or not text-based.", flags: 64 });
+    await interaction.reply({ content: "Download channel not set. Please configure it first.", flags: 64 });
     return;
   }
 
@@ -73,16 +67,22 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     files.push(new AttachmentBuilder(filePath));
   }
 
+  const channel = interaction.guild!.channels.cache.get(config.downloadChannelId) as TextChannel | undefined;
+  if (!channel || !channel.isTextBased()) {
+    await interaction.reply({ content: "Download channel not found or not text-based.", flags: 64 });
+    return;
+  }
+
   await channel.send({ files });
 
   if (singleEventId) {
     await interaction.reply({
-      content: `Participant file for event sent to <#${targetChannelId}>.`,
+      content: `Participant file for event <#${singleEventId}> sent to <#${config.downloadChannelId}>.`,
       flags: 64
     });
   } else {
     await interaction.reply({
-      content: `Participant files for all events sent to <#${targetChannelId}>.`,
+      content: `Participant files for all events sent to <#${config.downloadChannelId}>.`,
       flags: 64
     });
   }
