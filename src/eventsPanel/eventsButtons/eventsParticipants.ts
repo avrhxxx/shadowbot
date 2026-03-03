@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsParticipants.ts
 import { 
   ButtonInteraction, 
   ModalSubmitInteraction, 
@@ -10,7 +9,7 @@ import {
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
-import { EventObject } from "../eventService"; // upewnij się, że EventObject ma pole absent: string[]
+import { EventObject } from "../eventService"; // EventObject powinien mieć pole absent: string[]
 
 /* ======================================================
    🔹 ADD PARTICIPANT (BUTTON → MODAL)
@@ -23,7 +22,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
   const input = new TextInputBuilder()
     .setCustomId("user_input")
     .setLabel("Enter game nickname(s), separated by commas")
-    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia, DomSugarDaddy, UnicornUA")
+    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia, DomSugarDaddy, UnicornUA, Lady Death, SirRussty, SebGDS 😆")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -33,7 +32,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
 }
 
 /* ======================================================
-   🔹 ADD PARTICIPANT (MODAL SUBMIT)
+   🔹 ADD PARTICIPANT (MODAL SUBMIT) – Multi-add
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
   const guildId = interaction.guildId!;
@@ -46,7 +45,7 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
     return;
   }
 
-  // Split by comma, trim, ignore empty
+  // Multi-add: split by comma, trim, ignore empty
   const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
 
   const added: string[] = [];
@@ -59,7 +58,7 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Update main embed
+  // Aktualizacja głównego embedu listy
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
