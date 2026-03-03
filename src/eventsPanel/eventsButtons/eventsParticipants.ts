@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsParticipants.ts
 import { 
   ButtonInteraction, 
   ModalSubmitInteraction, 
@@ -9,7 +10,14 @@ import {
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
-import { EventObject } from "../eventService"; // EventObject powinien mieć pole absent: string[]
+import { EventObject } from "../eventService";
+
+/**
+ * Upewnij się, że EventObject ma pole absent
+ */
+interface EventObjectWithAbsent extends EventObject {
+  absent: string[];
+}
 
 /* ======================================================
    🔹 ADD PARTICIPANT (BUTTON → MODAL)
@@ -38,14 +46,13 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId);
-  const event = events.find((e: EventObject) => e.id === eventId);
+  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  // Multi-add: split by comma, trim, ignore empty
   const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
 
   const added: string[] = [];
@@ -58,7 +65,6 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Aktualizacja głównego embedu listy
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
@@ -99,8 +105,8 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId);
-  const event = events.find((e: EventObject) => e.id === eventId);
+  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
@@ -145,8 +151,8 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId);
-  const event = events.find((e: EventObject) => e.id === eventId);
+  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
