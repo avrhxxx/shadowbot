@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsParticipants.ts
 import { 
   ButtonInteraction, 
   ModalSubmitInteraction, 
@@ -20,7 +19,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter user mention, ID or username")
+    .setLabel("Enter game nickname") // Zmienione na game nickname
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -33,15 +32,8 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
    🔹 ADD PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
-  const guild = interaction.guild!;
-  const guildId = guild.id;
+  const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
-
-  const member =
-    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
-    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
-
-  // ✅ Usuwamy walidację "User not found" – dodajemy nawet jeśli nie znaleziono w cache
 
   const events = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
@@ -50,14 +42,14 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
     return;
   }
 
-  if (member && !event.participants.includes(member.id)) {
-    event.participants.push(member.id);
+  if (!event.participants.includes(input)) {
+    event.participants.push(input);
     await EventStorage.saveEvents(guildId, events);
   }
 
   const embed = new EmbedBuilder()
     .setTitle(`Participant Added`)
-    .setDescription(member ? `${member} added to **${event.name}**` : `User added to **${event.name}**`)
+    .setDescription(`${input} added to **${event.name}**`)
     .setColor("Green");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -73,7 +65,7 @@ export async function handleRemoveParticipant(interaction: ButtonInteraction, ev
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter user mention, ID or username")
+    .setLabel("Enter game nickname") // Zmienione na game nickname
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -86,18 +78,8 @@ export async function handleRemoveParticipant(interaction: ButtonInteraction, ev
    🔹 REMOVE PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
-  const guild = interaction.guild!;
-  const guildId = guild.id;
+  const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
-
-  const member =
-    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
-    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
-
-  if (!member) {
-    await interaction.reply({ content: "User not found.", ephemeral: true });
-    return;
-  }
 
   const events = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
@@ -106,12 +88,12 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
-  event.participants = event.participants.filter(id => id !== member.id);
+  event.participants = event.participants.filter(nick => nick !== input);
   await EventStorage.saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
     .setTitle(`Participant Removed`)
-    .setDescription(`${member} removed from **${event.name}**`)
+    .setDescription(`${input} removed from **${event.name}**`)
     .setColor("Red");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -127,7 +109,7 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter user mention, ID or username")
+    .setLabel("Enter game nickname") // Zmienione na game nickname
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -140,18 +122,8 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
    🔹 ABSENT PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
-  const guild = interaction.guild!;
-  const guildId = guild.id;
+  const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
-
-  const member =
-    guild.members.cache.get(input.replace(/[<@!>]/g, "")) ||
-    guild.members.cache.find(m => m.user.username.toLowerCase() === input.toLowerCase());
-
-  if (!member) {
-    await interaction.reply({ content: "User not found.", ephemeral: true });
-    return;
-  }
 
   const events = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
@@ -160,15 +132,15 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
-  event.participants = event.participants.filter(id => id !== member.id);
+  event.participants = event.participants.filter(nick => nick !== input);
   if (!("absent" in event)) (event as any).absent = [];
-  (event as any).absent.push(member.id);
+  (event as any).absent.push(input);
 
   await EventStorage.saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
     .setTitle(`Participant Marked Absent`)
-    .setDescription(`${member} marked absent for **${event.name}**`)
+    .setDescription(`${input} marked absent for **${event.name}**`)
     .setColor("Orange");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
