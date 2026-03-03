@@ -1,7 +1,8 @@
 // src/index.ts
-import { Client, GatewayIntentBits, Partials } from "discord.js";
+import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./modules/ModeratorPanel";
+import { handleEventInteraction } from "./events/eventPanel"; // <--- importujemy handler
 
 const client = new Client({
   intents: [
@@ -21,9 +22,13 @@ client.once("clientReady", () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
   // Root panel i moduły
-  initTranslationModule(client); // moduł placeholder
-  initModeratorPanel(client);     // tworzy kanał + root panel + obsługa przycisków
-  // Event Panel NIE jest inicjalizowany tutaj, tylko po kliknięciu przycisku "Event Menu"
+  initTranslationModule(client);
+  initModeratorPanel(client);
+
+  // Listener dla wszystkich przycisków Event Panelu
+  client.on("interactionCreate", async (interaction: Interaction) => {
+    await handleEventInteraction(interaction);
+  });
 });
 
 client.login(BOT_TOKEN);
