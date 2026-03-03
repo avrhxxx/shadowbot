@@ -1,8 +1,12 @@
+import { 
+  ButtonInteraction, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  ActionRowBuilder 
+} from "discord.js";
 
-import { Interaction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from "discord.js";
-import * as EventService from "../eventService";
-
-export async function handleCreate(interaction: Interaction) {
+export async function handleCreate(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
   const modal = new ModalBuilder()
