@@ -5,9 +5,9 @@ import fs from "fs";
 import { EventObject } from "../eventService";
 
 /**
- * Download plików z uczestnikami
- * Jeżeli przekazany eventId -> tylko dla jednego eventu
- * Jeżeli brak eventId -> globalny download wszystkich eventów
+ * Download participant lists
+ * singleEventId -> one event
+ * otherwise -> all events in single file and message
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -17,19 +17,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
   const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
 
-  // Filtrujemy jeśli podano singleEventId
-  const events: EventObject[] = singleEventId
-    ? allEvents.filter(e => e.id === singleEventId)
-    : allEvents;
-
-  if (!events.length) {
-    await interaction.reply({ content: "No events to download.", ephemeral: true });
-    return;
-  }
-
   const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
-
-  // **Wymagany kanał do downloadu**
   if (!config.downloadChannelId) {
     await interaction.reply({ content: "Download channel is not set.", ephemeral: true });
     return;
@@ -44,9 +32,16 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const tempDir = path.join(__dirname, "../../temp");
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  const files: AttachmentBuilder[] = [];
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
-  for (const event of events) {
+  // Jeśli pojedynczy event
+  if (singleEventId) {
+    const event = allEvents.find(e => e.id === singleEventId);
+    if (!event) {
+      await interaction.reply({ content: "Event not found.", ephemeral: true });
+      return;
+    }
+
     const statusLabel =
       event.status === "PAST"
         ? "[PAST]"
@@ -54,33 +49,78 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
         ? "[CANCELED]"
         : "[ACTIVE]";
 
-    const participants = event.participants.length
-      ? event.participants.map(id => `<@${id}>`).join("\n")
-      : "None";
+    const participants = event.participants.length ? event.participants.join("\n") : "None";
+    const absent = event.absent?.length ? event.absent.join("\n") : "None";
+    const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-    const absent = event.absent?.length
-      ? event.absent.map(id => `<@${id}>`).join("\n")
-      : "None";
+    const messageContent = [
+      `**Event:** ${event.name}`,
+      `**Status:** ${statusLabel}`,
+      `**Date:** ${dateStr}`,
+      `**Participants:**\n${participants}`,
+      `**Absent:**\n${absent}`,
+      `\nYou can also download this as a TXT file attached below.`
+    ].join("\n\n");
 
-    const content = [
+    const filePath = path.join(tempDir, `${event.id}.txt`);
+    fs.writeFileSync(filePath, messageContent);
+
+    const attachment = new AttachmentBuilder(filePath);
+
+    await channel.send({ content: messageContent, files: [attachment] });
+
+    await interaction.reply({
+      content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
+      ephemeral: true
+    });
+
+    return;
+  }
+
+  // Wszystkie eventy -> jeden plik i jedna wiadomość
+  if (!allEvents.length) {
+    await interaction.reply({ content: "No events to download.", ephemeral: true });
+    return;
+  }
+
+  let fullMessage: string[] = [];
+  allEvents.forEach(event => {
+    const statusLabel =
+      event.status === "PAST"
+        ? "[PAST]"
+        : event.status === "CANCELED"
+        ? "[CANCELED]"
+        : "[ACTIVE]";
+
+    const participants = event.participants.length ? event.participants.join("\n") : "None";
+    const absent = event.absent?.length ? event.absent.join("\n") : "None";
+    const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
+
+    const eventText = [
       `Event: ${event.name}`,
       `Status: ${statusLabel}`,
-      `Date: ${event.day}/${event.month} ${event.hour}:${event.minute}`,
+      `Date: ${dateStr}`,
       `Participants:\n${participants}`,
       `Absent:\n${absent}`
     ].join("\n\n");
 
-    const filePath = path.join(tempDir, `${event.id}.txt`);
-    fs.writeFileSync(filePath, content);
-    files.push(new AttachmentBuilder(filePath));
-  }
+    fullMessage.push(eventText);
+  });
 
-  await channel.send({ files });
+  const finalMessage = fullMessage.join("\n\n====================\n\n");
+
+  const filePath = path.join(tempDir, `all_events_${Date.now()}.txt`);
+  fs.writeFileSync(filePath, finalMessage);
+
+  const attachment = new AttachmentBuilder(filePath);
+
+  await channel.send({
+    content: `Participant lists for all events:\n\n${finalMessage}\n\nYou can also download this as a TXT file attached below.`,
+    files: [attachment]
+  });
 
   await interaction.reply({
-    content: singleEventId
-      ? `Participant file for event **${singleEventId}** sent to <#${config.downloadChannelId}>.`
-      : `Participant files for all events sent to <#${config.downloadChannelId}>.`,
+    content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`,
     ephemeral: true
   });
 }
