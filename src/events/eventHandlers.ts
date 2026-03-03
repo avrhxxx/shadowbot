@@ -1,12 +1,12 @@
-// events/EventHandlers.ts
-
 import { Interaction } from "discord.js";
-import * as EventService from "./EventService";
+import * as EventService from "./eventService";
 
 export async function handleEventInteraction(interaction: Interaction) {
-  if (!interaction.isButton() && 
-      !interaction.isModalSubmit() && 
-      !interaction.isStringSelectMenu()) return;
+  if (
+    !interaction.isButton() &&
+    !interaction.isModalSubmit() &&
+    !interaction.isStringSelectMenu()
+  ) return;
 
   const { customId } = interaction;
 
