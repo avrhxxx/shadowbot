@@ -1,15 +1,19 @@
+// src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import fs from "fs";
 import path from "path";
+import { EventObject } from "../eventStorage"; // upewnij się, że EventObject jest eksportowany
 
 export async function handleDownload(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
-  const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
   const pastEvents = events.filter(e => e.status === "PAST");
-  const config = await EventStorage.getConfig(guildId);
+  const config: { defaultChannelId?: string } = await EventStorage.getConfig(guildId);
 
   if (!pastEvents.length) {
     await interaction.reply({ content: "No past events to download.", ephemeral: true });
@@ -32,6 +36,11 @@ export async function handleDownload(interaction: ButtonInteraction) {
     const filePath = path.join(tempDir, `${event.id}.txt`);
     fs.writeFileSync(filePath, content);
     files.push(new AttachmentBuilder(filePath));
+  }
+
+  if (!config.defaultChannelId) {
+    await interaction.reply({ content: "Default channel not set.", ephemeral: true });
+    return;
   }
 
   const channel = interaction.guild!.channels.cache.get(config.defaultChannelId) as TextChannel | undefined;
