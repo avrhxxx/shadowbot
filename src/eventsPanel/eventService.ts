@@ -16,11 +16,11 @@ export interface EventObject {
   status: "ACTIVE" | "PAST" | "CANCELED"; // US spelling
   participants: string[];
   createdAt: number;
-  absent?: string[];
+  absent?: string[]; // opcjonalnie nieobecni
 }
 
 /**
- * Tworzy nowy event i zapisuje go w storage
+ * Tworzy nowy event i zapisuje w storage
  */
 export async function createEvent(data: {
   guildId: string;
@@ -85,7 +85,7 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
 
-  event.status = "CANCELED"; // US spelling
+  event.status = "CANCELED";
   await EventStorage.saveEvents(guildId, events);
   return event;
 }
