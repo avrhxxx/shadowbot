@@ -16,29 +16,35 @@ export async function handleCreate(interaction: ButtonInteraction) {
   const nameInput = new TextInputBuilder()
     .setCustomId("event_name")
     .setLabel("Event Name")
-    .setStyle(TextInputStyle.Short);
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
   const dayInput = new TextInputBuilder()
     .setCustomId("event_day")
     .setLabel("Day (1-31)")
-    .setStyle(TextInputStyle.Short);
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
   const monthInput = new TextInputBuilder()
     .setCustomId("event_month")
     .setLabel("Month (1-12)")
-    .setStyle(TextInputStyle.Short);
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
 
   const timeInput = new TextInputBuilder()
     .setCustomId("event_time")
     .setLabel("Time")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("e.g. 1:30, 130, 1100, 19:00");
+    .setPlaceholder("e.g. 1:30, 130, 1100, 19:00")
+    .setRequired(true);
 
+  // 🔥 KLUCZOWA ZMIANA TUTAJ
   const reminderInput = new TextInputBuilder()
     .setCustomId("reminder_before")
     .setLabel("Reminder before (minutes, optional)")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Leave empty if no reminder");
+    .setPlaceholder("Leave empty if no reminder")
+    .setRequired(false); // ✅ TERAZ JEST OPCJONALNE
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
