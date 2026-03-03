@@ -2,7 +2,7 @@
 import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./modules/ModeratorPanel";
-import { handleEventInteraction } from "./events/eventPanel"; // <--- importujemy handler
+import { handleEventInteraction } from "./events/eventHandlers"; // ✅ POPRAWIONE
 
 const client = new Client({
   intents: [
@@ -17,7 +17,6 @@ const client = new Client({
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// Wywołujemy moduły dopiero po zalogowaniu
 client.once("clientReady", () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
@@ -25,7 +24,7 @@ client.once("clientReady", () => {
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // Listener dla wszystkich przycisków Event Panelu
+  // Globalny listener event panelu
   client.on("interactionCreate", async (interaction: Interaction) => {
     await handleEventInteraction(interaction);
   });
