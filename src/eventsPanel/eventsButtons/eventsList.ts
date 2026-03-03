@@ -1,10 +1,9 @@
-import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 
 /**
  * Show ephemeral list of all events
- * Each event → separate embed with buttons
  * Dynamic: Participants & Absent show counts only
  */
 export async function handleList(interaction: ButtonInteraction) {
@@ -26,7 +25,7 @@ export async function handleList(interaction: ButtonInteraction) {
       .setTitle(e.name)
       .setDescription(
         `Status: ${e.status}\nDate: ${dateStr}\nParticipants: ${e.participants.length}` +
-        (e.absent && e.absent.length ? `\nAbsent: ${e.absent.length}` : "")
+        (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
       )
       .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
 
@@ -59,26 +58,30 @@ export async function handleList(interaction: ButtonInteraction) {
       new ButtonBuilder()
         .setCustomId(`event_compare_${e.id}`)
         .setLabel("Compare")
-        .setStyle(ButtonStyle.Secondary) // placeholder
+        .setStyle(ButtonStyle.Secondary)
     );
 
+    const messagePayload = { embeds: [embed], components: [row1, row2], ephemeral: true };
+
     if (i === 0) {
-      await interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
+      await interaction.reply(messagePayload);
     } else {
-      await interaction.followUp({ embeds: [embed], components: [row1, row2], ephemeral: true });
+      await interaction.followUp(messagePayload);
     }
   }
 }
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
+ * Zamienia ID na nicki
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
+  const guild = interaction.guild;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
-  if (!event) {
+  if (!event || !guild) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
@@ -86,16 +89,89 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-  const participants = event.participants.length ? event.participants.map(id => `<@${id}>`).join("\n") : "None";
-  const absent = event.absent?.length ? event.absent.map(id => `<@${id}>`).join("\n") : "None";
+  // Zamiana ID na nicki (displayName)
+  const resolveNick = async (id: string) => {
+    try {
+      const member = await guild.members.fetch(id);
+      return member.displayName;
+    } catch {
+      return id; // fallback jeśli nie znaleziono
+    }
+  };
+
+  const participants = event.participants.length
+    ? await Promise.all(event.participants.map(resolveNick))
+    : ["None"];
+
+  const absent = event.absent?.length
+    ? await Promise.all(event.absent.map(resolveNick))
+    : ["None"];
 
   const embed = new EmbedBuilder()
     .setTitle(`Participants List – ${event.name}`)
     .setDescription(
-      `Status: ${event.status}\nDate: ${dateStr}\n\nParticipants (${event.participants.length}):\n${participants}` +
-      (event.absent && event.absent.length ? `\n\nAbsent (${event.absent.length}):\n${absent}` : "")
+      `Status: ${event.status}\nDate: ${dateStr}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
+      (absent.length && absent[0] !== "None" ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
     )
     .setColor(event.status === "ACTIVE" ? 0x00ff00 : event.status === "PAST" ? 0x808080 : 0xff0000);
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/**
+ * Aktualizacja embedu głównej listy po dodaniu/usunięciu uczestnika
+ * Edytuje istniejący embed, nie wysyła nowego
+ */
+export async function updateEventEmbed(message: any, eventId: string) {
+  const guildId = message.guildId;
+  if (!guildId) return;
+
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const e = events.find(ev => ev.id === eventId);
+  if (!e) return;
+
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const dateStr = `${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)}`;
+
+  const embed = new EmbedBuilder()
+    .setTitle(e.name)
+    .setDescription(
+      `Status: ${e.status}\nDate: ${dateStr}\nParticipants: ${e.participants.length}` +
+      (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
+    )
+    .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
+
+  // Row 1
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`event_add_${e.id}`)
+      .setLabel("Add Participant")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`event_remove_${e.id}`)
+      .setLabel("Remove Participant")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`event_absent_${e.id}`)
+      .setLabel("Absent")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`event_show_list_${e.id}`)
+      .setLabel("Show List")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`event_download_single_${e.id}`)
+      .setLabel("Download")
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  // Row 2
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`event_compare_${e.id}`)
+      .setLabel("Compare")
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  await message.edit({ embeds: [embed], components: [row1, row2] });
 }
