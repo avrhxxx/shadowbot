@@ -1,61 +1,50 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
-import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { EventObject } from "../eventService";
+import { 
+  ButtonInteraction, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  ActionRowBuilder 
+} from "discord.js";
 
-// Pomocnicza funkcja do formatowania daty
-function formatDate(day: number, month: number, year: number): string {
-  const dd = day < 10 ? `0${day}` : `${day}`;
-  const mm = month < 10 ? `0${month}` : `${month}`;
-  return `${dd}/${mm}/${year}`;
-}
+export async function handleCreate(interaction: ButtonInteraction) {
+  if (!interaction.isButton()) return;
 
-export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
-  if (!interaction.isModalSubmit()) return;
-  if (interaction.customId !== "event_create_modal") return;
+  const modal = new ModalBuilder()
+    .setCustomId("event_create_modal")
+    .setTitle("Create Event");
 
-  const guildId = interaction.guildId!;
-  const name = interaction.fields.getTextInputValue("event_name");
-  const dayInput = interaction.fields.getTextInputValue("event_day");
-  const monthInput = interaction.fields.getTextInputValue("event_month");
-  const time = interaction.fields.getTextInputValue("event_time");
-  const reminderInput = interaction.fields.getTextInputValue("reminder_before");
+  const nameInput = new TextInputBuilder()
+    .setCustomId("event_name")
+    .setLabel("Event Name")
+    .setStyle(TextInputStyle.Short);
 
-  const day = parseInt(dayInput, 10);
-  const month = parseInt(monthInput, 10);
-  const year = new Date().getFullYear();
+  const dayInput = new TextInputBuilder()
+    .setCustomId("event_day")
+    .setLabel("Day (1-31)")
+    .setStyle(TextInputStyle.Short);
 
-  if (isNaN(day) || day < 1 || day > 31) {
-    await interaction.reply({ content: "Invalid day.", ephemeral: true });
-    return;
-  }
-  if (isNaN(month) || month < 1 || month > 12) {
-    await interaction.reply({ content: "Invalid month.", ephemeral: true });
-    return;
-  }
+  const monthInput = new TextInputBuilder()
+    .setCustomId("event_month")
+    .setLabel("Month (1-12)")
+    .setStyle(TextInputStyle.Short);
 
-  const formattedDate = formatDate(day, month, year);
+  const timeInput = new TextInputBuilder()
+    .setCustomId("event_time")
+    .setLabel("Time (HH:MM 24h)")
+    .setStyle(TextInputStyle.Short);
 
-  // Tworzymy nowy event
-  const newEvent: EventObject = {
-    id: `${Date.now()}`, // unikalne ID na podstawie timestampu
-    name,
-    date: formattedDate,
-    time,
-    reminderBefore: parseInt(reminderInput, 10) || 0,
-    participants: [],
-    status: "ACTIVE"
-  };
+  const reminderInput = new TextInputBuilder()
+    .setCustomId("reminder_before")
+    .setLabel("Reminder before (minutes)")
+    .setStyle(TextInputStyle.Short);
 
-  // Pobieramy istniejące eventy i dodajemy nowy
-  const events = await EventStorage.getEvents(guildId);
-  events.push(newEvent);
-  await EventStorage.saveEvents(guildId, events);
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(timeInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
+  );
 
-  const embed = new EmbedBuilder()
-    .setTitle("Event Created")
-    .setDescription(`**${name}** scheduled on **${formattedDate}** at **${time}**.`)
-    .setColor("Blue");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.showModal(modal);
 }
