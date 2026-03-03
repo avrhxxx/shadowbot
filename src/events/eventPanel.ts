@@ -1,179 +1,266 @@
-// src/events/eventService.ts
-import fs from "fs";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+// src/events/eventPanel.ts
+import {
+  Client,
+  Interaction,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
+  EmbedBuilder,
+  TextChannel
+} from "discord.js";
 
-const DATA_DIR = path.resolve("./data");
-const EVENTS_FILE = path.join(DATA_DIR, "events.json");
-const CONFIG_FILE = path.join(DATA_DIR, "config.json");
+import {
+  createEvent,
+  getEvents,
+  getActiveEvents,
+  getPastEvents,
+  cancelEvent,
+  updateEventStatuses,
+  setDefaultChannel,
+  getDefaultChannel,
+  generateParticipantsFile
+} from "./eventService";
 
-// ===== Typy =====
-export type EventStatus = "ACTIVE" | "PAST" | "CANCELLED";
+// ===== EVENT HANDLER =====
+export async function handleEventInteraction(interaction: Interaction) {
+  if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
-export interface EventObject {
-  id: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  reminderBefore: number; // min
-  status: EventStatus;
-  participants: string[];
-  createdAt: number;
-  guildId: string;
-  reminderSent?: boolean;
-}
+  const guildId = interaction.guildId!;
+  updateEventStatuses(guildId);
 
-export interface GuildEvents {
-  [guildId: string]: {
-    events: EventObject[];
-  };
-}
+  // ===== BUTTONS =====
+  if (interaction.isButton()) {
+    switch (interaction.customId) {
+      case "event_create": {
+        const modal = new ModalBuilder()
+          .setCustomId("event_create_modal")
+          .setTitle("Create Event");
 
-export interface ConfigObject {
-  [guildId: string]: {
-    defaultChannelId?: string;
-  };
-}
+        modal.addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("event_name")
+              .setLabel("Event Name")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("event_day")
+              .setLabel("Day (1-31)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("event_month")
+              .setLabel("Month (1-12)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("event_time")
+              .setLabel("Time (HH:MM)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("event_reminder")
+              .setLabel("Reminder Before (min)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
 
-// ===== Utils =====
-function ensureDataFiles() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+        await interaction.showModal(modal);
+        return;
+      }
 
-  if (!fs.existsSync(EVENTS_FILE)) fs.writeFileSync(EVENTS_FILE, JSON.stringify({}, null, 2));
-  if (!fs.existsSync(CONFIG_FILE)) fs.writeFileSync(CONFIG_FILE, JSON.stringify({}, null, 2));
-}
+      case "event_list": {
+        const events = getEvents(guildId);
+        if (!events.length) {
+          await interaction.reply({ content: "No events found.", ephemeral: true });
+          return;
+        }
 
-// ======= EVENTS JSON =======
-export function loadEvents(): GuildEvents {
-  ensureDataFiles();
-  return JSON.parse(fs.readFileSync(EVENTS_FILE, "utf-8"));
-}
+        const embed = new EmbedBuilder().setTitle("📅 Events").setColor("Blue");
+        for (const e of events) {
+          const statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "🔴" : "⚪";
+          embed.addFields({
+            name: `${statusEmoji} ${e.name}`,
+            value: `📆 ${e.day}-${e.month} ${e.hour}:${e.minute} | Participants: ${e.participants.length}`
+          });
+        }
 
-export function saveEvents(data: GuildEvents) {
-  ensureDataFiles();
-  fs.writeFileSync(EVENTS_FILE, JSON.stringify(data, null, 2));
-}
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
 
-// ======= CONFIG JSON =======
-export function loadConfig(): ConfigObject {
-  ensureDataFiles();
-  return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
-}
+      case "event_manual_reminder": {
+        const channelId = getDefaultChannel(guildId);
+        if (!channelId) {
+          await interaction.reply({ content: "Default channel not set.", ephemeral: true });
+          return;
+        }
 
-export function saveConfig(config: ConfigObject) {
-  ensureDataFiles();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-}
+        const activeEvents = getActiveEvents(guildId);
+        if (!activeEvents.length) {
+          await interaction.reply({ content: "No active events.", ephemeral: true });
+          return;
+        }
 
-// ======= EVENT CREATION =======
-export function createEvent(
-  guildId: string,
-  name: string,
-  day: number,
-  month: number,
-  hour: number,
-  minute: number,
-  reminderBefore: number
-): EventObject {
-  const now = new Date();
-  let year = now.getFullYear();
+        const channel = interaction.guild?.channels.cache.get(channelId) as TextChannel;
+        if (!channel) {
+          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
+          return;
+        }
 
-  const eventDate = new Date(year, month - 1, day, hour, minute);
-  if (eventDate.getTime() < Date.now()) {
-    year += 1; // jeśli przeszłość, ustaw następny rok
-  }
+        for (const e of activeEvents) {
+          const embed = new EmbedBuilder()
+            .setTitle(`🔔 Reminder: ${e.name}`)
+            .setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
+          await channel.send({ embeds: [embed] });
+        }
 
-  const newEvent: EventObject = {
-    id: uuidv4(),
-    name,
-    day,
-    month,
-    hour,
-    minute,
-    reminderBefore,
-    status: "ACTIVE",
-    participants: [],
-    createdAt: Date.now(),
-    guildId,
-    reminderSent: false,
-  };
+        await interaction.reply({ content: "Reminders sent.", ephemeral: true });
+        return;
+      }
 
-  const allEvents = loadEvents();
-  if (!allEvents[guildId]) allEvents[guildId] = { events: [] };
-  allEvents[guildId].events.push(newEvent);
-  saveEvents(allEvents);
+      case "event_cancel": {
+        const activeEvents = getActiveEvents(guildId);
+        if (!activeEvents.length) {
+          await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
+          return;
+        }
 
-  return newEvent;
-}
+        const options = activeEvents.map(e => ({ label: e.name, value: e.id }));
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_cancel_select")
+          .setPlaceholder("Select event to cancel")
+          .addOptions(options);
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select event to cancel:", components: [row], ephemeral: true });
+        return;
+      }
 
-// ======= GET EVENTS =======
-export function getEvents(guildId: string): EventObject[] {
-  return loadEvents()[guildId]?.events || [];
-}
+      case "event_download": {
+        const pastEvents = getPastEvents(guildId);
+        if (!pastEvents.length) {
+          await interaction.reply({ content: "No past events found.", ephemeral: true });
+          return;
+        }
 
-export function getActiveEvents(guildId: string): EventObject[] {
-  return getEvents(guildId).filter(e => e.status === "ACTIVE");
-}
+        const options = pastEvents.map(e => ({ label: e.name, value: e.id }));
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_download_select")
+          .setPlaceholder("Select past event")
+          .addOptions(options);
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select past event to download participants:", components: [row], ephemeral: true });
+        return;
+      }
 
-export function getPastEvents(guildId: string): EventObject[] {
-  return getEvents(guildId).filter(e => e.status === "PAST");
-}
+      case "event_settings": {
+        const channels = interaction.guild?.channels.cache
+          .filter(c => c.isTextBased())
+          .map(c => ({ label: c.name, value: c.id })) || [];
 
-// ======= CANCEL EVENT =======
-export function cancelEvent(guildId: string, eventId: string) {
-  const all = loadEvents();
-  const event = all[guildId]?.events.find(e => e.id === eventId);
-  if (event) {
-    event.status = "CANCELLED";
-    saveEvents(all);
-  }
-}
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_settings_select")
+          .setPlaceholder("Select default channel")
+          .addOptions(channels);
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+        await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
+        return;
+      }
 
-// ======= UPDATE STATUS (PAST / REMINDERS) =======
-export function updateEventStatuses(guildId: string) {
-  const now = Date.now();
-  const all = loadEvents();
-  const events = all[guildId]?.events || [];
-
-  for (const e of events) {
-    const eventDate = new Date(new Date().getFullYear(), e.month - 1, e.day, e.hour, e.minute).getTime();
-
-    if (e.status === "ACTIVE" && now >= eventDate) {
-      e.status = "PAST";
+      case "event_help": {
+        const embed = new EmbedBuilder()
+          .setTitle("Event Panel Help")
+          .setDescription(
+            "📌 **Buttons:**\n" +
+            "🟢 Create → Create a new event\n" +
+            "📄 List → List all events\n" +
+            "⬇️ Download → Download participants\n" +
+            "⚙️ Settings → Set default channel\n" +
+            "🔔 Reminder → Send reminder for active events\n" +
+            "🗑️ Cancel → Cancel an active event\n" +
+            "❓ Help → Show this info"
+          );
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
     }
   }
 
-  saveEvents(all);
+  // ===== MODAL SUBMIT =====
+  if (interaction.isModalSubmit() && interaction.customId === "event_create_modal") {
+    const name = interaction.fields.getTextInputValue("event_name");
+    const day = Number(interaction.fields.getTextInputValue("event_day"));
+    const month = Number(interaction.fields.getTextInputValue("event_month"));
+    const [hour, minute] = interaction.fields.getTextInputValue("event_time").split(":").map(Number);
+    const reminderBefore = Number(interaction.fields.getTextInputValue("event_reminder"));
+
+    createEvent(guildId, name, day, month, hour, minute, reminderBefore);
+    await interaction.reply({ content: `✅ Event **${name}** created.`, ephemeral: true });
+    return;
+  }
+
+  // ===== SELECT MENU SUBMIT =====
+  if (interaction.isStringSelectMenu()) {
+    switch (interaction.customId) {
+      case "event_settings_select":
+        setDefaultChannel(guildId, interaction.values[0]);
+        await interaction.reply({ content: `Default channel set.`, ephemeral: true });
+        return;
+
+      case "event_cancel_select":
+        cancelEvent(guildId, interaction.values[0]);
+        await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
+        return;
+
+      case "event_download_select":
+        const eventId = interaction.values[0];
+        const filePath = generateParticipantsFile(guildId, eventId);
+        const channelId = getDefaultChannel(guildId);
+        const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
+        if (channel) {
+          await channel.send({ content: `📥 Participants file for event`, files: [filePath] });
+          await interaction.reply({ content: "File sent to default channel.", ephemeral: true });
+        } else {
+          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
+        }
+        return;
+    }
+  }
 }
 
-// ======= CONFIG =======
-export function setDefaultChannel(guildId: string, channelId: string) {
-  const config = loadConfig();
-  if (!config[guildId]) config[guildId] = {};
-  config[guildId].defaultChannelId = channelId;
-  saveConfig(config);
+// ===== INIT EVENT PANEL =====
+export async function initEventPanel(client: Client, interaction: Interaction) {
+  if (!interaction.isButton()) return;
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("event_create").setLabel("Create 🟢").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("event_list").setLabel("List 📄").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_cancel").setLabel("Cancel 🗑️").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("event_manual_reminder").setLabel("Reminder 🔔").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_download").setLabel("Download ⬇️").setStyle(ButtonStyle.Secondary)
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("event_settings").setLabel("Settings ⚙️").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("event_help").setLabel("Help ❓").setStyle(ButtonStyle.Success)
+  );
+
+  await interaction.reply({ content: "📌 **Event Panel**", components: [row1, row2], ephemeral: true });
+  console.log(`EventPanel opened for ${client.user?.tag}`);
 }
 
-export function getDefaultChannel(guildId: string): string | undefined {
-  return loadConfig()[guildId]?.defaultChannelId;
-}
-
-// ======= GENERATE PARTICIPANTS FILE =======
-export function generateParticipantsFile(guildId: string, eventId: string): string {
-  const all = loadEvents();
-  const event = all[guildId]?.events.find(e => e.id === eventId);
-  if (!event) throw new Error("Event not found");
-
-  const lines = [
-    `Event: ${event.name}`,
-    `Date: ${event.day}-${event.month} ${event.hour}:${event.minute}`,
-    `Participants (${event.participants.length}):`,
-    ...event.participants.map(id => id)
-  ];
-
-  const filePath = path.join(DATA_DIR, `${event.id}_participants.txt`);
-  fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
-  return filePath;
-}
+// ===== EXPORTY =====
+export { handleEventInteraction, initEventPanel };
