@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 
@@ -12,6 +13,7 @@ function parseTime(input: string): { hour: number; minute: number } | null {
   if (input.includes(":")) {
     const [h, m] = input.split(":").map(n => parseInt(n, 10));
     if (isNaN(h) || isNaN(m)) return null;
+    if (h > 23 || m > 59) return null;
     return { hour: h, minute: m };
   }
 
@@ -35,8 +37,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const timeRaw = interaction.fields.getTextInputValue("event_time");
   const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
-  const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : null;
+  // Optional reminder
+  const reminderBefore: number | null = reminderRaw ? parseInt(reminderRaw, 10) : null;
 
+  // Parse time
   const parsedTime = parseTime(timeRaw);
   if (!name || isNaN(day) || isNaN(month) || !parsedTime) {
     await interaction.reply({ content: "Invalid input. Please check all fields.", ephemeral: true });
@@ -63,6 +67,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     reminderBefore, // can be null
     status: "ACTIVE",
     participants: [],
+    absent: [], // initialize empty absent list
     createdAt: Date.now()
   };
 
