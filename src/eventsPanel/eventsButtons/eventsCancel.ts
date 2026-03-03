@@ -1,11 +1,17 @@
 import { 
   ButtonInteraction, 
-  StringSelectMenuBuilder, 
-  ActionRowBuilder 
+  StringSelectMenuInteraction, 
+  ActionRowBuilder, 
+  StringSelectMenuBuilder 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 
-export async function handleCancel(interaction: ButtonInteraction) {
+/**
+ * Handler przycisku CANCEL w Event Panel
+ * Typ przyjmowany to Interaction, ale musimy sprawdzić typ w runtime
+ */
+export async function handleCancel(interaction: ButtonInteraction | StringSelectMenuInteraction) {
+  // Sprawdzamy, czy to przycisk
   if (!interaction.isButton()) return;
 
   const guildId = interaction.guildId;
@@ -22,9 +28,7 @@ export async function handleCancel(interaction: ButtonInteraction) {
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId("event_cancel_select")
     .setPlaceholder("Select an event to cancel")
-    .addOptions(
-      activeEvents.map(e => ({ label: e.name, value: e.id }))
-    );
+    .addOptions(activeEvents.map(e => ({ label: e.name, value: e.id })));
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
