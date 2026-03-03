@@ -1,9 +1,7 @@
-import { Interaction, EmbedBuilder } from "discord.js";
+import { ButtonInteraction, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 
-export async function handleList(interaction: Interaction) {
-  if (!interaction.isButton()) return;
-
+export async function handleList(interaction: ButtonInteraction) {
   const events = await EventStorage.getEvents(interaction.guildId!);
 
   const embed = new EmbedBuilder()
