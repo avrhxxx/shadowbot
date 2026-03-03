@@ -6,11 +6,11 @@ import {
   TextInputBuilder, 
   TextInputStyle, 
   ActionRowBuilder, 
-  EmbedBuilder, 
-  Message 
+  EmbedBuilder 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import { updateEventEmbed } from "./eventsList"; // funkcja do aktualizacji embedu listy
+import { updateEventEmbed } from "./eventsList";
+import { EventObject } from "../eventService"; // upewnij się, że EventObject ma pole absent: string[]
 
 /* ======================================================
    🔹 ADD PARTICIPANT (BUTTON → MODAL)
@@ -23,7 +23,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
   const input = new TextInputBuilder()
     .setCustomId("user_input")
     .setLabel("Enter game nickname(s), separated by commas")
-    .setPlaceholder("e.g. Arek, Basia, Kamil")
+    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia, DomSugarDaddy, UnicornUA")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -34,20 +34,19 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
 
 /* ======================================================
    🔹 ADD PARTICIPANT (MODAL SUBMIT)
-   – obsługa wielu uczestników na raz
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = events.find((e: EventObject) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  // Split po przecinku, trim, ignorujemy puste
+  // Split by comma, trim, ignore empty
   const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
 
   const added: string[] = [];
@@ -60,7 +59,7 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Aktualizacja głównego embedu listy
+  // Update main embed
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
   const embed = new EmbedBuilder()
@@ -102,7 +101,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = events.find((e: EventObject) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
@@ -148,13 +147,13 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = events.find((e: EventObject) => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  // Usuń z participants i dodaj do absent
+  // Remove from participants and add to absent
   event.participants = event.participants.filter(nick => nick !== input);
   if (!event.absent) event.absent = [];
   event.absent.push(input);
