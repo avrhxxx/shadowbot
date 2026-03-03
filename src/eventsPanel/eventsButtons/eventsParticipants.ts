@@ -19,7 +19,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter game nickname") // Zmienione na game nickname
+    .setLabel("Enter game nickname")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -65,7 +65,7 @@ export async function handleRemoveParticipant(interaction: ButtonInteraction, ev
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter game nickname") // Zmienione na game nickname
+    .setLabel("Enter game nickname")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -109,7 +109,7 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter game nickname") // Zmienione na game nickname
+    .setLabel("Enter game nickname")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
