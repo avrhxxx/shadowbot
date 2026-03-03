@@ -25,7 +25,7 @@ import {
   generateParticipantsFile
 } from "./eventService";
 
-// ===== HANDLE BUTTONS / MODALS / SELECTS =====
+// ===== EVENT HANDLER =====
 export async function handleEventInteraction(interaction: Interaction) {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
@@ -34,123 +34,180 @@ export async function handleEventInteraction(interaction: Interaction) {
 
   // ===== BUTTONS =====
   if (interaction.isButton()) {
+    // Od razu deferujemy, żeby uniknąć "this interaction failed"
+    await interaction.deferReply({ ephemeral: true });
+
     switch (interaction.customId) {
+      // ----- CREATE EVENT -----
       case "event_create": {
-        const modal = new ModalBuilder().setCustomId("event_create_modal").setTitle("Create Event");
+        const modal = new ModalBuilder()
+          .setCustomId("event_create_modal")
+          .setTitle("Create Event");
+
         modal.addComponents(
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("event_name").setLabel("Event Name").setStyle(TextInputStyle.Short).setRequired(true)
+            new TextInputBuilder()
+              .setCustomId("event_name")
+              .setLabel("Event Name")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("event_day").setLabel("Day (1-31)").setStyle(TextInputStyle.Short).setRequired(true)
+            new TextInputBuilder()
+              .setCustomId("event_day")
+              .setLabel("Day (1-31)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("event_month").setLabel("Month (1-12)").setStyle(TextInputStyle.Short).setRequired(true)
+            new TextInputBuilder()
+              .setCustomId("event_month")
+              .setLabel("Month (1-12)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("event_time").setLabel("Time (HH:MM)").setStyle(TextInputStyle.Short).setRequired(true)
+            new TextInputBuilder()
+              .setCustomId("event_time")
+              .setLabel("Time (HH:MM)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
           ),
           new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder().setCustomId("event_reminder").setLabel("Reminder Before (min)").setStyle(TextInputStyle.Short).setRequired(true)
+            new TextInputBuilder()
+              .setCustomId("event_reminder")
+              .setLabel("Reminder Before (min)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
           )
         );
+
+        await interaction.editReply({ content: "Opening modal...", components: [] });
         await interaction.showModal(modal);
         return;
       }
 
+      // ----- LIST EVENTS -----
       case "event_list": {
         const events = getEvents(guildId);
         if (!events.length) {
-          await interaction.reply({ content: "No events found.", ephemeral: true });
+          await interaction.editReply({ content: "No events found." });
           return;
         }
 
         const embed = new EmbedBuilder().setTitle("📅 Events").setColor("Blue");
         for (const e of events) {
           const statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "🔴" : "⚪";
-          embed.addFields({ name: `${statusEmoji} ${e.name}`, value: `📆 ${e.day}-${e.month} ${e.hour}:${e.minute} | Participants: ${e.participants.length}` });
+          embed.addFields({
+            name: `${statusEmoji} ${e.name}`,
+            value: `📆 ${e.day}-${e.month} ${e.hour}:${e.minute} | Participants: ${e.participants.length}`
+          });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
 
+      // ----- MANUAL REMINDER -----
       case "event_manual_reminder": {
         const channelId = getDefaultChannel(guildId);
         if (!channelId) {
-          await interaction.reply({ content: "Default channel not set.", ephemeral: true });
+          await interaction.editReply({ content: "Default channel not set." });
           return;
         }
 
         const activeEvents = getActiveEvents(guildId);
         if (!activeEvents.length) {
-          await interaction.reply({ content: "No active events.", ephemeral: true });
+          await interaction.editReply({ content: "No active events." });
           return;
         }
 
         const channel = interaction.guild?.channels.cache.get(channelId) as TextChannel;
         if (!channel) {
-          await interaction.reply({ content: "Default channel not found.", ephemeral: true });
+          await interaction.editReply({ content: "Default channel not found." });
           return;
         }
 
         for (const e of activeEvents) {
-          const embed = new EmbedBuilder().setTitle(`🔔 Reminder: ${e.name}`).setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
+          const embed = new EmbedBuilder()
+            .setTitle(`🔔 Reminder: ${e.name}`)
+            .setDescription(`Starts at ${e.hour}:${e.minute} on ${e.day}-${e.month}`);
           await channel.send({ embeds: [embed] });
         }
 
-        await interaction.reply({ content: "Reminders sent.", ephemeral: true });
+        await interaction.editReply({ content: "Reminders sent." });
         return;
       }
 
+      // ----- CANCEL EVENT -----
       case "event_cancel": {
         const activeEvents = getActiveEvents(guildId);
         if (!activeEvents.length) {
-          await interaction.reply({ content: "No active events to cancel.", ephemeral: true });
+          await interaction.editReply({ content: "No active events to cancel." });
           return;
         }
 
         const options = activeEvents.map(e => ({ label: e.name, value: e.id }));
-        const select = new StringSelectMenuBuilder().setCustomId("event_cancel_select").setPlaceholder("Select event to cancel").addOptions(options);
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_cancel_select")
+          .setPlaceholder("Select event to cancel")
+          .addOptions(options);
+
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-        await interaction.reply({ content: "Select event to cancel:", components: [row], ephemeral: true });
+        await interaction.editReply({ content: "Select event to cancel:", components: [row] });
         return;
       }
 
+      // ----- DOWNLOAD PARTICIPANTS -----
       case "event_download": {
         const pastEvents = getPastEvents(guildId);
         if (!pastEvents.length) {
-          await interaction.reply({ content: "No past events found.", ephemeral: true });
+          await interaction.editReply({ content: "No past events found." });
           return;
         }
 
         const options = pastEvents.map(e => ({ label: e.name, value: e.id }));
-        const select = new StringSelectMenuBuilder().setCustomId("event_download_select").setPlaceholder("Select past event").addOptions(options);
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_download_select")
+          .setPlaceholder("Select past event")
+          .addOptions(options);
+
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-        await interaction.reply({ content: "Select past event to download participants:", components: [row], ephemeral: true });
+        await interaction.editReply({ content: "Select past event to download participants:", components: [row] });
         return;
       }
 
+      // ----- SETTINGS -----
       case "event_settings": {
-        const channels = interaction.guild?.channels.cache.filter(c => c.isTextBased()).map(c => ({ label: c.name, value: c.id })) || [];
-        const select = new StringSelectMenuBuilder().setCustomId("event_settings_select").setPlaceholder("Select default channel").addOptions(channels);
+        const channels = interaction.guild?.channels.cache
+          .filter(c => c.isTextBased())
+          .map(c => ({ label: c.name, value: c.id })) || [];
+
+        const select = new StringSelectMenuBuilder()
+          .setCustomId("event_settings_select")
+          .setPlaceholder("Select default channel")
+          .addOptions(channels);
+
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-        await interaction.reply({ content: "Select default channel for event notifications:", components: [row], ephemeral: true });
+        await interaction.editReply({ content: "Select default channel for event notifications:", components: [row] });
         return;
       }
 
+      // ----- HELP -----
       case "event_help": {
-        const embed = new EmbedBuilder().setTitle("Event Panel Help").setDescription(
-          "📌 **Buttons:**\n" +
-          "🟢 Create → Create a new event\n" +
-          "📄 List → List all events\n" +
-          "⬇️ Download → Download participants\n" +
-          "⚙️ Settings → Set default channel\n" +
-          "🔔 Reminder → Send reminder for active events\n" +
-          "🗑️ Cancel → Cancel an active event\n" +
-          "❓ Help → Show this info"
-        );
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        const embed = new EmbedBuilder()
+          .setTitle("Event Panel Help")
+          .setDescription(
+            "📌 **Buttons:**\n" +
+            "🟢 Create → Create a new event\n" +
+            "📄 List → List all events\n" +
+            "⬇️ Download → Download participants\n" +
+            "⚙️ Settings → Set default channel\n" +
+            "🔔 Reminder → Send reminder for active events\n" +
+            "🗑️ Cancel → Cancel an active event\n" +
+            "❓ Help → Show this info"
+          );
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
     }
@@ -182,19 +239,20 @@ export async function handleEventInteraction(interaction: Interaction) {
         await interaction.reply({ content: `Event cancelled.`, ephemeral: true });
         return;
 
-      case "event_download_select": {
+      case "event_download_select":
         const eventId = interaction.values[0];
         const filePath = generateParticipantsFile(guildId, eventId);
+
         const channelId = getDefaultChannel(guildId);
         const channel = interaction.guild?.channels.cache.get(channelId!) as TextChannel;
+
         if (channel) {
           await channel.send({ content: `📥 Participants file for event`, files: [filePath] });
-          await interaction.reply({ content: "File sent to default channel.", ephemeral: true });
+          await interaction.followUp({ content: "File sent to default channel.", ephemeral: true });
         } else {
           await interaction.reply({ content: "Default channel not found.", ephemeral: true });
         }
         return;
-      }
     }
   }
 }
@@ -203,7 +261,6 @@ export async function handleEventInteraction(interaction: Interaction) {
 export async function initEventPanel(client: Client, interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  // Row 1
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("event_create").setLabel("Create 🟢").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("event_list").setLabel("List 📄").setStyle(ButtonStyle.Secondary),
@@ -212,7 +269,6 @@ export async function initEventPanel(client: Client, interaction: Interaction) {
     new ButtonBuilder().setCustomId("event_download").setLabel("Download ⬇️").setStyle(ButtonStyle.Secondary)
   );
 
-  // Row 2
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("event_settings").setLabel("Settings ⚙️").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("event_help").setLabel("Help ❓").setStyle(ButtonStyle.Success)
