@@ -1,4 +1,4 @@
-import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember } from "discord.js";
+import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 
@@ -73,7 +73,6 @@ export async function handleList(interaction: ButtonInteraction) {
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
- * Zamienia ID na nicki
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
@@ -89,7 +88,6 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-  // Zamiana ID na nicki (displayName)
   const resolveNick = async (id: string) => {
     try {
       const member = await guild.members.fetch(id);
@@ -120,7 +118,6 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 
 /**
  * Aktualizacja embedu głównej listy po dodaniu/usunięciu uczestnika
- * Edytuje istniejący embed, nie wysyła nowego
  */
 export async function updateEventEmbed(message: any, eventId: string) {
   const guildId = message.guildId;
@@ -141,7 +138,6 @@ export async function updateEventEmbed(message: any, eventId: string) {
     )
     .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
 
-  // Row 1
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`event_add_${e.id}`)
@@ -165,7 +161,6 @@ export async function updateEventEmbed(message: any, eventId: string) {
       .setStyle(ButtonStyle.Primary)
   );
 
-  // Row 2
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`event_compare_${e.id}`)
