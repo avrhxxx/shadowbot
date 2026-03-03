@@ -1,7 +1,5 @@
 // src/eventsPanel/eventHandlers.ts
-import {
-  Interaction
-} from "discord.js";
+import { Interaction } from "discord.js";
 
 // Importy buttonów / modali / selectów
 import { handleCreate } from "./eventsButtons/eventsCreate";
@@ -13,7 +11,7 @@ import {
   handleCancelConfirm,
   handleCancelAbort
 } from "./eventsButtons/eventsCancel";
-import { handleManualReminder } from "./eventsButtons/eventsReminder";
+import { handleManualReminder, handleManualReminderSelect } from "./eventsButtons/eventsReminder";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings } from "./eventsButtons/eventsSettings";
 import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
@@ -32,27 +30,17 @@ import {
 /**
  * Główny router Event Panelu
  */
-export async function handleEventInteraction(
-  interaction: Interaction
-): Promise<void> {
+export async function handleEventInteraction(interaction: Interaction): Promise<void> {
 
-  if (
-    !interaction.isButton() &&
-    !interaction.isModalSubmit() &&
-    !interaction.isStringSelectMenu()
-  ) return;
+  if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const { customId } = interaction;
   if (!customId.startsWith("event_")) return;
 
   /* =======================================================
      🔥 DYNAMIC – CONFIRM CANCEL
-     ======================================================= */
-
-  if (
-    interaction.isButton() &&
-    customId.startsWith("event_cancel_confirm_")
-  ) {
+  ======================================================= */
+  if (interaction.isButton() && customId.startsWith("event_cancel_confirm_")) {
     const eventId = customId.replace("event_cancel_confirm_", "");
     await handleCancelConfirm(interaction, eventId);
     return;
@@ -60,47 +48,73 @@ export async function handleEventInteraction(
 
   /* =======================================================
      🔥 DYNAMIC – PARTICIPANT BUTTONS
-     ======================================================= */
-
+  ======================================================= */
   if (interaction.isButton()) {
-
     if (customId.startsWith("event_add_")) {
       const eventId = customId.replace("event_add_", "");
       await handleAddParticipant(interaction, eventId);
       return;
     }
-
     if (customId.startsWith("event_remove_")) {
       const eventId = customId.replace("event_remove_", "");
       await handleRemoveParticipant(interaction, eventId);
       return;
     }
-
     if (customId.startsWith("event_absent_")) {
       const eventId = customId.replace("event_absent_", "");
       await handleAbsentParticipant(interaction, eventId);
+      return;
+    }
+
+    /* =======================================================
+       🔥 DYNAMIC – LIST BUTTONS (Show List / Download single event)
+    ======================================================= */
+    if (customId.startsWith("event_show_list_")) {
+      const eventId = customId.replace("event_show_list_", "");
+      const guildId = interaction.guildId!;
+      const events = await EventStorage.getEvents(guildId);
+      const event = events.find(e => e.id === eventId);
+      if (!event) {
+        await interaction.reply({ content: "Event not found.", ephemeral: true });
+        return;
+      }
+
+      const participantsList = event.participants.length
+        ? event.participants.map(id => `<@${id}>`).join("\n")
+        : "No participants";
+
+      const embed = {
+        title: `Participants for ${event.name}`,
+        description: participantsList,
+        color: event.status === "ACTIVE" ? 0x00ff00 : 0x808080
+      };
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
+    if (customId.startsWith("event_download_single_")) {
+      const eventId = customId.replace("event_download_single_", "");
+      // handleDownload w eventsDownload.ts musi przyjmować eventId opcjonalnie
+      await handleDownload(interaction, eventId);
       return;
     }
   }
 
   /* =======================================================
      🔥 DYNAMIC – PARTICIPANT MODALS
-     ======================================================= */
-
+  ======================================================= */
   if (interaction.isModalSubmit()) {
-
     if (customId.startsWith("event_add_modal_")) {
       const eventId = customId.replace("event_add_modal_", "");
       await handleAddParticipantSubmit(interaction, eventId);
       return;
     }
-
     if (customId.startsWith("event_remove_modal_")) {
       const eventId = customId.replace("event_remove_modal_", "");
       await handleRemoveParticipantSubmit(interaction, eventId);
       return;
     }
-
     if (customId.startsWith("event_absent_modal_")) {
       const eventId = customId.replace("event_absent_modal_", "");
       await handleAbsentParticipantSubmit(interaction, eventId);
@@ -110,8 +124,7 @@ export async function handleEventInteraction(
 
   /* =======================================================
      STANDARDOWE CUSTOM ID
-     ======================================================= */
-
+  ======================================================= */
   switch (customId) {
 
     // BUTTONS
@@ -154,13 +167,15 @@ export async function handleEventInteraction(
 
     // SELECT MENU
     case "event_settings_select":
-      if (interaction.isStringSelectMenu())
-        await handleSettingsSelect(interaction);
+      if (interaction.isStringSelectMenu()) await handleSettingsSelect(interaction);
       break;
 
     case "event_cancel_select":
-      if (interaction.isStringSelectMenu())
-        await handleCancelSelect(interaction);
+      if (interaction.isStringSelectMenu()) await handleCancelSelect(interaction);
+      break;
+
+    case "event_manual_reminder_select":
+      if (interaction.isStringSelectMenu()) await handleManualReminderSelect(interaction);
       break;
 
     default:
