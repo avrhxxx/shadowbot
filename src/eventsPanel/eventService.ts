@@ -1,3 +1,4 @@
+// src/eventsPanel/eventService.ts
 import * as EventStorage from "./eventStorage";
 import { EmbedBuilder, TextChannel } from "discord.js";
 
@@ -54,6 +55,13 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 /**
+ * Wrapper do zapisu eventów
+ */
+export async function saveEvents(guildId: string, events: EventObject[]) {
+  await EventStorage.saveEvents(guildId, events);
+}
+
+/**
  * Pobiera aktywne eventy
  */
 export async function getActiveEvents(guildId: string): Promise<EventObject[]> {
@@ -85,7 +93,7 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
 
-  event.status = "CANCELED";
+  event.status = "CANCELED"; // US spelling
   await EventStorage.saveEvents(guildId, events);
   return event;
 }
