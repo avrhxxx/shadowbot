@@ -1,7 +1,7 @@
 // src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { sendEventCreatedNotification } from "./eventsReminder";
+import { sendEventCreatedNotification, scheduleEventReminders } from "./eventsReminder";
 
 /**
  * Convert various time formats into HH:MM
@@ -83,6 +83,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   // 🔹 Powiadomienie o utworzeniu eventu @everyone
   if (interaction.guild) {
     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
+
+    // 🔹 Zaplanuj przypomnienia w tle
+    await scheduleEventReminders(newEvent, interaction.guild as Guild);
   }
 
   await interaction.reply({ content: "Event created successfully!", ephemeral: true });
