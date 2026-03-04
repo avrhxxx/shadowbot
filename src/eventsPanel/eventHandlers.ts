@@ -1,4 +1,3 @@
-// src/eventsPanel/eventHandlers.ts
 import { Interaction } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
@@ -17,6 +16,7 @@ import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings } from "./eventsButtons/eventsSettings";
 import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
 import { handleHelp } from "./eventsButtons/eventsHelp";
+import { handleCompare } from "./eventsButtons/eventsCompare"; // 🔥 DODANE
 
 // Uczestnicy
 import {
@@ -48,34 +48,45 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   }
 
   /* =======================================================
-     🔥 DYNAMIC – PARTICIPANT BUTTONS
+     🔥 DYNAMIC – BUTTONS
   ======================================================= */
   if (interaction.isButton()) {
+
     if (customId.startsWith("event_add_")) {
       const eventId = customId.replace("event_add_", "");
       await handleAddParticipant(interaction, eventId);
       return;
     }
+
     if (customId.startsWith("event_remove_")) {
       const eventId = customId.replace("event_remove_", "");
       await handleRemoveParticipant(interaction, eventId);
       return;
     }
+
     if (customId.startsWith("event_absent_")) {
       const eventId = customId.replace("event_absent_", "");
       await handleAbsentParticipant(interaction, eventId);
       return;
     }
 
+    // 🔥 NOWE – COMPARE
+    if (customId.startsWith("event_compare_")) {
+      const eventId = customId.replace("event_compare_", "");
+      await handleCompare(interaction, eventId);
+      return;
+    }
+
     /* =======================================================
-       🔥 DYNAMIC – LIST BUTTONS
-       Show List / Download single event
+       🔥 LIST BUTTONS
     ======================================================= */
+
     if (customId.startsWith("event_show_list_")) {
       const eventId = customId.replace("event_show_list_", "");
       const guildId = interaction.guildId!;
       const events = await EventStorage.getEvents(guildId);
       const event = events.find(e => e.id === eventId);
+
       if (!event) {
         await interaction.reply({ content: "Event not found.", ephemeral: true });
         return;
@@ -103,19 +114,22 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   }
 
   /* =======================================================
-     🔥 DYNAMIC – PARTICIPANT MODALS
+     🔥 DYNAMIC – MODALS
   ======================================================= */
   if (interaction.isModalSubmit()) {
+
     if (customId.startsWith("event_add_modal_")) {
       const eventId = customId.replace("event_add_modal_", "");
       await handleAddParticipantSubmit(interaction, eventId);
       return;
     }
+
     if (customId.startsWith("event_remove_modal_")) {
       const eventId = customId.replace("event_remove_modal_", "");
       await handleRemoveParticipantSubmit(interaction, eventId);
       return;
     }
+
     if (customId.startsWith("event_absent_modal_")) {
       const eventId = customId.replace("event_absent_modal_", "");
       await handleAbsentParticipantSubmit(interaction, eventId);
@@ -124,11 +138,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   }
 
   /* =======================================================
-     STANDARDOWE CUSTOM ID
+     🔥 STANDARDOWE CUSTOM ID
   ======================================================= */
   switch (customId) {
 
-    // BUTTONS
     case "event_create":
       if (interaction.isButton()) await handleCreate(interaction);
       break;
@@ -149,7 +162,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       if (interaction.isButton()) await handleManualReminder(interaction);
       break;
 
-    case "event_download": // Globalny download – wszystkie eventy
+    case "event_download":
       if (interaction.isButton()) await handleDownload(interaction);
       break;
 
@@ -161,7 +174,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       if (interaction.isButton()) await handleHelp(interaction);
       break;
 
-    // MODAL SUBMIT
+    // MODAL
     case "event_create_modal":
       if (interaction.isModalSubmit()) await handleCreateSubmit(interaction);
       break;
@@ -170,7 +183,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     case "event_settings_notification":
     case "event_settings_download":
       if (interaction.isStringSelectMenu()) {
-        await handleSettingsSelect(interaction); // wywołuje nasz handler settings
+        await handleSettingsSelect(interaction);
       }
       break;
 
