@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreate.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -11,7 +12,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   const modal = new ModalBuilder()
     .setCustomId("event_create_modal")
-    .setTitle("Create Event");
+    .setTitle("Create Event (UTC)");
 
   const nameInput = new TextInputBuilder()
     .setCustomId("event_name")
@@ -21,30 +22,31 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   const dayInput = new TextInputBuilder()
     .setCustomId("event_day")
-    .setLabel("Day (1-31)")
+    .setLabel("Day (1-31, UTC)")
     .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter day in UTC")
     .setRequired(true);
 
   const monthInput = new TextInputBuilder()
     .setCustomId("event_month")
-    .setLabel("Month (1-12)")
+    .setLabel("Month (1-12, UTC)")
     .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter month in UTC")
     .setRequired(true);
 
   const timeInput = new TextInputBuilder()
     .setCustomId("event_time")
-    .setLabel("Time")
+    .setLabel("Time (HH:MM UTC)")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("e.g. 1:30, 130, 1100, 19:00")
+    .setPlaceholder("Enter time in UTC, e.g. 1:30, 13:00")
     .setRequired(true);
 
-  // 🔥 KLUCZOWA ZMIANA TUTAJ
   const reminderInput = new TextInputBuilder()
     .setCustomId("reminder_before")
     .setLabel("Reminder before (minutes, optional)")
     .setStyle(TextInputStyle.Short)
     .setPlaceholder("Leave empty if no reminder")
-    .setRequired(false); // ✅ TERAZ JEST OPCJONALNE
+    .setRequired(false);
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
