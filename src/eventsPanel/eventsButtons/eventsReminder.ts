@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -12,12 +11,16 @@ import {
   Guild
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import { formatUTCDate } from "../../utils/timeUtils";
 
 /**
- * KROK 1
- * Kliknięcie przycisku "Manual Reminder"
- * -> pokazuje select menu z aktywnymi eventami
+ * Pomocnicza funkcja – pad liczby zerem
+ */
+function pad(n: number) {
+  return n < 10 ? `0${n}` : n;
+}
+
+/**
+ * KROK 1 – Manual Reminder
  */
 export async function handleManualReminder(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -36,7 +39,7 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
       activeEvents.map(event =>
         new StringSelectMenuOptionBuilder()
           .setLabel(event.name)
-          .setDescription(formatUTCDate(event.day, event.month, new Date().getUTCFullYear(), event.hour, event.minute) + " UTC")
+          .setDescription(`${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`)
           .setValue(event.id)
       )
     );
@@ -51,8 +54,7 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
 }
 
 /**
- * KROK 2
- * Obsługa wyboru eventu z select menu
+ * KROK 2 – Obsługa select menu Manual Reminder
  */
 export async function handleManualReminderSelect(interaction: StringSelectMenuInteraction) {
   const guildId = interaction.guildId!;
@@ -60,7 +62,6 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 
   const events = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
-
   if (!event) {
     await interaction.reply({ content: "Event not found.", flags: 64 });
     return;
@@ -79,12 +80,11 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     return;
   }
 
-  const year = new Date().getUTCFullYear();
-  const dateStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+  const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
 
   const embed = new EmbedBuilder()
     .setTitle(`📢 Reminder: ${event.name}`)
-    .setDescription(`Event starts on ${dateStr} UTC`)
+    .setDescription(`Event starts on ${eventDateStr}`)
     .setColor("Blue");
 
   const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -94,13 +94,14 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
       .setStyle(ButtonStyle.Primary)
   );
 
-  await channel.send({ embeds: [embed], components: [buttonRow] });
+  // 🔹 Wyślij everyone
+  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
 
   await interaction.update({ content: "Manual reminder sent!", components: [] });
 }
 
 /**
- * Auto reminder
+ * Auto Reminder
  */
 export async function sendAutoReminder(event: any, guild: Guild) {
   const guildId = guild.id;
@@ -110,12 +111,11 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  const year = new Date().getUTCFullYear();
-  const dateStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+  const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
 
   const embed = new EmbedBuilder()
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
-    .setDescription(`Event starts on ${dateStr} UTC`)
+    .setDescription(`Event starts on ${eventDateStr}`)
     .setColor("Orange");
 
   const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -125,5 +125,5 @@ export async function sendAutoReminder(event: any, guild: Guild) {
       .setStyle(ButtonStyle.Primary)
   );
 
-  await channel.send({ embeds: [embed], components: [buttonRow] });
+  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
 }
