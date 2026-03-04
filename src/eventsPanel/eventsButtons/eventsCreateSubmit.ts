@@ -1,7 +1,8 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { formatUTCDate } from "../../utils/timeUtils";
-import * as EventStorage from "./eventStorage";
+import * as EventStorage from "../eventStorage"; // Poprawiony import
 import { sendAutoReminder, sendEventCreatedNotification } from "./eventsReminder";
 
 /**
