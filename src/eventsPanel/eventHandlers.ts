@@ -14,10 +14,9 @@ import {
 } from "./eventsButtons/eventsCancel";
 import { handleManualReminder, handleManualReminderSelect } from "./eventsButtons/eventsReminder";
 import { handleDownload } from "./eventsButtons/eventsDownload";
-import { handleSettings } from "./eventsButtons/eventsSettings";
-import { handleSettingsSelect } from "./eventsButtons/eventsSettingsSelect";
+import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
-import { handleCompare } from "./eventsButtons/eventsCompare"; // 🔥 DODANE
+import { handleCompare } from "./eventsButtons/eventsCompare";
 
 // Uczestnicy
 import {
@@ -71,20 +70,15 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // 🔥 NOWE – COMPARE
     if (customId.startsWith("event_compare_")) {
       const eventId = customId.replace("event_compare_", "");
       await handleCompare(interaction, eventId);
       return;
     }
 
-    /* =======================================================
-       🔥 LIST BUTTONS
-    ======================================================= */
-
     if (customId.startsWith("event_show_list_")) {
       const eventId = customId.replace("event_show_list_", "");
-      await handleShowList(interaction, eventId); // 🔹 Poprawnie wywołujemy handler z eventsList.ts
+      await handleShowList(interaction, eventId);
       return;
     }
 
@@ -115,6 +109,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_absent_modal_")) {
       const eventId = customId.replace("event_absent_modal_", "");
       await handleAbsentParticipantSubmit(interaction, eventId);
+      return;
+    }
+
+    if (customId === "event_create_modal") {
+      await handleCreateSubmit(interaction);
       return;
     }
   }
@@ -156,12 +155,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       if (interaction.isButton()) await handleHelp(interaction);
       break;
 
-    // MODAL
-    case "event_create_modal":
-      if (interaction.isModalSubmit()) await handleCreateSubmit(interaction);
-      break;
-
-    // SELECT MENU
+    // SELECT MENU – teraz korzystamy tylko z nowego pliku
     case "event_settings_notification":
     case "event_settings_download":
       if (interaction.isStringSelectMenu()) {
