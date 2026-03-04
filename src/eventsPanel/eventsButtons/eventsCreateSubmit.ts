@@ -1,6 +1,6 @@
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { formatUTCDate, formatLocalDateFromUTC } from "../../utils/timeUtils";
+import { formatUTCDate } from "../../utils/timeUtils";
 
 /**
  * Convert various time formats into HH:MM
@@ -47,16 +47,13 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
 
-  // 🔹 UTC Date dla eventu (nie ruszamy)
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
 
-  // 🔹 Walidacja: nie pozwalamy na event w przeszłości (UTC)
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
     return;
   }
 
-  // 🔹 Walidacja: nie tworzymy eventu z tym samym dniem/godziną jeśli ACTIVE
   const events: EventObject[] = await getEvents(guildId);
   const duplicate = events.find(
     e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
@@ -83,15 +80,12 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   await saveEvents(guildId, [...events, newEvent]);
 
-  // 🔹 Formatowanie dat
   const eventDateUTCStr = formatUTCDate(day, month, year, hour, minute);
-  const eventDateLocalStr = formatLocalDateFromUTC(day, month, year, hour, minute);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
       `Event **${name}** scheduled for ${eventDateUTCStr} UTC` +
-      `\nFor your local time: ${eventDateLocalStr}` +
       (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
     )
     .setColor("Green");
