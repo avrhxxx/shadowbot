@@ -110,22 +110,7 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     return;
   }
 
-  const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`📢 Reminder: ${event.name}`)
-    .setDescription(`Event starts on ${eventDateStr}`)
-    .setColor("Blue");
-
-  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`show_local_time_${event.id}`)
-      .setLabel("Show in your local time")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  // 🔹 Wyślij everyone
-  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
+  await sendReminderMessage(channel, event);
 
   await interaction.update({ content: "Manual reminder sent!", components: [] });
 }
@@ -134,11 +119,36 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
  * Auto Reminder (przy ustawionym reminderBefore)
  */
 export async function sendAutoReminder(event: any, guild: Guild) {
+  if (event.reminderBefore === undefined) return;
+
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
+
+  // 🔹 Oblicz dokładny timestamp przypomnienia
+  const nowUTC = new Date();
+  const year = nowUTC.getUTCFullYear();
+  const eventTime = new Date(Date.UTC(year, event.month - 1, event.day, event.hour, event.minute));
+  const reminderTime = eventTime.getTime() - event.reminderBefore * 60 * 1000; // reminderBefore w minutach
+  const delay = reminderTime - nowUTC.getTime();
+
+  if (delay <= 0) {
+    // jeśli już powinniśmy wysłać → wyślij natychmiast
+    await sendReminderMessage(channel, event);
+  } else {
+    setTimeout(async () => {
+      await sendReminderMessage(channel, event);
+    }, delay);
+  }
+}
+
+/**
+ * Własna funkcja wysyłająca wiadomość przypomnienia
+ */
+async function sendReminderMessage(channel: TextChannel, event: any) {
+  const pad = (n: number) => (n < 10 ? `0${n}` : n);
 
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
 
@@ -154,6 +164,5 @@ export async function sendAutoReminder(event: any, guild: Guild) {
       .setStyle(ButtonStyle.Primary)
   );
 
-  // 🔹 Wyślij everyone
   await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
 }
