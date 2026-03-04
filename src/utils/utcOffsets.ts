@@ -1,8 +1,8 @@
 // src/utils/utcOffsets.ts
 
 /**
- * Baza najważniejszych stref czasowych dla Europy, USA/Kanada i Azji
- * Offset w godzinach (półgodzinne wartości uwzględnione)
+ * Baza najważniejszych stref czasowych na świecie
+ * ⚠️ Offset w godzinach, półgodzinne wartości uwzględnione
  */
 export const countryToUTCOffset: Record<string, number> = {
   // 🇪🇺 Europa
@@ -25,6 +25,8 @@ export const countryToUTCOffset: Record<string, number> = {
   "Greece (Athens)": 2,
   "Finland (Helsinki)": 2,
   "Turkey (Istanbul)": 3,
+
+  // 🇷🇺 Rosja – kilka reprezentatywnych stref
   "Russia (Kaliningrad)": 2,
   "Russia (Moscow)": 3,
   "Russia (Samara)": 4,
@@ -48,7 +50,14 @@ export const countryToUTCOffset: Record<string, number> = {
   "Canada (Pacific - Vancouver)": -8,
   "Canada (Newfoundland - St. John's)": -3.5,
 
-  // 🇨🇳 Azja
+  // 🇧🇷 Brazylia – kilka stref
+  "Brazil (Brasilia)": -3,
+  "Brazil (Manaus)": -4,
+  "Brazil (Fernando de Noronha)": -2,
+  "Argentina (Buenos Aires)": -3,
+  "Chile (Santiago)": -4,
+
+  // 🇨🇳 Azja i inne duże kraje
   "China (Beijing)": 8,
   "Japan (Tokyo)": 9,
   "South Korea (Seoul)": 9,
@@ -66,5 +75,15 @@ export const countryToUTCOffset: Record<string, number> = {
   "Nepal (Kathmandu)": 5.75,
   "Sri Lanka (Colombo)": 5.5,
   "Kazakhstan (Almaty)": 6,
-  "Kazakhstan (Nur-Sultan)": 5
+  "Kazakhstan (Nur-Sultan)": 5,
+
+  // 🇦🇺 Australia / Oceania
+  "Australia (Sydney)": 10,
+  "Australia (Perth)": 8,
+  "New Zealand (Wellington)": 12,
+
+  // 🇿🇦 Afryka
+  "South Africa (Cape Town)": 2,
+  "Egypt (Cairo)": 2,
+  "Kenya (Nairobi)": 3
 };
