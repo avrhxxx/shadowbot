@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 
@@ -46,14 +47,16 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   }
 
   const { hour, minute } = parsedTime;
-  const now = new Date();
-  const year = now.getFullYear();
+  const nowUTC = new Date();
+  const year = nowUTC.getUTCFullYear();
 
-  // 🔹 Walidacja: nie pozwalamy na event w przeszłości
-  const eventDate = new Date(year, month - 1, day, hour, minute);
-  if (eventDate < now) {
+  // 🔹 UTC Date dla eventu
+  const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+
+  // 🔹 Walidacja: nie pozwalamy na event w przeszłości (UTC)
+  if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({
-      content: "Cannot create an event in the past. Please select a future date/time.",
+      content: "Cannot create an event in the past (UTC). Please select a future date/time.",
       ephemeral: true
     });
     return;
@@ -66,7 +69,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   );
   if (duplicate) {
     await interaction.reply({
-      content: "An active event at this date and time already exists. Please choose another date/time.",
+      content: "An active event at this UTC date and time already exists. Please choose another date/time.",
       ephemeral: true
     });
     return;
@@ -92,7 +95,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
-      `Event **${name}** scheduled for ${pad(day)}/${pad(month)}/${year} at ${pad(hour)}:${pad(minute)}` +
+      `Event **${name}** scheduled for ${pad(day)}/${pad(month)}/${year} at ${pad(hour)}:${pad(minute)} UTC` +
       (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
     )
     .setColor("Green");
