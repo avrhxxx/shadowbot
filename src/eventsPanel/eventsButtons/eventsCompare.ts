@@ -15,10 +15,10 @@ import { EventObject } from "../eventService";
 import { formatUTCDate } from "../utils/timeUtils";
 
 /**
- * Formatowanie daty eventu w UTC dla wyświetlania w wiadomościach i plikach
+ * Formatuje datę eventu w UTC dla wyświetlania w wiadomościach i plikach
  */
 function formatEventUTC(e: EventObject) {
-  const year = new Date().getUTCFullYear(); // Bieżący rok
+  const year = new Date().getUTCFullYear(); // bieżący rok
   return formatUTCDate(e.day, e.month, year, e.hour, e.minute);
 }
 
