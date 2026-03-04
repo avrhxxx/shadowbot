@@ -91,10 +91,22 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   await saveEvents(guildId, [...events, newEvent]);
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+  // 🔹 Local time użytkownika (informacyjnie)
+  const eventDateLocal = new Date(
+    Date.UTC(year, month - 1, day, hour, minute)
+  ).toLocaleString("default", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
       `Event **${name}** scheduled for ${pad(day)}/${pad(month)}/${year} at ${pad(hour)}:${pad(minute)} UTC` +
+      `\nFor your local time: ${eventDateLocal}` +
       (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
     )
     .setColor("Green");
