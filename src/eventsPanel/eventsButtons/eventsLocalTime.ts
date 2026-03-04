@@ -31,7 +31,9 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
-    await interaction.reply({
+    const responseMethod = interaction.replied || interaction.deferred ? "followUp" : "reply";
+
+    await interaction[responseMethod]({
       content: "Select your country/region to set your local time:",
       ephemeral: true,
       components: [row],
@@ -42,7 +44,7 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
   // jeśli strefa ustawiona → pokaz lokalny czas
   const timeZone = userConfig.timeZone;
 
-  // używamy roku z eventu, jeśli istnieje, w przeciwnym razie bieżącego roku
+  // używamy roku z eventu, jeśli istnieje, w przeciwnym razie bieżącego roku UTC
   const year = event.year ?? new Date().getUTCFullYear();
 
   const localDateStr = formatLocalDateFromUTCWithTimeZone(
@@ -54,7 +56,9 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
     timeZone
   );
 
-  await interaction.reply({
+  const responseMethod = interaction.replied || interaction.deferred ? "followUp" : "reply";
+
+  await interaction[responseMethod]({
     content: `Event **${event.name}** starts at your local time: ${localDateStr} (${timeZone})`,
     ephemeral: true,
   });
@@ -71,7 +75,9 @@ export async function handleSetupLocalTimeSelect(interaction: StringSelectMenuIn
   userTimeConfig[userId] = { timeZone };
   await UserTimeStorage.saveUserTimeConfig(userTimeConfig);
 
-  await interaction.reply({
+  const responseMethod = interaction.replied || interaction.deferred ? "followUp" : "reply";
+
+  await interaction[responseMethod]({
     content: `Your time zone has been set! (${timeZone})`,
     ephemeral: true,
   });
