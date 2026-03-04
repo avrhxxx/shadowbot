@@ -12,6 +12,7 @@ import {
   Guild
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
+import { formatUTCDate } from "../../utils/timeUtils";
 
 /**
  * KROK 1
@@ -35,7 +36,7 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
       activeEvents.map(event =>
         new StringSelectMenuOptionBuilder()
           .setLabel(event.name)
-          .setDescription(`${event.day}/${event.month} ${event.hour}:${event.minute} UTC`)
+          .setDescription(formatUTCDate(event.day, event.month, new Date().getUTCFullYear(), event.hour, event.minute) + " UTC")
           .setValue(event.id)
       )
     );
@@ -78,9 +79,12 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     return;
   }
 
+  const year = new Date().getUTCFullYear();
+  const dateStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+
   const embed = new EmbedBuilder()
     .setTitle(`📢 Reminder: ${event.name}`)
-    .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute} UTC`)
+    .setDescription(`Event starts on ${dateStr} UTC`)
     .setColor("Blue");
 
   const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -96,9 +100,7 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 }
 
 /**
- * Funkcja pomocnicza do wysyłania auto reminderów
- * - wykorzystywana przy przypomnieniach w czasie `reminderBefore`
- * - także dodaje przycisk "Show in your local time"
+ * Auto reminder
  */
 export async function sendAutoReminder(event: any, guild: Guild) {
   const guildId = guild.id;
@@ -108,9 +110,12 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
+  const year = new Date().getUTCFullYear();
+  const dateStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+
   const embed = new EmbedBuilder()
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
-    .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute} UTC`)
+    .setDescription(`Event starts on ${dateStr} UTC`)
     .setColor("Orange");
 
   const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
