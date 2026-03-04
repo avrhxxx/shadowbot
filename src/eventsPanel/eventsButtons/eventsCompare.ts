@@ -14,6 +14,9 @@ import {
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 
+/**
+ * Formatowanie daty eventu
+ */
 function formatDate(e: EventObject) {
   return `${e.day}/${e.month} ${e.hour}:${e.minute} UTC`;
 }
@@ -21,7 +24,6 @@ function formatDate(e: EventObject) {
 /* ===================================================== */
 /*  STEP 1 — CLICK COMPARE BUTTON                       */
 /* ===================================================== */
-
 export async function handleCompareButton(
   interaction: ButtonInteraction,
   eventId: string
@@ -30,12 +32,10 @@ export async function handleCompareButton(
   const events: EventObject[] = await EventStorage.getEvents(guildId);
 
   const currentEvent = events.find(e => e.id === eventId);
-
   if (!currentEvent) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
-
   if (currentEvent.status !== "PAST") {
     await interaction.reply({
       content: "You can only compare past events.",
@@ -80,7 +80,6 @@ export async function handleCompareButton(
 /* ===================================================== */
 /*  STEP 2 — HANDLE SELECT MENU                         */
 /* ===================================================== */
-
 export async function handleCompareSelect(
   interaction: StringSelectMenuInteraction
 ) {
@@ -89,7 +88,6 @@ export async function handleCompareSelect(
   const currentEventId = interaction.customId.replace("compare_select_", "");
 
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-
   const currentEvent = events.find(e => e.id === currentEventId);
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -124,7 +122,6 @@ export async function handleCompareSelect(
 /* ===================================================== */
 /*  STEP 3 — DOWNLOAD BUTTON                            */
 /* ===================================================== */
-
 export async function handleCompareDownload(
   interaction: ButtonInteraction
 ) {
@@ -136,7 +133,6 @@ export async function handleCompareDownload(
   const eventBId = parts[3];
 
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-
   const eventA = events.find(e => e.id === eventAId);
   const eventB = events.find(e => e.id === eventBId);
 
@@ -165,18 +161,26 @@ export async function handleCompareDownload(
     return;
   }
 
-  const file = new AttachmentBuilder(
-    Buffer.from(result.txtText, "utf-8"),
-    { name: `compare_${eventA.name}_vs_${eventB.name}.txt` }
-  );
+  // Wyślij plik TXT
+  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
+    name: `compare_${eventA.name}_vs_${eventB.name}.txt`
+  });
 
   await channel.send({
     content: `📥 Attendance comparison:\n**${eventA.name}** vs **${eventB.name}**`,
     files: [file]
   });
 
+  // Wyślij też wiadomość embed w kanale
+  const embed = new EmbedBuilder()
+    .setTitle("📊 Attendance Comparison")
+    .setDescription(result.embedText)
+    .setColor(0xff9900);
+
+  await channel.send({ embeds: [embed] });
+
   await interaction.reply({
-    content: "Comparison file sent to download channel.",
+    content: "Comparison sent to download channel.",
     ephemeral: true
   });
 }
@@ -184,11 +188,9 @@ export async function handleCompareDownload(
 /* ===================================================== */
 /*  CORE LOGIC (REUSABLE)                               */
 /* ===================================================== */
-
 function buildComparison(eventA: EventObject, eventB: EventObject) {
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
-
   const absentA = new Set(eventA.absent || []);
   const absentB = new Set(eventB.absent || []);
 
@@ -212,11 +214,11 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
     `Event A: ${eventA.name} (${formatDate(eventA)})\n` +
     `Event B: ${eventB.name} (${formatDate(eventB)})\n\n` +
     `Reliable (${reliable.length})\n` +
-    reliable.join("\n") +
+    (reliable.length ? reliable.join("\n") : "") +
     `\n\nMissed Once (${missedOnce.length})\n` +
-    missedOnce.join("\n") +
+    (missedOnce.length ? missedOnce.join("\n") : "") +
     `\n\nMissed Twice (${missedTwice.length})\n` +
-    missedTwice.join("\n");
+    (missedTwice.length ? missedTwice.join("\n") : "");
 
   return { embedText, txtText };
 }
