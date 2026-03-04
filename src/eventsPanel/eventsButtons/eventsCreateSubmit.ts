@@ -1,8 +1,9 @@
-import { ModalSubmitInteraction, EmbedBuilder, TextChannel, Guild } from "discord.js";
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
+import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { formatUTCDate } from "../../utils/timeUtils";
+import { parseUTCDate, formatUTCDate } from "../../utils/timeUtils";
 import * as EventStorage from "./eventStorage";
-import { sendAutoReminder } from "./eventsReminder";
+import { sendAutoReminder, sendEventCreatedNotification } from "./eventsReminder";
 
 /**
  * Convert various time formats into HH:MM
@@ -50,7 +51,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const year = nowUTC.getUTCFullYear();
 
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
-
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
     return;
@@ -60,7 +60,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const duplicate = events.find(
     e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
   );
-
   if (duplicate) {
     await interaction.reply({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", ephemeral: true });
     return;
@@ -82,30 +81,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   await saveEvents(guildId, [...events, newEvent]);
 
-  const eventDateUTCStr = formatUTCDate(day, month, year, hour, minute);
-
-  // 🔹 Embed eventu stworzono
-  const embed = new EmbedBuilder()
-    .setTitle("Event Created")
-    .setDescription(
-      `Event **${name}** scheduled for ${eventDateUTCStr} UTC` +
-      (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
-    )
-    .setColor("Green");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
-
-  // 🔹 Wyślij powiadomienie @everyone na kanał powiadomień
-  const config = await EventStorage.getConfig(guildId);
-  if (config?.notificationChannelId && interaction.guild) {
-    const channel = interaction.guild.channels.cache.get(config.notificationChannelId) as TextChannel;
-    if (channel && channel.isTextBased()) {
-      await channel.send({ content: "@everyone", embeds: [embed] });
-    }
+  // 🔹 Powiadomienie o utworzeniu eventu @everyone
+  if (interaction.guild) {
+    await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
   }
 
-  // 🔹 Zaplanuj auto-reminder jeśli ustawiono reminderBefore
+  // 🔹 Auto-reminder jeśli ustawiono reminderBefore
   if (reminderBefore && interaction.guild) {
     await sendAutoReminder(newEvent, interaction.guild as Guild);
   }
+
+  await interaction.reply({ content: "Event created successfully!", ephemeral: true });
 }
