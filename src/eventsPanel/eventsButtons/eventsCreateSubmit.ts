@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 
