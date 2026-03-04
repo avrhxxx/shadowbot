@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -6,8 +5,6 @@ import {
   StringSelectMenuOptionBuilder,
   ActionRowBuilder,
   EmbedBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   TextChannel,
   Guild
 } from "discord.js";
@@ -38,15 +35,7 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
       (event.reminderBefore !== undefined ? `\nReminder set ${event.reminderBefore} minutes before.` : "\nNo reminder set."))
     .setColor("Green");
 
-  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`show_local_time_${event.id}`)
-      .setLabel("Show in your local time")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  // 🔹 Wyślij everyone
-  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 /**
@@ -127,7 +116,6 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  // 🔹 Oblicz dokładny timestamp przypomnienia
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
   const eventTime = new Date(Date.UTC(year, event.month - 1, event.day, event.hour, event.minute));
@@ -135,7 +123,6 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   const delay = reminderTime - nowUTC.getTime();
 
   if (delay <= 0) {
-    // jeśli już powinniśmy wysłać → wyślij natychmiast
     await sendReminderMessage(channel, event);
   } else {
     setTimeout(async () => {
@@ -148,8 +135,6 @@ export async function sendAutoReminder(event: any, guild: Guild) {
  * Własna funkcja wysyłająca wiadomość przypomnienia
  */
 async function sendReminderMessage(channel: TextChannel, event: any) {
-  const pad = (n: number) => (n < 10 ? `0${n}` : n);
-
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
 
   const embed = new EmbedBuilder()
@@ -157,12 +142,5 @@ async function sendReminderMessage(channel: TextChannel, event: any) {
     .setDescription(`Event starts on ${eventDateStr}`)
     .setColor("Orange");
 
-  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`show_local_time_${event.id}`)
-      .setLabel("Show in your local time")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
