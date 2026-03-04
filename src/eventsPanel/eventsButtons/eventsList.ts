@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
@@ -41,7 +42,7 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId(`event_absent_${e.id}`)
-        .setLabel("Absent")
+        .setLabel("Add Absent") // <-- zmiana label
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(`event_show_list_${e.id}`)
@@ -73,14 +74,14 @@ export async function handleList(interaction: ButtonInteraction) {
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
+ * Pokazuje raw nicki
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const guild = interaction.guild;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
-  if (!event || !guild) {
+  if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
@@ -88,22 +89,9 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-  const resolveNick = async (id: string) => {
-    try {
-      const member = await guild.members.fetch(id);
-      return member.displayName;
-    } catch {
-      return id; // fallback jeśli nie znaleziono
-    }
-  };
-
-  const participants = event.participants.length
-    ? await Promise.all(event.participants.map(resolveNick))
-    : ["None"];
-
-  const absent = event.absent?.length
-    ? await Promise.all(event.absent.map(resolveNick))
-    : ["None"];
+  // Używamy raw nicków, bez konwersji na <@id>
+  const participants = event.participants.length ? event.participants : ["None"];
+  const absent = event.absent?.length ? event.absent : ["None"];
 
   const embed = new EmbedBuilder()
     .setTitle(`Participants List – ${event.name}`)
@@ -149,7 +137,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId(`event_absent_${e.id}`)
-      .setLabel("Absent")
+      .setLabel("Add Absent") // <-- zmiana label
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`event_show_list_${e.id}`)
