@@ -42,7 +42,7 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId(`event_absent_${e.id}`)
-        .setLabel("Add Absent") // <-- zmiana label
+        .setLabel("Add Absent") // <-- zmienione label
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(`event_show_list_${e.id}`)
@@ -74,7 +74,7 @@ export async function handleList(interaction: ButtonInteraction) {
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
- * Pokazuje raw nicki
+ * Pokazuje raw nicki (dokładnie takie, jakie wpisano)
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
@@ -89,7 +89,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-  // Używamy raw nicków, bez konwersji na <@id>
+  // Raw nicki z listy, bez konwersji
   const participants = event.participants.length ? event.participants : ["None"];
   const absent = event.absent?.length ? event.absent : ["None"];
 
@@ -137,7 +137,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId(`event_absent_${e.id}`)
-      .setLabel("Add Absent") // <-- zmiana label
+      .setLabel("Add Absent")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`event_show_list_${e.id}`)
