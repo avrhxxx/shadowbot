@@ -1,6 +1,8 @@
-import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
+import { ModalSubmitInteraction, EmbedBuilder, TextChannel, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { formatUTCDate } from "../../utils/timeUtils";
+import * as EventStorage from "./eventStorage";
+import { sendAutoReminder } from "./eventsReminder";
 
 /**
  * Convert various time formats into HH:MM
@@ -82,6 +84,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   const eventDateUTCStr = formatUTCDate(day, month, year, hour, minute);
 
+  // 🔹 Embed eventu stworzono
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
@@ -91,4 +94,18 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     .setColor("Green");
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
+
+  // 🔹 Wyślij powiadomienie @everyone na kanał powiadomień
+  const config = await EventStorage.getConfig(guildId);
+  if (config?.notificationChannelId && interaction.guild) {
+    const channel = interaction.guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+    if (channel && channel.isTextBased()) {
+      await channel.send({ content: "@everyone", embeds: [embed] });
+    }
+  }
+
+  // 🔹 Zaplanuj auto-reminder jeśli ustawiono reminderBefore
+  if (reminderBefore && interaction.guild) {
+    await sendAutoReminder(newEvent, interaction.guild as Guild);
+  }
 }
