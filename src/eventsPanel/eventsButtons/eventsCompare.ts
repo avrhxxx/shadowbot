@@ -1,4 +1,3 @@
-
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -13,7 +12,7 @@ import {
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate } from "../utils/timeUtils";
+import { formatUTCDate } from "../../utils/timeUtils"; // <- poprawiony import
 
 /**
  * Formatuje datę eventu w UTC dla wyświetlania w wiadomościach i plikach
@@ -110,7 +109,6 @@ export async function handleCompareSelect(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadButton);
 
-  // Pokazujemy porównanie w ephemeral + przycisk Download
   await interaction.update({
     content: result.embedText,
     components: [row]
@@ -159,15 +157,12 @@ export async function handleCompareDownload(
     return;
   }
 
-  // Aktualny czas UTC
   const utcNow = new Date().toISOString();
 
-  // Wyślij zwykłą wiadomość z porównaniem + datą UTC
   await channel.send({
     content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
   });
 
-  // Wyślij plik TXT
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
     name: `compare_${eventA.name}_vs_${eventB.name}.txt`
   });
