@@ -6,13 +6,12 @@ import {
   ActionRowBuilder
 } from "discord.js";
 import * as UserTimeStorage from "../eventStorage/userLocalTime";
-import { countryToUTCOffset, formatLocalDateFromUTCWithOffset } from "../../utils/timeUtils";
+import { countryToTimeZone } from "../../utils/timeZones";
+import { formatLocalDateFromUTCWithTimeZone } from "../../utils/timeUtils";
 
 /**
  * 🔹 KROK 1
  * Kliknięcie przycisku "Show in your local time"
- * -> sprawdza, czy użytkownik ma ustawiony offset
- * -> jeśli nie, pokazuje select menu krajów
  */
 export async function handleShowLocalTimeButton(interaction: ButtonInteraction, event: any) {
   const userId = interaction.user.id;
@@ -20,10 +19,10 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
   const userConfig = userTimeConfig[userId];
 
   if (!userConfig) {
-    // brak ustawionego czasu → pokazujemy select menu z krajami
-    const options = Object.entries(countryToUTCOffset).map(([country, offset]) => ({
+    // brak ustawionej strefy → pokazujemy select menu
+    const options = Object.entries(countryToTimeZone).map(([country, tz]) => ({
       label: country,
-      value: offset.toString(),
+      value: tz
     }));
 
     const select = new StringSelectMenuBuilder()
@@ -41,19 +40,19 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
     return;
   }
 
-  // jeśli offset ustawiony → pokazujemy lokalny czas
-  const offset = userConfig.utcOffset;
-  const localDateStr = formatLocalDateFromUTCWithOffset(
+  // jeśli strefa ustawiona → pokazujemy lokalny czas
+  const timeZone = userConfig.timeZone;
+  const localDateStr = formatLocalDateFromUTCWithTimeZone(
     event.day,
     event.month,
     event.year,
     event.hour,
     event.minute,
-    offset
+    timeZone
   );
 
   await interaction.reply({
-    content: `Event **${event.name}** starts at your local time: ${localDateStr} (UTC${offset >= 0 ? "+" : ""}${offset})`,
+    content: `Event **${event.name}** starts at your local time: ${localDateStr} (${timeZone})`,
     ephemeral: true,
   });
 }
@@ -61,18 +60,17 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
 /**
  * 🔹 KROK 2
  * Obsługa select menu wyboru kraju
- * -> zapisuje offset użytkownika w storage
  */
 export async function handleSetupLocalTimeSelect(interaction: StringSelectMenuInteraction) {
   const userId = interaction.user.id;
-  const utcOffset = parseInt(interaction.values[0], 10);
+  const timeZone = interaction.values[0];
 
   const userTimeConfig = await UserTimeStorage.getUserTimeConfig();
-  userTimeConfig[userId] = { utcOffset };
+  userTimeConfig[userId] = { timeZone };
   await UserTimeStorage.saveUserTimeConfig(userTimeConfig);
 
   await interaction.reply({
-    content: `Your local time has been set! (UTC${utcOffset >= 0 ? "+" : ""}${utcOffset})`,
+    content: `Your time zone has been set! (${timeZone})`,
     ephemeral: true,
   });
 }
