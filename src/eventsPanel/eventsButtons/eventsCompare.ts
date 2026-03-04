@@ -4,7 +4,6 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   ActionRowBuilder,
-  EmbedBuilder,
   ButtonBuilder,
   ButtonStyle,
   Guild,
@@ -101,11 +100,6 @@ export async function handleCompareSelect(
 
   const result = buildComparison(selectedEvent, currentEvent);
 
-  const embed = new EmbedBuilder()
-    .setTitle("📊 Attendance Comparison")
-    .setDescription(result.embedText)
-    .setColor(0xff9900);
-
   const downloadButton = new ButtonBuilder()
     .setCustomId(`compare_download_${selectedEvent.id}_${currentEvent.id}`)
     .setLabel("Download")
@@ -113,8 +107,9 @@ export async function handleCompareSelect(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadButton);
 
+  // Pokazujemy porównanie w ephemeral + przycisk Download
   await interaction.update({
-    embeds: [embed],
+    content: result.embedText,
     components: [row]
   });
 }
@@ -161,23 +156,21 @@ export async function handleCompareDownload(
     return;
   }
 
+  // Wyślij zwykłą wiadomość z porównaniem + datą UTC
+  const utcNow = new Date().toISOString();
+  await channel.send({
+    content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
+  });
+
   // Wyślij plik TXT
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
     name: `compare_${eventA.name}_vs_${eventB.name}.txt`
   });
 
   await channel.send({
-    content: `📥 Attendance comparison:\n**${eventA.name}** vs **${eventB.name}**`,
+    content: `File version of the comparison:`,
     files: [file]
   });
-
-  // Wyślij też wiadomość embed w kanale
-  const embed = new EmbedBuilder()
-    .setTitle("📊 Attendance Comparison")
-    .setDescription(result.embedText)
-    .setColor(0xff9900);
-
-  await channel.send({ embeds: [embed] });
 
   await interaction.reply({
     content: "Comparison sent to download channel.",
@@ -200,7 +193,8 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
 
   const embedText =
     `Comparing:\n` +
-    `**${eventA.name}** → **${eventB.name}**\n\n` +
+    `Event A: ${eventA.name} (${formatDate(eventA)})\n` +
+    `Event B: ${eventB.name} (${formatDate(eventB)})\n\n` +
     `🟢 Reliable (${reliable.length})\n` +
     (reliable.length ? reliable.map(id => `<@${id}>`).join("\n") : "None") +
     `\n\n🟡 Missed Once (${missedOnce.length})\n` +
