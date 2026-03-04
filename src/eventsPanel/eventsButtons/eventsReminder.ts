@@ -28,7 +28,7 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
 
   await channel.send({ content: "@everyone", embeds: [embed] });
 
-  // Zaplanuj automatyczne przypomnienia
+  // Zaplanuj automatyczne przypomnienia w tle
   await scheduleEventReminders(event, guild);
 }
 
@@ -116,9 +116,8 @@ async function scheduleEventReminders(event: any, guild: Guild) {
   if (event.reminderBefore !== undefined) {
     const reminderTime = eventTime.getTime() - event.reminderBefore * 60 * 1000;
     const delayReminder = reminderTime - nowUTC.getTime();
-    if (delayReminder <= 0) {
-      await sendReminderMessage(channel, event);
-    } else {
+
+    if (delayReminder > 0) {
       setTimeout(async () => {
         await sendReminderMessage(channel, event);
       }, delayReminder);
@@ -127,9 +126,7 @@ async function scheduleEventReminders(event: any, guild: Guild) {
 
   // 🔹 Reminder końcowy – Event Started
   const delayStart = eventTime.getTime() - nowUTC.getTime();
-  if (delayStart <= 0) {
-    await sendEventStarted(channel, event, guild);
-  } else {
+  if (delayStart > 0) {
     setTimeout(async () => {
       await sendEventStarted(channel, event, guild);
     }, delayStart);
@@ -171,3 +168,5 @@ async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) 
     await EventStorage.saveEvents(guild.id, events);
   }
 }
+
+export { scheduleEventReminders };
