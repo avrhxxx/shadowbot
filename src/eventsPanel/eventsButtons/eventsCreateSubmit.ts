@@ -34,7 +34,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const timeRaw = interaction.fields.getTextInputValue("event_time");
   const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
-  // ✅ Optional reminder (no null)
   const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : undefined;
 
   const parsedTime = parseTime(timeRaw);
@@ -47,13 +46,31 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   }
 
   const { hour, minute } = parsedTime;
+  const now = new Date();
+  const year = now.getFullYear();
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const dayStr = pad(day);
-  const monthStr = pad(month);
-  const yearStr = new Date().getFullYear();
+  // 🔹 Walidacja: nie pozwalamy na event w przeszłości
+  const eventDate = new Date(year, month - 1, day, hour, minute);
+  if (eventDate < now) {
+    await interaction.reply({
+      content: "Cannot create an event in the past. Please select a future date/time.",
+      ephemeral: true
+    });
+    return;
+  }
 
+  // 🔹 Walidacja: nie tworzymy eventu z tym samym dniem/godziną jeśli ACTIVE
   const events: EventObject[] = await getEvents(guildId);
+  const duplicate = events.find(
+    e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
+  );
+  if (duplicate) {
+    await interaction.reply({
+      content: "An active event at this date and time already exists. Please choose another date/time.",
+      ephemeral: true
+    });
+    return;
+  }
 
   const newEvent: EventObject = {
     id: `${Date.now()}`,
@@ -69,16 +86,14 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     ...(reminderBefore !== undefined && { reminderBefore })
   };
 
-  events.push(newEvent);
-  await saveEvents(guildId, events);
+  await saveEvents(guildId, [...events, newEvent]);
 
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
-      `Event **${name}** scheduled for ${dayStr}/${monthStr}/${yearStr} at ${pad(hour)}:${pad(minute)}` +
-      (reminderBefore !== undefined
-        ? `\nReminder set ${reminderBefore} minutes before.`
-        : "\nNo reminder set.")
+      `Event **${name}** scheduled for ${pad(day)}/${pad(month)}/${year} at ${pad(hour)}:${pad(minute)}` +
+      (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
     )
     .setColor("Green");
 
