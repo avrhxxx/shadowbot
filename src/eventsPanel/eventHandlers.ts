@@ -38,13 +38,25 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   const { customId } = interaction;
 
-  // 🔹 dopuszczalne prefixy do obsługi
-  const validPrefixes = [
-    "event_",
-    "show_local_time_",
-    "select_local_time_"
-  ];
-  if (!validPrefixes.some(p => customId.startsWith(p))) return;
+  /* =======================================================
+     🔹 PIERWSZE – obsługa lokalnego czasu
+  ======================================================= */
+  // 🔹 POKAŻ lokalny czas
+  if (interaction.isButton() && customId.startsWith("show_local_time_")) {
+    const eventId = customId.replace("show_local_time_", "");
+    const events = await EventStorage.getEvents(interaction.guildId!);
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      await handleShowLocalTimeButton(interaction, event);
+      return;
+    }
+  }
+
+  // 🔹 SELECT MENU – ustawienie strefy lokalnej
+  if (interaction.isStringSelectMenu() && customId.startsWith("select_local_time_")) {
+    await handleSetupLocalTimeSelect(interaction);
+    return;
+  }
 
   /* =======================================================
      🔥 DYNAMIC – CONFIRM CANCEL
@@ -93,15 +105,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_download_single_")) {
       const eventId = customId.replace("event_download_single_", "");
       await handleDownload(interaction, eventId);
-      return;
-    }
-
-    // 🔹 NOWY – pokaz lokalny czas
-    if (customId.startsWith("show_local_time_")) {
-      const eventId = customId.replace("show_local_time_", "");
-      const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find(e => e.id === eventId);
-      if (event) await handleShowLocalTimeButton(interaction, event);
       return;
     }
   }
@@ -189,12 +192,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       break;
 
     default:
-      // 🔹 NOWY – select menu konfiguracji lokalnego czasu
-      if (interaction.isStringSelectMenu() && customId.startsWith("select_local_time_")) {
-        await handleSetupLocalTimeSelect(interaction);
-        return;
-      }
-
       console.warn(`Nieobsługiwany event customId: ${customId}`);
   }
 }
