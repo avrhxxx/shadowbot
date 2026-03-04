@@ -1,11 +1,10 @@
-// src/eventsPanel/eventsButtons/eventsLocalTime.ts
 import {
   ButtonInteraction,
   StringSelectMenuBuilder,
   StringSelectMenuInteraction,
   ActionRowBuilder
 } from "discord.js";
-import * as UserTimeStorage from "../eventStorage/userLocalTime";
+import * as UserTimeStorage from "../eventStorage"; // <-- teraz wszystko w eventStorage
 import { countryToTimeZone } from "../../utils/timeZones";
 import { formatLocalDateFromUTCWithTimeZone } from "../../utils/timeUtils";
 
