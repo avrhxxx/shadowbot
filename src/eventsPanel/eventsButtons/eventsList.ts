@@ -1,25 +1,13 @@
-// src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
+import { formatUTCDate, formatLocalDateFromUTC } from "../../utils/timeUtils";
 
 /**
  * Funkcja do czyszczenia nicków – usuwa wszelkie pingowe ID i dziwne znaki
  */
 function cleanNickname(nick: string) {
   return nick.replace(/<@!?[0-9]+>/g, "").trim();
-}
-
-/**
- * Formatowanie daty w DD/MM HH:MM (zachowując strefę lokalną)
- */
-function formatLocalDate(date: Date) {
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const day = pad(date.getDate());
-  const month = pad(date.getMonth() + 1);
-  const hour = pad(date.getHours());
-  const minute = pad(date.getMinutes());
-  return `${day}/${month} ${hour}:${minute}`;
 }
 
 /**
@@ -59,14 +47,14 @@ export async function handleList(interaction: ButtonInteraction) {
 
   events = await updateEventStatuses(events, guildId);
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
-    const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-    const eventDateLocal = formatLocalDate(eventDateUTC); // lokalny czas tylko do podglądu
+    const year = new Date().getUTCFullYear();
 
-    const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)}\nLocal Date: ${eventDateLocal}`;
+    const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+    const eventDateLocalStr = formatLocalDateFromUTC(e.day, e.month, year, e.hour, e.minute);
+
+    const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
     const embed = new EmbedBuilder()
       .setTitle(e.name)
@@ -115,12 +103,12 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 
   const participants = event.participants.length ? event.participants.map(cleanNickname) : [];
   const absent = event.absent?.length ? event.absent.map(cleanNickname) : [];
+  const year = new Date().getUTCFullYear();
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
-  const eventDateLocal = formatLocalDate(eventDateUTC);
+  const eventDateUTCStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+  const eventDateLocalStr = formatLocalDateFromUTC(event.day, event.month, year, event.hour, event.minute);
 
-  const dateStr = `UTC Date: ${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}\nLocal Date: ${eventDateLocal}`;
+  const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
@@ -146,11 +134,11 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const e = events.find(ev => ev.id === eventId);
   if (!e) return;
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-  const eventDateLocal = formatLocalDate(eventDateUTC);
+  const year = new Date().getUTCFullYear();
+  const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+  const eventDateLocalStr = formatLocalDateFromUTC(e.day, e.month, year, e.hour, e.minute);
 
-  const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)}\nLocal Date: ${eventDateLocal}`;
+  const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
   const embed = new EmbedBuilder()
     .setTitle(e.name)
