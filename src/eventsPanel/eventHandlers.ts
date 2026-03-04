@@ -37,7 +37,14 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const { customId } = interaction;
-  if (!customId.startsWith("event_")) return;
+
+  // 🔹 dopuszczalne prefixy do obsługi
+  const validPrefixes = [
+    "event_",
+    "show_local_time_",
+    "select_local_time_"
+  ];
+  if (!validPrefixes.some(p => customId.startsWith(p))) return;
 
   /* =======================================================
      🔥 DYNAMIC – CONFIRM CANCEL
