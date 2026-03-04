@@ -50,6 +50,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
 
+  // Tworzymy datę eventu w UTC
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
@@ -71,6 +72,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     name,
     day,
     month,
+    year, // automatycznie ustawiany
     hour,
     minute,
     status: "ACTIVE",
