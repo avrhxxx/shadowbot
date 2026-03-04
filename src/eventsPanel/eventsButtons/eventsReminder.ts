@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -17,6 +18,35 @@ import * as EventStorage from "../eventStorage";
  */
 function pad(n: number) {
   return n < 10 ? `0${n}` : n;
+}
+
+/**
+ * 🔹 Powiadomienie po stworzeniu eventu
+ */
+export async function sendEventCreatedNotification(event: any, guild: Guild) {
+  const config = await EventStorage.getConfig(guild.id);
+  if (!config?.notificationChannelId) return;
+
+  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+  if (!channel || !channel.isTextBased()) return;
+
+  const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🎉 Event Created: ${event.name}`)
+    .setDescription(`Event scheduled for ${eventDateStr}` +
+      (event.reminderBefore !== undefined ? `\nReminder set ${event.reminderBefore} minutes before.` : "\nNo reminder set."))
+    .setColor("Green");
+
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`show_local_time_${event.id}`)
+      .setLabel("Show in your local time")
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  // 🔹 Wyślij everyone
+  await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
 }
 
 /**
@@ -101,11 +131,10 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 }
 
 /**
- * Auto Reminder
+ * Auto Reminder (przy ustawionym reminderBefore)
  */
 export async function sendAutoReminder(event: any, guild: Guild) {
-  const guildId = guild.id;
-  const config = await EventStorage.getConfig(guildId);
+  const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
@@ -125,5 +154,6 @@ export async function sendAutoReminder(event: any, guild: Guild) {
       .setStyle(ButtonStyle.Primary)
   );
 
+  // 🔹 Wyślij everyone
   await channel.send({ content: "@everyone", embeds: [embed], components: [buttonRow] });
 }
