@@ -12,7 +12,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   const modal = new ModalBuilder()
     .setCustomId("event_create_modal")
-    .setTitle("Create Event (UTC)");
+    .setTitle("Create Event");
 
   const nameInput = new TextInputBuilder()
     .setCustomId("event_name")
