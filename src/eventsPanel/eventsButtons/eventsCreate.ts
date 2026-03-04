@@ -36,7 +36,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   const timeInput = new TextInputBuilder()
     .setCustomId("event_time")
-    .setLabel("Time (HH:MM UTC 24H Format)")
+    .setLabel("Time (HH:MM or HHMM UTC 24H Format)")
     .setStyle(TextInputStyle.Short)
     .setPlaceholder("Enter time in UTC, e.g. 1:30, 13:00, 130, 1300")
     .setRequired(true);
