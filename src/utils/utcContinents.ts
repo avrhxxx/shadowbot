@@ -1,10 +1,11 @@
-import { countryToUTCOffset } from "./utcOffsets";
+// src/utils/utcContinents.ts
+import { countryToTimeZone } from "./timeZones";
 
 /**
- * Podział istniejących stref na kontynenty
+ * Kontynenty → lista krajów (do select menu)
  */
 export const continentToCountries: Record<string, string[]> = {
-  "Europe": Object.keys(countryToUTCOffset).filter(c =>
+  "Europe": Object.keys(countryToTimeZone).filter(c =>
     c.includes("Portugal") ||
     c.includes("United Kingdom") ||
     c.includes("Ireland") ||
@@ -26,18 +27,9 @@ export const continentToCountries: Record<string, string[]> = {
     c.includes("Turkey") ||
     c.includes("Russia")
   ),
-
-  "North America": Object.keys(countryToUTCOffset).filter(c =>
-    c.includes("USA") || c.includes("Canada")
-  ),
-
-  "South America": Object.keys(countryToUTCOffset).filter(c =>
-    c.includes("Brazil") ||
-    c.includes("Argentina") ||
-    c.includes("Chile")
-  ),
-
-  "Asia": Object.keys(countryToUTCOffset).filter(c =>
+  "North America": Object.keys(countryToTimeZone).filter(c => c.includes("USA") || c.includes("Canada")),
+  "South America": Object.keys(countryToTimeZone).filter(c => c.includes("Brazil") || c.includes("Argentina") || c.includes("Chile")),
+  "Asia": Object.keys(countryToTimeZone).filter(c =>
     c.includes("China") ||
     c.includes("Japan") ||
     c.includes("South Korea") ||
@@ -54,14 +46,12 @@ export const continentToCountries: Record<string, string[]> = {
     c.includes("Sri Lanka") ||
     c.includes("Kazakhstan")
   ),
-
-  "Africa": Object.keys(countryToUTCOffset).filter(c =>
+  "Africa": Object.keys(countryToTimeZone).filter(c =>
     c.includes("South Africa") ||
     c.includes("Egypt") ||
     c.includes("Kenya")
   ),
-
-  "Oceania": Object.keys(countryToUTCOffset).filter(c =>
+  "Oceania": Object.keys(countryToTimeZone).filter(c =>
     c.includes("Australia") ||
     c.includes("New Zealand")
   ),
