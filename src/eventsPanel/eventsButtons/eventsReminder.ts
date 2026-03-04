@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -105,11 +106,9 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 }
 
 /**
- * Auto Reminder (przy ustawionym reminderBefore)
+ * Auto Reminder (przy ustawionym reminderBefore) + końcowy alert startu eventu
  */
 export async function sendAutoReminder(event: any, guild: Guild) {
-  if (event.reminderBefore === undefined) return;
-
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
@@ -119,20 +118,34 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
   const eventTime = new Date(Date.UTC(year, event.month - 1, event.day, event.hour, event.minute));
-  const reminderTime = eventTime.getTime() - event.reminderBefore * 60 * 1000; // reminderBefore w minutach
-  const delay = reminderTime - nowUTC.getTime();
 
-  if (delay <= 0) {
-    await sendReminderMessage(channel, event);
+  // 🔹 Reminder przed eventem
+  if (event.reminderBefore !== undefined) {
+    const reminderTime = eventTime.getTime() - event.reminderBefore * 60 * 1000;
+    const delay = reminderTime - nowUTC.getTime();
+
+    if (delay <= 0) {
+      await sendReminderMessage(channel, event);
+    } else {
+      setTimeout(async () => {
+        await sendReminderMessage(channel, event);
+      }, delay);
+    }
+  }
+
+  // 🔹 Końcowy alert – event się rozpoczął
+  const startDelay = eventTime.getTime() - nowUTC.getTime();
+  if (startDelay <= 0) {
+    await sendEventStartedMessage(channel, event);
   } else {
     setTimeout(async () => {
-      await sendReminderMessage(channel, event);
-    }, delay);
+      await sendEventStartedMessage(channel, event);
+    }, startDelay);
   }
 }
 
 /**
- * Własna funkcja wysyłająca wiadomość przypomnienia
+ * Własna funkcja wysyłająca wiadomość przypomnienia przed eventem
  */
 async function sendReminderMessage(channel: TextChannel, event: any) {
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
@@ -141,6 +154,20 @@ async function sendReminderMessage(channel: TextChannel, event: any) {
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
     .setDescription(`Event starts on ${eventDateStr}`)
     .setColor("Orange");
+
+  await channel.send({ content: "@everyone", embeds: [embed] });
+}
+
+/**
+ * Własna funkcja wysyłająca wiadomość, że event się rozpoczął
+ */
+async function sendEventStartedMessage(channel: TextChannel, event: any) {
+  const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🚀 Event Started: ${event.name}`)
+    .setDescription(`Event has started at ${eventDateStr} UTC!`)
+    .setColor("Red");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
 }
