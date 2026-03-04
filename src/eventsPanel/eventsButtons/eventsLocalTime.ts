@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsLocalTime.ts
 import {
   ButtonInteraction,
   StringSelectMenuBuilder,
@@ -41,14 +42,13 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
   // jeśli strefa ustawiona → pokaz lokalny czas
   const timeZone = userConfig.timeZone;
 
-  // używamy bieżącego roku UTC
-  const nowUTC = new Date();
-  const year = nowUTC.getUTCFullYear();
+  // używamy roku z eventu, jeśli istnieje, w przeciwnym razie bieżącego roku
+  const year = event.year ?? new Date().getUTCFullYear();
 
   const localDateStr = formatLocalDateFromUTCWithTimeZone(
     event.day,
     event.month,
-    year,      // <-- bieżący rok
+    year,
     event.hour,
     event.minute,
     timeZone
