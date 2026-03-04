@@ -1,7 +1,7 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate, formatLocalDateFromUTC } from "../../utils/timeUtils";
+import { formatUTCDate } from "../../utils/timeUtils"; // używamy tylko UTC
 
 /**
  * Funkcja do czyszczenia nicków – usuwa wszelkie pingowe ID i dziwne znaki
@@ -52,14 +52,11 @@ export async function handleList(interaction: ButtonInteraction) {
     const year = new Date().getUTCFullYear();
 
     const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
-    const eventDateLocalStr = formatLocalDateFromUTC(e.day, e.month, year, e.hour, e.minute);
-
-    const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
     const embed = new EmbedBuilder()
       .setTitle(e.name)
       .setDescription(
-        `Status: ${e.status}\n${dateStr}\nParticipants: ${e.participants.length}` +
+        `Status: ${e.status}\nUTC Date: ${eventDateUTCStr}\nParticipants: ${e.participants.length}` +
         (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
       )
       .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
@@ -106,14 +103,11 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const year = new Date().getUTCFullYear();
 
   const eventDateUTCStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
-  const eventDateLocalStr = formatLocalDateFromUTC(event.day, event.month, year, event.hour, event.minute);
-
-  const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
     .setDescription(
-      `Date: ${dateStr}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
+      `UTC Date: ${eventDateUTCStr}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
       (absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
     )
     .setColor(event.status === "ACTIVE" ? 0x00ff00 : event.status === "PAST" ? 0x808080 : 0xff0000);
@@ -136,14 +130,11 @@ export async function updateEventEmbed(message: any, eventId: string) {
 
   const year = new Date().getUTCFullYear();
   const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
-  const eventDateLocalStr = formatLocalDateFromUTC(e.day, e.month, year, e.hour, e.minute);
-
-  const dateStr = `UTC Date: ${eventDateUTCStr}\nLocal Date: ${eventDateLocalStr}`;
 
   const embed = new EmbedBuilder()
     .setTitle(e.name)
     .setDescription(
-      `Status: ${e.status}\nDate: ${dateStr}\nParticipants: ${e.participants.length}` +
+      `Status: ${e.status}\nUTC Date: ${eventDateUTCStr}\nParticipants: ${e.participants.length}` +
       (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
     )
     .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
