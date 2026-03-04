@@ -2,7 +2,7 @@
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { formatUTCDate } from "../../utils/timeUtils";
-import * as EventStorage from "../eventStorage"; // Poprawiony import
+import * as EventStorage from "../eventStorage";
 import { sendAutoReminder, sendEventCreatedNotification } from "./eventsReminder";
 
 /**
@@ -50,7 +50,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
 
-  // Tworzymy datę eventu w UTC
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
@@ -90,7 +89,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   // 🔹 Auto-reminder jeśli ustawiono reminderBefore
   if (reminderBefore && interaction.guild) {
-    await sendAutoReminder(newEvent, interaction.guild as Guild);
+    // delay dokładnie w milisekundach
+    const reminderTime = eventDateUTC.getTime() - reminderBefore * 60 * 1000;
+    const delay = reminderTime - Date.now();
+    if (delay > 0) {
+      setTimeout(() => sendAutoReminder(newEvent, interaction.guild as Guild), delay);
+    } else {
+      // jeśli minęło → wyślij od razu
+      sendAutoReminder(newEvent, interaction.guild as Guild);
+    }
   }
 
   await interaction.reply({ content: "Event created successfully!", ephemeral: true });
