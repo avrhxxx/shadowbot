@@ -1,10 +1,11 @@
+// src/eventsPanel/eventHandlers.ts
 import { Interaction } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Importy buttonów / modali / selectów
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
-import { handleList } from "./eventsButtons/eventsList";
+import { handleList, handleShowList } from "./eventsButtons/eventsList";
 import {
   handleCancel,
   handleCancelSelect,
@@ -83,26 +84,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     if (customId.startsWith("event_show_list_")) {
       const eventId = customId.replace("event_show_list_", "");
-      const guildId = interaction.guildId!;
-      const events = await EventStorage.getEvents(guildId);
-      const event = events.find(e => e.id === eventId);
-
-      if (!event) {
-        await interaction.reply({ content: "Event not found.", ephemeral: true });
-        return;
-      }
-
-      const participantsList = event.participants.length
-        ? event.participants.map(id => `<@${id}>`).join("\n")
-        : "No participants";
-
-      const embed = {
-        title: `Participants for ${event.name}`,
-        description: participantsList,
-        color: event.status === "ACTIVE" ? 0x00ff00 : 0x808080
-      };
-
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await handleShowList(interaction, eventId); // 🔹 Poprawnie wywołujemy handler z eventsList.ts
       return;
     }
 
