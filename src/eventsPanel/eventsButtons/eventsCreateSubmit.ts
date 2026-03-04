@@ -1,9 +1,7 @@
 // src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { formatUTCDate } from "../../utils/timeUtils";
-import * as EventStorage from "../eventStorage";
-import { sendAutoReminder, sendEventCreatedNotification } from "./eventsReminder";
+import { sendEventCreatedNotification } from "./eventsReminder";
 
 /**
  * Convert various time formats into HH:MM
@@ -48,7 +46,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   const { hour, minute } = parsedTime;
   const nowUTC = new Date();
-  const year = nowUTC.getUTCFullYear(); // używamy bieżącego roku tylko lokalnie
+  const year = nowUTC.getUTCFullYear();
 
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
@@ -65,7 +63,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     return;
   }
 
-  // 🔹 Tworzymy EventObject bez roku
+  // 🔹 Tworzymy EventObject
   const newEvent: EventObject = {
     id: `${Date.now()}`,
     guildId,
@@ -85,11 +83,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   // 🔹 Powiadomienie o utworzeniu eventu @everyone
   if (interaction.guild) {
     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
-  }
-
-  // 🔹 Auto-reminder jeśli ustawiono reminderBefore
-  if (reminderBefore && interaction.guild) {
-    await sendAutoReminder(newEvent, interaction.guild as Guild);
   }
 
   await interaction.reply({ content: "Event created successfully!", ephemeral: true });
