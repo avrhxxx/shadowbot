@@ -115,7 +115,7 @@ export async function scheduleEventReminders(event: any, guild: Guild) {
 /* ===================================================== */
 /*  FUNKCJE WYSYŁAJĄCE WIADOMOŚCI                       */
 /* ===================================================== */
-async function sendReminderMessage(channel: TextChannel, event: any) {
+export async function sendReminderMessage(channel: TextChannel, event: any) {
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
   const embed = new EmbedBuilder()
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
