@@ -8,7 +8,6 @@ import {
   ActionRowBuilder 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import { updateEventEmbed } from "./eventsList";
 import { EventObject } from "../eventService";
 
 /**
@@ -33,13 +32,12 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
-  modal.addComponents(row);
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
   await interaction.showModal(modal);
 }
 
 /* ======================================================
-   🔹 ADD PARTICIPANT (MODAL SUBMIT) – Multi-add
+   🔹 ADD PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
   await interaction.deferReply({ ephemeral: true });
@@ -49,12 +47,12 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
-
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
     return;
   }
 
+  event.absent = event.absent || [];
   const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
   const added: string[] = [];
 
@@ -63,16 +61,11 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
       event.participants.push(nick);
       added.push(nick);
     }
-    // Usuń z absent jeśli był
-    if (event.absent?.includes(nick)) {
-      event.absent = event.absent.filter(n => n !== nick);
-    }
+    // Usuń z absent jeśli wraca do participants
+    event.absent = event.absent.filter(n => n !== nick);
   }
 
   await EventStorage.saveEvents(guildId, events);
-
-  // Aktualizacja embedu
-  await updateEventEmbed(interaction.message || interaction, eventId);
 
   await interaction.editReply({
     content: added.length
@@ -95,8 +88,7 @@ export async function handleRemoveParticipant(interaction: ButtonInteraction, ev
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
-  modal.addComponents(row);
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
   await interaction.showModal(modal);
 }
 
@@ -111,7 +103,6 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
-
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
     return;
@@ -122,10 +113,11 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
+  // Usuń z participants i absent (jeśli był)
   event.participants = event.participants.filter(nick => nick !== input);
-  await EventStorage.saveEvents(guildId, events);
+  event.absent = (event.absent || []).filter(n => n !== input);
 
-  await updateEventEmbed(interaction.message || interaction, eventId);
+  await EventStorage.saveEvents(guildId, events);
 
   await interaction.editReply({ content: `${input} removed from **${event.name}**` });
 }
@@ -136,7 +128,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
 export async function handleAbsentParticipant(interaction: ButtonInteraction, eventId: string) {
   const modal = new ModalBuilder()
     .setCustomId(`event_absent_modal_${eventId}`)
-    .setTitle("Add Absent");
+    .setTitle("Mark Absent");
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
@@ -144,8 +136,7 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
-  modal.addComponents(row);
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
   await interaction.showModal(modal);
 }
 
@@ -160,11 +151,12 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
-
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
     return;
   }
+
+  event.absent = event.absent || [];
 
   // Dodaj do absent tylko jeśli jest w participants
   if (!event.participants.includes(input)) {
@@ -172,16 +164,11 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
+  // Przenieś z participants do absent
   event.participants = event.participants.filter(nick => nick !== input);
-
-  if (!event.absent) event.absent = [];
-  if (!event.absent.includes(input)) {
-    event.absent.push(input);
-  }
+  if (!event.absent.includes(input)) event.absent.push(input);
 
   await EventStorage.saveEvents(guildId, events);
-
-  await updateEventEmbed(interaction.message || interaction, eventId);
 
   await interaction.editReply({ content: `${input} marked as absent for **${event.name}**` });
 }
