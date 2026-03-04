@@ -1,14 +1,4 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
-import {
-  ButtonInteraction,
-  StringSelectMenuInteraction,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
-  ActionRowBuilder,
-  EmbedBuilder,
-  TextChannel,
-  Guild
-} from "discord.js";
+import { ButtonInteraction, StringSelectMenuInteraction, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, EmbedBuilder, TextChannel, Guild } from "discord.js";
 import * as EventStorage from "../eventStorage";
 
 /**
@@ -37,6 +27,9 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
     .setColor("Green");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
+
+  // Zaplanuj automatyczne przypomnienia
+  await scheduleEventReminders(event, guild);
 }
 
 /**
@@ -106,9 +99,9 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 }
 
 /**
- * Auto Reminder (przy ustawionym reminderBefore) + końcowy alert startu eventu
+ * 🔹 Zaplanuj wszystkie przypomnienia (auto i event started)
  */
-export async function sendAutoReminder(event: any, guild: Guild) {
+async function scheduleEventReminders(event: any, guild: Guild) {
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
@@ -122,30 +115,29 @@ export async function sendAutoReminder(event: any, guild: Guild) {
   // 🔹 Reminder przed eventem
   if (event.reminderBefore !== undefined) {
     const reminderTime = eventTime.getTime() - event.reminderBefore * 60 * 1000;
-    const delay = reminderTime - nowUTC.getTime();
-
-    if (delay <= 0) {
+    const delayReminder = reminderTime - nowUTC.getTime();
+    if (delayReminder <= 0) {
       await sendReminderMessage(channel, event);
     } else {
       setTimeout(async () => {
         await sendReminderMessage(channel, event);
-      }, delay);
+      }, delayReminder);
     }
   }
 
-  // 🔹 Końcowy alert – event się rozpoczął
-  const startDelay = eventTime.getTime() - nowUTC.getTime();
-  if (startDelay <= 0) {
-    await sendEventStartedMessage(channel, event);
+  // 🔹 Reminder końcowy – Event Started
+  const delayStart = eventTime.getTime() - nowUTC.getTime();
+  if (delayStart <= 0) {
+    await sendEventStarted(channel, event, guild);
   } else {
     setTimeout(async () => {
-      await sendEventStartedMessage(channel, event);
-    }, startDelay);
+      await sendEventStarted(channel, event, guild);
+    }, delayStart);
   }
 }
 
 /**
- * Własna funkcja wysyłająca wiadomość przypomnienia przed eventem
+ * 🔹 Własna funkcja wysyłająca przypomnienie przed eventem
  */
 async function sendReminderMessage(channel: TextChannel, event: any) {
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
@@ -159,15 +151,23 @@ async function sendReminderMessage(channel: TextChannel, event: any) {
 }
 
 /**
- * Własna funkcja wysyłająca wiadomość, że event się rozpoczął
+ * 🔹 Własna funkcja wysyłająca przypomnienie, że event się rozpoczął
  */
-async function sendEventStartedMessage(channel: TextChannel, event: any) {
+async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) {
   const eventDateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`🚀 Event Started: ${event.name}`)
-    .setDescription(`Event has started at ${eventDateStr} UTC!`)
-    .setColor("Red");
+    .setTitle(`✅ Event Started: ${event.name}`)
+    .setDescription(`The event scheduled for ${eventDateStr} has just started!`)
+    .setColor("Blue");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
+
+  // 🔹 Aktualizujemy status w storage
+  const events = await EventStorage.getEvents(guild.id);
+  const e = events.find(ev => ev.id === event.id);
+  if (e && e.status !== "PAST") {
+    e.status = "PAST";
+    await EventStorage.saveEvents(guild.id, events);
+  }
 }
