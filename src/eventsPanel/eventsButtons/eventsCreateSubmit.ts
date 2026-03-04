@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification, scheduleEventReminders } from "./eventsReminder";
@@ -84,7 +83,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   if (interaction.guild) {
     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
 
-    // 🔹 Zaplanuj przypomnienia w tle
+    // 🔹 Zaplanuj przypomnienia w tle (każdy event ma własny timeout)
     await scheduleEventReminders(newEvent, interaction.guild as Guild);
   }
 
