@@ -30,7 +30,6 @@ export async function handleList(interaction: ButtonInteraction) {
       )
       .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
 
-    // Row 1 – główne akcje
     const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`event_add_${e.id}`)
@@ -42,7 +41,7 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId(`event_absent_${e.id}`)
-        .setLabel("Add Absent") // <-- zmienione label
+        .setLabel("Add Absent")
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(`event_show_list_${e.id}`)
@@ -54,7 +53,6 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Primary)
     );
 
-    // Row 2 – placeholder Compare
     const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`event_compare_${e.id}`)
@@ -89,15 +87,18 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
-  // Raw nicki z listy, bez konwersji
   const participants = event.participants.length ? event.participants : ["None"];
   const absent = event.absent?.length ? event.absent : ["None"];
 
+  // Literalne wyświetlanie nicków, brak pingów
+  const participantsStr = participants.map(p => `\`${p}\``).join("\n");
+  const absentStr = absent.map(a => `\`${a}\``).join("\n");
+
   const embed = new EmbedBuilder()
-    .setTitle(`Participants List – ${event.name}`)
+    .setTitle(`${event.name} – List`)
     .setDescription(
-      `Status: ${event.status}\nDate: ${dateStr}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
-      (absent.length && absent[0] !== "None" ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
+      `Status: ${event.status}\nDate: ${dateStr}\n\nParticipants (${participants.length}):\n${participantsStr}` +
+      (absent.length && absent[0] !== "None" ? `\n\nAbsent (${absent.length}):\n${absentStr}` : "")
     )
     .setColor(event.status === "ACTIVE" ? 0x00ff00 : event.status === "PAST" ? 0x808080 : 0xff0000);
 
