@@ -1,6 +1,6 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
+import { formatUTCDate, formatLocalDateFromUTC } from "../../utils/timeUtils";
 
 /**
  * Convert various time formats into HH:MM
@@ -27,18 +27,6 @@ function parseTime(input: string): { hour: number; minute: number } | null {
   return null;
 }
 
-/**
- * Formatowanie lokalnej daty w DD/MM HH:MM
- */
-function formatLocalDate(date: Date) {
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const day = pad(date.getDate());
-  const month = pad(date.getMonth() + 1);
-  const hour = pad(date.getHours());
-  const minute = pad(date.getMinutes());
-  return `${day}/${month} ${hour}:${minute}`;
-}
-
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const guildId = interaction.guildId!;
   const name = interaction.fields.getTextInputValue("event_name");
@@ -48,13 +36,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
   const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : undefined;
-
   const parsedTime = parseTime(timeRaw);
+
   if (!name || isNaN(day) || isNaN(month) || !parsedTime) {
-    await interaction.reply({
-      content: "Invalid input. Please check all fields.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "Invalid input. Please check all fields.", ephemeral: true });
     return;
   }
 
@@ -67,10 +52,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   // 🔹 Walidacja: nie pozwalamy na event w przeszłości (UTC)
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
-    await interaction.reply({
-      content: "Cannot create an event in the past (UTC). Please select a future date/time.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
     return;
   }
 
@@ -79,11 +61,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const duplicate = events.find(
     e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
   );
+
   if (duplicate) {
-    await interaction.reply({
-      content: "An active event at this UTC date and time already exists. Please choose another date/time.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", ephemeral: true });
     return;
   }
 
@@ -103,16 +83,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   await saveEvents(guildId, [...events, newEvent]);
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-
-  // 🔹 Local time użytkownika (informacyjnie)
-  const eventDateLocal = formatLocalDate(new Date(year, month - 1, day, hour, minute));
+  // 🔹 Formatowanie dat
+  const eventDateUTCStr = formatUTCDate(day, month, year, hour, minute);
+  const eventDateLocalStr = formatLocalDateFromUTC(day, month, year, hour, minute);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
     .setDescription(
-      `Event **${name}** scheduled for ${pad(day)}/${pad(month)}/${year} at ${pad(hour)}:${pad(minute)} UTC` +
-      `\nFor your local time: ${eventDateLocal}` +
+      `Event **${name}** scheduled for ${eventDateUTCStr} UTC` +
+      `\nFor your local time: ${eventDateLocalStr}` +
       (reminderBefore !== undefined ? `\nReminder set ${reminderBefore} minutes before.` : "\nNo reminder set.")
     )
     .setColor("Green");
