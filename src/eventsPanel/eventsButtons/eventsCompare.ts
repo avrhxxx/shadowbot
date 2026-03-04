@@ -12,7 +12,15 @@ import {
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate } from "../utils/dateUtils"; // <- Twoje funkcje z Luxon lub pad
+import { formatUTCDate } from "../utils/timeUtils";
+
+/**
+ * Formatowanie daty eventu w UTC dla wyświetlania w wiadomościach i plikach
+ */
+function formatEventUTC(e: EventObject) {
+  const year = new Date().getUTCFullYear(); // Bieżący rok
+  return formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+}
 
 /* ===================================================== */
 /*  STEP 1 — CLICK COMPARE BUTTON                       */
@@ -56,7 +64,7 @@ export async function handleCompareButton(
       pastEvents.map(event =>
         new StringSelectMenuOptionBuilder()
           .setLabel(event.name)
-          .setDescription(formatUTCDate(event.day, event.month, event.year ?? new Date().getUTCFullYear(), event.hour, event.minute))
+          .setDescription(formatEventUTC(event))
           .setValue(event.id)
       )
     );
@@ -101,6 +109,7 @@ export async function handleCompareSelect(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadButton);
 
+  // Pokazujemy porównanie w ephemeral + przycisk Download
   await interaction.update({
     content: result.embedText,
     components: [row]
@@ -149,8 +158,10 @@ export async function handleCompareDownload(
     return;
   }
 
-  // Wyślij zwykłą wiadomość z porównaniem + datą UTC
+  // Aktualny czas UTC
   const utcNow = new Date().toISOString();
+
+  // Wyślij zwykłą wiadomość z porównaniem + datą UTC
   await channel.send({
     content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
   });
@@ -186,8 +197,8 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
 
   const embedText =
     `Comparing:\n` +
-    `Event A: ${eventA.name} (${formatUTCDate(eventA.day, eventA.month, eventA.year ?? new Date().getUTCFullYear(), eventA.hour, eventA.minute)})\n` +
-    `Event B: ${eventB.name} (${formatUTCDate(eventB.day, eventB.month, eventB.year ?? new Date().getUTCFullYear(), eventB.hour, eventB.minute)})\n\n` +
+    `Event A: ${eventA.name} (${formatEventUTC(eventA)})\n` +
+    `Event B: ${eventB.name} (${formatEventUTC(eventB)})\n\n` +
     `🟢 Reliable (${reliable.length})\n` +
     (reliable.length ? reliable.map(id => `<@${id}>`).join("\n") : "None") +
     `\n\n🟡 Missed Once (${missedOnce.length})\n` +
@@ -198,8 +209,8 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
   const txtText =
     `Attendance Comparison\n` +
     `=====================\n\n` +
-    `Event A: ${eventA.name} (${formatUTCDate(eventA.day, eventA.month, eventA.year ?? new Date().getUTCFullYear(), eventA.hour, eventA.minute)})\n` +
-    `Event B: ${eventB.name} (${formatUTCDate(eventB.day, eventB.month, eventB.year ?? new Date().getUTCFullYear(), eventB.hour, eventB.minute)})\n\n` +
+    `Event A: ${eventA.name} (${formatEventUTC(eventA)})\n` +
+    `Event B: ${eventB.name} (${formatEventUTC(eventB)})\n\n` +
     `Reliable (${reliable.length})\n` +
     (reliable.length ? reliable.join("\n") : "") +
     `\n\nMissed Once (${missedOnce.length})\n` +
