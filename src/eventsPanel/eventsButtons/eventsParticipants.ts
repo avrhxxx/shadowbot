@@ -29,7 +29,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
   const input = new TextInputBuilder()
     .setCustomId("user_input")
     .setLabel("Enter game nickname(s), separated by commas")
-    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia…")
+    .setPlaceholder("e.g. Arek, Allie, DomSugarDaddy...")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -67,10 +67,7 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Aktualizacja panelu / embedu
-  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
-
-  // Krótkie potwierdzenie dla użytkownika
+  // Odpowiedź użytkownikowi – tylko potwierdzenie, żadna aktualizacja embedu
   await interaction.editReply({
     content: added.length
       ? `${added.join(", ")} added to **${event.name}**`
@@ -117,8 +114,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   event.participants = event.participants.filter(nick => nick !== input);
   await EventStorage.saveEvents(guildId, events);
 
-  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
-
+  // Tylko odpowiedź dla użytkownika
   await interaction.editReply({ content: `${input} removed from **${event.name}**` });
 }
 
@@ -128,7 +124,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
 export async function handleAbsentParticipant(interaction: ButtonInteraction, eventId: string) {
   const modal = new ModalBuilder()
     .setCustomId(`event_absent_modal_${eventId}`)
-    .setTitle("Mark Participant Absent");
+    .setTitle("Add Absent");
 
   const input = new TextInputBuilder()
     .setCustomId("user_input")
@@ -165,7 +161,6 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
 
   await EventStorage.saveEvents(guildId, events);
 
-  if (interaction.message) await updateEventEmbed(interaction.message, eventId);
-
-  await interaction.editReply({ content: `${input} marked absent for **${event.name}**` });
+  // Tylko potwierdzenie, brak edycji panelu
+  await interaction.editReply({ content: `${input} added to absent for **${event.name}**` });
 }
