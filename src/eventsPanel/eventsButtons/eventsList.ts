@@ -11,7 +11,7 @@ function cleanNickname(nick: string) {
 }
 
 /**
- * Formatowanie daty lokalnej w DD/MM HH:MM
+ * Formatowanie daty w DD/MM HH:MM (zachowując strefę lokalną)
  */
 function formatLocalDate(date: Date) {
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -30,8 +30,7 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
   let updated = false;
 
   for (const e of events) {
-    // 🔹 używamy UTC
-    const eventDateUTC = new Date(Date.UTC(now.getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
+    const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
     if (e.status === "ACTIVE" && eventDateUTC.getTime() < now.getTime()) {
       e.status = "PAST";
       updated = true;
@@ -65,9 +64,9 @@ export async function handleList(interaction: ButtonInteraction) {
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-    const eventDateLocal = formatLocalDate(eventDateUTC);
+    const eventDateLocal = formatLocalDate(eventDateUTC); // lokalny czas tylko do podglądu
 
-    const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
+    const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)}\nLocal Date: ${eventDateLocal}`;
 
     const embed = new EmbedBuilder()
       .setTitle(e.name)
@@ -121,7 +120,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
   const eventDateLocal = formatLocalDate(eventDateUTC);
 
-  const dateStr = `UTC Date: ${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC\nLocal Date: ${eventDateLocal}`;
+  const dateStr = `UTC Date: ${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}\nLocal Date: ${eventDateLocal}`;
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
@@ -151,7 +150,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
   const eventDateLocal = formatLocalDate(eventDateUTC);
 
-  const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
+  const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)}\nLocal Date: ${eventDateLocal}`;
 
   const embed = new EmbedBuilder()
     .setTitle(e.name)
