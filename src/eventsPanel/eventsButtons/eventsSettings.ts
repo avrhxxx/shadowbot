@@ -1,7 +1,15 @@
-// src/eventsPanel/eventsButtons/eventSettings.ts
-import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
+// src/eventsPanel/eventsButtons/eventsSettings.ts
+import {
+  Interaction,
+  StringSelectMenuBuilder,
+  ActionRowBuilder,
+  StringSelectMenuInteraction
+} from "discord.js";
 import * as EventStorage from "../eventStorage";
 
+/**
+ * Handler przycisku „Settings” – tworzy dwa select menu dla kanałów
+ */
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
@@ -14,13 +22,11 @@ export async function handleSettings(interaction: Interaction) {
     return;
   }
 
-  // Select menu dla notification channel
   const notificationSelect = new StringSelectMenuBuilder()
     .setCustomId("event_settings_notification")
     .setPlaceholder("Select notification channel")
     .addOptions(channels);
 
-  // Select menu dla download channel
   const downloadSelect = new StringSelectMenuBuilder()
     .setCustomId("event_settings_download")
     .setPlaceholder("Select download channel")
@@ -36,16 +42,21 @@ export async function handleSettings(interaction: Interaction) {
   });
 }
 
+/**
+ * Handler select menu – zapisuje wybrany kanał w config
+ */
 export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
-  const guildId = interaction.guildId!;
-  const selectedChannelId = interaction.values[0];
+  if (!interaction.guildId) return;
 
+  const guildId = interaction.guildId;
+  const selectedChannelId = interaction.values[0];
   if (!selectedChannelId) {
     await interaction.reply({ content: "No channel selected.", ephemeral: true });
     return;
   }
 
-  const config = await EventStorage.getConfig(guildId);
+  // Pobieramy konfigurację, zawsze zwracamy obiekt
+  const config = await EventStorage.getConfig(guildId) || {};
 
   if (interaction.customId === "event_settings_notification") {
     config.notificationChannelId = selectedChannelId;
