@@ -1,5 +1,3 @@
-// src/utils/timeUtils.ts
-
 /**
  * Formatuje datę w UTC w DD/MM HH:MM
  */
@@ -9,16 +7,18 @@ export function formatUTCDate(day: number, month: number, year: number, hour: nu
 }
 
 /**
- * Formatuje datę z UTC na lokalny czas użytkownika w DD/MM HH:MM
+ * Formatuje datę z UTC + offset w DD/MM HH:MM
  */
-export function formatLocalDateFromUTC(day: number, month: number, year: number, hour: number, minute: number) {
-  // Tworzymy datę UTC
+export function formatLocalDateFromUTCWithOffset(
+  day: number,
+  month: number,
+  year: number,
+  hour: number,
+  minute: number,
+  offset: number
+) {
   const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const localDate = new Date(utcDate.getTime() + offset * 60 * 60 * 1000);
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  // Pobieramy faktyczny lokalny czas użytkownika
-  const localDay = pad(utcDate.getDate());
-  const localMonth = pad(utcDate.getMonth() + 1);
-  const localHour = pad(utcDate.getHours());
-  const localMinute = pad(utcDate.getMinutes());
-  return `${localDay}/${localMonth} ${localHour}:${localMinute}`;
+  return `${pad(localDate.getDate())}/${pad(localDate.getMonth() + 1)} ${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
 }
