@@ -5,8 +5,7 @@ import {
   ModalBuilder, 
   TextInputBuilder, 
   TextInputStyle, 
-  ActionRowBuilder, 
-  EmbedBuilder 
+  ActionRowBuilder 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
@@ -30,7 +29,7 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
   const input = new TextInputBuilder()
     .setCustomId("user_input")
     .setLabel("Enter game nickname(s), separated by commas")
-    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia, DomSugarDaddy, UnicornUA, Lady Death, SirRussty, SebGDS 😆")
+    .setPlaceholder("e.g. Arek, Allie, RunSawyer, Queen Miia…")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -43,13 +42,16 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
    🔹 ADD PARTICIPANT (MODAL SUBMIT) – Multi-add
 ====================================================== */
 export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  await interaction.deferReply({ ephemeral: true });
+
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
+  const event = events.find(e => e.id === eventId);
+
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.editReply({ content: "Event not found." });
     return;
   }
 
@@ -65,18 +67,15 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
 
   await EventStorage.saveEvents(guildId, events);
 
+  // Aktualizacja panelu / embedu
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Participant(s) Added`)
-    .setDescription(
-      added.length
-        ? `${added.join(", ")} added to **${event.name}**`
-        : `No new participants were added (all already present).`
-    )
-    .setColor("Green");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  // Krótkie potwierdzenie dla użytkownika
+  await interaction.editReply({
+    content: added.length
+      ? `${added.join(", ")} added to **${event.name}**`
+      : `No new participants were added (all already present).`
+  });
 }
 
 /* ======================================================
@@ -102,13 +101,16 @@ export async function handleRemoveParticipant(interaction: ButtonInteraction, ev
    🔹 REMOVE PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  await interaction.deferReply({ ephemeral: true });
+
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
+  const event = events.find(e => e.id === eventId);
+
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.editReply({ content: "Event not found." });
     return;
   }
 
@@ -117,12 +119,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
 
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Participant Removed`)
-    .setDescription(`${input} removed from **${event.name}**`)
-    .setColor("Red");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.editReply({ content: `${input} removed from **${event.name}**` });
 }
 
 /* ======================================================
@@ -148,13 +145,16 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
    🔹 ABSENT PARTICIPANT (MODAL SUBMIT)
 ====================================================== */
 export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  await interaction.deferReply({ ephemeral: true });
+
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
   const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find((e: EventObjectWithAbsent) => e.id === eventId);
+  const event = events.find(e => e.id === eventId);
+
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.editReply({ content: "Event not found." });
     return;
   }
 
@@ -167,10 +167,5 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
 
   if (interaction.message) await updateEventEmbed(interaction.message, eventId);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Participant Marked Absent`)
-    .setDescription(`${input} marked absent for **${event.name}**`)
-    .setColor("Orange");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.editReply({ content: `${input} marked absent for **${event.name}**` });
 }
