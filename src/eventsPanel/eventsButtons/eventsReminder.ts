@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -118,8 +117,8 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
 /**
  * 🔹 Zaplanuj przypomnienia dla pojedynczego eventu
  */
-function scheduleEventReminders(event: any, guild: Guild) {
-  const config = EventStorage.getConfig(guild.id);
+export async function scheduleEventReminders(event: any, guild: Guild) {
+  const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
