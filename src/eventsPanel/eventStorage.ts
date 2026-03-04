@@ -4,12 +4,16 @@ import path from "path";
 const dataDir = path.join(__dirname, "../../data");
 const eventsPath = path.join(dataDir, "events.json");
 const configPath = path.join(dataDir, "config.json");
+const userTimePath = path.join(dataDir, "userLocalTime.json");
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, "{}");
 if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, "{}");
+if (!fs.existsSync(userTimePath)) fs.writeFileSync(userTimePath, "{}");
 
-// ✅ reminderBefore TERAZ OPCJONALNE
+// ==========================
+// EVENT STORAGE
+// ==========================
 export type EventObject = {
   id: string;
   name: string;
@@ -17,7 +21,7 @@ export type EventObject = {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore?: number; // ✅ FIX
+  reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   createdAt: number;
@@ -47,6 +51,20 @@ export async function saveConfig(guildId: string, config: any) {
   writeJSON(configPath, data);
 }
 
+// ==========================
+// USER LOCAL TIME STORAGE
+// ==========================
+export async function getUserTimeConfig(): Promise<Record<string, { timeZone: string }>> {
+  return readJSON(userTimePath);
+}
+
+export async function saveUserTimeConfig(data: Record<string, { timeZone: string }>) {
+  writeJSON(userTimePath, data);
+}
+
+// ==========================
+// UTILS
+// ==========================
 function readJSON(filePath: string) {
   if (!fs.existsSync(filePath)) return {};
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
