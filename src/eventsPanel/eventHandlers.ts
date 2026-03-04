@@ -1,4 +1,5 @@
-import { Interaction } from "discord.js";
+// src/eventsPanel/eventHandlers.ts
+import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
@@ -32,6 +33,12 @@ import {
   handleAbsentParticipantSubmit
 } from "./eventsButtons/eventsParticipants";
 
+// Manual Reminder
+import { sendReminderMessage } from "./eventsButtons/eventsReminder";
+
+/* =======================================================
+   🔹 Handler interakcji dla całego Event Panelu
+======================================================= */
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
@@ -107,14 +114,39 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    if (customId === "event_settings_notification" ||
-        customId === "event_settings_download") {
+    // Settings selects
+    if (customId === "event_settings_notification" || customId === "event_settings_download") {
       await handleSettingsSelect(interaction);
       return;
     }
 
     if (customId === "event_cancel_select") {
       await handleCancelSelect(interaction);
+      return;
+    }
+
+    // Manual Reminder select menu
+    if (customId === "manual_reminder_select") {
+      const selectedEventId = interaction.values[0];
+      const events = await EventStorage.getEvents(interaction.guildId!);
+      const event = events.find(e => e.id === selectedEventId);
+
+      if (!event) {
+        await interaction.update({ content: "Event not found.", components: [] });
+        return;
+      }
+
+      const config = await EventStorage.getConfig(interaction.guildId!);
+      const channel = interaction.guild!.channels.cache.get(config!.notificationChannelId) as TextChannel;
+
+      if (!channel || !channel.isTextBased()) {
+        await interaction.update({ content: "Notification channel invalid.", components: [] });
+        return;
+      }
+
+      await sendReminderMessage(channel, event);
+
+      await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
       return;
     }
   }
@@ -174,8 +206,46 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       case "event_help":
         await handleHelp(interaction);
         break;
+      case "event_manual_reminder":
+        // wyświetl select menu do wyboru eventu
+        await handleManualReminder(interaction);
+        break;
       default:
         console.warn(`Nieobsługiwany event customId: ${customId}`);
     }
   }
+}
+
+/* =======================================================
+   🔹 Funkcja dla przycisku Manual Reminder
+======================================================= */
+async function handleManualReminder(interaction: ButtonInteraction) {
+  const guildId = interaction.guildId!;
+  const events = await EventStorage.getEvents(guildId);
+
+  const upcomingEvents = events.filter(e => e.status !== "PAST");
+  if (upcomingEvents.length === 0) {
+    await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
+    return;
+  }
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("manual_reminder_select")
+    .setPlaceholder("Select an event to manually send a reminder")
+    .addOptions(
+      upcomingEvents.map(ev =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(ev.name)
+          .setDescription(`UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`)
+          .setValue(ev.id)
+      )
+    );
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
+  await interaction.reply({
+    content: "Select an event to manually send a reminder:",
+    components: [row],
+    ephemeral: true
+  });
 }
