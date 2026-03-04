@@ -40,10 +40,15 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
 
   // jeśli strefa ustawiona → pokaz lokalny czas
   const timeZone = userConfig.timeZone;
+
+  // używamy bieżącego roku UTC
+  const nowUTC = new Date();
+  const year = nowUTC.getUTCFullYear();
+
   const localDateStr = formatLocalDateFromUTCWithTimeZone(
     event.day,
     event.month,
-    event.year,
+    year,      // <-- bieżący rok
     event.hour,
     event.minute,
     timeZone
