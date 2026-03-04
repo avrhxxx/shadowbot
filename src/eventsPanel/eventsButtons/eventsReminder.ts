@@ -54,7 +54,7 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
     .setDescription(
       `Event scheduled for ${eventDateStr}` +
       (event.reminderBefore !== undefined
-        ? `\nReminder set ${event.reminderBefore} minutes before.`
+        ? `\nReminder set for ${event.reminderBefore} minutes before event start.`
         : "\nNo reminder set.")
     )
     .setColor("Green");
