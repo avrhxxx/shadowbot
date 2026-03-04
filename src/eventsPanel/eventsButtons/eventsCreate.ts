@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreate.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
