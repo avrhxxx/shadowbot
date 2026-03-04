@@ -18,7 +18,7 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
   let updated = false;
 
   for (const e of events) {
-    // 🔹 zmiana na UTC
+    // 🔹 używamy UTC
     const eventDateUTC = new Date(Date.UTC(now.getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
     if (e.status === "ACTIVE" && eventDateUTC.getTime() < now.getTime()) {
       e.status = "PAST";
@@ -52,12 +52,15 @@ export async function handleList(interaction: ButtonInteraction) {
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
-    const dateStr = `${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC`;
+    const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
+    const eventDateLocal = eventDateUTC.toLocaleString(); // lokalny czas do podglądu
+
+    const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
     const embed = new EmbedBuilder()
       .setTitle(e.name)
       .setDescription(
-        `Status: ${e.status}\nDate: ${dateStr}\nParticipants: ${e.participants.length}` +
+        `Status: ${e.status}\n${dateStr}\nParticipants: ${e.participants.length}` +
         (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
       )
       .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
@@ -103,7 +106,10 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const absent = event.absent?.length ? event.absent.map(cleanNickname) : [];
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC`;
+  const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
+  const eventDateLocal = eventDateUTC.toLocaleString();
+
+  const dateStr = `UTC Date: ${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
@@ -130,7 +136,10 @@ export async function updateEventEmbed(message: any, eventId: string) {
   if (!e) return;
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const dateStr = `${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC`;
+  const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
+  const eventDateLocal = eventDateUTC.toLocaleString();
+
+  const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
   const embed = new EmbedBuilder()
     .setTitle(e.name)
