@@ -4,13 +4,12 @@ import {
   StringSelectMenuInteraction,
   ActionRowBuilder
 } from "discord.js";
-import * as UserTimeStorage from "../eventStorage"; // <-- teraz wszystko w eventStorage
+import * as UserTimeStorage from "../eventStorage";
 import { countryToTimeZone } from "../../utils/timeZones";
 import { formatLocalDateFromUTCWithTimeZone } from "../../utils/timeUtils";
 
 /**
- * 🔹 KROK 1
- * Kliknięcie przycisku "Show in your local time"
+ * 🔹 KROK 1 – Kliknięcie przycisku "Show in your local time"
  */
 export async function handleShowLocalTimeButton(interaction: ButtonInteraction, event: any) {
   const userId = interaction.user.id;
@@ -18,7 +17,7 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
   const userConfig = userTimeConfig[userId];
 
   if (!userConfig) {
-    // brak ustawionej strefy → pokazujemy select menu
+    // brak strefy → select menu
     const options = Object.entries(countryToTimeZone).map(([country, tz]) => ({
       label: country,
       value: tz
@@ -39,7 +38,7 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
     return;
   }
 
-  // jeśli strefa ustawiona → pokazujemy lokalny czas
+  // jeśli strefa ustawiona → pokaz lokalny czas
   const timeZone = userConfig.timeZone;
   const localDateStr = formatLocalDateFromUTCWithTimeZone(
     event.day,
@@ -57,8 +56,7 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
 }
 
 /**
- * 🔹 KROK 2
- * Obsługa select menu wyboru kraju
+ * 🔹 KROK 2 – Select menu wyboru kraju
  */
 export async function handleSetupLocalTimeSelect(interaction: StringSelectMenuInteraction) {
   const userId = interaction.user.id;
