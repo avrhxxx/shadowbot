@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { ModalSubmitInteraction, EmbedBuilder } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 
@@ -26,6 +27,18 @@ function parseTime(input: string): { hour: number; minute: number } | null {
   return null;
 }
 
+/**
+ * Formatowanie lokalnej daty w DD/MM HH:MM
+ */
+function formatLocalDate(date: Date) {
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  return `${day}/${month} ${hour}:${minute}`;
+}
+
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const guildId = interaction.guildId!;
   const name = interaction.fields.getTextInputValue("event_name");
@@ -49,7 +62,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const nowUTC = new Date();
   const year = nowUTC.getUTCFullYear();
 
-  // 🔹 UTC Date dla eventu
+  // 🔹 UTC Date dla eventu (nie ruszamy)
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
 
   // 🔹 Walidacja: nie pozwalamy na event w przeszłości (UTC)
@@ -93,14 +106,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
   // 🔹 Local time użytkownika (informacyjnie)
-  const eventDateLocal = new Date(
-    Date.UTC(year, month - 1, day, hour, minute)
-  ).toLocaleString("default", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  const eventDateLocal = formatLocalDate(new Date(year, month - 1, day, hour, minute));
 
   const embed = new EmbedBuilder()
     .setTitle("Event Created")
