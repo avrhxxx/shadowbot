@@ -56,18 +56,24 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
   }
 
   const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
-
   const added: string[] = [];
+
   for (const nick of nicknames) {
     if (!event.participants.includes(nick)) {
       event.participants.push(nick);
       added.push(nick);
     }
+    // Usuń z absent jeśli był
+    if (event.absent?.includes(nick)) {
+      event.absent = event.absent.filter(n => n !== nick);
+    }
   }
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Odpowiedź użytkownikowi – tylko potwierdzenie, żadna aktualizacja embedu
+  // Aktualizacja embedu
+  await updateEventEmbed(interaction.message || interaction, eventId);
+
   await interaction.editReply({
     content: added.length
       ? `${added.join(", ")} added to **${event.name}**`
@@ -111,10 +117,16 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
+  if (!event.participants.includes(input)) {
+    await interaction.editReply({ content: `${input} is not a participant in **${event.name}**` });
+    return;
+  }
+
   event.participants = event.participants.filter(nick => nick !== input);
   await EventStorage.saveEvents(guildId, events);
 
-  // Tylko odpowiedź dla użytkownika
+  await updateEventEmbed(interaction.message || interaction, eventId);
+
   await interaction.editReply({ content: `${input} removed from **${event.name}**` });
 }
 
@@ -154,13 +166,22 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
-  // Remove from participants and add to absent
+  // Dodaj do absent tylko jeśli jest w participants
+  if (!event.participants.includes(input)) {
+    await interaction.editReply({ content: `${input} is not a participant in **${event.name}**, cannot mark absent.` });
+    return;
+  }
+
   event.participants = event.participants.filter(nick => nick !== input);
+
   if (!event.absent) event.absent = [];
-  event.absent.push(input);
+  if (!event.absent.includes(input)) {
+    event.absent.push(input);
+  }
 
   await EventStorage.saveEvents(guildId, events);
 
-  // Tylko potwierdzenie, brak edycji panelu
-  await interaction.editReply({ content: `${input} added to absent for **${event.name}**` });
+  await updateEventEmbed(interaction.message || interaction, eventId);
+
+  await interaction.editReply({ content: `${input} marked as absent for **${event.name}**` });
 }
