@@ -17,6 +17,7 @@ import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 import { handleCompare } from "./eventsButtons/eventsCompare";
+import { handleShowLocalTimeButton, handleSetupLocalTimeSelect } from "./eventsButtons/eventsLocalTime";
 
 // Uczestnicy
 import {
@@ -87,6 +88,15 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleDownload(interaction, eventId);
       return;
     }
+
+    // 🔹 NOWY – pokaz lokalny czas
+    if (customId.startsWith("show_local_time_")) {
+      const eventId = customId.replace("show_local_time_", "");
+      const events = await EventStorage.getEvents(interaction.guildId!);
+      const event = events.find(e => e.id === eventId);
+      if (event) await handleShowLocalTimeButton(interaction, event);
+      return;
+    }
   }
 
   /* =======================================================
@@ -155,7 +165,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       if (interaction.isButton()) await handleHelp(interaction);
       break;
 
-    // SELECT MENU – teraz korzystamy tylko z nowego pliku
+    // SELECT MENU – teraz korzystamy z nowych plików
     case "event_settings_notification":
     case "event_settings_download":
       if (interaction.isStringSelectMenu()) {
@@ -172,6 +182,12 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       break;
 
     default:
+      // 🔹 NOWY – select menu konfiguracji lokalnego czasu
+      if (interaction.isStringSelectMenu() && customId.startsWith("select_local_time_")) {
+        await handleSetupLocalTimeSelect(interaction);
+        return;
+      }
+
       console.warn(`Nieobsługiwany event customId: ${customId}`);
   }
 }
