@@ -3,12 +3,10 @@ import {
   ButtonInteraction,
   StringSelectMenuBuilder,
   StringSelectMenuInteraction,
-  ActionRowBuilder,
-  EmbedBuilder,
-  TextChannel
+  ActionRowBuilder
 } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { countryToUTCOffset, formatUTCDate } from "../../utils/timeUtils";
+import * as UserTimeStorage from "../eventStorage/userLocalTime";
+import { countryToUTCOffset, formatLocalDateFromUTCWithOffset } from "../../utils/timeUtils";
 
 /**
  * 🔹 KROK 1
@@ -17,12 +15,11 @@ import { countryToUTCOffset, formatUTCDate } from "../../utils/timeUtils";
  * -> jeśli nie, pokazuje select menu krajów
  */
 export async function handleShowLocalTimeButton(interaction: ButtonInteraction, event: any) {
-  const guildId = interaction.guildId!;
   const userId = interaction.user.id;
-  const config = await EventStorage.getConfig(guildId);
-  const userTimeConfig = config.userTimeConfig?.[userId];
+  const userTimeConfig = await UserTimeStorage.getUserTimeConfig();
+  const userConfig = userTimeConfig[userId];
 
-  if (!userTimeConfig) {
+  if (!userConfig) {
     // brak ustawionego czasu → pokazujemy select menu z krajami
     const options = Object.entries(countryToUTCOffset).map(([country, offset]) => ({
       label: country,
@@ -45,12 +42,15 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
   }
 
   // jeśli offset ustawiony → pokazujemy lokalny czas
-  const utcDate = new Date(Date.UTC(event.year, event.month - 1, event.day, event.hour, event.minute));
-  const offset = userTimeConfig.utcOffset;
-  const localDate = new Date(utcDate.getTime() + offset * 60 * 60 * 1000);
-
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const localDateStr = `${pad(localDate.getDate())}/${pad(localDate.getMonth() + 1)} ${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
+  const offset = userConfig.utcOffset;
+  const localDateStr = formatLocalDateFromUTCWithOffset(
+    event.day,
+    event.month,
+    event.year,
+    event.hour,
+    event.minute,
+    offset
+  );
 
   await interaction.reply({
     content: `Event **${event.name}** starts at your local time: ${localDateStr} (UTC${offset >= 0 ? "+" : ""}${offset})`,
@@ -64,14 +64,12 @@ export async function handleShowLocalTimeButton(interaction: ButtonInteraction, 
  * -> zapisuje offset użytkownika w storage
  */
 export async function handleSetupLocalTimeSelect(interaction: StringSelectMenuInteraction) {
-  const guildId = interaction.guildId!;
   const userId = interaction.user.id;
   const utcOffset = parseInt(interaction.values[0], 10);
 
-  const config = await EventStorage.getConfig(guildId);
-  if (!config.userTimeConfig) config.userTimeConfig = {};
-  config.userTimeConfig[userId] = { utcOffset };
-  await EventStorage.saveConfig(guildId, config);
+  const userTimeConfig = await UserTimeStorage.getUserTimeConfig();
+  userTimeConfig[userId] = { utcOffset };
+  await UserTimeStorage.saveUserTimeConfig(userTimeConfig);
 
   await interaction.reply({
     content: `Your local time has been set! (UTC${utcOffset >= 0 ? "+" : ""}${utcOffset})`,
