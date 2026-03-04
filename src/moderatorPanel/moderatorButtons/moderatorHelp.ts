@@ -1,4 +1,3 @@
-
 // src/moderatorPanel/moderatorButtons/moderatorHelp.ts
 import { Interaction, EmbedBuilder } from "discord.js";
 
@@ -8,10 +7,10 @@ export async function handleModeratorHelp(interaction: Interaction) {
   const embed = new EmbedBuilder()
     .setTitle("Moderator Panel Help")
     .setDescription(`
-🟢 Event Menu – przejdź do Event Panel  
-⭐ Points Menu – placeholder  
-📝 Translate Menu – placeholder  
-❓ Help – pokazuje ten opis
+🟢 Event Menu – go to Event Panel  
+⭐ Points Menu – not implemented yet  
+📝 Translate Menu – not implemented yet  
+❓ Help – shows this description
   `);
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
