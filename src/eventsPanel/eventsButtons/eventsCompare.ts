@@ -84,7 +84,9 @@ export async function handleCompareButton(
 export async function handleCompareSelect(
   interaction: StringSelectMenuInteraction
 ) {
-  const guildId = interaction.guildId!;
+  const guild = interaction.guild as Guild;
+  const guildId = guild.id;
+
   const selectedEventId = interaction.values[0];
   const currentEventId = interaction.customId.replace("compare_select_", "");
 
@@ -100,7 +102,7 @@ export async function handleCompareSelect(
     return;
   }
 
-  const result = buildComparison(selectedEvent, currentEvent);
+  const result = await buildComparison(selectedEvent, currentEvent, guild);
 
   const downloadButton = new ButtonBuilder()
     .setCustomId(`compare_download_${selectedEvent.id}_${currentEvent.id}`)
@@ -137,7 +139,7 @@ export async function handleCompareDownload(
     return;
   }
 
-  const result = buildComparison(eventA, eventB);
+  const result = await buildComparison(eventA, eventB, guild);
 
   const config = await EventStorage.getConfig(guildId);
   if (!config?.downloadChannelId) {
@@ -181,11 +183,17 @@ export async function handleCompareDownload(
 /* ===================================================== */
 /*  CORE LOGIC (REUSABLE)                               */
 /* ===================================================== */
-function buildComparison(eventA: EventObject, eventB: EventObject) {
+async function buildComparison(eventA: EventObject, eventB: EventObject, guild: Guild) {
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
   const absentA = new Set(eventA.absent || []);
   const absentB = new Set(eventB.absent || []);
+
+  // Clean nick: jeśli członek istnieje w guild, weź displayName, inaczej id
+  const getMemberName = (id: string) => {
+    const member = guild.members.cache.get(id);
+    return member ? member.displayName : id;
+  };
 
   const reliable = [...participantsA].filter(id => participantsB.has(id));
   const missedOnce = [...participantsA].filter(id => absentB.has(id));
@@ -196,11 +204,11 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
     `Event A: ${eventA.name} (${formatEventUTC(eventA)})\n` +
     `Event B: ${eventB.name} (${formatEventUTC(eventB)})\n\n` +
     `🟢 Reliable (${reliable.length})\n` +
-    (reliable.length ? reliable.map(id => `<@${id}>`).join("\n") : "None") +
+    (reliable.length ? reliable.map(getMemberName).join("\n") : "None") +
     `\n\n🟡 Missed Once (${missedOnce.length})\n` +
-    (missedOnce.length ? missedOnce.map(id => `<@${id}>`).join("\n") : "None") +
+    (missedOnce.length ? missedOnce.map(getMemberName).join("\n") : "None") +
     `\n\n🔴 Missed Twice (${missedTwice.length})\n` +
-    (missedTwice.length ? missedTwice.map(id => `<@${id}>`).join("\n") : "None");
+    (missedTwice.length ? missedTwice.map(getMemberName).join("\n") : "None");
 
   const txtText =
     `Attendance Comparison\n` +
@@ -208,11 +216,11 @@ function buildComparison(eventA: EventObject, eventB: EventObject) {
     `Event A: ${eventA.name} (${formatEventUTC(eventA)})\n` +
     `Event B: ${eventB.name} (${formatEventUTC(eventB)})\n\n` +
     `Reliable (${reliable.length})\n` +
-    (reliable.length ? reliable.join("\n") : "") +
+    (reliable.length ? reliable.map(getMemberName).join("\n") : "") +
     `\n\nMissed Once (${missedOnce.length})\n` +
-    (missedOnce.length ? missedOnce.join("\n") : "") +
+    (missedOnce.length ? missedOnce.map(getMemberName).join("\n") : "") +
     `\n\nMissed Twice (${missedTwice.length})\n` +
-    (missedTwice.length ? missedTwice.join("\n") : "");
+    (missedTwice.length ? missedTwice.map(getMemberName).join("\n") : "");
 
   return { embedText, txtText };
 }
