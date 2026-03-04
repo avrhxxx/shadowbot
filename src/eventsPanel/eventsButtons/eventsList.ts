@@ -25,24 +25,31 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
     }
   }
 
-  if (updated) await EventStorage.saveEvents(guildId, events);
+  if (updated) {
+    await EventStorage.saveEvents(guildId, events);
+    // pobranie świeżych danych po zapisie
+    return await EventStorage.getEvents(guildId);
+  }
+
+  return events;
 }
 
 /**
  * Show ephemeral list of all events
  * Dynamic: Participants & Absent show counts only
- * Automatyczna aktualizacja statusów ACTIVE -> PAST
+ * Pokazuje wszystkie statusy: ACTIVE, PAST, CANCELED
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await EventStorage.getEvents(guildId);
 
   if (!events || events.length === 0) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
-  await updateEventStatuses(events, guildId);
+  // 🔹 aktualizacja statusów ACTIVE -> PAST i pobranie świeżych danych
+  events = await updateEventStatuses(events, guildId);
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
@@ -100,19 +107,21 @@ export async function handleList(interaction: ButtonInteraction) {
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
- * Nicki czyszczone z pingów, oddzielnie Participants i Absent
+ * Pokazuje aktualny status eventu
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  let events: EventObject[] = await EventStorage.getEvents(guildId);
 
+  // 🔹 aktualizacja statusów przed wyświetleniem szczegółów
+  events = await updateEventStatuses(events, guildId);
+
+  const event = events.find(e => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  // 🔹 Konwersja nicków – czyszczenie pingów
   const participants = event.participants.length
     ? event.participants.map(cleanNickname)
     : [];
@@ -143,7 +152,9 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const guildId = message.guildId;
   if (!guildId) return;
 
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  events = await updateEventStatuses(events, guildId); // 🔹 aktualizacja statusu przed edycją embedu
+
   const e = events.find(ev => ev.id === eventId);
   if (!e) return;
 
