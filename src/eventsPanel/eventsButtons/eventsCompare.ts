@@ -1,58 +1,67 @@
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
-import { getEvents } from "../eventService";
+import * as EventStorage from "../eventStorage";
+import { EventObject } from "../eventService";
 
-export async function handleCompare(interaction: ButtonInteraction) {
-  if (!interaction.isButton()) return;
-
+export async function handleCompare(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
 
-  const pastEvents = events
-    .filter(e => e.status === "PAST")
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const currentEvent = events.find(e => e.id === eventId);
 
-  if (pastEvents.length < 2) {
-    return interaction.reply({
-      content: "Not enough past events to compare.",
-      ephemeral: true
-    });
+  if (!currentEvent) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
   }
 
-  const eventA = pastEvents[1]; // starszy
-  const eventB = pastEvents[0]; // nowszy
+  if (currentEvent.status !== "PAST") {
+    await interaction.reply({
+      content: "You can only compare past events.",
+      ephemeral: true
+    });
+    return;
+  }
 
-  const participantsA = new Set(eventA.participants);
-  const participantsB = new Set(eventB.participants);
+  // Znajdź wszystkie PAST i posortuj rosnąco po createdAt
+  const pastEvents = events
+    .filter(e => e.status === "PAST")
+    .sort((a, b) => a.createdAt - b.createdAt);
 
-  const absentA = new Set(eventA.absent || []);
-  const absentB = new Set(eventB.absent || []);
+  const currentIndex = pastEvents.findIndex(e => e.id === eventId);
 
-  const reliable = [...participantsA].filter(id =>
-    participantsB.has(id)
-  );
+  if (currentIndex <= 0) {
+    await interaction.reply({
+      content: "No previous past event to compare with.",
+      ephemeral: true
+    });
+    return;
+  }
 
-  const missedOnce = [...participantsA].filter(id =>
-    absentB.has(id)
-  );
+  const previousEvent = pastEvents[currentIndex - 1];
 
-  const missedTwice = [...absentA].filter(id =>
-    absentB.has(id)
-  );
+  const participantsA = new Set(previousEvent.participants);
+  const participantsB = new Set(currentEvent.participants);
+
+  const absentA = new Set(previousEvent.absent || []);
+  const absentB = new Set(currentEvent.absent || []);
+
+  const reliable = [...participantsA].filter(id => participantsB.has(id));
+  const missedOnce = [...participantsA].filter(id => absentB.has(id));
+  const missedTwice = [...absentA].filter(id => absentB.has(id));
 
   const embed = new EmbedBuilder()
     .setTitle("📊 Attendance Comparison")
     .setDescription(
       `Comparing:\n` +
-      `Event: ${eventA.name} → ${eventB.name}\n\n` +
+      `**${previousEvent.name}** → **${currentEvent.name}**\n\n` +
 
       `🟢 Reliable (${reliable.length})\n` +
-      (reliable.map(id => `<@${id}>`).join("\n") || "None") +
+      (reliable.length ? reliable.map(id => `<@${id}>`).join("\n") : "None") +
 
       `\n\n🟡 Missed Once (${missedOnce.length})\n` +
-      (missedOnce.map(id => `<@${id}>`).join("\n") || "None") +
+      (missedOnce.length ? missedOnce.map(id => `<@${id}>`).join("\n") : "None") +
 
       `\n\n🔴 Missed Twice (${missedTwice.length})\n` +
-      (missedTwice.map(id => `<@${id}>`).join("\n") || "None")
+      (missedTwice.length ? missedTwice.map(id => `<@${id}>`).join("\n") : "None")
     )
     .setColor(0xff9900);
 
