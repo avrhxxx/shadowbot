@@ -11,6 +11,24 @@ function cleanNickname(nick: string) {
 }
 
 /**
+ * Aktualizuje statusy eventów ACTIVE -> PAST jeśli data minęła
+ */
+async function updateEventStatuses(events: EventObject[], guildId: string) {
+  const now = new Date();
+  let updated = false;
+
+  for (const e of events) {
+    const eventDate = new Date(now.getFullYear(), e.month - 1, e.day, e.hour, e.minute);
+    if (e.status === "ACTIVE" && eventDate.getTime() < now.getTime()) {
+      e.status = "PAST";
+      updated = true;
+    }
+  }
+
+  if (updated) await EventStorage.saveEvents(guildId, events);
+}
+
+/**
  * Show ephemeral list of all events
  * Dynamic: Participants & Absent show counts only
  * Automatyczna aktualizacja statusów ACTIVE -> PAST
@@ -24,18 +42,9 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  await updateEventStatuses(events, guildId);
 
-  // 🔹 Aktualizacja statusów na podstawie daty
-  let updated = false;
-  for (const e of events) {
-    const eventDate = new Date(new Date().getFullYear(), e.month - 1, e.day, e.hour, e.minute);
-    if (eventDate.getTime() < Date.now() && e.status === "ACTIVE") {
-      e.status = "PAST";
-      updated = true;
-    }
-  }
-  if (updated) await EventStorage.saveEvents(guildId, events);
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
@@ -49,7 +58,6 @@ export async function handleList(interaction: ButtonInteraction) {
       )
       .setColor(e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000);
 
-    // Row 1 – główne akcje
     const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`event_add_${e.id}`)
@@ -73,7 +81,6 @@ export async function handleList(interaction: ButtonInteraction) {
         .setStyle(ButtonStyle.Primary)
     );
 
-    // Row 2 – placeholder Compare
     const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`event_compare_${e.id}`)
@@ -93,7 +100,7 @@ export async function handleList(interaction: ButtonInteraction) {
 
 /**
  * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
- * Pokazuje raw nicki (czyszczone z pingów) i oddzielnie Absent
+ * Nicki czyszczone z pingów, oddzielnie Participants i Absent
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
@@ -105,25 +112,24 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
     return;
   }
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
-
-  // 🔹 Konwersja nicków
+  // 🔹 Konwersja nicków – czyszczenie pingów
   const participants = event.participants.length
     ? event.participants.map(cleanNickname)
-    : ["None"];
+    : [];
   const absent = event.absent?.length
     ? event.absent.map(cleanNickname)
-    : ["None"];
+    : [];
 
-  const participantsStr = participants.join("\n");
-  const absentStr = absent.join("\n");
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
     .setDescription(
-      `Date: ${dateStr}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participantsStr}` +
-      (absent.length && absent[0] !== "None" ? `\n\nAbsent (${absent.length}):\n${absentStr}` : "")
+      `Date: ${dateStr}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
+      (absent.length
+        ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}`
+        : "")
     )
     .setColor(event.status === "ACTIVE" ? 0x00ff00 : event.status === "PAST" ? 0x808080 : 0xff0000);
 
