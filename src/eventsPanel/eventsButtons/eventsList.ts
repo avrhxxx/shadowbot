@@ -11,6 +11,18 @@ function cleanNickname(nick: string) {
 }
 
 /**
+ * Formatowanie daty lokalnej w DD/MM HH:MM
+ */
+function formatLocalDate(date: Date) {
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  return `${day}/${month} ${hour}:${minute}`;
+}
+
+/**
  * Aktualizuje statusy eventów ACTIVE -> PAST jeśli data minęła (UTC)
  */
 async function updateEventStatuses(events: EventObject[], guildId: string) {
@@ -53,7 +65,7 @@ export async function handleList(interaction: ButtonInteraction) {
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-    const eventDateLocal = eventDateUTC.toLocaleString(); // lokalny czas do podglądu
+    const eventDateLocal = formatLocalDate(eventDateUTC);
 
     const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
@@ -107,7 +119,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
-  const eventDateLocal = eventDateUTC.toLocaleString();
+  const eventDateLocal = formatLocalDate(eventDateUTC);
 
   const dateStr = `UTC Date: ${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
@@ -137,7 +149,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-  const eventDateLocal = eventDateUTC.toLocaleString();
+  const eventDateLocal = formatLocalDate(eventDateUTC);
 
   const dateStr = `UTC Date: ${pad(e.day)}/${pad(e.month)} ${pad(e.hour)}:${pad(e.minute)} UTC\nLocal Date: ${eventDateLocal}`;
 
