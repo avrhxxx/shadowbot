@@ -1,6 +1,6 @@
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { sendEventCreatedNotification, scheduleEventReminders } from "./eventsReminder";
+import { sendEventCreatedNotification } from "./eventsReminder";
 
 /**
  * Convert various time formats into HH:MM
@@ -48,21 +48,34 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   const year = nowUTC.getUTCFullYear();
 
   const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
-    await interaction.reply({ content: "Cannot create an event in the past (UTC). Please select a future date/time.", ephemeral: true });
+    await interaction.reply({
+      content: "Cannot create an event in the past (UTC). Please select a future date/time.",
+      ephemeral: true
+    });
     return;
   }
 
   const events: EventObject[] = await getEvents(guildId);
+
   const duplicate = events.find(
-    e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
+    e =>
+      e.day === day &&
+      e.month === month &&
+      e.hour === hour &&
+      e.minute === minute &&
+      e.status === "ACTIVE"
   );
+
   if (duplicate) {
-    await interaction.reply({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", ephemeral: true });
+    await interaction.reply({
+      content: "An active event at this UTC date and time already exists. Please choose another date/time.",
+      ephemeral: true
+    });
     return;
   }
 
-  // 🔹 Tworzymy EventObject
   const newEvent: EventObject = {
     id: `${Date.now()}`,
     guildId,
@@ -79,13 +92,13 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   await saveEvents(guildId, [...events, newEvent]);
 
-  // 🔹 Powiadomienie o utworzeniu eventu @everyone
+  // 🔹 WAŻNE: TYLKO TO WYWOŁUJEMY
   if (interaction.guild) {
     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
-
-    // 🔹 Zaplanuj przypomnienia w tle (każdy event ma własny timeout)
-    await scheduleEventReminders(newEvent, interaction.guild as Guild);
   }
 
-  await interaction.reply({ content: "Event created successfully!", ephemeral: true });
+  await interaction.reply({
+    content: "Event created successfully!",
+    ephemeral: true
+  });
 }
