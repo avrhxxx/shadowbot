@@ -5,9 +5,13 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   ActionRowBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  TextChannel
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
+import * as UserTimeStorage from "../eventStorage/userLocalTime";
 
 /**
  * KROK 1
@@ -36,7 +40,7 @@ export async function handleManualReminder(
       activeEvents.map(event =>
         new StringSelectMenuOptionBuilder()
           .setLabel(event.name)
-          .setDescription(`${event.day}/${event.month} ${event.hour}:${event.minute}`)
+          .setDescription(`${event.day}/${event.month} ${event.hour}:${event.minute} UTC`)
           .setValue(event.id)
       )
     );
@@ -81,8 +85,7 @@ export async function handleManualReminderSelect(
     return;
   }
 
-  const channel = interaction.guild!.channels.cache.get(config.defaultChannelId);
-
+  const channel = interaction.guild!.channels.cache.get(config.defaultChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) {
     await interaction.reply({
       content: "Notification channel invalid.",
@@ -93,13 +96,49 @@ export async function handleManualReminderSelect(
 
   const embed = new EmbedBuilder()
     .setTitle(`📢 Reminder: ${event.name}`)
-    .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute}`)
+    .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute} UTC`)
     .setColor("Blue");
 
-  await channel.send({ embeds: [embed] });
+  // 🔹 Dodajemy przycisk Show in Local Time
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`show_local_time_${event.id}`)
+      .setLabel("Show in your local time")
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  await channel.send({ embeds: [embed], components: [buttonRow] });
 
   await interaction.update({
     content: "Manual reminder sent!",
     components: []
   });
+}
+
+/**
+ * Funkcja pomocnicza do wysyłania auto reminderów
+ * - wykorzystywana przy przypomnieniach w czasie `reminderBefore`
+ * - także dodaje przycisk "Show in your local time"
+ */
+export async function sendAutoReminder(event: any, guildId: string) {
+  const config = await EventStorage.getConfig(guildId);
+
+  if (!config?.defaultChannelId) return;
+
+  const channel = await (await EventStorage.getGuildChannel(config.defaultChannelId, guildId)) as TextChannel;
+  if (!channel || !channel.isTextBased()) return;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`⏰ Upcoming Event: ${event.name}`)
+    .setDescription(`Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute} UTC`)
+    .setColor("Orange");
+
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`show_local_time_${event.id}`)
+      .setLabel("Show in your local time")
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  await channel.send({ embeds: [embed], components: [buttonRow] });
 }
