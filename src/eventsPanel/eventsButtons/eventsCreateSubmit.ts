@@ -2,7 +2,7 @@
 import { ModalSubmitInteraction, Guild, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
-import { getEventDateUTC } from "../../utils/timeUtils";
+import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 function parseEventDateTime(input: string): { day: number; month: number; hour: number; minute: number } | null {
     input = input.trim();
@@ -63,10 +63,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     let eventDateUTC: Date;
 
     if (year !== undefined) {
-        // Literalny rok – nie przesuwamy automatycznie
         eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
     } else {
-        // Rok nie podany → używamy funkcji getEventDateUTC (przesuwa jeśli przeszła)
         eventDateUTC = getEventDateUTC(day, month, hour, minute);
     }
 
@@ -148,7 +146,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 await saveEvents(tempData.guildId, [...events, newEvent]);
                 if (interaction.guild) await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
 
-                await i.update({ content: `Event created for ${tempData.day}/${tempData.month} ${tempData.hour}:${tempData.minute} UTC next year.`, components: [] });
+                // 🔹 kosmetyczny fix – formatowanie daty
+                const formattedDate = `${formatEventUTC(tempData.day, tempData.month, tempData.hour, tempData.minute)} ${nextYear}`;
+                await i.update({ content: `Event created for ${formattedDate} UTC next year.`, components: [] });
                 await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
             } else {
                 await i.update({ content: "Event was not added.", components: [] });
@@ -166,7 +166,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     // 🔹 normalne tworzenie eventu (rok wpisany lub przyszła data)
     const events: EventObject[] = await getEvents(guildId);
 
-    // 🔹 sprawdzenie duplikatu: nazwa + data + rok
     const duplicate = events.find(e =>
         e.name === name &&
         e.day === day &&
