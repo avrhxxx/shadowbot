@@ -7,22 +7,21 @@ import {
 } from "discord.js";
 
 export async function handleCreate(interaction: ButtonInteraction) {
-    // Tylko przycisk
+    // tylko przycisk
     if (!interaction.isButton()) return;
-
-    // Deferujemy interakcję, aby Discord nie wyświetlał "This interaction failed"
-    await interaction.deferReply({ ephemeral: true });
 
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
         .setTitle("Create Event");
 
+    // Pole: nazwa eventu (required)
     const nameInput = new TextInputBuilder()
         .setCustomId("event_name")
         .setLabel("Event Name")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
+    // Pole: data + godzina (required) z opisem dopuszczalnych formatów
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -40,6 +39,7 @@ DDMMHHMM      → 18072030`
         )
         .setRequired(true);
 
+    // Pole: rok (opcjonalny)
     const yearInput = new TextInputBuilder()
         .setCustomId("event_year")
         .setLabel("Year (optional)")
@@ -47,6 +47,7 @@ DDMMHHMM      → 18072030`
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
+    // Pole: reminder przed eventem (opcjonalny)
     const reminderInput = new TextInputBuilder()
         .setCustomId("reminder_before")
         .setLabel("Reminder before (minutes, optional)")
@@ -54,6 +55,7 @@ DDMMHHMM      → 18072030`
         .setPlaceholder("Leave empty if no reminder")
         .setRequired(false);
 
+    // Dodanie pól do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
@@ -61,5 +63,6 @@ DDMMHHMM      → 18072030`
         new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
     );
 
+    // ✅ wyświetlenie modala od razu po kliknięciu przycisku
     await interaction.showModal(modal);
 }
