@@ -2,6 +2,10 @@ import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
+// ✅ Importujemy funkcje z innych plików
+import { handleCompareAll } from "./eventsCompare";
+import { handleDownload } from "./eventsDownload";
+
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
@@ -25,7 +29,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     })
     .join("\n");
 
-  // 🔹 przyciski Compare All i Download All
+  // 🔹 przyciski Compare All i Download All – wywołują funkcje z innych plików
   const compareBtn = new ButtonBuilder()
     .setCustomId("compare_all_events")
     .setLabel("Compare All")
