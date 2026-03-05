@@ -162,6 +162,39 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   ======================================================= */
   if (interaction.isStringSelectMenu()) {
 
+    // ✅ REMINDER SELECT MENU (ustawienie reminderBefore dla nowego eventu)
+    if (customId.startsWith("reminder_select_")) {
+      const [, userEventKey] = customId.split("reminder_select_"); // userId-eventId
+      const selectedValue = interaction.values[0]; // np. "0", "5", "15" ...
+      const reminderMinutes = parseInt(selectedValue, 10);
+
+      // Pobranie eventu z storage
+      const events = await EventStorage.getEvents(interaction.guildId!);
+      const eventId = userEventKey.split("-")[1]; // wyciągamy eventId z customId
+      const event = events.find(e => e.id === eventId);
+
+      if (!event) {
+        await interaction.update({ content: "Event not found. Could not set reminder.", components: [] });
+        return;
+      }
+
+      // Aktualizacja pola reminderBefore w eventcie
+      if (reminderMinutes > 0) {
+        event.reminderBefore = reminderMinutes;
+      } else {
+        delete event.reminderBefore;
+      }
+
+      await EventStorage.saveEvents(interaction.guildId!, events);
+
+      await interaction.update({
+        content: `Reminder for **${event.name}** set to ${reminderMinutes > 0 ? `${reminderMinutes} minutes before` : "No reminder"}.`,
+        components: []
+      });
+
+      return;
+    }
+
     // ✅ COMPARE SELECT
     if (customId.startsWith("compare_select_")) {
       await handleCompareSelect(interaction);
