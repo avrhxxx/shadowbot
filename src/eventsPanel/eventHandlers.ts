@@ -115,6 +115,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
+    // ✅ SHOW LIST / DOWNLOAD SINGLE
     if (customId.startsWith("event_show_list_")) {
       const eventId = customId.replace("event_show_list_", "");
       await handleShowList(interaction, eventId);
@@ -124,6 +125,12 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_download_single_")) {
       const eventId = customId.replace("event_download_single_", "");
       await handleDownload(interaction, eventId);
+      return;
+    }
+
+    // ✅ DOWNLOAD ALL EVENTS (Show All button)
+    if (customId === "download_all_events") {
+      await handleDownload(interaction);
       return;
     }
 
