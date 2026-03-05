@@ -6,7 +6,8 @@ import {
     ButtonBuilder, 
     ButtonStyle, 
     StringSelectMenuInteraction, 
-    ButtonInteraction 
+    ButtonInteraction, 
+    BaseInteraction 
 } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
@@ -89,11 +90,7 @@ export async function showReminderSelect(
 ) {
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        if ("update" in interaction) {
-            await interaction.update({ content: "Temporary event data not found.", components: [] });
-        } else {
-            await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
-        }
+        (interaction as BaseInteraction).reply?.({ content: "Temporary event data not found.", ephemeral: true });
         return;
     }
 
@@ -115,7 +112,7 @@ export async function showReminderSelect(
     if ("update" in interaction) {
         await interaction.update({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row] });
     } else {
-        await interaction.reply({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row], ephemeral: true });
+        await (interaction as BaseInteraction).reply({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row], ephemeral: true });
     }
 }
 
@@ -126,11 +123,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     const tempKey = interaction.customId.replace("reminder_select_", "");
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        if ("update" in interaction) {
-            await interaction.update({ content: "Temporary event data not found.", components: [] });
-        } else {
-            await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
-        }
+        (interaction as BaseInteraction).reply?.({ content: "Temporary event data not found.", ephemeral: true });
         return;
     }
 
@@ -165,7 +158,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     if (interaction.replied || interaction.deferred) {
         await interaction.editReply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
     } else {
-        await interaction.reply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [], ephemeral: true });
+        await (interaction as BaseInteraction).reply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [], ephemeral: true });
     }
 }
 
@@ -180,7 +173,7 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
         if (interaction.replied || interaction.deferred) {
             await interaction.editReply({ content: "Temporary event data not found. Please try again.", components: [] });
         } else {
-            await interaction.reply({ content: "Temporary event data not found. Please try again.", ephemeral: true });
+            await (interaction as BaseInteraction).reply({ content: "Temporary event data not found. Please try again.", ephemeral: true });
         }
         return;
     }
@@ -215,6 +208,6 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     if (interaction.replied || interaction.deferred) {
         await interaction.editReply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [] });
     } else {
-        await interaction.reply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [], ephemeral: true });
+        await (interaction as BaseInteraction).reply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [], ephemeral: true });
     }
 }
