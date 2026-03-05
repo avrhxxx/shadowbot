@@ -51,7 +51,7 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
   });
 
   // 🔹 tymczasowe przechowanie txtText w mapie, żeby Download button wiedział, co wysłać
-  compareAllCache.set(downloadBtn.data.custom_id!, { txtText, guildId });
+  compareAllCache.set(downloadBtn.data.customId!, { txtText, guildId });
 }
 
 // 🔹 Cache dla Compare All (key = customId przycisku)
@@ -159,3 +159,12 @@ export async function buildComparison(eventA: EventObject, eventB: EventObject, 
 
   return { embedText, txtText };
 }
+
+/* ===================================================== */
+/*  EXPORTY                                             */
+/* ===================================================== */
+export {
+  handleCompareAll,
+  handleCompareAllDownload,
+  buildComparison
+};
