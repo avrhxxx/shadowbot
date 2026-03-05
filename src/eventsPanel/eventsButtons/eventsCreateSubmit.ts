@@ -4,15 +4,6 @@ import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
-/**
- * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
- * Obsługiwane formaty:
- * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
- * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
- * DDMM HHMM
- * DDMMHHMM
- * Dopuszczalny rok opcjonalnie jako osobne pole
- */
 function parseEventDateTime(input: string): { day: number; month: number; hour: number; minute: number } | null {
     input = input.trim();
     if (!input) return null;
@@ -35,7 +26,6 @@ function parseEventDateTime(input: string): { day: number; month: number; hour: 
     return { day, month, hour, minute };
 }
 
-// Tymczasowe przechowywanie danych eventu dla przycisków Next Year / Cancel
 const tempEventStore = new Map<string, {
     guildId: string;
     name: string;
@@ -43,6 +33,7 @@ const tempEventStore = new Map<string, {
     month: number;
     hour: number;
     minute: number;
+    year?: number;
     reminderBefore?: number;
 }>();
 
@@ -50,6 +41,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
     const name = interaction.fields.getTextInputValue("event_name");
     const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
+    const yearRaw = interaction.fields.getTextInputValue("event_year");
     const reminderRaw = interaction.fields.getTextInputValue("reminder_before");
 
     const reminderBefore = reminderRaw ? parseInt(reminderRaw, 10) : undefined;
@@ -65,10 +57,14 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     let { day, month, hour, minute } = parsed;
     const nowUTC = new Date();
-    let eventDateUTC = getEventDateUTC(day, month, hour, minute);
 
-    // Jeśli data jest w przeszłości → zapytaj o przesunięcie na następny rok
-    if (eventDateUTC.getTime() < nowUTC.getTime()) {
+    // 🔹 uwzględnienie opcjonalnego roku z pola modal
+    const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
+    const eventYear = year ?? nowUTC.getUTCFullYear();
+    const eventDateUTC = getEventDateUTC(day, month, hour, minute, eventYear);
+
+    // 🔹 jeśli rok nie był podany i data jest w przeszłości → Next Year / Cancel
+    if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         const tempId = `${interaction.user.id}-${Date.now()}`;
         tempEventStore.set(tempId, { guildId, name, day, month, hour, minute, reminderBefore });
 
@@ -97,7 +93,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         collector.on("collect", async i => {
             const tempData = tempEventStore.get(tempId);
             if (!tempData) {
-                await i.update({ content: "Temporary event data not found, please try again.", components: [] });
+                await i.update({ content: "Temporary event data not found.", components: [] });
                 collector.stop();
                 return;
             }
@@ -117,7 +113,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     createdAt: Date.now(),
                     reminderSent: false,
                     started: false,
-                    // Dodaj year do EventObject w eventService.ts
                     year: nextYear,
                     ...(tempData.reminderBefore !== undefined && { reminderBefore: tempData.reminderBefore })
                 };
@@ -133,7 +128,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 );
 
                 if (duplicate) {
-                    await i.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [] });
+                    await i.update({ content: "An active event already exists.", components: [] });
                     await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
                     tempEventStore.delete(tempId);
                     collector.stop();
@@ -141,10 +136,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 }
 
                 await saveEvents(tempData.guildId, [...events, newEvent]);
-
-                if (interaction.guild) {
-                    await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
-                }
+                if (interaction.guild) await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
 
                 await i.update({ content: `Event created for ${tempData.day}/${tempData.month} ${tempData.hour}:${tempData.minute} UTC next year.`, components: [] });
                 await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
@@ -157,14 +149,11 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
             collector.stop();
         });
 
-        collector.on("end", () => {
-            tempEventStore.delete(tempId);
-        });
-
+        collector.on("end", () => tempEventStore.delete(tempId));
         return;
     }
 
-    // Normalne tworzenie eventu w przyszłości
+    // 🔹 normalne tworzenie eventu (rok wpisany lub przyszła data)
     const events: EventObject[] = await getEvents(guildId);
     const duplicate = events.find(
         e =>
@@ -196,14 +185,12 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
+        year: eventYear,
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
     await saveEvents(guildId, [...events, newEvent]);
-
-    if (interaction.guild) {
-        await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
-    }
+    if (interaction.guild) await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
 
     await interaction.reply({
         content: "Event created successfully!",
