@@ -12,7 +12,7 @@ import { EventObject, getEvents, saveEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
-type TempEventData = {
+export type TempEventData = {
     name: string;
     day: number;
     month: number;
@@ -22,7 +22,7 @@ type TempEventData = {
     year?: number;
 };
 
-const tempEventStore = new Map<string, TempEventData>();
+export const tempEventStore = new Map<string, TempEventData>();
 
 function parseEventDateTime(input: string) {
     const match = input.trim().match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
@@ -83,7 +83,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 /* =======================================================
    🔹 Pokazujemy select menu do ustawienia remindera
 ======================================================= */
-async function showReminderSelect(interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction, tempKey: string) {
+export async function showReminderSelect(
+    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction, 
+    tempKey: string
+) {
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
         await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
