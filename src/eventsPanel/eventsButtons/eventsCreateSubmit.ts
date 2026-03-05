@@ -4,6 +4,14 @@ import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
+/**
+ * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
+ * Obsługiwane formaty:
+ * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
+ * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
+ * DDMM HHMM
+ * DDMMHHMM
+ */
 function parseEventDateTime(input: string): { day: number; month: number; hour: number; minute: number } | null {
     input = input.trim();
     if (!input) return null;
@@ -26,6 +34,7 @@ function parseEventDateTime(input: string): { day: number; month: number; hour: 
     return { day, month, hour, minute };
 }
 
+// Tymczasowe przechowywanie danych eventu dla przycisków Next Year / Cancel
 const tempEventStore = new Map<string, {
     guildId: string;
     name: string;
@@ -49,21 +58,23 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     if (!name || !parsed) {
         await interaction.reply({
-            content: "Invalid date/time input. Please use a valid format like 18.07 20:30 and check the calendar.",
+            content: "Invalid date/time input. Please use a valid format like 18.07 20:30.",
             ephemeral: true
         });
         return;
     }
 
-    let { day, month, hour, minute } = parsed;
+    const { day, month, hour, minute } = parsed;
     const nowUTC = new Date();
 
-    // 🔹 uwzględnienie opcjonalnego roku z pola modal
+    // 🔹 obsługa opcjonalnego roku
     const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const eventYear = year ?? nowUTC.getUTCFullYear();
-    const eventDateUTC = getEventDateUTC(day, month, hour, minute, eventYear);
 
-    // 🔹 jeśli rok nie był podany i data jest w przeszłości → Next Year / Cancel
+    // 🔹 przekazujemy informację o podanym roku do funkcji getEventDateUTC
+    const eventDateUTC = getEventDateUTC(day, month, hour, minute, !!year);
+
+    // 🔹 jeśli rok nie był podany i data już minęła → Next Year / Cancel
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         const tempId = `${interaction.user.id}-${Date.now()}`;
         tempEventStore.set(tempId, { guildId, name, day, month, hour, minute, reminderBefore });
@@ -85,7 +96,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
             fetchReply: true
         });
 
-        const filter = (i: any) => i.user.id === interaction.user.id &&
+        const filter = (i: any) =>
+            i.user.id === interaction.user.id &&
             (i.customId.startsWith("next_year_yes") || i.customId.startsWith("next_year_no"));
 
         const collector = msg.createMessageComponentCollector({ filter, componentType: ComponentType.Button, time: 60_000 });
