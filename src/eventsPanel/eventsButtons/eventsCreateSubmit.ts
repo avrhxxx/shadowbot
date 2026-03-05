@@ -84,8 +84,11 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 .setStyle(ButtonStyle.Danger)
         );
 
+        // 🔹 kosmetyczny fix: użycie formatEventUTC dla komunikatu o przeszłej dacie
+        const formattedDate = formatEventUTC(day, month, hour, minute);
+
         const msg = await interaction.reply({
-            content: `The date ${day}/${month} ${hour}:${minute} UTC has already passed. Do you want to set the event for next year?`,
+            content: `The date ${formattedDate} UTC has already passed. Do you want to set the event for next year?`,
             components: [row],
             fetchReply: true
         });
@@ -146,9 +149,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 await saveEvents(tempData.guildId, [...events, newEvent]);
                 if (interaction.guild) await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
 
-                // 🔹 kosmetyczny fix – formatowanie daty
-                const formattedDate = `${formatEventUTC(tempData.day, tempData.month, tempData.hour, tempData.minute)} ${nextYear}`;
-                await i.update({ content: `Event created for ${formattedDate} UTC next year.`, components: [] });
+                const formattedDateNextYear = `${formatEventUTC(tempData.day, tempData.month, tempData.hour, tempData.minute)} ${nextYear}`;
+                await i.update({ content: `Event created for ${formattedDateNextYear} UTC next year.`, components: [] });
                 await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
             } else {
                 await i.update({ content: "Event was not added.", components: [] });
