@@ -4,7 +4,7 @@ import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
-import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder } from "./eventsButtons/eventsCreateSubmit";
+import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, finalizeNextYearEvent } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
 import {
   handleCancel,
@@ -104,25 +104,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     // ✅ NEW YEAR BUTTONS
     if (customId === "next_year_yes" || customId === "next_year_no") {
-      const tempKey = `${interaction.user.id}-temp`;
-      const storedData = tempEventStore.get(tempKey);
-
-      if (!storedData) {
-        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
-        return;
-      }
-
-      if (customId === "next_year_no") {
-        tempEventStore.delete(tempKey);
-        await interaction.update({ content: "Event was not added.", components: [] });
-        return;
-      }
-
-      // Set next year
-      storedData.year = new Date().getUTCFullYear() + 1;
-
-      // Wywołanie finalizacji eventu z remindera (ustawienie 0 min domyślnie)
-      await finalizeEventWithReminder({ ...interaction, customId: `reminder_select_${tempKey}`, values: ["0"] } as any);
+      await finalizeNextYearEvent(interaction);
       return;
     }
   }
