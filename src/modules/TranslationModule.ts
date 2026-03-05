@@ -36,19 +36,12 @@ const LANGUAGES = [
 ];
 
 export function initTranslationModule(client: Client) {
-    // Auto reakcja 🌍, ale ignoruj komendy
-    client.on("messageCreate", async (message: Message) => {
-        if (message.author.bot || !message.inGuild()) return;
-        if (message.content.startsWith("!")) return; // nie reaguj na komendy
-
-        try { await message.react("🌍"); } catch {}
-    });
-
+    // Nie reagujemy automatycznie 🌍, tylko czekamy na reakcję 🈯
     client.on("messageReactionAdd", async (reaction, user) => {
         if (user.bot) return;
         if (reaction.partial) await reaction.fetch();
         if (reaction.message.partial) await reaction.message.fetch();
-        if (reaction.emoji.name !== "🌍") return;
+        if (reaction.emoji.name !== "🈯") return; // <- tu reagujemy tylko na u6307
         if (!reaction.message.inGuild()) return;
 
         const message = reaction.message;
