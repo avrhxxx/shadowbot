@@ -9,11 +9,15 @@ export interface EventObject {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore?: number; // ✅ OPTIONAL
+  reminderBefore?: number; // OPTIONAL
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   createdAt: number;
   absent?: string[];
+
+  // 🔹 nowe pola dla reminderów
+  reminderSent?: boolean;
+  started?: boolean;
 }
 
 export async function createEvent(data: {
@@ -23,7 +27,7 @@ export async function createEvent(data: {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore?: number; // ✅ OPTIONAL
+  reminderBefore?: number;
 }): Promise<EventObject> {
   const events = await EventStorage.getEvents(data.guildId);
 
@@ -32,7 +36,9 @@ export async function createEvent(data: {
     ...data,
     status: "ACTIVE",
     participants: [],
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    reminderSent: false, // 🔹 inicjalizacja
+    started: false       // 🔹 inicjalizacja
   };
 
   events.push(newEvent);
