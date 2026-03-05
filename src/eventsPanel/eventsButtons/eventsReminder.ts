@@ -2,11 +2,19 @@ import { TextChannel, Guild, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
-const CHECK_INTERVAL = 30_000; // co 30 sekund
-let intervalHandles = new Map<string, NodeJS.Timer>();
+// co ile sprawdzamy eventy (ms)
+const CHECK_INTERVAL = 30_000;
+
+// Mapy intervali, poprawiony typ
+let intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
+
+// Rozszerzamy EventObject o pola do reminderów
+export interface EventWithReminder extends EventStorage.EventObject {
+  reminderSent?: boolean;
+  started?: boolean;
+}
 
 export async function initEventReminders(guild: Guild) {
-  // Start cyklicznego checka dla guilda, jeśli jeszcze nie startował
   if (intervalHandles.has(guild.id)) return;
 
   const handle = setInterval(() => checkEvents(guild), CHECK_INTERVAL);
@@ -22,7 +30,7 @@ export function stopEventReminders(guildId: string) {
 }
 
 async function checkEvents(guild: Guild) {
-  const events = await EventStorage.getEvents(guild.id);
+  const events = await EventStorage.getEvents(guild.id) as EventWithReminder[];
   const now = new Date();
 
   for (const event of events) {
@@ -36,8 +44,10 @@ async function checkEvents(guild: Guild) {
       if (!event.reminderSent && now.getTime() >= reminderTime) {
         const config = await EventStorage.getConfig(guild.id);
         if (!config?.notificationChannelId) continue;
+
         const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
         if (!channel || !channel.isTextBased()) continue;
+
         await sendReminderMessage(channel, event);
         event.reminderSent = true;
         await EventStorage.saveEvents(guild.id, events);
@@ -48,8 +58,10 @@ async function checkEvents(guild: Guild) {
     if (!event.started && now.getTime() >= eventTime.getTime()) {
       const config = await EventStorage.getConfig(guild.id);
       if (!config?.notificationChannelId) continue;
+
       const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
       if (!channel || !channel.isTextBased()) continue;
+
       await sendEventStarted(channel, event, guild);
       event.started = true;
       event.status = "PAST";
@@ -58,7 +70,7 @@ async function checkEvents(guild: Guild) {
   }
 }
 
-export async function sendEventCreatedNotification(event: any, guild: Guild) {
+export async function sendEventCreatedNotification(event: EventWithReminder, guild: Guild) {
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
@@ -80,7 +92,7 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
   await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
-export async function sendReminderMessage(channel: TextChannel, event: any) {
+export async function sendReminderMessage(channel: TextChannel, event: EventWithReminder) {
   const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
 
   const embed = new EmbedBuilder()
@@ -91,7 +103,7 @@ export async function sendReminderMessage(channel: TextChannel, event: any) {
   await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
-async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) {
+async function sendEventStarted(channel: TextChannel, event: EventWithReminder, guild: Guild) {
   const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
 
   const embed = new EmbedBuilder()
