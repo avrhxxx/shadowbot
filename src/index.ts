@@ -3,6 +3,7 @@ import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers"; // nowa ścieżka
+import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder"; // dodane
 
 const client = new Client({
   intents: [
@@ -24,8 +25,10 @@ client.once("ready", () => { // poprawione z "clientReady" na "ready"
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // 🔹 UWAGA: Nie uruchamiamy interwału reminderów jeszcze
-  // initEventReminders(guild) -> wywołanie pozostawione na później
+  // 🔹 Uruchamiamy interval reminderów dla wszystkich guildów
+  for (const guild of client.guilds.cache.values()) {
+    initEventReminders(guild);
+  }
 
   // Globalny listener dla Event Panelu
   client.on("interactionCreate", async (interaction: Interaction) => {
