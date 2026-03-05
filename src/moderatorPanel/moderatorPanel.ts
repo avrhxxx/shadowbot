@@ -17,8 +17,8 @@ import { handleEventMenu } from "./moderatorButtons/eventMenu";
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
-  // Znajdź lub utwórz kanał moderator-panel w każdym guildzie
-  client.guilds.cache.forEach(async (guild) => {
+  // Iteracja po guildach z await, żeby uniknąć podwójnego tworzenia paneli
+  for (const guild of client.guilds.cache.values()) {
     let modChannel = guild.channels.cache.find(
       (c) =>
         c.type === 0 && // GUILD_TEXT
@@ -63,7 +63,7 @@ Tip: No need for magic wands — just type it straight! ✨
 
     // Render root hub w tym kanale
     await renderModeratorHub(modChannel);
-  });
+  }
 
   // Globalny listener na przyciski ModeratorPanel
   client.on("interactionCreate", async (interaction: Interaction) => {
