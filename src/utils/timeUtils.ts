@@ -1,39 +1,33 @@
+// src/utils/timeUtils.ts
+
 /**
- * Zwraca najbliższą przyszłą datę eventu w UTC.
- * Rok NIE jest zapisywany w bazie — wyliczamy go dynamicznie.
+ * Zwraca literalną datę eventu w UTC.
+ * Funkcja NIE przesuwa daty na następny rok.
+ * Logika „Next Year / Cancel” powinna być obsługiwana w submit handlerze.
  */
 export function getEventDateUTC(
   day: number,
   month: number,
   hour: number,
-  minute: number
+  minute: number,
+  year?: number
 ): Date {
-
-  const now = new Date();
-  let year = now.getUTCFullYear();
-
-  let eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-
-  // jeśli data już minęła → użyj następnego roku
-  if (eventDate.getTime() <= now.getTime()) {
-    year += 1;
-    eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-  }
-
-  return eventDate;
+  const useYear = year ?? new Date().getUTCFullYear();
+  return new Date(Date.UTC(useYear, month - 1, day, hour, minute));
 }
 
 /**
  * Formatowanie daty eventu do wyświetlenia
+ * @param year - opcjonalny rok, jeśli go podamy, zostanie dołączony do tekstu
  */
 export function formatEventUTC(
   day: number,
   month: number,
   hour: number,
-  minute: number
+  minute: number,
+  year?: number
 ): string {
-
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-
-  return `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)} UTC`;
+  const base = `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)}`;
+  return year ? `${base} ${year} UTC` : `${base} UTC`;
 }

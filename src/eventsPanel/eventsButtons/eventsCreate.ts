@@ -1,59 +1,68 @@
+// src/eventsPanel/eventsButtons/eventsCreate.ts
 import { 
-  ButtonInteraction, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ActionRowBuilder 
+    ButtonInteraction, 
+    ModalBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    ActionRowBuilder 
 } from "discord.js";
 
+import * as EventStorage from "../eventStorage"; // 🔹 dodane
+
 export async function handleCreate(interaction: ButtonInteraction) {
-  if (!interaction.isButton()) return;
+    // ✅ tylko dla przycisku
+    if (!interaction.isButton()) return;
 
-  const modal = new ModalBuilder()
-    .setCustomId("event_create_modal")
-    .setTitle("Create Event");
+    // 🔹 sprawdzenie czy system jest skonfigurowany
+    const config = await EventStorage.getConfig(interaction.guildId!);
 
-  const nameInput = new TextInputBuilder()
-    .setCustomId("event_name")
-    .setLabel("Event Name")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+    if (!config?.notificationChannelId || !config?.downloadChannelId) {
+        await interaction.reply({
+            content:
+                "⚠️ Event system is not configured yet.\n\n" +
+                "Please use the ⚙️ **Settings** button first and configure:\n" +
+                "• Notification Channel\n" +
+                "• Download Channel",
+            ephemeral: true
+        });
+        return;
+    }
 
-  const dayInput = new TextInputBuilder()
-    .setCustomId("event_day")
-    .setLabel("Day (1-31, UTC)")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Enter day in UTC")
-    .setRequired(true);
+    const modal = new ModalBuilder()
+        .setCustomId("event_create_modal")
+        .setTitle("Create Event");
 
-  const monthInput = new TextInputBuilder()
-    .setCustomId("event_month")
-    .setLabel("Month (1-12, UTC)")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Enter month in UTC")
-    .setRequired(true);
+    // Pole: nazwa eventu (required)
+    const nameInput = new TextInputBuilder()
+        .setCustomId("event_name")
+        .setLabel("Event Name")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
 
-  const timeInput = new TextInputBuilder()
-    .setCustomId("event_time")
-    .setLabel("Time (HH:MM or HHMM UTC 24H Format)")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Enter time in UTC, e.g. 1:30, 13:00, 130, 1300")
-    .setRequired(true);
+    // Pole: data + godzina (required)
+    const datetimeInput = new TextInputBuilder()
+        .setCustomId("event_datetime")
+        .setLabel("Date & Time (UTC)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("See pinned message in this channel for formats")
+        .setRequired(true);
 
-  const reminderInput = new TextInputBuilder()
-    .setCustomId("reminder_before")
-    .setLabel("Reminder before (minutes, optional)")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Leave empty if no reminder")
-    .setRequired(false);
+    // Pole: opcjonalny rok
+    const yearInput = new TextInputBuilder()
+        .setCustomId("event_year")
+        .setLabel("Year (optional)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Leave empty to auto-calculate the year")
+        .setRequired(false);
 
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(timeInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
-  );
+    // 🔹 Usunięto pole reminderInput z modala
+    // Wszystkie pola dodajemy do modala
+    modal.addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
+    );
 
-  await interaction.showModal(modal);
+    // ✅ Wyświetlenie modala
+    await interaction.showModal(modal);
 }

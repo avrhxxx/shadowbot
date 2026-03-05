@@ -1,7 +1,8 @@
 // src/eventsPanel/eventsButtons/eventsManualReminder.ts
-import { ButtonInteraction, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, TextChannel } from "discord.js";
+import { ButtonInteraction, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { sendReminderMessage } from "./eventsReminder";
+import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
  * 🔹 Handler przycisku "Manual Reminder"
@@ -24,7 +25,7 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
       upcomingEvents.map(ev =>
         new StringSelectMenuOptionBuilder()
           .setLabel(ev.name)
-          .setDescription(`UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`)
+          .setDescription(formatEventUTC(ev.day, ev.month, ev.hour, ev.minute, ev.year))
           .setValue(ev.id)
       )
     );

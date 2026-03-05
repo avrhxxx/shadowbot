@@ -9,11 +9,16 @@ export interface EventObject {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore?: number; // ✅ OPTIONAL
+  year?: number;           // 🔹 dodane dla Next Year
+  reminderBefore?: number; // OPTIONAL
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   createdAt: number;
   absent?: string[];
+
+  // 🔹 nowe pola dla reminderów
+  reminderSent?: boolean;
+  started?: boolean;
 }
 
 export async function createEvent(data: {
@@ -23,7 +28,8 @@ export async function createEvent(data: {
   month: number;
   hour: number;
   minute: number;
-  reminderBefore?: number; // ✅ OPTIONAL
+  year?: number;           // 🔹 dodane
+  reminderBefore?: number;
 }): Promise<EventObject> {
   const events = await EventStorage.getEvents(data.guildId);
 
@@ -32,7 +38,9 @@ export async function createEvent(data: {
     ...data,
     status: "ACTIVE",
     participants: [],
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    reminderSent: false,
+    started: false
   };
 
   events.push(newEvent);
@@ -104,7 +112,7 @@ export async function sendManualReminders(guild: any) {
     const embed = new EmbedBuilder()
       .setTitle(`Reminder: ${event.name}`)
       .setDescription(
-        `Event starts on ${event.day}/${event.month} at ${event.hour}:${event.minute}`
+        `Event starts on ${event.day}/${event.month}${event.year ? `/${event.year}` : ""} at ${event.hour}:${event.minute}`
       );
 
     await channel.send({ embeds: [embed] });

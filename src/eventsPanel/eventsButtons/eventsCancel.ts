@@ -9,6 +9,7 @@ import {
   EmbedBuilder
 } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
+import { formatEventUTC } from "../../utils/timeUtils";
 
 /* ======================================================
    🔹 STEP 1 – BUTTON → SELECT
@@ -34,7 +35,7 @@ export async function handleCancel(interaction: ButtonInteraction) {
     .addOptions(
       activeEvents.map(e => ({
         label: e.name,
-        description: `${e.day}/${e.month} ${e.hour}:${e.minute}`,
+        description: formatEventUTC(e.day, e.month, e.hour, e.minute, e.year),
         value: e.id
       }))
     );
@@ -70,7 +71,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
     .setTitle("Confirm Cancellation")
     .setDescription(
       `Are you sure you want to cancel **${event.name}**?\n\n` +
-      `📅 ${event.day}/${event.month} ${event.hour}:${event.minute}`
+      `📅 ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}`
     )
     .setColor("Orange");
 
@@ -106,7 +107,6 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
     return;
   }
 
-  // ✅ US spelling
   event.status = "CANCELED";
   await saveEvents(guildId, events);
 

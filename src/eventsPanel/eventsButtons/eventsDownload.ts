@@ -1,8 +1,10 @@
+// src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import path from "path";
 import fs from "fs";
 import { EventObject } from "../eventService";
+import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
  * Download participant lists
@@ -31,8 +33,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const tempDir = path.join(__dirname, "../../temp");
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-
   // 🔹 Single event download
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
@@ -48,15 +48,16 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-    const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
 
+    const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
+
+    // 🔹 Usunięto linię o download z pliku TXT
     const messageContent = [
       `**Event:** ${event.name}`,
       `**Status:** ${statusLabel}`,
       `**Date:** ${dateStr}`,
       `**Participants:**\n${participants}`,
-      `**Absent:**\n${absent}`,
-      `\nYou can also download this as a TXT file attached below.`
+      `**Absent:**\n${absent}`
     ].join("\n\n");
 
     const filePath = path.join(tempDir, `${event.id}.txt`);
@@ -64,7 +65,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const attachment = new AttachmentBuilder(filePath);
 
-    await channel.send({ content: messageContent, files: [attachment] });
+    await channel.send({ content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`, files: [attachment] });
 
     await interaction.reply({
       content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
@@ -90,7 +91,8 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-    const dateStr = `${pad(event.day)}/${pad(event.month)} ${pad(event.hour)}:${pad(event.minute)}`;
+
+    const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     const eventText = [
       `Event: ${event.name}`,

@@ -21,11 +21,16 @@ export type EventObject = {
   month: number;
   hour: number;
   minute: number;
+  year?: number;          // 🔹 dodane dla Next Year
   reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   createdAt: number;
   guildId: string;
+
+  // 🔹 nowe pola
+  reminderSent?: boolean;
+  started?: boolean;
 };
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {

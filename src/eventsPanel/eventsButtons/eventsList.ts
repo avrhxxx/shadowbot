@@ -11,33 +11,11 @@ function cleanNickname(nick: string) {
 }
 
 /**
- * Aktualizuje statusy eventów ACTIVE -> PAST jeśli data minęła (UTC)
- */
-async function updateEventStatuses(events: EventObject[], guildId: string) {
-  const now = new Date();
-  let updated = false;
-
-  for (const e of events) {
-    const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
-    if (e.status === "ACTIVE" && eventDateUTC.getTime() < now.getTime()) {
-      e.status = "PAST";
-      updated = true;
-    }
-  }
-
-  if (updated) {
-    await EventStorage.saveEvents(guildId, events);
-    return await EventStorage.getEvents(guildId);
-  }
-
-  return events;
-}
-
-/**
  * Helper: formatuje EventObject na UTC string
  */
 function formatEventUTCObj(e: EventObject) {
-  return formatEventUTC(e.day, e.month, e.hour, e.minute);
+  const year = e.year ?? new Date().getUTCFullYear();
+  return formatEventUTC(e.day, e.month, e.hour, e.minute, year);
 }
 
 /**
@@ -52,8 +30,7 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  events = await updateEventStatuses(events, guildId);
-
+  // 🔹 usunięcie updateEventStatuses — status bierze się z reminderów
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const eventDateUTCStr = formatEventUTCObj(e);
@@ -95,8 +72,6 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const guildId = interaction.guildId!;
   let events: EventObject[] = await EventStorage.getEvents(guildId);
 
-  events = await updateEventStatuses(events, guildId);
-
   const event = events.find(e => e.id === eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -127,7 +102,6 @@ export async function updateEventEmbed(message: any, eventId: string) {
   if (!guildId) return;
 
   let events: EventObject[] = await EventStorage.getEvents(guildId);
-  events = await updateEventStatuses(events, guildId);
 
   const e = events.find(ev => ev.id === eventId);
   if (!e) return;

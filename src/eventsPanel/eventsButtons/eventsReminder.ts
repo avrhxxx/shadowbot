@@ -1,37 +1,85 @@
+// src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
-const reminderTimeouts = new Map<string, NodeJS.Timeout>();
-const eventStartTimeouts = new Map<string, NodeJS.Timeout>();
+// co ile sprawdzamy eventy (ms)
+const CHECK_INTERVAL = 30_000;
+
+// Mapy intervali, poprawiony typ
+let intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
+
+// Rozszerzamy EventObject o pola do reminderów
+export interface EventWithReminder extends EventStorage.EventObject {
+  reminderSent?: boolean;
+  started?: boolean;
+}
 
 export async function initEventReminders(guild: Guild) {
-  const events = await EventStorage.getEvents(guild.id);
-  const now = new Date();
+  if (intervalHandles.has(guild.id)) return;
+
+  const handle = setInterval(() => checkEvents(guild), CHECK_INTERVAL);
+  intervalHandles.set(guild.id, handle);
+}
+
+export function stopEventReminders(guildId: string) {
+  const handle = intervalHandles.get(guildId);
+  if (handle) {
+    clearInterval(handle);
+    intervalHandles.delete(guildId);
+  }
+}
+
+async function checkEvents(guild: Guild) {
+  const events = await EventStorage.getEvents(guild.id) as EventWithReminder[];
+  const now = Date.now(); // 🔹 UTC timestamp
 
   for (const event of events) {
+    if (event.status !== "ACTIVE") continue;
 
-    const eventTime = getEventDateUTC(
-      event.day,
-      event.month,
-      event.hour,
-      event.minute
-    );
+    // 🔹 używamy literalnego roku zapisanego w evencie
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime(); // 🔹 UTC timestamp
 
-    if (event.status === "ACTIVE" && eventTime.getTime() > now.getTime()) {
-      await scheduleEventReminders(event, guild);
+    // Reminder
+    if (event.reminderBefore !== undefined) {
+      const reminderTime = eventTime - event.reminderBefore * 60_000;
+      if (!event.reminderSent && now >= reminderTime) {
+        const config = await EventStorage.getConfig(guild.id);
+        if (!config?.notificationChannelId) continue;
+
+        const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+        if (!channel || !channel.isTextBased()) continue;
+
+        await sendReminderMessage(channel, event);
+        event.reminderSent = true;
+        await EventStorage.saveEvents(guild.id, events);
+      }
+    }
+
+    // Event started
+    if (!event.started && now >= eventTime) {
+      const config = await EventStorage.getConfig(guild.id);
+      if (!config?.notificationChannelId) continue;
+
+      const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+      if (!channel || !channel.isTextBased()) continue;
+
+      await sendEventStarted(channel, event, guild);
+      event.started = true;
+      event.status = "PAST";
+      await EventStorage.saveEvents(guild.id, events);
     }
   }
 }
 
-export async function sendEventCreatedNotification(event: any, guild: Guild) {
+export async function sendEventCreatedNotification(event: EventWithReminder, guild: Guild) {
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`🎉 Event Created: ${event.name}`)
@@ -44,66 +92,10 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
     .setColor("Green");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
-
-  await scheduleEventReminders(event, guild);
 }
 
-export async function scheduleEventReminders(event: any, guild: Guild) {
-
-  if (reminderTimeouts.has(event.id) || eventStartTimeouts.has(event.id)) return;
-
-  const config = await EventStorage.getConfig(guild.id);
-  if (!config?.notificationChannelId) return;
-
-  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
-  if (!channel || !channel.isTextBased()) return;
-
-  const now = new Date();
-
-  const eventTime = getEventDateUTC(
-    event.day,
-    event.month,
-    event.hour,
-    event.minute
-  );
-
-  if (event.reminderBefore !== undefined) {
-
-    const reminderTime = eventTime.getTime() - event.reminderBefore * 60_000;
-    const delayReminder = reminderTime - now.getTime();
-
-    if (delayReminder > 0) {
-
-      const timeout = setTimeout(() => {
-        sendReminderMessage(channel, event);
-        reminderTimeouts.delete(event.id);
-      }, delayReminder);
-
-      reminderTimeouts.set(event.id, timeout);
-    }
-  }
-
-  const delayStart = eventTime.getTime() - now.getTime();
-
-  if (delayStart > 0) {
-
-    const timeout = setTimeout(async () => {
-      await sendEventStarted(channel, event, guild);
-      eventStartTimeouts.delete(event.id);
-    }, delayStart);
-
-    eventStartTimeouts.set(event.id, timeout);
-  }
-}
-
-export async function sendReminderMessage(channel: TextChannel, event: any) {
-
-  const eventDateStr = formatEventUTC(
-    event.day,
-    event.month,
-    event.hour,
-    event.minute
-  );
+export async function sendReminderMessage(channel: TextChannel, event: EventWithReminder) {
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
@@ -113,14 +105,8 @@ export async function sendReminderMessage(channel: TextChannel, event: any) {
   await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
-async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) {
-
-  const eventDateStr = formatEventUTC(
-    event.day,
-    event.month,
-    event.hour,
-    event.minute
-  );
+async function sendEventStarted(channel: TextChannel, event: EventWithReminder, guild: Guild) {
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`✅ Event Started: ${event.name}`)
@@ -128,23 +114,4 @@ async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) 
     .setColor("Blue");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
-
-  const events = await EventStorage.getEvents(guild.id);
-  const e = events.find(ev => ev.id === event.id);
-
-  if (e && e.status !== "PAST") {
-    e.status = "PAST";
-    await EventStorage.saveEvents(guild.id, events);
-  }
-}
-
-export function clearEventTimeouts(eventId: string) {
-
-  const rem = reminderTimeouts.get(eventId);
-  if (rem) clearTimeout(rem);
-  reminderTimeouts.delete(eventId);
-
-  const start = eventStartTimeouts.get(eventId);
-  if (start) clearTimeout(start);
-  eventStartTimeouts.delete(eventId);
 }

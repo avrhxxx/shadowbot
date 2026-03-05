@@ -1,10 +1,10 @@
 // src/eventsPanel/eventHandlers.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel } from "discord.js";
+import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
-import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
+import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, showReminderSelect } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
 import {
   handleCancel,
@@ -101,12 +101,42 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleDownload(interaction, eventId);
       return;
     }
+
+    // ✅ NEW YEAR BUTTONS
+    if (customId === "next_year_yes" || customId === "next_year_no") {
+      const tempKey = `${interaction.user.id}-temp`;
+      const storedData = tempEventStore.get(tempKey);
+
+      if (!storedData) {
+        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+        return;
+      }
+
+      if (customId === "next_year_no") {
+        tempEventStore.delete(tempKey);
+        await interaction.update({ content: "Event was not added.", components: [] });
+        return;
+      }
+
+      // Set next year
+      storedData.year = new Date().getUTCFullYear() + 1;
+
+      // 🔹 pokaż select menu remindera zamiast finalizować od razu
+      await showReminderSelect(interaction, tempKey);
+      return;
+    }
   }
 
   /* =======================================================
      🔥 SELECT MENUS
   ======================================================= */
   if (interaction.isStringSelectMenu()) {
+
+    // ✅ REMINDER SELECT MENU (ustawienie reminderBefore dla nowego eventu)
+    if (customId.startsWith("reminder_select_")) {
+      await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
+      return;
+    }
 
     // ✅ COMPARE SELECT
     if (customId.startsWith("compare_select_")) {
@@ -207,11 +237,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await handleHelp(interaction);
         break;
       case "event_manual_reminder":
-        // wyświetl select menu do wyboru eventu
         await handleManualReminder(interaction);
         break;
       default:
-        console.warn(`Nieobsługiwany event customId: ${customId}`);
+        console.warn(`Unsupported event customId: ${customId}`);
     }
   }
 }
