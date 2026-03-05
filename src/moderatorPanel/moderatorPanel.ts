@@ -10,6 +10,8 @@ import {
 } from "discord.js";
 
 import { renderEventPanel } from "../eventsPanel/eventPanel"; // EventPanel renderer
+// import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
+// import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
 import { handleEventMenu } from "./moderatorButtons/eventMenu";
 
@@ -37,34 +39,35 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- Wiadomość z formatami dat w embedzie ---
-    const formatsEmbed = new EmbedBuilder()
+    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat jako EMBED ---
+    const embed = new EmbedBuilder()
       .setTitle("📅 Accepted Date & Time Formats")
-      .setDescription(
-        `Please enter dates and times in one of the following formats:\n\n` +
-        `**Date + Time:**\n` +
-        "`DD.MM HH:MM`   → 18.07 20:30\n" +
-        "`DD/MM HH:MM`   → 18/07 20:30\n" +
-        "`DD-MM HH:MM`   → 18-07 20:30\n" +
-        "`DD.MM HHMM`    → 18.07 2030\n" +
-        "`DD/MM HHMM`    → 18/07 2030\n" +
-        "`DD-MM HHMM`    → 18-07 2030\n" +
-        "`DDMM HHMM`     → 1807 2030\n" +
-        "`DDMMHHMM`      → 18072030\n\n" +
-        `**Year only:**\n` +
-        "`YYYY`          → 2026\n\n" +
-        `Tip: No need for magic wands — just type it straight! ✨`
+      .setDescription("Please enter dates and times in one of the following formats:")
+      .addFields(
+        {
+          name: "🕰 Date + Time",
+          value:
+            `DD.MM HH:MM   → 18.07 20:30\n` +
+            `DD/MM HH:MM   → 18/07 20:30\n` +
+            `DD-MM HH:MM   → 18-07 20:30\n` +
+            `DD.MM HHMM    → 18.07 2030\n` +
+            `DD/MM HHMM    → 18/07 2030\n` +
+            `DD-MM HHMM    → 18-07 2030\n` +
+            `DDMM HHMM     → 1807 2030\n` +
+            `DDMMHHMM      → 18072030`
+        },
+        {
+          name: "📆 Year only",
+          value: "YYYY → 2026"
+        },
+        {
+          name: "Tip",
+          value: "No need for magic wands — just type it straight! ✨"
+        }
       )
       .setColor("Blue");
 
-    await modChannel.send({ embeds: [formatsEmbed] });
-
-    // --- Embed separator ---
-    const separatorEmbed = new EmbedBuilder()
-      .setDescription("────────────────────────────")
-      .setColor("Grey");
-
-    await modChannel.send({ embeds: [separatorEmbed] });
+    await modChannel.send({ embeds: [embed] });
 
     // Render root hub w tym kanale
     await renderModeratorHub(modChannel);
@@ -80,6 +83,7 @@ export async function initModeratorPanel(client: Client) {
         break;
 
       case "moderator_points_menu":
+        // await handlePointsMenu(interaction); // placeholder
         await interaction.reply({
           content: "Points Menu – TODO",
           ephemeral: true
@@ -87,6 +91,7 @@ export async function initModeratorPanel(client: Client) {
         break;
 
       case "moderator_translate_menu":
+        // await handleTranslateMenu(interaction); // placeholder
         await interaction.reply({
           content: "Translate Menu – TODO",
           ephemeral: true
