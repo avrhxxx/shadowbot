@@ -1,12 +1,18 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate } from "../../utils/timeUtils"; // używamy tylko UTC
+import { formatUTCDate } from "../../utils/timeUtils";
 
+/**
+ * Funkcja do czyszczenia nicków – usuwa wszelkie pingowe ID i dziwne znaki
+ */
 function cleanNickname(nick: string) {
   return nick.replace(/<@!?[0-9]+>/g, "").trim();
 }
 
+/**
+ * Aktualizuje statusy eventów ACTIVE -> PAST jeśli data minęła (UTC)
+ */
 async function updateEventStatuses(events: EventObject[], guildId: string) {
   const now = new Date();
   let updated = false;
@@ -27,11 +33,17 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
   return events;
 }
 
+/**
+ * Helper: formatuje EventObject na UTC string
+ */
 function formatEventUTCObj(e: EventObject) {
   const year = new Date().getUTCFullYear();
-  return formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+  return formatUTCDate(e.day, e.month, year, { hour: e.hour, minute: e.minute });
 }
 
+/**
+ * Show ephemeral list of all events
+ */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   let events: EventObject[] = await EventStorage.getEvents(guildId);
@@ -77,6 +89,9 @@ export async function handleList(interaction: ButtonInteraction) {
   }
 }
 
+/**
+ * Handler Show List – wyświetla pełną listę uczestników i nieobecnych
+ */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   let events: EventObject[] = await EventStorage.getEvents(guildId);
@@ -104,6 +119,9 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
+/**
+ * Aktualizacja embedu głównej listy po dodaniu/usunięciu uczestnika
+ */
 export async function updateEventEmbed(message: any, eventId: string) {
   const guildId = message.guildId;
   if (!guildId) return;
