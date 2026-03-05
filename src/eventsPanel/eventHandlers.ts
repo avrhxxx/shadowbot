@@ -118,7 +118,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       // Set to next year
       const nextYear = new Date().getUTCFullYear() + 1;
       const { guildId, name, day, month, hour, minute, reminderBefore } = storedData;
-      const eventDateUTC = new Date(Date.UTC(nextYear, month - 1, day, hour, minute));
 
       const events = await EventStorage.getEvents(guildId);
       const duplicate = events.find(
@@ -168,7 +167,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       const selectedValue = interaction.values[0]; // np. "0", "5", "15" ...
       const reminderMinutes = parseInt(selectedValue, 10);
 
-      // Pobranie eventu z storage
       const events = await EventStorage.getEvents(interaction.guildId!);
       const eventId = userEventKey.split("-")[1]; // wyciągamy eventId z customId
       const event = events.find(e => e.id === eventId);
@@ -178,7 +176,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
 
-      // Aktualizacja pola reminderBefore w eventcie
       if (reminderMinutes > 0) {
         event.reminderBefore = reminderMinutes;
       } else {
@@ -191,7 +188,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         content: `Reminder for **${event.name}** set to ${reminderMinutes > 0 ? `${reminderMinutes} minutes before` : "No reminder"}.`,
         components: []
       });
-
       return;
     }
 
