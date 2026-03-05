@@ -95,6 +95,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         status: "ACTIVE",
         participants: [],
         createdAt: Date.now(),
+        reminderSent: false, // <-- dodane, domyślnie false
+        started: false,      // <-- dodane, domyślnie false
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
