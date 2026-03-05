@@ -19,11 +19,25 @@ export async function handleCreate(interaction: ButtonInteraction) {
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const datetimeInput = new TextInputBuilder()
-    .setCustomId("event_datetime")
-    .setLabel("Date & Time (UTC)")
+  const dayInput = new TextInputBuilder()
+    .setCustomId("event_day")
+    .setLabel("Day (1-31, UTC)")
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Examples: 18.07 20 | 18/07 20:30 | 18-07 2030")
+    .setPlaceholder("Enter day in UTC")
+    .setRequired(true);
+
+  const monthInput = new TextInputBuilder()
+    .setCustomId("event_month")
+    .setLabel("Month (1-12, UTC)")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter month in UTC")
+    .setRequired(true);
+
+  const timeInput = new TextInputBuilder()
+    .setCustomId("event_time")
+    .setLabel("Time (HH:MM or HHMM UTC 24H Format)")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter time in UTC, e.g. 1:30, 13:00, 130, 1300")
     .setRequired(true);
 
   const reminderInput = new TextInputBuilder()
@@ -35,7 +49,9 @@ export async function handleCreate(interaction: ButtonInteraction) {
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(dayInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(monthInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(timeInput),
     new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
   );
 
