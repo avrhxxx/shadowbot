@@ -89,7 +89,11 @@ export async function showReminderSelect(
 ) {
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
+        if ("update" in interaction) {
+            await interaction.update({ content: "Temporary event data not found.", components: [] });
+        } else {
+            await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
+        }
         return;
     }
 
@@ -106,11 +110,13 @@ export async function showReminderSelect(
             { label: "6h before", value: "360" }
         ]);
 
-    await interaction.reply({
-        content: `Event "${tempData.name}" created. Please select a reminder time:`,
-        components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu)],
-        ephemeral: true
-    });
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+    if ("update" in interaction) {
+        await interaction.update({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row] });
+    } else {
+        await interaction.reply({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row], ephemeral: true });
+    }
 }
 
 /* =======================================================
@@ -120,7 +126,11 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     const tempKey = interaction.customId.replace("reminder_select_", "");
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await interaction.update({ content: "Temporary event data not found.", components: [] });
+        if ("update" in interaction) {
+            await interaction.update({ content: "Temporary event data not found.", components: [] });
+        } else {
+            await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
+        }
         return;
     }
 
@@ -148,12 +158,15 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     await saveEvents(tempData.guildId, [...events, newEvent]);
     tempEventStore.delete(tempKey);
 
-    // 🔹 Wyślij powiadomienie o utworzonym evencie
     if (interaction.guild) {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
-    await interaction.update({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
+    if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
+    } else {
+        await interaction.reply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [], ephemeral: true });
+    }
 }
 
 /* =======================================================
@@ -164,7 +177,11 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     const tempKey = `${interaction.user.id}-temp`;
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+        if (interaction.replied || interaction.deferred) {
+            await interaction.editReply({ content: "Temporary event data not found. Please try again.", components: [] });
+        } else {
+            await interaction.reply({ content: "Temporary event data not found. Please try again.", ephemeral: true });
+        }
         return;
     }
 
@@ -195,5 +212,9 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
-    await interaction.update({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [] });
+    if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [] });
+    } else {
+        await interaction.reply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [], ephemeral: true });
+    }
 }
