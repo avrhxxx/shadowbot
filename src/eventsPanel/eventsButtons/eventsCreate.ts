@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 
 export async function handleCreate(interaction: ButtonInteraction) {
+    // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
 
     const modal = new ModalBuilder()
@@ -21,12 +22,12 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-    // Pole: data + godzina (required), placeholder krótki
+    // Pole: data + godzina (required), krótki placeholder
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Enter date & time (see channel description for formats)")
+        .setPlaceholder("See pinned message in this channel for formats")
         .setRequired(true);
 
     // Pole: opcjonalny rok
@@ -53,6 +54,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
         new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
     );
 
-    // Wyświetlenie modala po kliknięciu przycisku
+    // ✅ Wyświetlenie modala po kliknięciu przycisku
     await interaction.showModal(modal);
 }
