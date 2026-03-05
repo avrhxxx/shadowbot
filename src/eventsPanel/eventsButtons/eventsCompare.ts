@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCompare.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -16,9 +17,10 @@ import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
  * Pomocnicza funkcja formatująca EventObject
+ * 🔹 teraz uwzględnia też rok
  */
 function formatEventUTCObj(e: EventObject) {
-  return formatEventUTC(e.day, e.month, e.hour, e.minute);
+  return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
 
 /* ===================================================== */
@@ -134,11 +136,15 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
 
   const utcNow = new Date().toISOString();
 
+  // 🔹 Wiadomość na Discordzie – zostawiamy
   await channel.send({ content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}` });
 
-  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_${eventA.name}_vs_${eventB.name}.txt` });
+  // 🔹 Plik TXT – nie dodajemy dodatkowych zdań, tylko sam tekst
+  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
+    name: `compare_${eventA.name}_vs_${eventB.name}.txt`
+  });
 
-  await channel.send({ content: `File version of the comparison:`, files: [file] });
+  await channel.send({ files: [file] });
 
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
