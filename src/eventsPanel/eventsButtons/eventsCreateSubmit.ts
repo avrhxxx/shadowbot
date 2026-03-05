@@ -155,3 +155,45 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
 
     await interaction.update({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
 }
+
+/* =======================================================
+   🔹 Finalizacja eventu dla przycisku NEXT YEAR
+       (bez select menu)
+======================================================= */
+export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+    const tempKey = `${interaction.user.id}-temp`;
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) {
+        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+        return;
+    }
+
+    // ustawiamy rok na następny
+    tempData.year = new Date().getUTCFullYear() + 1;
+
+    const events: EventObject[] = await getEvents(tempData.guildId);
+    const newEvent: EventObject = {
+        id: `${Date.now()}`,
+        guildId: tempData.guildId,
+        name: tempData.name,
+        day: tempData.day,
+        month: tempData.month,
+        hour: tempData.hour,
+        minute: tempData.minute,
+        year: tempData.year!,
+        status: "ACTIVE",
+        participants: [],
+        createdAt: Date.now(),
+        reminderSent: false,
+        started: false
+    };
+
+    await saveEvents(tempData.guildId, [...events, newEvent]);
+    tempEventStore.delete(tempKey);
+
+    if (interaction.guild) {
+        await sendEventCreatedNotification(newEvent, interaction.guild);
+    }
+
+    await interaction.update({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [] });
+}
