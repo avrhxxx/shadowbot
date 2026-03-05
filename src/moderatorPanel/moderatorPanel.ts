@@ -38,6 +38,29 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
+    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat ---
+    await modChannel.send(`
+\`\`\`
+📅 Accepted Date & Time Formats
+Please enter dates and times in one of the following formats:
+
+🕰 Date + Time:
+  DD.MM HH:MM   → 18.07 20:30
+  DD/MM HH:MM   → 18/07 20:30
+  DD-MM HH:MM   → 18-07 20:30
+  DD.MM HHMM    → 18.07 2030
+  DD/MM HHMM    → 18/07 2030
+  DD-MM HHMM    → 18-07 2030
+  DDMM HHMM     → 1807 2030
+  DDMMHHMM      → 18072030
+
+📆 Year only:
+  YYYY          → 2026
+
+Tip: No need for magic wands — just type it straight! ✨
+\`\`\`
+    `);
+
     // Render root hub w tym kanale
     await renderModeratorHub(modChannel);
   });
