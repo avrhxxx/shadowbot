@@ -18,13 +18,16 @@ export function getEventDateUTC(
 
 /**
  * Formatowanie daty eventu do wyświetlenia
+ * @param year - opcjonalny rok, jeśli go podamy, zostanie dołączony do tekstu
  */
 export function formatEventUTC(
   day: number,
   month: number,
   hour: number,
-  minute: number
+  minute: number,
+  year?: number
 ): string {
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)} UTC`;
+  const base = `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)}`;
+  return year ? `${base} ${year} UTC` : `${base} UTC`;
 }
