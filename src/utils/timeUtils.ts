@@ -1,6 +1,6 @@
 /**
- * Zwraca NAJBLIŻSZĄ przyszłą datę eventu w UTC.
- * Rok nie jest zapisywany w bazie — wyliczamy go dynamicznie.
+ * Zwraca najbliższą przyszłą datę eventu w UTC.
+ * Rok NIE jest zapisywany w bazie — wyliczamy go dynamicznie.
  */
 export function getEventDateUTC(
   day: number,
@@ -14,7 +14,7 @@ export function getEventDateUTC(
 
   let eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
 
-  // jeśli data już minęła → używamy następnego roku
+  // jeśli data już minęła → użyj następnego roku
   if (eventDate.getTime() <= now.getTime()) {
     year += 1;
     eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
