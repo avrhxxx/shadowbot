@@ -4,13 +4,13 @@ import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
 /**
- * Parses various allowed date/time formats to day/month/hour/minute
- * Supported formats:
+ * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
+ * Obsługiwane formaty:
  * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
  * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
  * DDMM HHMM
  * DDMMHHMM
- * Optional year as separate field
+ * Dopuszczalny rok opcjonalnie jako osobne pole
  */
 function parseEventDateTime(input: string): { day: number; month: number; year?: number; hour: number; minute: number } | null {
     input = input.trim();
@@ -44,7 +44,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const parsed = parseEventDateTime(datetimeRaw);
 
     if (!name || !parsed) {
-        await interaction.reply({ content: "Invalid date/time input. Please use a valid format like 18.07 20:30 and check the calendar.", ephemeral: true });
+        await interaction.reply({
+            content: "Invalid date/time input. Please use a valid format like 18.07 20:30 and check the calendar.",
+            ephemeral: true
+        });
         return;
     }
 
@@ -55,14 +58,19 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     // Check if date is in the past
     if (eventDateUTC.getTime() < nowUTC.getTime()) {
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId("next_year_yes").setLabel("Set for next year").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId("next_year_no").setLabel("Do not add").setStyle(ButtonStyle.Danger)
+            new ButtonBuilder()
+                .setCustomId("next_year_yes")
+                .setLabel("Yes, set for next year")
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId("next_year_no")
+                .setLabel("No, cancel")
+                .setStyle(ButtonStyle.Danger)
         );
 
         const msg = await interaction.reply({
             content: `The date ${day}/${month} ${hour}:${minute} UTC has already passed. Do you want to set the event for next year?`,
             components: [row],
-            ephemeral: true,
             fetchReply: true
         });
 
@@ -86,8 +94,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                             e.status === "ACTIVE"
                     );
                     if (duplicate) {
-                        await i.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [], ephemeral: true });
-                        collector.stop();
+                        await i.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [] });
+                        await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
                         return;
                     }
 
@@ -113,20 +121,22 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                         await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
                     }
 
-                    await i.update({ content: `Event created for ${day}/${month} ${hour}:${minute} UTC next year.`, components: [], ephemeral: true });
+                    await i.update({ content: `Event created for ${day}/${month} ${hour}:${minute} UTC next year.`, components: [] });
+                    await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
                 } else {
-                    await i.update({ content: "Event was not added.", components: [], ephemeral: true });
+                    await i.update({ content: "Event was not added.", components: [] });
+                    await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
                 }
                 collector.stop();
             });
         } catch {
-            await interaction.followUp({ content: "No response received in 60 seconds. Event canceled.", ephemeral: true });
+            await interaction.followUp({ content: "No response within 60 seconds. Event creation cancelled.", ephemeral: true });
         }
 
         return;
     }
 
-    // Normal future event creation
+    // Normal event creation if date is in the future
     const events: EventObject[] = await getEvents(guildId);
     const duplicate = events.find(
         e =>
@@ -138,7 +148,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     );
 
     if (duplicate) {
-        await interaction.reply({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", ephemeral: true });
+        await interaction.reply({
+            content: "An active event at this UTC date and time already exists. Please choose another date/time.",
+            ephemeral: true
+        });
         return;
     }
 
@@ -164,5 +177,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
     }
 
-    await interaction.reply({ content: "Event created successfully!", ephemeral: true });
+    await interaction.reply({
+        content: "Event created successfully!",
+        ephemeral: true
+    });
 }
