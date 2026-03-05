@@ -3,15 +3,6 @@ import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
-/**
- * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
- * Obsługiwane formaty:
- * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
- * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
- * DDMM HHMM
- * DDMMHHMM
- * Dopuszczalny rok opcjonalnie jako osobne pole
- */
 function parseEventDateTime(input: string): { day: number; month: number; year?: number; hour: number; minute: number } | null {
     input = input.trim();
     if (!input) return null;
@@ -53,9 +44,11 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     let { day, month, hour, minute } = parsed;
     const nowUTC = new Date();
-    let eventDateUTC = getEventDateUTC(day, month, hour, minute);
 
-    // Check if date is in the past
+    // Tu nie przesuwamy automatycznie na next year
+    let eventDateUTC = getEventDateUTC(day, month, hour, minute, true);
+
+    // Jeśli data minęła → pokaż przyciski
     if (eventDateUTC.getTime() < nowUTC.getTime()) {
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
@@ -81,8 +74,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
             collector.on("collect", async i => {
                 if (i.customId === "next_year_yes") {
+                    // teraz przesuwamy na next year
                     const nextYear = nowUTC.getUTCFullYear() + 1;
-                    eventDateUTC = new Date(Date.UTC(nextYear, month - 1, day, hour, minute));
+                    eventDateUTC = getEventDateUTC(day, month, hour, minute, false);
 
                     const events: EventObject[] = await getEvents(guildId);
                     const duplicate = events.find(
