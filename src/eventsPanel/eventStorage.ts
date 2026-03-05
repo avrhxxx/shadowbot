@@ -26,6 +26,10 @@ export type EventObject = {
   participants: string[];
   createdAt: number;
   guildId: string;
+
+  // 🔹 nowe pola
+  reminderSent?: boolean;
+  started?: boolean;
 };
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
