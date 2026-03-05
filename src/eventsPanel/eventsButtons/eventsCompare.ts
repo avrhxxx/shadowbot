@@ -9,7 +9,8 @@ import {
   ButtonStyle,
   Guild,
   TextChannel,
-  AttachmentBuilder
+  AttachmentBuilder,
+  InteractionResponse
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
@@ -18,7 +19,6 @@ import { formatEventUTC } from "../../utils/timeUtils";
 /* ===================================================== */
 /*  HELPERS                                              */
 /* ===================================================== */
-
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
@@ -31,7 +31,6 @@ function getMemberName(guild: Guild, id: string) {
 /* ===================================================== */
 /*  STEP 1 — SINGLE COMPARE BUTTON                       */
 /* ===================================================== */
-
 export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
@@ -78,9 +77,8 @@ export async function handleCompareButton(interaction: ButtonInteraction, eventI
 }
 
 /* ===================================================== */
-/*  STEP 2 — HANDLE SELECT MENU (A vs B)                 */
+/*  STEP 2 — HANDLE SELECT MENU (A vs B)                */
 /* ===================================================== */
-
 export async function handleCompareSelect(interaction: StringSelectMenuInteraction) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
@@ -113,9 +111,8 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
 }
 
 /* ===================================================== */
-/*  STEP 3 — DOWNLOAD BUTTON (A vs B)                    */
+/*  STEP 3 — DOWNLOAD BUTTON (A vs B)                   */
 /* ===================================================== */
-
 export async function handleCompareDownload(interaction: ButtonInteraction) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
@@ -148,7 +145,6 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   }
 
   const utcNow = new Date().toISOString();
-
   await channel.send({
     content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
   });
@@ -156,21 +152,15 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
     name: `compare_${eventA.name}_vs_${eventB.name}.txt`
   });
-
   await channel.send({ files: [file] });
 
-  await interaction.reply({
-    content: "Comparison sent to download channel.",
-    ephemeral: true
-  });
+  await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
 
 /* ===================================================== */
 /*  SINGLE COMPARE LOGIC (A vs B)                        */
 /* ===================================================== */
-
 function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guild) {
-
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
   const absentA = new Set(eventA.absent || []);
@@ -207,17 +197,18 @@ function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guil
 }
 
 /* ===================================================== */
-/*  COMPARE ALL EVENTS                                   */
+/*  COMPARE ALL EVENTS (z Connect Control)               */
 /* ===================================================== */
-
 export async function handleCompareAll(interaction: ButtonInteraction) {
+  // 🔹 Connect Control — defer reply na czas generacji
+  await interaction.deferReply({ ephemeral: true });
+
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
 
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-
   if (!events.length) {
-    await interaction.reply({ content: "No events to compare.", ephemeral: true });
+    await interaction.editReply({ content: "No events to compare.", components: [] });
     return;
   }
 
@@ -230,64 +221,51 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
 
-  await interaction.reply({
-    content: result.embedText,
-    components: [row],
-    ephemeral: true
-  });
+  await interaction.editReply({ content: result.embedText, components: [row] });
 }
 
 export async function handleCompareAllDownload(interaction: ButtonInteraction) {
+  // 🔹 Connect Control — defer reply na czas generacji
+  await interaction.deferReply({ ephemeral: true });
+
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
 
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-
   if (!events.length) {
-    await interaction.reply({ content: "No events to download.", ephemeral: true });
+    await interaction.editReply({ content: "No events to download.", components: [] });
     return;
   }
 
   const result = buildComparisonAll(events, guild);
 
   const config = await EventStorage.getConfig(guildId);
-
   if (!config?.downloadChannelId) {
-    await interaction.reply({ content: "Download channel not configured.", ephemeral: true });
+    await interaction.editReply({ content: "Download channel not configured.", components: [] });
     return;
   }
 
   const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
-
   if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Download channel invalid.", ephemeral: true });
+    await interaction.editReply({ content: "Download channel invalid.", components: [] });
     return;
   }
 
   const utcNow = new Date().toISOString();
-
-  await channel.send({
-    content: `📥 Attendance comparison for all events (UTC: ${utcNow}):\n${result.embedText}`
-  });
+  await channel.send({ content: `📥 Attendance comparison for all events (UTC: ${utcNow}):\n${result.embedText}` });
 
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
     name: `compare_all_events.txt`
   });
-
   await channel.send({ files: [file] });
 
-  await interaction.reply({
-    content: "Comparison sent to download channel.",
-    ephemeral: true
-  });
+  await interaction.editReply({ content: "Comparison sent to download channel.", components: [] });
 }
 
 /* ===================================================== */
 /*  BUILD COMPARE ALL LOGIC (VERTICAL TABLE)             */
 /* ===================================================== */
-
 function buildComparisonAll(events: EventObject[], guild: Guild) {
-
   const allParticipants = new Set<string>();
 
   events.forEach(ev => {
@@ -301,25 +279,19 @@ function buildComparisonAll(events: EventObject[], guild: Guild) {
   let txtLines: string[] = [];
 
   participants.forEach(memberId => {
-
     const name = getMemberName(guild, memberId);
-
     let attended = 0;
     let block: string[] = [];
 
     events.forEach(ev => {
-
       let status = "-";
-
       if (ev.participants.includes(memberId)) {
         status = "✓";
         attended++;
       } else if (ev.absent?.includes(memberId)) {
         status = "✗";
       }
-
       block.push(`${ev.name}  ${status}`);
-
     });
 
     const percent = Math.round((attended / events.length) * 100);
@@ -337,7 +309,6 @@ ${block.join("\n")}
 Attendance: ${attended}/${events.length} (${percent}%)
 `
     );
-
   });
 
   const embedText =
