@@ -30,8 +30,7 @@ import {
   handleCompareSelect,
   handleCompareDownload,
   handleCompareAll,
-  handleCompareAllDownload,
-  buildComparison
+  handleCompareAllDownload
 } from "./eventsButtons/eventsCompare";
 
 // ✅ Show All Events
