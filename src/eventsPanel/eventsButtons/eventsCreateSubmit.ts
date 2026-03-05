@@ -1,6 +1,7 @@
 import { ModalSubmitInteraction, Guild } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
+import { getEventDateUTC } from "../../utils/timeUtils";
 
 /**
  * Convert various time formats into HH:MM
@@ -44,10 +45,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
   }
 
   const { hour, minute } = parsedTime;
-  const nowUTC = new Date();
-  const year = nowUTC.getUTCFullYear();
 
-  const eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const eventDateUTC = getEventDateUTC(day, month, hour, minute);
+  const nowUTC = new Date();
 
   if (eventDateUTC.getTime() < nowUTC.getTime()) {
     await interaction.reply({
@@ -92,7 +92,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
   await saveEvents(guildId, [...events, newEvent]);
 
-  // 🔹 WAŻNE: TYLKO TO WYWOŁUJEMY
   if (interaction.guild) {
     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
   }
