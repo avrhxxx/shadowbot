@@ -1,25 +1,47 @@
-import { DateTime } from "luxon";
-
 /**
- * Formatuje datę UTC na lokalny czas w wybranej strefie IANA
+ * Zwraca najbliższą przyszłą datę eventu w UTC.
+ * Rok NIE jest zapisywany w eventach — wyliczamy go dynamicznie.
  */
-export function formatLocalDateFromUTCWithTimeZone(
+export function getEventDateUTC(
   day: number,
   month: number,
-  year: number,
   hour: number,
-  minute: number,
-  timeZone: string
-) {
-  return DateTime.fromUTC({ year, month, day, hour, minute })
-    .setZone(timeZone)
-    .toFormat("dd/MM HH:mm");
+  minute: number
+): Date {
+
+  const now = new Date();
+
+  let year = now.getUTCFullYear();
+
+  let eventDate = new Date(
+    Date.UTC(year, month - 1, day, hour, minute)
+  );
+
+  // jeśli data już minęła → event jest w następnym roku
+  if (eventDate.getTime() < now.getTime()) {
+    year += 1;
+
+    eventDate = new Date(
+      Date.UTC(year, month - 1, day, hour, minute)
+    );
+  }
+
+  return eventDate;
 }
 
+
 /**
- * Formatuje datę w UTC w DD/MM HH:MM
+ * Formatowanie daty eventu do wyświetlenia
+ * np. 07/03 09:10 UTC
  */
-export function formatUTCDate(day: number, month: number, year: number, hour: number, minute: number) {
+export function formatEventUTC(
+  day: number,
+  month: number,
+  hour: number,
+  minute: number
+): string {
+
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)}`;
+
+  return `${pad(day)}/${pad(month)} ${pad(hour)}:${pad(minute)} UTC`;
 }
