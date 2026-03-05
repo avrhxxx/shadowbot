@@ -37,9 +37,8 @@ async function checkEvents(guild: Guild) {
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
-    // 🔹 używamy roku zapisanego w evencie, żeby nie traktować go jako przeszłego
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, true);
-    eventTime.setUTCFullYear(event.year);
+    // 🔹 używamy literalnego roku zapisanego w evencie
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     // Reminder
     if (event.reminderBefore !== undefined) {
