@@ -24,6 +24,9 @@ client.once("ready", () => { // poprawione z "clientReady" na "ready"
   initTranslationModule(client);
   initModeratorPanel(client);
 
+  // 🔹 UWAGA: Nie uruchamiamy interwału reminderów jeszcze
+  // initEventReminders(guild) -> wywołanie pozostawione na później
+
   // Globalny listener dla Event Panelu
   client.on("interactionCreate", async (interaction: Interaction) => {
     await handleEventInteraction(interaction);
