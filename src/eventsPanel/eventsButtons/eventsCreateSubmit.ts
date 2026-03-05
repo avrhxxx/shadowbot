@@ -90,14 +90,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
             ephemeral: true
         });
 
-        const filter = (i: any) => i.user.id === interaction.user.id && (i.customId.startsWith("next_year_yes") || i.customId.startsWith("next_year_no"));
+        const filter = (i: any) => i.user.id === interaction.user.id &&
+            (i.customId.startsWith("next_year_yes") || i.customId.startsWith("next_year_no"));
 
         const collector = msg.createMessageComponentCollector({ filter, componentType: ComponentType.Button, time: 60_000 });
 
         collector.on("collect", async i => {
             const tempData = tempEventStore.get(tempId);
             if (!tempData) {
-                await i.update({ content: "Temporary event data not found, please try again.", components: [], ephemeral: true });
+                await i.update({ content: "Temporary event data not found, please try again.", components: [] });
                 collector.stop();
                 return;
             }
@@ -132,7 +133,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 );
 
                 if (duplicate) {
-                    await i.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [], ephemeral: true });
+                    await i.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [] });
                     await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
                     tempEventStore.delete(tempId);
                     collector.stop();
@@ -145,10 +146,12 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
                 }
 
-                await i.update({ content: `Event created for ${tempData.day}/${tempData.month} ${tempData.hour}:${tempData.minute} UTC next year.`, components: [], ephemeral: true });
+                // ✅ ephemeral tylko w followUp, update nie używa ephemeral
+                await i.update({ content: `Event created for ${tempData.day}/${tempData.month} ${tempData.hour}:${tempData.minute} UTC next year.`, components: [] });
                 await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
             } else {
-                await i.update({ content: "Event was not added.", components: [], ephemeral: true });
+                // Cancel
+                await i.update({ content: "Event was not added.", components: [] });
                 await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
             }
 
