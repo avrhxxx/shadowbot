@@ -4,33 +4,37 @@ import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
 /**
- * Parsuje różne formaty daty i czasu na day/month/hour/minute
+ * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
+ * Obsługiwane formaty:
+ * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
+ * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
+ * DDMM HHMM
+ * DDMMHHMM
+ * Dopuszczalny rok opcjonalnie jako osobne pole
  */
 function parseEventDateTime(input: string): { day: number; month: number; year?: number; hour: number; minute: number } | null {
     input = input.trim();
     if (!input) return null;
 
-    const dateTimeRegex = /^(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?\s+(\d{1,2})(?::?(\d{2}))?$/;
+    // Regex obsługujący tylko bezpieczne formaty
+    const dateTimeRegex = /^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/;
     const match = input.match(dateTimeRegex);
     if (!match) return null;
 
-    const [, dayStr, monthStr, yearStr, hourStr, minuteStr] = match;
-    const day = parseInt(dayStr, 10);
-    const month = parseInt(monthStr, 10);
-    const year = yearStr ? parseInt(yearStr, 10) : undefined;
-    const hour = parseInt(hourStr, 10);
-    const minute = minuteStr ? parseInt(minuteStr, 10) : 0;
+    let day = parseInt(match[1], 10);
+    let month = parseInt(match[2], 10);
+    let hour = parseInt(match[3], 10);
+    let minute = match[4] ? parseInt(match[4], 10) : 0;
 
-    // Sprawdzenie zakresów godzin i minut
+    // Walidacja godzin i minut
     if (hour > 23 || minute > 59) return null;
 
-    // Walidacja kalendarza
+    // Sprawdzenie poprawności kalendarza dla bieżącego roku
     const nowYear = new Date().getUTCFullYear();
-    const testYear = year || nowYear;
-    const testDate = new Date(Date.UTC(testYear, month - 1, day, hour, minute));
+    const testDate = new Date(Date.UTC(nowYear, month - 1, day));
     if (testDate.getUTCDate() !== day || testDate.getUTCMonth() !== month - 1) return null;
 
-    return { day, month, year, hour, minute };
+    return { day, month, hour, minute };
 }
 
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
@@ -43,11 +47,14 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const parsed = parseEventDateTime(datetimeRaw);
 
     if (!name || !parsed) {
-        await interaction.reply({ content: "Invalid date/time input. Please check format and calendar.", ephemeral: true });
+        await interaction.reply({
+            content: "Invalid date/time input. Please use a valid format like 18.07 20:30 and check the calendar.",
+            ephemeral: true
+        });
         return;
     }
 
-    const { day, month, year, hour, minute } = parsed;
+    const { day, month, hour, minute } = parsed;
     const eventDateUTC = getEventDateUTC(day, month, hour, minute);
     const nowUTC = new Date();
 
