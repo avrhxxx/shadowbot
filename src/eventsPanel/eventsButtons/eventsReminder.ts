@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
@@ -36,7 +37,9 @@ async function checkEvents(guild: Guild) {
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute);
+    // 🔹 używamy roku zapisanego w evencie, żeby nie traktować go jako przeszłego
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, true);
+    eventTime.setUTCFullYear(event.year);
 
     // Reminder
     if (event.reminderBefore !== undefined) {
@@ -77,7 +80,7 @@ export async function sendEventCreatedNotification(event: EventWithReminder, gui
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`🎉 Event Created: ${event.name}`)
@@ -93,7 +96,7 @@ export async function sendEventCreatedNotification(event: EventWithReminder, gui
 }
 
 export async function sendReminderMessage(channel: TextChannel, event: EventWithReminder) {
-  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`⏰ Upcoming Event: ${event.name}`)
@@ -104,7 +107,7 @@ export async function sendReminderMessage(channel: TextChannel, event: EventWith
 }
 
 async function sendEventStarted(channel: TextChannel, event: EventWithReminder, guild: Guild) {
-  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
+  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
   const embed = new EmbedBuilder()
     .setTitle(`✅ Event Started: ${event.name}`)
