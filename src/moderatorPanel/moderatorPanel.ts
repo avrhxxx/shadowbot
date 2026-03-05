@@ -40,7 +40,7 @@ export async function initModeratorPanel(client: Client) {
 
     // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat ---
     await modChannel.send(`
-\`\`\`
+
 📅 Accepted Date & Time Formats
 Please enter dates and times in one of the following formats:
 
@@ -58,7 +58,7 @@ Please enter dates and times in one of the following formats:
   YYYY          → 2026
 
 Tip: No need for magic wands — just type it straight! ✨
-\`\`\`
+
     `);
 
     // Render root hub w tym kanale
