@@ -1,7 +1,7 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate } from "../../utils/timeUtils"; // używamy tylko UTC
+import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
  * Funkcja do czyszczenia nicków – usuwa wszelkie pingowe ID i dziwne znaki
@@ -34,6 +34,13 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
 }
 
 /**
+ * Helper: formatuje EventObject na UTC string
+ */
+function formatEventUTCObj(e: EventObject) {
+  return formatEventUTC(e.day, e.month, e.hour, e.minute);
+}
+
+/**
  * Show ephemeral list of all events
  */
 export async function handleList(interaction: ButtonInteraction) {
@@ -49,9 +56,7 @@ export async function handleList(interaction: ButtonInteraction) {
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
-    const year = new Date().getUTCFullYear();
-
-    const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+    const eventDateUTCStr = formatEventUTCObj(e);
 
     const embed = new EmbedBuilder()
       .setTitle(e.name)
@@ -100,9 +105,8 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 
   const participants = event.participants.length ? event.participants.map(cleanNickname) : [];
   const absent = event.absent?.length ? event.absent.map(cleanNickname) : [];
-  const year = new Date().getUTCFullYear();
 
-  const eventDateUTCStr = formatUTCDate(event.day, event.month, year, event.hour, event.minute);
+  const eventDateUTCStr = formatEventUTCObj(event);
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
@@ -128,8 +132,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const e = events.find(ev => ev.id === eventId);
   if (!e) return;
 
-  const year = new Date().getUTCFullYear();
-  const eventDateUTCStr = formatUTCDate(e.day, e.month, year, e.hour, e.minute);
+  const eventDateUTCStr = formatEventUTCObj(e);
 
   const embed = new EmbedBuilder()
     .setTitle(e.name)
