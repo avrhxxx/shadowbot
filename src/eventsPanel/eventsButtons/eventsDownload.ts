@@ -33,7 +33,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const tempDir = path.join(__dirname, "../../temp");
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  // 🔹 Single event download
+  // 🔹 Single event download (bez Connect Control)
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
     if (!event) {
@@ -77,9 +77,11 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 Download all events in one file
+  // 🔹 Download all events in one file — Connect Control
+  await interaction.deferReply({ ephemeral: true }); // <=== Connect Control defer
+
   if (!allEvents.length) {
-    await interaction.reply({ content: "No events to download.", ephemeral: true });
+    await interaction.editReply({ content: "No events to download.", components: [] });
     return;
   }
 
@@ -114,8 +116,8 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     files: [attachment]
   });
 
-  await interaction.reply({
+  await interaction.editReply({ // <=== Connect Control edit
     content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`,
-    ephemeral: true
+    components: []
   });
 }
