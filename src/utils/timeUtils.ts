@@ -1,6 +1,6 @@
 /**
  * Zwraca najbliższą przyszłą datę eventu w UTC.
- * Rok NIE jest zapisywany w eventach — wyliczamy go dynamicznie.
+ * Rok NIE jest zapisywany w bazie — wyliczamy go dynamicznie.
  */
 export function getEventDateUTC(
   day: number,
@@ -10,29 +10,21 @@ export function getEventDateUTC(
 ): Date {
 
   const now = new Date();
-
   let year = now.getUTCFullYear();
 
-  let eventDate = new Date(
-    Date.UTC(year, month - 1, day, hour, minute)
-  );
+  let eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
 
-  // jeśli data już minęła → event jest w następnym roku
-  if (eventDate.getTime() < now.getTime()) {
+  // jeśli data już minęła → użyj następnego roku
+  if (eventDate.getTime() <= now.getTime()) {
     year += 1;
-
-    eventDate = new Date(
-      Date.UTC(year, month - 1, day, hour, minute)
-    );
+    eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
   }
 
   return eventDate;
 }
 
-
 /**
  * Formatowanie daty eventu do wyświetlenia
- * np. 07/03 09:10 UTC
  */
 export function formatEventUTC(
   day: number,
