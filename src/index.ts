@@ -37,22 +37,32 @@ async function seedEventsSafe(guildId: string) {
       day: 5,
       month: 3,
       year: 2026,
-      hour: 23,
-      minute: 45
+      hour: 0,
+      minute: 5,
     });
-    events.push(event);
 
+    // Ustawiamy event jako PAST
+    event.status = "PAST";
+
+    // Dodajemy uczestników
+    event.participants = [...userIds];
+
+    // Losowo generujemy absent (30% szans)
+    const absentSet = new Set<string>();
     for (const userId of userIds) {
-      event.participants.push(userId);
-
-      if (!event.absent) event.absent = [];
-      if (Math.random() < 0.3) event.absent.push(userId);
-
-      await saveEvents(guildId, events);
-      await delay(50); // 50ms przerwy między dodawaniem użytkowników
+      if (Math.random() < 0.3) absentSet.add(userId);
     }
 
-    await delay(200); // przerwa między eventami
+    // Usuń absent z participants
+    event.participants = event.participants.filter(u => !absentSet.has(u));
+    event.absent = Array.from(absentSet);
+
+    // Zapisz pojedynczy event
+    events.push(event);
+    await saveEvents(guildId, events);
+
+    // Delay między eventami
+    await delay(200);
   }
 
   console.log(`✅ Safe seed finished: ${totalEvents} events × ${totalUsers} users`);
