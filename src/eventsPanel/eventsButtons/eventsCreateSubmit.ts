@@ -86,8 +86,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         const msg = await interaction.reply({
             content: `The date ${day}/${month} ${hour}:${minute} UTC has already passed. Do you want to set the event for next year?`,
             components: [row],
-            fetchReply: true,
-            ephemeral: true
+            fetchReply: true
         });
 
         const filter = (i: any) => i.user.id === interaction.user.id &&
@@ -118,6 +117,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     createdAt: Date.now(),
                     reminderSent: false,
                     started: false,
+                    // Dodaj year do EventObject w eventService.ts
                     year: nextYear,
                     ...(tempData.reminderBefore !== undefined && { reminderBefore: tempData.reminderBefore })
                 };
@@ -146,11 +146,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     await sendEventCreatedNotification(newEvent, interaction.guild as Guild);
                 }
 
-                // ✅ ephemeral tylko w followUp, update nie używa ephemeral
                 await i.update({ content: `Event created for ${tempData.day}/${tempData.month} ${tempData.hour}:${tempData.minute} UTC next year.`, components: [] });
                 await i.followUp({ content: "Event successfully scheduled.", ephemeral: true });
             } else {
-                // Cancel
                 await i.update({ content: "Event was not added.", components: [] });
                 await i.followUp({ content: "Event creation cancelled.", ephemeral: true });
             }
