@@ -14,7 +14,7 @@ export function getEventDateUTC(
 
   let eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
 
-  // Jeśli data już minęła → użyj następnego roku
+  // jeśli data już minęła → użyj następnego roku
   if (eventDate.getTime() <= now.getTime()) {
     year += 1;
     eventDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
@@ -24,9 +24,9 @@ export function getEventDateUTC(
 }
 
 /**
- * Formatowanie daty eventu do wyświetlania
+ * Formatowanie daty eventu do wyświetlenia
  */
-export function formatUTCDate(
+export function formatEventUTC(
   day: number,
   month: number,
   hour: number,
