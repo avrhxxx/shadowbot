@@ -4,12 +4,25 @@ import {
     ActionRowBuilder, 
     StringSelectMenuBuilder, 
     ButtonBuilder, 
-    ButtonStyle 
+    ButtonStyle, 
+    StringSelectMenuInteraction, 
+    ButtonInteraction 
 } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { sendEventCreatedNotification } from "./eventsReminder";
 
-const tempEventStore = new Map<string, { name: string; day: number; month: number; hour: number; minute: number; guildId: string }>();
+type TempEventData = {
+    name: string;
+    day: number;
+    month: number;
+    hour: number;
+    minute: number;
+    guildId: string;
+    year?: number;
+};
+
+const tempEventStore = new Map<string, TempEventData>();
 
 function parseEventDateTime(input: string) {
     const match = input.trim().match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
@@ -22,6 +35,9 @@ function parseEventDateTime(input: string) {
     return { day, month, hour, minute };
 }
 
+/* =======================================================
+   🔹 Modal submit handler
+======================================================= */
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
     const name = interaction.fields.getTextInputValue("event_name");
@@ -41,10 +57,11 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
+    const tempKey = `${interaction.user.id}-temp`;
+
     // 🔹 Obsługa Next Year jeśli brak roku i data już minęła
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(`${interaction.user.id}-temp`, { name, day, month, hour, minute, guildId });
-
+        tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
         await interaction.reply({
             content: `The date ${formatEventUTC(day, month, hour, minute)} UTC has passed. Do you want to schedule it for next year?`,
             components: [
@@ -58,29 +75,23 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         return;
     }
 
-    // 🔹 Teraz mamy finalną datę (rok podany lub obecny/next year) → zapisujemy event
-    const events: EventObject[] = await getEvents(guildId);
-    const newEvent: EventObject = {
-        id: `${Date.now()}`,
-        guildId,
-        name,
-        day,
-        month,
-        hour,
-        minute,
-        year: year ?? eventDateUTC.getUTCFullYear(),
-        status: "ACTIVE",
-        participants: [],
-        createdAt: Date.now(),
-        reminderSent: false,
-        started: false
-    };
+    // 🔹 Jeśli data przyszła lub rok podany → zapis w temp i pokaz select menu
+    tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId, year: year ?? eventDateUTC.getUTCFullYear() });
+    await showReminderSelect(interaction, tempKey);
+}
 
-    await saveEvents(guildId, [...events, newEvent]);
+/* =======================================================
+   🔹 Pokazujemy select menu do ustawienia remindera
+======================================================= */
+async function showReminderSelect(interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction, tempKey: string) {
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) {
+        await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
+        return;
+    }
 
-    // 🔹 Wyświetlenie select menu do wyboru przypomnienia
     const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`reminder_select_${interaction.user.id}-${newEvent.id}`)
+        .setCustomId(`reminder_select_${tempKey}`)
         .setPlaceholder("Set reminder before event (optional)")
         .addOptions([
             { label: "No reminder", value: "0" },
@@ -93,8 +104,51 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         ]);
 
     await interaction.reply({
-        content: `Event "${name}" created. Please select a reminder time:`,
+        content: `Event "${tempData.name}" created. Please select a reminder time:`,
         components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu)],
         ephemeral: true
     });
+}
+
+/* =======================================================
+   🔹 Finalizacja eventu po wyborze remindera
+======================================================= */
+export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
+    const tempKey = interaction.customId.replace("reminder_select_", "");
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) {
+        await interaction.update({ content: "Temporary event data not found.", components: [] });
+        return;
+    }
+
+    const reminderValue = parseInt(interaction.values[0], 10);
+    const reminderBefore = reminderValue > 0 ? reminderValue : undefined;
+
+    const events: EventObject[] = await getEvents(tempData.guildId);
+    const newEvent: EventObject = {
+        id: `${Date.now()}`,
+        guildId: tempData.guildId,
+        name: tempData.name,
+        day: tempData.day,
+        month: tempData.month,
+        hour: tempData.hour,
+        minute: tempData.minute,
+        year: tempData.year!,
+        status: "ACTIVE",
+        participants: [],
+        createdAt: Date.now(),
+        reminderSent: false,
+        started: false,
+        ...(reminderBefore !== undefined && { reminderBefore })
+    };
+
+    await saveEvents(tempData.guildId, [...events, newEvent]);
+    tempEventStore.delete(tempKey);
+
+    // 🔹 Wyślij powiadomienie o utworzonym evencie
+    if (interaction.guild) {
+        await sendEventCreatedNotification(newEvent, interaction.guild);
+    }
+
+    await interaction.update({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
 }
