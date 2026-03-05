@@ -19,8 +19,11 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
 
   for (const e of events) {
 
+    // 🔹 fallback jeśli event nie ma roku
+    const eventYear = e.year ?? new Date().getUTCFullYear();
+
     const eventDateUTC = new Date(Date.UTC(
-      e.year,
+      eventYear,
       e.month - 1,
       e.day,
       e.hour,
@@ -45,7 +48,8 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
  * Helper: formatuje EventObject na UTC string
  */
 function formatEventUTCObj(e: EventObject) {
-  return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
+  const year = e.year ?? new Date().getUTCFullYear();
+  return formatEventUTC(e.day, e.month, e.hour, e.minute, year);
 }
 
 /**
