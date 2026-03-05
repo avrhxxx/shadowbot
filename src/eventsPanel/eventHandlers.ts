@@ -1,5 +1,5 @@
 // src/eventsPanel/eventHandlers.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel } from "discord.js";
+import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ComponentType, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
@@ -99,6 +99,60 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_download_single_")) {
       const eventId = customId.replace("event_download_single_", "");
       await handleDownload(interaction, eventId);
+      return;
+    }
+
+    // ✅ NEW YEAR BUTTONS
+    if (customId === "next_year_yes" || customId === "next_year_no") {
+      const storedData = (interaction as any).eventTempData as { guildId: string; name: string; day: number; month: number; hour: number; minute: number; reminderBefore?: number };
+      if (!storedData) {
+        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+        return;
+      }
+
+      if (customId === "next_year_no") {
+        await interaction.update({ content: "Event was not added.", components: [] });
+        return;
+      }
+
+      // Set to next year
+      const nextYear = new Date().getUTCFullYear() + 1;
+      const { guildId, name, day, month, hour, minute, reminderBefore } = storedData;
+      const eventDateUTC = new Date(Date.UTC(nextYear, month - 1, day, hour, minute));
+
+      const events = await EventStorage.getEvents(guildId);
+      const duplicate = events.find(
+        e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
+      );
+      if (duplicate) {
+        await interaction.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [] });
+        return;
+      }
+
+      const newEvent: EventStorage.EventObject = {
+        id: `${Date.now()}`,
+        guildId,
+        name,
+        day,
+        month,
+        hour,
+        minute,
+        status: "ACTIVE",
+        participants: [],
+        createdAt: Date.now(),
+        reminderSent: false,
+        started: false,
+        ...(reminderBefore !== undefined && { reminderBefore })
+      };
+
+      await EventStorage.saveEvents(guildId, [...events, newEvent]);
+
+      if (interaction.guild) {
+        const { sendEventCreatedNotification } = await import("./eventsButtons/eventsReminder");
+        await sendEventCreatedNotification(newEvent, interaction.guild);
+      }
+
+      await interaction.update({ content: `Event created for ${day}/${month} ${hour}:${minute} UTC next year.`, components: [] });
       return;
     }
   }
@@ -207,11 +261,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await handleHelp(interaction);
         break;
       case "event_manual_reminder":
-        // wyświetl select menu do wyboru eventu
         await handleManualReminder(interaction);
         break;
       default:
-        console.warn(`Nieobsługiwany event customId: ${customId}`);
+        console.warn(`Unsupported event customId: ${customId}`);
     }
   }
 }
