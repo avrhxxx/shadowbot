@@ -1,10 +1,10 @@
 // src/eventsPanel/eventHandlers.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ComponentType, ButtonBuilder, ButtonStyle } from "discord.js";
+import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
-import { handleCreateSubmit } from "./eventsButtons/eventsCreateSubmit";
+import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
 import {
   handleCancel,
@@ -104,54 +104,25 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     // ✅ NEW YEAR BUTTONS
     if (customId === "next_year_yes" || customId === "next_year_no") {
-      const storedData = (interaction as any).eventTempData as { guildId: string; name: string; day: number; month: number; hour: number; minute: number; reminderBefore?: number };
+      const tempKey = `${interaction.user.id}-temp`;
+      const storedData = tempEventStore.get(tempKey);
+
       if (!storedData) {
         await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
         return;
       }
 
       if (customId === "next_year_no") {
+        tempEventStore.delete(tempKey);
         await interaction.update({ content: "Event was not added.", components: [] });
         return;
       }
 
-      // Set to next year
-      const nextYear = new Date().getUTCFullYear() + 1;
-      const { guildId, name, day, month, hour, minute, reminderBefore } = storedData;
+      // Set next year
+      storedData.year = new Date().getUTCFullYear() + 1;
 
-      const events = await EventStorage.getEvents(guildId);
-      const duplicate = events.find(
-        e => e.day === day && e.month === month && e.hour === hour && e.minute === minute && e.status === "ACTIVE"
-      );
-      if (duplicate) {
-        await interaction.update({ content: "An active event at this UTC date and time already exists. Please choose another date/time.", components: [] });
-        return;
-      }
-
-      const newEvent: EventStorage.EventObject = {
-        id: `${Date.now()}`,
-        guildId,
-        name,
-        day,
-        month,
-        hour,
-        minute,
-        status: "ACTIVE",
-        participants: [],
-        createdAt: Date.now(),
-        reminderSent: false,
-        started: false,
-        ...(reminderBefore !== undefined && { reminderBefore })
-      };
-
-      await EventStorage.saveEvents(guildId, [...events, newEvent]);
-
-      if (interaction.guild) {
-        const { sendEventCreatedNotification } = await import("./eventsButtons/eventsReminder");
-        await sendEventCreatedNotification(newEvent, interaction.guild);
-      }
-
-      await interaction.update({ content: `Event created for ${day}/${month} ${hour}:${minute} UTC next year.`, components: [] });
+      // Wywołanie finalizacji eventu z remindera (ustawienie 0 min domyślnie)
+      await finalizeEventWithReminder({ ...interaction, customId: `reminder_select_${tempKey}`, values: ["0"] } as any);
       return;
     }
   }
@@ -163,31 +134,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     // ✅ REMINDER SELECT MENU (ustawienie reminderBefore dla nowego eventu)
     if (customId.startsWith("reminder_select_")) {
-      const [, userEventKey] = customId.split("reminder_select_"); // userId-eventId
-      const selectedValue = interaction.values[0]; // np. "0", "5", "15" ...
-      const reminderMinutes = parseInt(selectedValue, 10);
-
-      const events = await EventStorage.getEvents(interaction.guildId!);
-      const eventId = userEventKey.split("-")[1]; // wyciągamy eventId z customId
-      const event = events.find(e => e.id === eventId);
-
-      if (!event) {
-        await interaction.update({ content: "Event not found. Could not set reminder.", components: [] });
-        return;
-      }
-
-      if (reminderMinutes > 0) {
-        event.reminderBefore = reminderMinutes;
-      } else {
-        delete event.reminderBefore;
-      }
-
-      await EventStorage.saveEvents(interaction.guildId!, events);
-
-      await interaction.update({
-        content: `Reminder for **${event.name}** set to ${reminderMinutes > 0 ? `${reminderMinutes} minutes before` : "No reminder"}.`,
-        components: []
-      });
+      await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
       return;
     }
 
