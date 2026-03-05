@@ -30,7 +30,9 @@ import { handleHelp } from "./eventsButtons/eventsHelp";
 import {
   handleCompareButton,
   handleCompareSelect,
-  handleCompareDownload
+  handleCompareDownload,
+  handleCompareAll,
+  handleCompareAllDownload
 } from "./eventsButtons/eventsCompare";
 
 // ✅ SHOW ALL EVENTS
@@ -100,6 +102,18 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     // ✅ COMPARE DOWNLOAD
     if (customId.startsWith("compare_download_")) {
       await handleCompareDownload(interaction);
+      return;
+    }
+
+    // ✅ COMPARE ALL BUTTON
+    if (customId === "compare_all_events") {
+      await handleCompareAll(interaction);
+      return;
+    }
+
+    // ✅ COMPARE ALL DOWNLOAD
+    if (customId.startsWith("compare_all_download_")) {
+      await handleCompareAllDownload(interaction);
       return;
     }
 
