@@ -1,37 +1,102 @@
 import { TextChannel, Guild, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { getEventDateUTC, formatUTCDate } from "../../utils/timeUtils";
 
-const reminderTimeouts = new Map<string, NodeJS.Timeout>();
-const eventStartTimeouts = new Map<string, NodeJS.Timeout>();
+const reminderSent = new Set<string>();
+const eventStarted = new Set<string>();
 
-export async function initEventReminders(guild: Guild) {
-  const events = await EventStorage.getEvents(guild.id);
-  const now = new Date();
+/* ===================================================== */
+/*  GŁÓWNY SCHEDULER (sprawdza eventy co 30 sekund)      */
+/* ===================================================== */
 
-  for (const event of events) {
+let schedulerStarted = false;
 
-    const eventTime = getEventDateUTC(
-      event.day,
-      event.month,
-      event.hour,
-      event.minute
-    );
+export function startEventScheduler(guild: Guild) {
 
-    if (event.status === "ACTIVE" && eventTime.getTime() > now.getTime()) {
-      await scheduleEventReminders(event, guild);
+  if (schedulerStarted) return;
+  schedulerStarted = true;
+
+  setInterval(async () => {
+
+    const events = await EventStorage.getEvents(guild.id);
+    const now = new Date();
+
+    const config = await EventStorage.getConfig(guild.id);
+    if (!config?.notificationChannelId) return;
+
+    const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+    if (!channel || !channel.isTextBased()) return;
+
+    for (const event of events) {
+
+      if (event.status !== "ACTIVE") continue;
+
+      const eventTime = getEventDateUTC(
+        event.day,
+        event.month,
+        event.hour,
+        event.minute
+      );
+
+      const timeToEvent = eventTime.getTime() - now.getTime();
+
+      /* ================= REMINDER ================= */
+
+      if (event.reminderBefore !== undefined) {
+
+        const reminderTime = eventTime.getTime() - event.reminderBefore * 60_000;
+        const timeToReminder = reminderTime - now.getTime();
+
+        if (timeToReminder <= 0 && !reminderSent.has(event.id)) {
+
+          await sendReminderMessage(channel, event);
+          reminderSent.add(event.id);
+
+        }
+      }
+
+      /* ================= EVENT START ================= */
+
+      if (timeToEvent <= 0 && !eventStarted.has(event.id)) {
+
+        await sendEventStarted(channel, event, guild);
+        eventStarted.add(event.id);
+
+      }
+
     }
-  }
+
+  }, 30_000); // sprawdzanie co 30s
 }
 
+/* ===================================================== */
+/*  INIT PRZY STARCIE BOTA                               */
+/* ===================================================== */
+
+export async function initEventReminders(guild: Guild) {
+
+  startEventScheduler(guild);
+
+}
+
+/* ===================================================== */
+/*  EVENT CREATED                                        */
+/* ===================================================== */
+
 export async function sendEventCreatedNotification(event: any, guild: Guild) {
+
   const config = await EventStorage.getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
-  const eventDateStr = formatEventUTC(event.day, event.month, event.hour, event.minute);
+  const eventDateStr = formatUTCDate(
+    event.day,
+    event.month,
+    event.hour,
+    event.minute
+  );
 
   const embed = new EmbedBuilder()
     .setTitle(`🎉 Event Created: ${event.name}`)
@@ -45,60 +110,15 @@ export async function sendEventCreatedNotification(event: any, guild: Guild) {
 
   await channel.send({ content: "@everyone", embeds: [embed] });
 
-  await scheduleEventReminders(event, guild);
 }
 
-export async function scheduleEventReminders(event: any, guild: Guild) {
-
-  if (reminderTimeouts.has(event.id) || eventStartTimeouts.has(event.id)) return;
-
-  const config = await EventStorage.getConfig(guild.id);
-  if (!config?.notificationChannelId) return;
-
-  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
-  if (!channel || !channel.isTextBased()) return;
-
-  const now = new Date();
-
-  const eventTime = getEventDateUTC(
-    event.day,
-    event.month,
-    event.hour,
-    event.minute
-  );
-
-  if (event.reminderBefore !== undefined) {
-
-    const reminderTime = eventTime.getTime() - event.reminderBefore * 60_000;
-    const delayReminder = reminderTime - now.getTime();
-
-    if (delayReminder > 0) {
-
-      const timeout = setTimeout(() => {
-        sendReminderMessage(channel, event);
-        reminderTimeouts.delete(event.id);
-      }, delayReminder);
-
-      reminderTimeouts.set(event.id, timeout);
-    }
-  }
-
-  const delayStart = eventTime.getTime() - now.getTime();
-
-  if (delayStart > 0) {
-
-    const timeout = setTimeout(async () => {
-      await sendEventStarted(channel, event, guild);
-      eventStartTimeouts.delete(event.id);
-    }, delayStart);
-
-    eventStartTimeouts.set(event.id, timeout);
-  }
-}
+/* ===================================================== */
+/*  REMINDER MESSAGE                                     */
+/* ===================================================== */
 
 export async function sendReminderMessage(channel: TextChannel, event: any) {
 
-  const eventDateStr = formatEventUTC(
+  const eventDateStr = formatUTCDate(
     event.day,
     event.month,
     event.hour,
@@ -111,11 +131,16 @@ export async function sendReminderMessage(channel: TextChannel, event: any) {
     .setColor("Orange");
 
   await channel.send({ content: "@everyone", embeds: [embed] });
+
 }
+
+/* ===================================================== */
+/*  EVENT STARTED                                        */
+/* ===================================================== */
 
 async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) {
 
-  const eventDateStr = formatEventUTC(
+  const eventDateStr = formatUTCDate(
     event.day,
     event.month,
     event.hour,
@@ -133,18 +158,21 @@ async function sendEventStarted(channel: TextChannel, event: any, guild: Guild) 
   const e = events.find(ev => ev.id === event.id);
 
   if (e && e.status !== "PAST") {
+
     e.status = "PAST";
     await EventStorage.saveEvents(guild.id, events);
+
   }
+
 }
 
-export function clearEventTimeouts(eventId: string) {
+/* ===================================================== */
+/*  RESET (opcjonalnie)                                  */
+/* ===================================================== */
 
-  const rem = reminderTimeouts.get(eventId);
-  if (rem) clearTimeout(rem);
-  reminderTimeouts.delete(eventId);
+export function resetEventCache() {
 
-  const start = eventStartTimeouts.get(eventId);
-  if (start) clearTimeout(start);
-  eventStartTimeouts.delete(eventId);
+  reminderSent.clear();
+  eventStarted.clear();
+
 }
