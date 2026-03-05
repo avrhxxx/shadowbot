@@ -5,7 +5,8 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  Interaction
+  Interaction,
+  EmbedBuilder
 } from "discord.js";
 
 import { renderEventPanel } from "../eventsPanel/eventPanel"; // EventPanel renderer
@@ -38,27 +39,35 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat ---
-    await modChannel.send(`
+    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat jako EMBED ---
+    const embed = new EmbedBuilder()
+      .setTitle("📅 Accepted Date & Time Formats")
+      .setDescription("Please enter dates and times in one of the following formats:")
+      .addFields(
+        {
+          name: "🕰 Date + Time",
+          value:
+            `DD.MM HH:MM   → 18.07 20:30\n` +
+            `DD/MM HH:MM   → 18/07 20:30\n` +
+            `DD-MM HH:MM   → 18-07 20:30\n` +
+            `DD.MM HHMM    → 18.07 2030\n` +
+            `DD/MM HHMM    → 18/07 2030\n` +
+            `DD-MM HHMM    → 18-07 2030\n` +
+            `DDMM HHMM     → 1807 2030\n` +
+            `DDMMHHMM      → 18072030`
+        },
+        {
+          name: "📆 Year only",
+          value: "YYYY → 2026"
+        },
+        {
+          name: "Tip",
+          value: "No need for magic wands — just type it straight! ✨"
+        }
+      )
+      .setColor("Blue");
 
-📅 Accepted Date & Time Formats
-Please enter dates and times in one of the following formats:
-
-🕰 **Date + Time:**
-  DD.MM HH:MM   → 18.07 20:30
-  DD/MM HH:MM   → 18/07 20:30
-  DD-MM HH:MM   → 18-07 20:30
-   DD.MM HHMM   → 18.07 2030
-   DD/MM HHMM   → 18/07 2030
-   DD-MM HHMM   → 18-07 2030
-    DDMM HHMM   → 1807 2030
-     DDMMHHMM   → 18072030
-📆 **Year only:**
-        YYYY    → 2026
-
-Tip: No need for magic wands — just type it straight! ✨
-
-    `);
+    await modChannel.send({ embeds: [embed] });
 
     // Render root hub w tym kanale
     await renderModeratorHub(modChannel);
