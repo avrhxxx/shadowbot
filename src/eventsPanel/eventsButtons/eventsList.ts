@@ -18,7 +18,15 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
   let updated = false;
 
   for (const e of events) {
-    const eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
+
+    const eventDateUTC = new Date(Date.UTC(
+      e.year,
+      e.month - 1,
+      e.day,
+      e.hour,
+      e.minute
+    ));
+
     if (e.status === "ACTIVE" && eventDateUTC.getTime() < now.getTime()) {
       e.status = "PAST";
       updated = true;
@@ -37,7 +45,7 @@ async function updateEventStatuses(events: EventObject[], guildId: string) {
  * Helper: formatuje EventObject na UTC string
  */
 function formatEventUTCObj(e: EventObject) {
-  return formatEventUTC(e.day, e.month, e.hour, e.minute);
+  return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
 
 /**
