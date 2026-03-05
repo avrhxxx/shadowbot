@@ -1,5 +1,15 @@
 // src/eventsPanel/eventHandlers.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ButtonBuilder, ButtonStyle } from "discord.js";
+import {
+  Interaction,
+  ButtonInteraction,
+  StringSelectMenuInteraction,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  TextChannel,
+  ButtonBuilder,
+  ButtonStyle
+} from "discord.js";
 import * as EventStorage from "./eventStorage";
 
 // Buttons / modals / selects
@@ -22,6 +32,9 @@ import {
   handleCompareSelect,
   handleCompareDownload
 } from "./eventsButtons/eventsCompare";
+
+// ✅ SHOW ALL EVENTS
+import { handleShowAllEvents } from "./eventsButtons/eventsShowAll";
 
 // Participants
 import {
@@ -211,34 +224,48 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   }
 
   /* =======================================================
-     🔥 STANDARD BUTTONS
+     🔥 STANDARD BUTTONS – Event Panel
   ======================================================= */
   if (interaction.isButton()) {
     switch (customId) {
       case "event_create":
         await handleCreate(interaction);
         break;
+
       case "event_list":
         await handleList(interaction);
         break;
+
       case "event_cancel":
         await handleCancel(interaction);
         break;
+
       case "event_cancel_abort":
         await handleCancelAbort(interaction);
         break;
+
+      // ✅ NOWY: Show All Events
+      case "event_show_all":
+        await handleShowAllEvents(interaction);
+        break;
+
+      // ✅ Stary download – zachowujemy możliwość pobierania plików
       case "event_download":
         await handleDownload(interaction);
         break;
+
       case "event_settings":
         await handleSettings(interaction);
         break;
+
       case "event_help":
         await handleHelp(interaction);
         break;
+
       case "event_manual_reminder":
         await handleManualReminder(interaction);
         break;
+
       default:
         console.warn(`Unsupported event customId: ${customId}`);
     }
