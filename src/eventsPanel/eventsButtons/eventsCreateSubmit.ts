@@ -184,7 +184,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
 
 /* =======================================================
    🔹 Finalizacja eventu dla przycisku NEXT YEAR
-       (bez select menu)
+       (poprawione: teraz można ustawić reminder)
 ======================================================= */
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     const tempKey = `${interaction.user.id}-temp`;
@@ -201,33 +201,6 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     // ustawiamy rok na następny
     tempData.year = new Date().getUTCFullYear() + 1;
 
-    const events: EventObject[] = await getEvents(tempData.guildId);
-    const newEvent: EventObject = {
-        id: `${Date.now()}`,
-        guildId: tempData.guildId,
-        name: tempData.name,
-        day: tempData.day,
-        month: tempData.month,
-        hour: tempData.hour,
-        minute: tempData.minute,
-        year: tempData.year!,
-        status: "ACTIVE",
-        participants: [],
-        createdAt: Date.now(),
-        reminderSent: false,
-        started: false
-    };
-
-    await saveEvents(tempData.guildId, [...events, newEvent]);
-    tempEventStore.delete(tempKey);
-
-    if (interaction.guild) {
-        await sendEventCreatedNotification(newEvent, interaction.guild);
-    }
-
-    if (interaction.replied || interaction.deferred) {
-        await interaction.editReply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [] });
-    } else if (canReply(interaction)) {
-        await interaction.reply({ content: `Event "${newEvent.name}" scheduled for next year successfully.`, components: [], ephemeral: true });
-    }
+    // 🔹 Zamiast od razu zapisywać event, pokazujemy select menu dla remindera
+    await showReminderSelect(interaction, tempKey);
 }
