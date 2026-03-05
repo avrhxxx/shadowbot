@@ -7,21 +7,22 @@ import {
 } from "discord.js";
 
 export async function handleCreate(interaction: ButtonInteraction) {
-    // Sprawdzenie, czy to faktycznie przycisk
+    // Tylko przycisk Create Event
     if (!interaction.isButton()) return;
 
+    // Tworzenie modala
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
         .setTitle("Create Event");
 
-    // Nazwa eventu
+    // Pole: nazwa eventu
     const nameInput = new TextInputBuilder()
         .setCustomId("event_name")
         .setLabel("Event Name")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-    // Data i godzina (UTC) z dopuszczalnymi formatami
+    // Pole: data + godzina z opisem dopuszczalnych formatów
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -55,7 +56,7 @@ DDMMHHMM      → 18072030`
         .setPlaceholder("Leave empty if no reminder")
         .setRequired(false);
 
-    // Dodanie wszystkich pól do modala
+    // Dodanie pól do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
@@ -63,6 +64,6 @@ DDMMHHMM      → 18072030`
         new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
     );
 
-    // Wyświetlenie modala
+    // Wyświetlenie modala po kliknięciu przycisku
     await interaction.showModal(modal);
 }
