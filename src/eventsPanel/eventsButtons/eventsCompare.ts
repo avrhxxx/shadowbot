@@ -12,14 +12,23 @@ import {
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
-import { formatUTCDate } from "../../utils/timeUtils";
+import { formatUTCDate } from "../../utils/timeUtils"; // <- poprawiony import
 
+/**
+ * Formatuje datę eventu w UTC dla wyświetlania w wiadomościach i plikach
+ */
 function formatEventUTC(e: EventObject) {
-  const year = new Date().getUTCFullYear();
-  return formatUTCDate(e.day, e.month, year, e.hour, e.minute); // poprawione
+  const year = new Date().getUTCFullYear(); // bieżący rok
+  return formatUTCDate(e.day, e.month, year, e.hour, e.minute);
 }
 
-export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
+/* ===================================================== */
+/*  STEP 1 — CLICK COMPARE BUTTON                       */
+/* ===================================================== */
+export async function handleCompareButton(
+  interaction: ButtonInteraction,
+  eventId: string
+) {
   const guildId = interaction.guildId!;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
 
@@ -29,7 +38,10 @@ export async function handleCompareButton(interaction: ButtonInteraction, eventI
     return;
   }
   if (currentEvent.status !== "PAST") {
-    await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
+    await interaction.reply({
+      content: "You can only compare past events.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -38,7 +50,10 @@ export async function handleCompareButton(interaction: ButtonInteraction, eventI
     .sort((a, b) => b.createdAt - a.createdAt);
 
   if (pastEvents.length === 0) {
-    await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
+    await interaction.reply({
+      content: "No other past events available to compare.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -63,7 +78,12 @@ export async function handleCompareButton(interaction: ButtonInteraction, eventI
   });
 }
 
-export async function handleCompareSelect(interaction: StringSelectMenuInteraction) {
+/* ===================================================== */
+/*  STEP 2 — HANDLE SELECT MENU                         */
+/* ===================================================== */
+export async function handleCompareSelect(
+  interaction: StringSelectMenuInteraction
+) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
 
@@ -75,7 +95,10 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
   if (!currentEvent || !selectedEvent) {
-    await interaction.update({ content: "One of the events no longer exists.", components: [] });
+    await interaction.update({
+      content: "One of the events no longer exists.",
+      components: []
+    });
     return;
   }
 
@@ -88,10 +111,18 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadButton);
 
-  await interaction.update({ content: result.embedText, components: [row] });
+  await interaction.update({
+    content: result.embedText,
+    components: [row]
+  });
 }
 
-export async function handleCompareDownload(interaction: ButtonInteraction) {
+/* ===================================================== */
+/*  STEP 3 — DOWNLOAD BUTTON                            */
+/* ===================================================== */
+export async function handleCompareDownload(
+  interaction: ButtonInteraction
+) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
 
@@ -112,35 +143,53 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
 
   const config = await EventStorage.getConfig(guildId);
   if (!config?.downloadChannelId) {
-    await interaction.reply({ content: "Download channel not configured.", ephemeral: true });
+    await interaction.reply({
+      content: "Download channel not configured.",
+      ephemeral: true
+    });
     return;
   }
 
   const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Download channel invalid.", ephemeral: true });
+    await interaction.reply({
+      content: "Download channel invalid.",
+      ephemeral: true
+    });
     return;
   }
 
   const utcNow = new Date().toISOString();
 
-  await channel.send({ content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}` });
+  await channel.send({
+    content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
+  });
 
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
     name: `compare_${eventA.name}_vs_${eventB.name}.txt`
   });
 
-  await channel.send({ content: `File version of the comparison:`, files: [file] });
+  await channel.send({
+    content: `File version of the comparison:`,
+    files: [file]
+  });
 
-  await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
+  await interaction.reply({
+    content: "Comparison sent to download channel.",
+    ephemeral: true
+  });
 }
 
+/* ===================================================== */
+/*  CORE LOGIC (REUSABLE)                               */
+/* ===================================================== */
 async function buildComparison(eventA: EventObject, eventB: EventObject, guild: Guild) {
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
   const absentA = new Set(eventA.absent || []);
   const absentB = new Set(eventB.absent || []);
 
+  // Clean nick: jeśli członek istnieje w guild, weź displayName, inaczej id
   const getMemberName = (id: string) => {
     const member = guild.members.cache.get(id);
     return member ? member.displayName : id;
@@ -162,7 +211,8 @@ async function buildComparison(eventA: EventObject, eventB: EventObject, guild: 
     (missedTwice.length ? missedTwice.map(getMemberName).join("\n") : "None");
 
   const txtText =
-    `Attendance Comparison\n=====================\n\n` +
+    `Attendance Comparison\n` +
+    `=====================\n\n` +
     `Event A: ${eventA.name} (${formatEventUTC(eventA)})\n` +
     `Event B: ${eventB.name} (${formatEventUTC(eventB)})\n\n` +
     `Reliable (${reliable.length})\n` +
