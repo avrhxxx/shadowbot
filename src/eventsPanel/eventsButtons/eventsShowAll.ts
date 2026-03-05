@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsShowAll.ts
 import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
