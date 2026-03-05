@@ -7,10 +7,9 @@ import {
 } from "discord.js";
 
 export async function handleCreate(interaction: ButtonInteraction) {
-    // Tylko przycisk Create Event
+    // ✅ tylko przycisk
     if (!interaction.isButton()) return;
 
-    // Tworzenie modala
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
         .setTitle("Create Event");
@@ -40,7 +39,7 @@ DDMMHHMM      → 18072030`
         )
         .setRequired(true);
 
-    // Opcjonalny rok
+    // Pole: opcjonalny rok
     const yearInput = new TextInputBuilder()
         .setCustomId("event_year")
         .setLabel("Year (optional)")
@@ -48,7 +47,7 @@ DDMMHHMM      → 18072030`
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
-    // Opcjonalny reminder
+    // Pole: opcjonalny reminder
     const reminderInput = new TextInputBuilder()
         .setCustomId("reminder_before")
         .setLabel("Reminder before (minutes, optional)")
@@ -64,6 +63,6 @@ DDMMHHMM      → 18072030`
         new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
     );
 
-    // Wyświetlenie modala po kliknięciu przycisku
+    // ✅ wyświetlenie modala po kliknięciu przycisku
     await interaction.showModal(modal);
 }
