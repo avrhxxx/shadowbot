@@ -55,20 +55,12 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
-    // Pole: opcjonalny reminder
-    const reminderInput = new TextInputBuilder()
-        .setCustomId("reminder_before")
-        .setLabel("Reminder before (minutes, optional)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Leave empty if no reminder")
-        .setRequired(false);
-
-    // Dodanie pól do modala
+    // 🔹 Usunięto pole reminderInput z modala
+    // Wszystkie pola dodajemy do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
+        new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
     );
 
     // ✅ Wyświetlenie modala
