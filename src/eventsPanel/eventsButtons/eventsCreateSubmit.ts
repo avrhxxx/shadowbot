@@ -4,14 +4,6 @@ import { EventObject, getEvents, saveEvents } from "../eventService";
 import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
-/**
- * Parsuje różne dopuszczalne formaty daty i czasu na day/month/hour/minute
- * Obsługiwane formaty:
- * DD.MM HH:MM, DD/MM HH:MM, DD-MM HH:MM
- * DD.MM HHMM, DD/MM HHMM, DD-MM HHMM
- * DDMM HHMM
- * DDMMHHMM
- */
 function parseEventDateTime(input: string): { day: number; month: number; hour: number; minute: number } | null {
     input = input.trim();
     if (!input) return null;
@@ -42,7 +34,6 @@ const tempEventStore = new Map<string, {
     month: number;
     hour: number;
     minute: number;
-    year?: number;
     reminderBefore?: number;
 }>();
 
@@ -69,13 +60,18 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // 🔹 obsługa opcjonalnego roku
     const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
-    const eventYear = year ?? nowUTC.getUTCFullYear();
+    let eventDateUTC: Date;
 
-    // 🔹 przekazujemy informację o podanym roku do funkcji getEventDateUTC
-    const eventDateUTC = getEventDateUTC(day, month, hour, minute, !!year);
+    if (year !== undefined) {
+        // Literalny rok – nie przesuwamy automatycznie
+        eventDateUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    } else {
+        // Rok nie podany → używamy funkcji getEventDateUTC (przesuwa jeśli przeszła)
+        eventDateUTC = getEventDateUTC(day, month, hour, minute);
+    }
 
     // 🔹 jeśli rok nie był podany i data już minęła → Next Year / Cancel
-    if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
+    if (year === undefined && eventDateUTC.getTime() < nowUTC.getTime()) {
         const tempId = `${interaction.user.id}-${Date.now()}`;
         tempEventStore.set(tempId, { guildId, name, day, month, hour, minute, reminderBefore });
 
@@ -132,11 +128,13 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                 const events = await getEvents(tempData.guildId);
                 const duplicate = events.find(
                     e =>
+                        e.name === tempData.name &&
                         e.day === tempData.day &&
                         e.month === tempData.month &&
                         e.hour === tempData.hour &&
                         e.minute === tempData.minute &&
-                        e.status === "ACTIVE"
+                        e.status === "ACTIVE" &&
+                        e.year === nextYear
                 );
 
                 if (duplicate) {
@@ -167,18 +165,21 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // 🔹 normalne tworzenie eventu (rok wpisany lub przyszła data)
     const events: EventObject[] = await getEvents(guildId);
-    const duplicate = events.find(
-        e =>
-            e.day === day &&
-            e.month === month &&
-            e.hour === hour &&
-            e.minute === minute &&
-            e.status === "ACTIVE"
+
+    // 🔹 sprawdzenie duplikatu: nazwa + data + rok
+    const duplicate = events.find(e =>
+        e.name === name &&
+        e.day === day &&
+        e.month === month &&
+        e.hour === hour &&
+        e.minute === minute &&
+        e.status === "ACTIVE" &&
+        (year ? e.year === year : true)
     );
 
     if (duplicate) {
         await interaction.reply({
-            content: "An active event at this UTC date and time already exists. Please choose another date/time.",
+            content: "An active event with the same name and date already exists. Please choose another.",
             ephemeral: true
         });
         return;
@@ -197,7 +198,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        year: eventYear,
+        year: year ?? eventDateUTC.getUTCFullYear(),
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
