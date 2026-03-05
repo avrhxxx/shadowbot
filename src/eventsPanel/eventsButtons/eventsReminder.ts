@@ -32,18 +32,18 @@ export function stopEventReminders(guildId: string) {
 
 async function checkEvents(guild: Guild) {
   const events = await EventStorage.getEvents(guild.id) as EventWithReminder[];
-  const now = new Date();
+  const now = Date.now(); // 🔹 UTC timestamp
 
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
     // 🔹 używamy literalnego roku zapisanego w evencie
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime(); // 🔹 UTC timestamp
 
     // Reminder
     if (event.reminderBefore !== undefined) {
-      const reminderTime = eventTime.getTime() - event.reminderBefore * 60_000;
-      if (!event.reminderSent && now.getTime() >= reminderTime) {
+      const reminderTime = eventTime - event.reminderBefore * 60_000;
+      if (!event.reminderSent && now >= reminderTime) {
         const config = await EventStorage.getConfig(guild.id);
         if (!config?.notificationChannelId) continue;
 
@@ -57,7 +57,7 @@ async function checkEvents(guild: Guild) {
     }
 
     // Event started
-    if (!event.started && now.getTime() >= eventTime.getTime()) {
+    if (!event.started && now >= eventTime) {
       const config = await EventStorage.getConfig(guild.id);
       if (!config?.notificationChannelId) continue;
 
