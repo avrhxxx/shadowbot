@@ -7,9 +7,26 @@ import {
     ActionRowBuilder 
 } from "discord.js";
 
+import * as EventStorage from "../eventStorage"; // 🔹 dodane
+
 export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
+
+    // 🔹 sprawdzenie czy system jest skonfigurowany
+    const config = await EventStorage.getConfig(interaction.guildId!);
+
+    if (!config?.notificationChannelId || !config?.downloadChannelId) {
+        await interaction.reply({
+            content:
+                "⚠️ Event system is not configured yet.\n\n" +
+                "Please use the ⚙️ **Settings** button first and configure:\n" +
+                "• Notification Channel\n" +
+                "• Download Channel",
+            ephemeral: true
+        });
+        return;
+    }
 
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
@@ -22,7 +39,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-    // Pole: data + godzina (required), krótki placeholder
+    // Pole: data + godzina (required)
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -54,6 +71,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
         new ActionRowBuilder<TextInputBuilder>().addComponents(reminderInput)
     );
 
-    // ✅ Wyświetlenie modala po kliknięciu przycisku
+    // ✅ Wyświetlenie modala
     await interaction.showModal(modal);
 }
