@@ -7,8 +7,6 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextChannel,
-  ButtonBuilder,
-  ButtonStyle
 } from "discord.js";
 import * as EventStorage from "./eventStorage";
 
@@ -26,13 +24,14 @@ import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
-// ✅ NOWE COMPARE IMPORTY
+// ✅ NOWE COMPARE IMPORTY – dokładnie te, które istnieją w eventsCompare.ts
 import {
   handleCompareButton,
   handleCompareSelect,
   handleCompareDownload,
   handleCompareAll,
-  handleCompareAllDownload
+  handleCompareAllDownload,
+  buildComparison
 } from "./eventsButtons/eventsCompare";
 
 // ✅ SHOW ALL EVENTS
@@ -72,7 +71,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
      🔥 DYNAMIC – BUTTONS
   ======================================================= */
   if (interaction.isButton()) {
-
     // Participants
     if (customId.startsWith("event_add_")) {
       const eventId = customId.replace("event_add_", "");
@@ -92,14 +90,14 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // ✅ COMPARE BUTTON
+    // ✅ COMPARE SINGLE
     if (customId.startsWith("event_compare_")) {
       const eventId = customId.replace("event_compare_", "");
       await handleCompareButton(interaction, eventId);
       return;
     }
 
-    // ✅ COMPARE DOWNLOAD
+    // ✅ COMPARE SINGLE DOWNLOAD
     if (customId.startsWith("compare_download_")) {
       await handleCompareDownload(interaction);
       return;
@@ -145,10 +143,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
 
-      // Set next year
       storedData.year = new Date().getUTCFullYear() + 1;
-
-      // 🔹 pokaż select menu remindera zamiast finalizować od razu
       await showReminderSelect(interaction, tempKey);
       return;
     }
@@ -158,20 +153,16 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
      🔥 SELECT MENUS
   ======================================================= */
   if (interaction.isStringSelectMenu()) {
-
-    // ✅ REMINDER SELECT MENU (ustawienie reminderBefore dla nowego eventu)
     if (customId.startsWith("reminder_select_")) {
       await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
       return;
     }
 
-    // ✅ COMPARE SELECT
     if (customId.startsWith("compare_select_")) {
       await handleCompareSelect(interaction);
       return;
     }
 
-    // Settings selects
     if (customId === "event_settings_notification" || customId === "event_settings_download") {
       await handleSettingsSelect(interaction);
       return;
@@ -182,7 +173,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Manual Reminder select menu
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
       const events = await EventStorage.getEvents(interaction.guildId!);
@@ -212,7 +202,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
      🔥 MODALS
   ======================================================= */
   if (interaction.isModalSubmit()) {
-
     if (customId.startsWith("event_add_modal_")) {
       const eventId = customId.replace("event_add_modal_", "");
       await handleAddParticipantSubmit(interaction, eventId);
@@ -258,12 +247,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await handleCancelAbort(interaction);
         break;
 
-      // ✅ NOWY: Show All Events
       case "event_show_all":
         await handleShowAllEvents(interaction);
         break;
 
-      // ✅ Stary download – zachowujemy możliwość pobierania plików
       case "event_download":
         await handleDownload(interaction);
         break;
@@ -294,7 +281,7 @@ async function handleManualReminder(interaction: ButtonInteraction) {
   const events = await EventStorage.getEvents(guildId);
 
   const upcomingEvents = events.filter(e => e.status !== "PAST");
-  if (upcomingEvents.length === 0) {
+  if (!upcomingEvents.length) {
     await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
     return;
   }
