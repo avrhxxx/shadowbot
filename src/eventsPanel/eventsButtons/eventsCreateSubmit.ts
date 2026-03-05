@@ -1,16 +1,15 @@
 // src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import { 
     ModalSubmitInteraction, 
-    Guild, 
     ActionRowBuilder, 
     StringSelectMenuBuilder, 
-    ComponentType 
+    ButtonBuilder, 
+    ButtonStyle 
 } from "discord.js";
 import { EventObject, getEvents, saveEvents } from "../eventService";
-import { sendEventCreatedNotification } from "./eventsReminder";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
-const tempEventStore = new Map<string, EventObject>();
+const tempEventStore = new Map<string, { name: string; day: number; month: number; hour: number; minute: number; guildId: string }>();
 
 function parseEventDateTime(input: string) {
     const match = input.trim().match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
@@ -38,15 +37,28 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const { day, month, hour, minute } = parsed;
     const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const nowUTC = new Date();
-    let eventDateUTC = year ? new Date(Date.UTC(year, month - 1, day, hour, minute)) : getEventDateUTC(day, month, hour, minute);
+    let eventDateUTC = year
+        ? new Date(Date.UTC(year, month - 1, day, hour, minute))
+        : getEventDateUTC(day, month, hour, minute);
 
-    // Obsługa Next Year / Cancel
+    // 🔹 Obsługa Next Year jeśli brak roku i data już minęła
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        await interaction.reply({ content: `The date ${formatEventUTC(day, month, hour, minute)} UTC has passed. Use Next Year option.`, ephemeral: true });
+        tempEventStore.set(`${interaction.user.id}-temp`, { name, day, month, hour, minute, guildId });
+
+        await interaction.reply({
+            content: `The date ${formatEventUTC(day, month, hour, minute)} UTC has passed. Do you want to schedule it for next year?`,
+            components: [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId("next_year_yes").setLabel("Yes").setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId("next_year_no").setLabel("No").setStyle(ButtonStyle.Danger)
+                )
+            ],
+            ephemeral: true
+        });
         return;
     }
 
-    // Tworzymy event w storage bez reminderBefore
+    // 🔹 Teraz mamy finalną datę (rok podany lub obecny/next year) → zapisujemy event
     const events: EventObject[] = await getEvents(guildId);
     const newEvent: EventObject = {
         id: `${Date.now()}`,
@@ -65,9 +77,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     };
 
     await saveEvents(guildId, [...events, newEvent]);
-    tempEventStore.set(`${interaction.user.id}-${newEvent.id}`, newEvent);
 
-    // ✅ Wyświetlenie select menu do wyboru przypomnienia
+    // 🔹 Wyświetlenie select menu do wyboru przypomnienia
     const selectMenu = new StringSelectMenuBuilder()
         .setCustomId(`reminder_select_${interaction.user.id}-${newEvent.id}`)
         .setPlaceholder("Set reminder before event (optional)")
