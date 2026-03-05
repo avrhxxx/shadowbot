@@ -6,23 +6,26 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
+  // 🔹 jeśli brak eventów – tylko ephemeral wiadomość, bez panelu
   if (!events.length) {
-    await interaction.reply({ content: "No events found.", ephemeral: true });
+    await interaction.reply({
+      content: "No events found.",
+      ephemeral: true
+    });
     return;
   }
 
   // 🔹 sortowanie chronologiczne
   const list = events
-    .sort((a,b)=>a.createdAt-b.createdAt)
+    .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
       const date = formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
-
       const statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "⚪" : "🔴";
       return `• ${statusEmoji} **${e.name}** — ${date} (${e.status})`;
     })
     .join("\n");
 
-  // 🔹 przyciski
+  // 🔹 przyciski Compare All i Download All
   const compareBtn = new ButtonBuilder()
     .setCustomId("compare_all_events")
     .setLabel("Compare All")
