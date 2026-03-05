@@ -1,43 +1,28 @@
-import {
-  ButtonInteraction,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
-} from "discord.js";
-
+import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
-
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
   if (!events.length) {
-    await interaction.reply({
-      content: "No events found.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
+  // 🔹 sortowanie chronologiczne
   const list = events
     .sort((a,b)=>a.createdAt-b.createdAt)
     .map(e => {
+      const date = formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 
-      const date = formatEventUTC(
-        e.day,
-        e.month,
-        e.hour,
-        e.minute,
-        e.year
-      );
-
-      return `• **${e.name}** — ${date} (${e.status})`;
-
+      const statusEmoji = e.status === "ACTIVE" ? "🟢" : e.status === "PAST" ? "⚪" : "🔴";
+      return `• ${statusEmoji} **${e.name}** — ${date} (${e.status})`;
     })
     .join("\n");
 
+  // 🔹 przyciski
   const compareBtn = new ButtonBuilder()
     .setCustomId("compare_all_events")
     .setLabel("Compare All")
@@ -48,8 +33,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     .setLabel("Download All")
     .setStyle(ButtonStyle.Secondary);
 
-  const row = new ActionRowBuilder<ButtonBuilder>()
-    .addComponents(compareBtn, downloadBtn);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(compareBtn, downloadBtn);
 
   await interaction.reply({
     content: `📅 **All Events**\n\n${list}`,
