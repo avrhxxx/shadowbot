@@ -51,7 +51,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
-    // 🔹 Usunięto linię o download z pliku TXT
     const messageContent = [
       `**Event:** ${event.name}`,
       `**Status:** ${statusLabel}`,
@@ -65,7 +64,10 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const attachment = new AttachmentBuilder(filePath);
 
-    await channel.send({ content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`, files: [attachment] });
+    await channel.send({
+      content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`,
+      files: [attachment]
+    });
 
     await interaction.reply({
       content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
@@ -81,9 +83,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  let fullMessage: string[] = [];
-
-  allEvents.forEach(event => {
+  const fullMessage: string[] = allEvents.map(event => {
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
       event.status === "CANCELED" ? "[CANCELED]" :
@@ -94,19 +94,16 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
-    const eventText = [
+    return [
       `Event: ${event.name}`,
       `Status: ${statusLabel}`,
       `Date: ${dateStr}`,
       `Participants:\n${participants}`,
       `Absent:\n${absent}`
     ].join("\n\n");
-
-    fullMessage.push(eventText);
   });
 
   const finalMessage = fullMessage.join("\n\n====================\n\n");
-
   const filePath = path.join(tempDir, `all_events_${Date.now()}.txt`);
   fs.writeFileSync(filePath, finalMessage);
 
