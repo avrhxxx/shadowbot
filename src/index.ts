@@ -1,4 +1,8 @@
 // src/index.ts
+
+// 🔹 Import Google Sheets klienta jako pierwszy
+import "./googleSheetsClient";
+
 import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
@@ -41,19 +45,12 @@ async function seedEventsSafe(guildId: string) {
       minute: 40,
     });
 
-    // 🔹 Status ACTIVE, aby event był aktywny
     event.status = "ACTIVE";
-
-    // Dodajemy uczestników
     event.participants = [...userIds];
 
-    // Losowe absent (30% szans)
     const absentSet = new Set<string>();
-    for (const userId of userIds) {
-      if (Math.random() < 0.3) absentSet.add(userId);
-    }
+    for (const userId of userIds) if (Math.random() < 0.3) absentSet.add(userId);
 
-    // Usuń absent z participants
     event.participants = event.participants.filter(u => !absentSet.has(u));
     event.absent = Array.from(absentSet);
 
@@ -68,19 +65,14 @@ async function seedEventsSafe(guildId: string) {
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
-  // 🔹 Inicjalizacja modułów
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // 🔹 Uruchamiamy interval reminderów dla wszystkich guildów
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
-
-    // 🔹 Seedowanie testowych eventów
     seedEventsSafe(guild.id);
   }
 
-  // 🔹 Globalny listener dla Event Panelu
   client.on("interactionCreate", async (interaction: Interaction) => {
     await handleEventInteraction(interaction);
   });
