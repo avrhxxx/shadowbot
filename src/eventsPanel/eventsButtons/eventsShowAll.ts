@@ -3,9 +3,9 @@ import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedB
 import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
+import { handleCompareAll } from "./eventsCompare";
 import { handleDownload } from "./eventsDownload";
-import { isHeavyLoad, sendHeavyReport, fragmentText } from "../eventsHelpers/heavyReportHelper";
+import { isHeavyLoad, sendHeavyReport, generateReportFragments } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -68,26 +68,11 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     return;
   }
 
-  const fullText = events
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .map(e => {
-      const date = `${e.day}/${e.month} ${e.hour}:${e.minute} UTC`;
-      const status = e.status;
-      const participants = e.participants.length ? e.participants.join("\n") : "None";
-      const absent = e.absent?.length ? e.absent.join("\n") : "None";
-      return `**${e.name}** — ${date} (${status})\nParticipants:\n${participants}\nAbsent:\n${absent}`;
-    })
-    .join("\n\n====================\n\n");
+  // 🔹 Generowanie fragmentów z heavyReportHelper
+  const { embedFragments } = generateReportFragments(events);
 
-  // Fragmentacja dużego tekstu na Discord
-  const fragments = fragmentText(fullText, 3900);
-
-  for (let i = 0; i < fragments.length; i++) {
-    const embed = new EmbedBuilder()
-      .setTitle(`📋 All Event Participant Lists${fragments.length > 1 ? ` — part ${i + 1}` : ""}`)
-      .setColor(0x00ff00)
-      .setDescription(fragments[i]);
-
+  for (let i = 0; i < embedFragments.length; i++) {
+    const embed = embedFragments[i];
     if (i === 0) await interaction.reply({ embeds: [embed], ephemeral: true });
     else await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
