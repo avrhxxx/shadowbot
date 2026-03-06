@@ -49,9 +49,6 @@ import {
 // Manual Reminder
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
-// Heavy Report
-import { sendHeavyReport, isHeavyLoad } from "./eventsHelpers/heavyReportHelper";
-
 /* =======================================================
    🔹 Handler interakcji dla całego Event Panelu
 ======================================================= */
@@ -127,38 +124,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId === "show_all_lists") {
       await handleShowAllLists(interaction);
-      return;
-    }
-
-    // 🔹 Heavy Report Confirmation
-    if (customId === "heavy_report_yes" || customId === "heavy_report_no") {
-      if (customId === "heavy_report_no") {
-        await interaction.update({ content: "Report generation cancelled.", components: [] });
-        return;
-      }
-
-      // 🔹 Tak = generujemy raport
-      await interaction.deferReply({ ephemeral: true }); // pozwala na długą operację
-
-      const guildId = guild.id;
-      const events = await EventStorage.getEvents(guildId);
-      if (!events.length) {
-        await interaction.followUp({ content: "No events found.", ephemeral: true });
-        return;
-      }
-
-      const config = await EventStorage.getConfig(guildId);
-      const downloadChannelId = config?.downloadChannelId;
-      if (!downloadChannelId) {
-        await interaction.followUp({ content: "Download channel not configured.", ephemeral: true });
-        return;
-      }
-
-      // 🔹 Wywołanie faktycznego wysyłania raportu w helperze
-      await sendHeavyReport(guild, events, downloadChannelId);
-
-      // 🔹 Potwierdzenie dla użytkownika
-      await interaction.followUp({ content: "✅ Heavy report generated in download channel.", ephemeral: true });
       return;
     }
 
