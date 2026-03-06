@@ -6,10 +6,11 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   TextChannel,
+  Guild,
 } from "discord.js";
 
-// 🔹 zmieniony import na eventService
-import * as EventStorage from "./eventService";
+// 🔹 import do Google Sheets storage, bez podmian
+import * as EventStorage from "./googleSheetsStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
@@ -58,11 +59,9 @@ import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort 
 ======================================================= */
 
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
-
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const { customId, guild } = interaction;
-
   if (!guild) return;
 
   const tempKey = `${interaction.user.id}-temp`;
@@ -119,9 +118,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    /* =========================================
-       CLEAR EVENT DATA (FIXED ORDER)
-    ========================================= */
+    /* CLEAR EVENT DATA */
     if (customId === "event_clear_confirm") {
       await handleClearEventConfirm(interaction);
       return;
@@ -133,13 +130,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_clear_")) {
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find((e: EventStorage.EventObject) => e.id.toString() === eventId.toString());
-
+      const event = events.find(e => e.id === eventId);
       if (!event) {
         await interaction.reply({ content: "Event not found.", ephemeral: true });
         return;
       }
-
       await handleClearEventButton(interaction, eventId, event.name);
       return;
     }
@@ -167,13 +162,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
         return;
       }
-
       if (customId === "next_year_no") {
         tempEventStore.delete(tempKey);
         await interaction.update({ content: "Event was not added.", components: [] });
         return;
       }
-
       storedData.year = new Date().getUTCFullYear() + 1;
       await showReminderSelect(interaction, tempKey);
       return;
@@ -209,7 +202,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* SELECT MENUS */
   if (interaction.isStringSelectMenu()) {
-
     if (customId.startsWith("reminder_select_")) {
       await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
       return;
@@ -229,27 +221,19 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
       const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find((e: EventStorage.EventObject) => e.id.toString() === selectedEventId.toString());
-
+      const event = events.find(e => e.id === selectedEventId);
       if (!event) {
         await interaction.update({ content: "Event not found.", components: [] });
         return;
       }
-
       const config = await EventStorage.getConfig(interaction.guildId!);
-      const channel = guild.channels.cache.get(config?.notificationChannel ?? "") as TextChannel;
-
+      const channel = guild.channels.cache.get(config?.notificationChannelId ?? "") as TextChannel;
       if (!channel || !channel.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
         return;
       }
-
       await sendReminderMessage(channel, event);
-
-      await interaction.update({
-        content: `Manual reminder sent for **${event.name}**`,
-        components: []
-      });
+      await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
     }
   }
 
@@ -276,13 +260,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
 /* MANUAL REMINDER */
 async function handleManualReminder(interaction: ButtonInteraction): Promise<void> {
-
   const guild = interaction.guild;
   if (!guild) return;
 
   const events = await EventStorage.getEvents(interaction.guildId!);
-  const upcomingEvents = events.filter((e: EventStorage.EventObject) => e.status !== "PAST");
-
+  const upcomingEvents = events.filter(e => e.status !== "PAST");
   if (!upcomingEvents.length) {
     await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
     return;
@@ -292,7 +274,7 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
     .setCustomId("manual_reminder_select")
     .setPlaceholder("Select an event to manually send a reminder")
     .addOptions(
-      upcomingEvents.map((ev: EventStorage.EventObject) => ({
+      upcomingEvents.map(ev => ({
         label: ev.name,
         description: `UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`,
         value: ev.id
