@@ -1,4 +1,3 @@
-// src/eventsPanel/eventHandlers.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -96,7 +95,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleCompareAll(interaction);
       return;
     }
-    if (customId.startsWith("compare_all_download_")) {
+    if (customId === "compare_all_download") {
       await handleCompareAllDownload(interaction);
       return;
     }
@@ -111,9 +110,9 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Download All
+    // Download All – zwykły przycisk
     if (customId === "download_all_events") {
-      await handleCompareAllDownload(interaction);
+      await handleDownload(interaction);
       return;
     }
 
