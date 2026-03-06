@@ -1,12 +1,23 @@
 // src/eventsPanel/eventsButtons/eventsClear.ts
-import { ButtonInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from "discord.js";
+import {
+  ButtonInteraction,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+  Message
+} from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
 
 /**
  * Wyświetla modal confirm dla przycisku Clear Event Data
  */
-export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
+export async function handleClearEventButton(
+  interaction: ButtonInteraction,
+  eventId: string,
+  eventName: string
+) {
   const modal = new ModalBuilder()
     .setCustomId(`confirm_clear_event_${eventId}`)
     .setTitle("Confirm Clear Event Data");
@@ -25,7 +36,7 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
 }
 
 /**
- * Handler dla submit modal confirm
+ * Handler submit modal confirm
  */
 export async function handleClearEventSubmit(interaction: any) {
   const customId = interaction.customId as string;
@@ -35,7 +46,10 @@ export async function handleClearEventSubmit(interaction: any) {
   const confirmText = interaction.fields.getTextInputValue("confirm_text");
 
   if (confirmText !== "CLEAR") {
-    await interaction.reply({ content: "Clear action canceled. You did not type CLEAR.", ephemeral: true });
+    await interaction.reply({
+      content: "Clear action canceled. You did not type CLEAR.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -54,10 +68,19 @@ export async function handleClearEventSubmit(interaction: any) {
   events.splice(eventIndex, 1);
   await EventStorage.saveEvents(guildId, events);
 
-  await interaction.reply({ content: `✅ All data for **${eventName}** has been cleared.`, ephemeral: true });
+  // Odpowiedź ephemeral dla użytkownika
+  await interaction.reply({
+    content: `✅ All data for **${eventName}** has been cleared.`,
+    ephemeral: true
+  });
 
-  // Opcjonalnie: zaktualizuj embed listy jeśli był pokazany
-  if (interaction.message) {
-    await updateEventEmbed(interaction.message, eventId);
+  // Spróbuj zaktualizować embed w kanale, jeśli istnieje
+  try {
+    const message = interaction.message as Message | undefined;
+    if (message) {
+      await updateEventEmbed(message, eventId);
+    }
+  } catch (err) {
+    console.warn("Could not update event embed after clearing:", err);
   }
 }
