@@ -1,10 +1,10 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
-import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel } from "discord.js";
+import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 import { handleCompareAll } from "./eventsCompare";
 import { handleDownload } from "./eventsDownload";
-import { fragmentText } from "../../helpers/heavyTaskHelper";
+import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -17,10 +17,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
   const events = await getEvents(guildId);
 
   if (!events.length) {
-    await interaction.reply({
-      content: "No events found.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
@@ -59,7 +56,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 
 /**
  * Show all participant lists in embed (bez pobierania pliku)
- * - obsługuje fragmentację jeśli treść za długa
+ * - obsługuje heavy load i fragmentację embedów
  */
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -70,7 +67,15 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     return;
   }
 
-  let fullText = events
+  // 🔹 jeśli duży load -> użyj heavy helpera
+  if (isHeavyLoad(events)) {
+    await sendHeavyReport(interaction.guild!, events, interaction.guild?.channels.cache.get(interaction.channelId!)?.id);
+    await interaction.reply({ content: "Heavy report sent.", ephemeral: true });
+    return;
+  }
+
+  // 🔹 standardowa fragmentacja embedów dla mniejszych raportów
+  const fullText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
       const date = `${e.day}/${e.month} ${e.hour}:${e.minute} UTC`;
@@ -81,8 +86,12 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
-  // Fragmentacja jeśli treść za długa dla Discord embed
-  const fragments = fragmentText(fullText, 3900); // 4000 znaków max w embed description
+  const CHUNK_SIZE = 3900; // max znaków w embed description
+  const fragments: string[] = [];
+
+  for (let i = 0; i < fullText.length; i += CHUNK_SIZE) {
+    fragments.push(fullText.slice(i, i + CHUNK_SIZE));
+  }
 
   for (let i = 0; i < fragments.length; i++) {
     const embed = new EmbedBuilder()
