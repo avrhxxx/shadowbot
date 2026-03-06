@@ -10,9 +10,6 @@ import {
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
 
-/* ======================================================
-   🔹 STEP 1 – BUTTON → CONFIRMATION
-====================================================== */
 export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
   const embed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Clear Event Data")
@@ -22,28 +19,24 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
     )
     .setColor("Red");
 
-  const confirmBtn = new ButtonBuilder()
-    .setCustomId(`event_clear_confirm_${eventId}`)
-    .setLabel("Confirm")
-    .setStyle(ButtonStyle.Danger);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`event_clear_confirm_${eventId}`)
+      .setLabel("Confirm")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`event_clear_abort`)
+      .setLabel("Abort")
+      .setStyle(ButtonStyle.Secondary)
+  );
 
-  const abortBtn = new ButtonBuilder()
-    .setCustomId(`event_clear_abort`)
-    .setLabel("Abort")
-    .setStyle(ButtonStyle.Secondary);
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply({ content: "", embeds: [embed], components: [row] });
+  } else {
+    await interaction.reply({ content: "", embeds: [embed], components: [row], ephemeral: true });
+  }
+}
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
-
-  await interaction.update({
-    content: "",
-    embeds: [embed],
-    components: [row]
-  });
-};
-
-/* ======================================================
-   🔹 STEP 2 – CONFIRM BUTTON
-====================================================== */
 export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await EventStorage.getEvents(guildId);
@@ -56,7 +49,6 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
 
   const eventName = events[eventIndex].name;
 
-  // Usuń event z bazy
   events.splice(eventIndex, 1);
   await EventStorage.saveEvents(guildId, events);
 
@@ -67,23 +59,20 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
 
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
-  // Aktualizacja embed listy w kanale, jeśli istnieje
-  try {
-    if (interaction.message) {
+  // Aktualizacja embed listy – tylko jeśli wiadomość nie jest ephemeral
+  if (interaction.message && !interaction.message.ephemeral) {
+    try {
       await updateEventEmbed(interaction.message as Message, eventId);
+    } catch (err) {
+      console.warn("Could not update event embed after clearing:", err);
     }
-  } catch (err) {
-    console.warn("Could not update event embed after clearing:", err);
   }
-};
+}
 
-/* ======================================================
-   🔹 STEP 3 – ABORT BUTTON
-====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
   await interaction.update({
     content: "Clear action aborted.",
     embeds: [],
     components: []
   });
-};
+}
