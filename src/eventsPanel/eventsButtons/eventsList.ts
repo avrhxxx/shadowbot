@@ -1,6 +1,6 @@
+// src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { EventObject } from "../eventService";
+import { getEvents, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
@@ -23,14 +23,13 @@ function formatEventUTCObj(e: EventObject) {
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
   if (!events || events.length === 0) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
-  // 🔹 usunięcie updateEventStatuses — status bierze się z reminderów
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const eventDateUTCStr = formatEventUTCObj(e);
@@ -52,7 +51,8 @@ export async function handleList(interaction: ButtonInteraction) {
     );
 
     const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
     );
 
     const messagePayload = { embeds: [embed], components: [row1, row2], ephemeral: true };
@@ -70,9 +70,10 @@ export async function handleList(interaction: ButtonInteraction) {
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
-  const event = events.find(e => e.id === eventId);
+  // Porównanie ID jako string
+  const event = events.find(e => e.id.toString() === eventId.toString());
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
@@ -101,9 +102,9 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const guildId = message.guildId;
   if (!guildId) return;
 
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
-  const e = events.find(ev => ev.id === eventId);
+  const e = events.find(ev => ev.id.toString() === eventId.toString());
   if (!e) return;
 
   const eventDateUTCStr = formatEventUTCObj(e);
@@ -125,7 +126,8 @@ export async function updateEventEmbed(message: any, eventId: string) {
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
   );
 
   await message.edit({ embeds: [embed], components: [row1, row2] });

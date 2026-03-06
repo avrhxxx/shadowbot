@@ -9,7 +9,7 @@ import {
     ButtonInteraction, 
     BaseInteraction 
 } from "discord.js";
-import { EventObject, getEvents, saveEvents } from "../eventService";
+import { getEvents, saveEvents, EventObject } from "../eventService"; // 🔹 zmienione importy
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
@@ -95,7 +95,6 @@ export async function showReminderSelect(
         return;
     }
 
-    // 🔹 Chronologiczne przypisanie wszystkich 25 slotów
     const options = [
         { label: "No reminder", value: "0" },
         { label: "5 min before", value: "5" },

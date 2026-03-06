@@ -1,23 +1,19 @@
 // src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import path from "path";
-import fs from "fs";
+import { getEvents, getConfig } from "../eventService";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
  * Download participant lists
  * - singleEventId -> one event
- * - otherwise -> all events in single file and message
+ * - otherwise -> all events in TXT file(s)
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
-  const guildId = interaction.guildId;
-  if (!guildId) return;
-
-  const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
-  const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
+  const guildId = interaction.guildId!;
+  const allEvents: EventObject[] = await getEvents(guildId);
+  const config = await getConfig(guildId);
 
   if (!config.downloadChannelId) {
     await interaction.reply({ content: "Download channel is not set.", ephemeral: true });
@@ -30,16 +26,10 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  const tempDir = path.join(__dirname, "../../temp");
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
   // 🔹 Single event download
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
-    if (!event) {
-      await interaction.reply({ content: "Event not found.", ephemeral: true });
-      return;
-    }
+    if (!event) return interaction.reply({ content: "Event not found.", ephemeral: true });
 
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
@@ -48,10 +38,8 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
-    // 🔹 Usunięto linię o download z pliku TXT
     const messageContent = [
       `**Event:** ${event.name}`,
       `**Status:** ${statusLabel}`,
@@ -60,30 +48,29 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
       `**Absent:**\n${absent}`
     ].join("\n\n");
 
-    const filePath = path.join(tempDir, `${event.id}.txt`);
-    fs.writeFileSync(filePath, messageContent);
+    const file = new AttachmentBuilder(Buffer.from(messageContent, "utf-8"), { name: `${event.id}.txt` });
 
-    const attachment = new AttachmentBuilder(filePath);
-
-    await channel.send({ content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`, files: [attachment] });
+    await channel.send({
+      content: `${messageContent}\n\nTXT file attached.`,
+      files: [file]
+    });
 
     await interaction.reply({
       content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
       ephemeral: true
     });
-
     return;
   }
 
-  // 🔹 Download all events in one file
+  // 🔹 Download all events
+  await interaction.deferReply({ ephemeral: true });
+
   if (!allEvents.length) {
-    await interaction.reply({ content: "No events to download.", ephemeral: true });
+    await interaction.editReply({ content: "No events to download.", components: [] });
     return;
   }
 
-  let fullMessage: string[] = [];
-
-  allEvents.forEach(event => {
+  const finalMessage: string[] = allEvents.map(event => {
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
       event.status === "CANCELED" ? "[CANCELED]" :
@@ -91,34 +78,24 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
-    const eventText = [
+    return [
       `Event: ${event.name}`,
       `Status: ${statusLabel}`,
       `Date: ${dateStr}`,
       `Participants:\n${participants}`,
       `Absent:\n${absent}`
     ].join("\n\n");
-
-    fullMessage.push(eventText);
   });
 
-  const finalMessage = fullMessage.join("\n\n====================\n\n");
-
-  const filePath = path.join(tempDir, `all_events_${Date.now()}.txt`);
-  fs.writeFileSync(filePath, finalMessage);
-
-  const attachment = new AttachmentBuilder(filePath);
+  const filePath = `all_events_${Date.now()}.txt`;
+  const file = new AttachmentBuilder(Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"), { name: filePath });
 
   await channel.send({
-    content: `Participant lists for all events:\n\n${finalMessage}\n\nYou can also download this as a TXT file attached below.`,
-    files: [attachment]
+    content: `All participant lists sent as TXT file.`,
+    files: [file]
   });
 
-  await interaction.reply({
-    content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`,
-    ephemeral: true
-  });
+  await interaction.editReply({ content: `Participant lists sent to <#${config.downloadChannelId}>.`, components: [] });
 }

@@ -6,26 +6,31 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } fr
  * Rząd 2: ustawienia i help
  */
 export function renderEventPanel(): MessageCreateOptions {
+
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("event_create")
       .setLabel("Create Event")
       .setStyle(ButtonStyle.Success),
+
     new ButtonBuilder()
       .setCustomId("event_list")
-      .setLabel("List Events")
+      .setLabel("Events List")
       .setStyle(ButtonStyle.Primary),
+
     new ButtonBuilder()
       .setCustomId("event_cancel")
       .setLabel("Cancel Event")
       .setStyle(ButtonStyle.Danger),
+
     new ButtonBuilder()
       .setCustomId("event_manual_reminder")
       .setLabel("Manual Reminder")
       .setStyle(ButtonStyle.Secondary),
+
     new ButtonBuilder()
-      .setCustomId("event_download")
-      .setLabel("Download All Events")
+      .setCustomId("event_show_all")
+      .setLabel("Show All")
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -34,6 +39,7 @@ export function renderEventPanel(): MessageCreateOptions {
       .setCustomId("event_settings")
       .setLabel("Settings")
       .setStyle(ButtonStyle.Secondary),
+
     new ButtonBuilder()
       .setCustomId("event_help")
       .setLabel("Help")

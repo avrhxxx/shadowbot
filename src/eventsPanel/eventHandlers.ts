@@ -1,6 +1,14 @@
-// src/eventsPanel/eventHandlers.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, TextChannel, ButtonBuilder, ButtonStyle } from "discord.js";
-import * as EventStorage from "./eventStorage";
+import {
+  Interaction,
+  ButtonInteraction,
+  StringSelectMenuInteraction,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  TextChannel,
+} from "discord.js";
+
+// 🔹 tutaj podmieniamy na Google Sheets storage
+import * as EventStorage from "./googleSheetsStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
@@ -16,12 +24,17 @@ import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
-// ✅ NOWE COMPARE IMPORTY
+// Compare
 import {
   handleCompareButton,
   handleCompareSelect,
-  handleCompareDownload
+  handleCompareDownload,
+  handleCompareAll,
+  handleCompareAllDownload
 } from "./eventsButtons/eventsCompare";
+
+// Show All
+import { handleShowAllEvents, handleShowAllLists } from "./eventsButtons/eventsShowAll";
 
 // Participants
 import {
@@ -33,78 +46,147 @@ import {
   handleAbsentParticipantSubmit
 } from "./eventsButtons/eventsParticipants";
 
-// Manual Reminder
+// Reminder
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
+// Clear Event
+import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
+
 /* =======================================================
-   🔹 Handler interakcji dla całego Event Panelu
+   EVENT INTERACTION HANDLER
 ======================================================= */
+
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
+
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
-  const { customId } = interaction;
+  const { customId, guild } = interaction;
 
-  /* =======================================================
-     🔥 DYNAMIC – CONFIRM CANCEL
-  ======================================================= */
+  if (!guild) return;
+
+  const tempKey = `${interaction.user.id}-temp`;
+
+  /* CANCEL CONFIRM */
+
   if (interaction.isButton() && customId.startsWith("event_cancel_confirm_")) {
+
     const eventId = customId.replace("event_cancel_confirm_", "");
+
     await handleCancelConfirm(interaction, eventId);
+
     return;
   }
 
-  /* =======================================================
-     🔥 DYNAMIC – BUTTONS
-  ======================================================= */
+  /* BUTTONS */
+
   if (interaction.isButton()) {
 
     // Participants
+
     if (customId.startsWith("event_add_")) {
-      const eventId = customId.replace("event_add_", "");
-      await handleAddParticipant(interaction, eventId);
+      await handleAddParticipant(interaction, customId.replace("event_add_", ""));
       return;
     }
 
     if (customId.startsWith("event_remove_")) {
-      const eventId = customId.replace("event_remove_", "");
-      await handleRemoveParticipant(interaction, eventId);
+      await handleRemoveParticipant(interaction, customId.replace("event_remove_", ""));
       return;
     }
 
     if (customId.startsWith("event_absent_")) {
-      const eventId = customId.replace("event_absent_", "");
-      await handleAbsentParticipant(interaction, eventId);
+      await handleAbsentParticipant(interaction, customId.replace("event_absent_", ""));
       return;
     }
 
-    // ✅ COMPARE BUTTON
+    // Compare
+
     if (customId.startsWith("event_compare_")) {
-      const eventId = customId.replace("event_compare_", "");
-      await handleCompareButton(interaction, eventId);
+      await handleCompareButton(interaction, customId.replace("event_compare_", ""));
       return;
     }
 
-    // ✅ COMPARE DOWNLOAD
     if (customId.startsWith("compare_download_")) {
       await handleCompareDownload(interaction);
       return;
     }
 
+    if (customId === "compare_all_events") {
+      await handleCompareAll(interaction);
+      return;
+    }
+
+    if (customId.startsWith("compare_all_download")) {
+      await handleCompareAllDownload(interaction);
+      return;
+    }
+
+    // Show / Download
+
     if (customId.startsWith("event_show_list_")) {
-      const eventId = customId.replace("event_show_list_", "");
-      await handleShowList(interaction, eventId);
+      await handleShowList(interaction, customId.replace("event_show_list_", ""));
       return;
     }
 
     if (customId.startsWith("event_download_single_")) {
-      const eventId = customId.replace("event_download_single_", "");
-      await handleDownload(interaction, eventId);
+      await handleDownload(interaction, customId.replace("event_download_single_", ""));
       return;
     }
 
-    // ✅ NEW YEAR BUTTONS
+    /* =========================================
+       CLEAR EVENT DATA (FIXED ORDER)
+    ========================================= */
+
+    if (customId === "event_clear_confirm") {
+      await handleClearEventConfirm(interaction);
+      return;
+    }
+
+    if (customId === "event_clear_abort") {
+      await handleClearEventAbort(interaction);
+      return;
+    }
+
+    if (customId.startsWith("event_clear_")) {
+
+      const eventId = customId.replace("event_clear_", "");
+
+      const events = await EventStorage.getEvents(interaction.guildId!);
+
+      const event = events.find(e => e.id.toString() === eventId.toString());
+
+      if (!event) {
+        await interaction.reply({ content: "Event not found.", ephemeral: true });
+        return;
+      }
+
+      await handleClearEventButton(interaction, eventId, event.name);
+
+      return;
+    }
+
+    // Download All
+
+    if (customId === "download_all_events") {
+      await handleDownload(interaction);
+      return;
+    }
+
+    // Show All
+
+    if (customId === "event_show_all") {
+      await handleShowAllEvents(interaction);
+      return;
+    }
+
+    if (customId === "show_all_lists") {
+      await handleShowAllLists(interaction);
+      return;
+    }
+
+    // New Year
+
     if (customId === "next_year_yes" || customId === "next_year_no") {
-      const tempKey = `${interaction.user.id}-temp`;
+
       const storedData = tempEventStore.get(tempKey);
 
       if (!storedData) {
@@ -113,38 +195,75 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       }
 
       if (customId === "next_year_no") {
+
         tempEventStore.delete(tempKey);
-        await interaction.update({ content: "Event was not added.", components: [] });
+
+        await interaction.update({
+          content: "Event was not added.",
+          components: []
+        });
+
         return;
       }
 
-      // Set next year
       storedData.year = new Date().getUTCFullYear() + 1;
 
-      // 🔹 pokaż select menu remindera zamiast finalizować od razu
       await showReminderSelect(interaction, tempKey);
+
       return;
+    }
+
+    /* PANEL BUTTONS */
+
+    switch (customId) {
+
+      case "event_create":
+        await handleCreate(interaction);
+        break;
+
+      case "event_list":
+        await handleList(interaction);
+        break;
+
+      case "event_cancel":
+        await handleCancel(interaction);
+        break;
+
+      case "event_cancel_abort":
+        await handleCancelAbort(interaction);
+        break;
+
+      case "event_settings":
+        await handleSettings(interaction);
+        break;
+
+      case "event_help":
+        await handleHelp(interaction);
+        break;
+
+      case "event_manual_reminder":
+        await handleManualReminder(interaction);
+        break;
+
+      default:
+        console.warn(`Unsupported event customId: ${customId}`);
     }
   }
 
-  /* =======================================================
-     🔥 SELECT MENUS
-  ======================================================= */
+  /* SELECT MENUS */
+
   if (interaction.isStringSelectMenu()) {
 
-    // ✅ REMINDER SELECT MENU (ustawienie reminderBefore dla nowego eventu)
     if (customId.startsWith("reminder_select_")) {
       await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
       return;
     }
 
-    // ✅ COMPARE SELECT
     if (customId.startsWith("compare_select_")) {
       await handleCompareSelect(interaction);
       return;
     }
 
-    // Settings selects
     if (customId === "event_settings_notification" || customId === "event_settings_download") {
       await handleSettingsSelect(interaction);
       return;
@@ -155,11 +274,13 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Manual Reminder select menu
     if (customId === "manual_reminder_select") {
+
       const selectedEventId = interaction.values[0];
+
       const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find(e => e.id === selectedEventId);
+
+      const event = events.find(e => e.id.toString() === selectedEventId.toString());
 
       if (!event) {
         await interaction.update({ content: "Event not found.", components: [] });
@@ -167,7 +288,8 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       }
 
       const config = await EventStorage.getConfig(interaction.guildId!);
-      const channel = interaction.guild!.channels.cache.get(config!.notificationChannelId) as TextChannel;
+
+      const channel = guild.channels.cache.get(config?.notificationChannelId ?? "") as TextChannel;
 
       if (!channel || !channel.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
@@ -176,31 +298,29 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
       await sendReminderMessage(channel, event);
 
-      await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
-      return;
+      await interaction.update({
+        content: `Manual reminder sent for **${event.name}**`,
+        components: []
+      });
     }
   }
 
-  /* =======================================================
-     🔥 MODALS
-  ======================================================= */
+  /* MODALS */
+
   if (interaction.isModalSubmit()) {
 
     if (customId.startsWith("event_add_modal_")) {
-      const eventId = customId.replace("event_add_modal_", "");
-      await handleAddParticipantSubmit(interaction, eventId);
+      await handleAddParticipantSubmit(interaction, customId.replace("event_add_modal_", ""));
       return;
     }
 
     if (customId.startsWith("event_remove_modal_")) {
-      const eventId = customId.replace("event_remove_modal_", "");
-      await handleRemoveParticipantSubmit(interaction, eventId);
+      await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", ""));
       return;
     }
 
     if (customId.startsWith("event_absent_modal_")) {
-      const eventId = customId.replace("event_absent_modal_", "");
-      await handleAbsentParticipantSubmit(interaction, eventId);
+      await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", ""));
       return;
     }
 
@@ -209,51 +329,21 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
   }
-
-  /* =======================================================
-     🔥 STANDARD BUTTONS
-  ======================================================= */
-  if (interaction.isButton()) {
-    switch (customId) {
-      case "event_create":
-        await handleCreate(interaction);
-        break;
-      case "event_list":
-        await handleList(interaction);
-        break;
-      case "event_cancel":
-        await handleCancel(interaction);
-        break;
-      case "event_cancel_abort":
-        await handleCancelAbort(interaction);
-        break;
-      case "event_download":
-        await handleDownload(interaction);
-        break;
-      case "event_settings":
-        await handleSettings(interaction);
-        break;
-      case "event_help":
-        await handleHelp(interaction);
-        break;
-      case "event_manual_reminder":
-        await handleManualReminder(interaction);
-        break;
-      default:
-        console.warn(`Unsupported event customId: ${customId}`);
-    }
-  }
 }
 
-/* =======================================================
-   🔹 Funkcja dla przycisku Manual Reminder
-======================================================= */
-async function handleManualReminder(interaction: ButtonInteraction) {
-  const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+/* MANUAL REMINDER */
+
+async function handleManualReminder(interaction: ButtonInteraction): Promise<void> {
+
+  const guild = interaction.guild;
+
+  if (!guild) return;
+
+  const events = await EventStorage.getEvents(interaction.guildId!);
 
   const upcomingEvents = events.filter(e => e.status !== "PAST");
-  if (upcomingEvents.length === 0) {
+
+  if (!upcomingEvents.length) {
     await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
     return;
   }
@@ -262,12 +352,11 @@ async function handleManualReminder(interaction: ButtonInteraction) {
     .setCustomId("manual_reminder_select")
     .setPlaceholder("Select an event to manually send a reminder")
     .addOptions(
-      upcomingEvents.map(ev =>
-        new StringSelectMenuOptionBuilder()
-          .setLabel(ev.name)
-          .setDescription(`UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`)
-          .setValue(ev.id)
-      )
+      upcomingEvents.map(ev => ({
+        label: ev.name,
+        description: `UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`,
+        value: ev.id
+      }))
     );
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
