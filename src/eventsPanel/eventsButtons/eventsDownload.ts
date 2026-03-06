@@ -6,7 +6,7 @@ import { formatEventUTC } from "../../utils/timeUtils";
 /**
  * Download participant lists
  * - singleEventId -> one event
- * - otherwise -> all events in single file and message
+ * - otherwise -> all events in TXT file(s)
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -50,7 +50,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     const file = new AttachmentBuilder(Buffer.from(messageContent, "utf-8"), { name: `${event.id}.txt` });
 
     await channel.send({
-      content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`,
+      content: `${messageContent}\n\nTXT file attached.`,
       files: [file]
     });
 
@@ -58,11 +58,10 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
       content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
       ephemeral: true
     });
-
     return;
   }
 
-  // 🔹 Download all events → always in file
+  // 🔹 Download all events
   await interaction.deferReply({ ephemeral: true });
 
   if (!allEvents.length) {
@@ -89,12 +88,13 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     ].join("\n\n");
   });
 
-  const file = new AttachmentBuilder(Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"), { name: `all_events_${Date.now()}.txt` });
+  const filePath = `all_events_${Date.now()}.txt`;
+  const file = new AttachmentBuilder(Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"), { name: filePath });
 
   await channel.send({
-    content: `Participant lists for all events:\n\nYou can also download this as a TXT file attached below.`,
+    content: `All participant lists sent as TXT file.`,
     files: [file]
   });
 
-  await interaction.editReply({ content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`, components: [] });
+  await interaction.editReply({ content: `Participant lists sent to <#${config.downloadChannelId}>.`, components: [] });
 }
