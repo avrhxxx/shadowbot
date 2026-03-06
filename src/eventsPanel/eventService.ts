@@ -1,5 +1,6 @@
+// src/eventsPanel/eventService.ts
 import * as EventStorage from "./eventStorage";
-import { EmbedBuilder, TextChannel } from "discord.js";
+import { EmbedBuilder, TextChannel, Guild, AttachmentBuilder } from "discord.js";
 
 export interface EventObject {
   id: string;
@@ -28,7 +29,7 @@ export async function createEvent(data: {
   month: number;
   hour: number;
   minute: number;
-  year?: number;           // 🔹 dodane
+  year?: number;           
   reminderBefore?: number;
 }): Promise<EventObject> {
   const events = await EventStorage.getEvents(data.guildId);
@@ -146,4 +147,71 @@ export function generateEventListEmbedDetailed(events: EventObject[]) {
           : 0xff0000
       )
   );
+}
+
+// 🔹==============================
+// 🔹 FRAGMENTATION HELPERS
+// 🔹==============================
+export function chunkEventEmbedDescription(description: string, maxChars = 6000): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < description.length) {
+    chunks.push(description.slice(start, start + maxChars));
+    start += maxChars;
+  }
+
+  return chunks;
+}
+
+export function chunkTextFile(content: string, maxChars = 1900000): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+
+  while (start < content.length) {
+    chunks.push(content.slice(start, start + maxChars));
+    start += maxChars;
+  }
+
+  return chunks;
+}
+
+// 🔹==============================
+// 🔹 BUILD FRAGMENTED REPORTS
+// 🔹==============================
+export function buildReportFragments(events: EventObject[], guild: Guild) {
+  const participantsSet = new Set<string>();
+  events.forEach(ev => {
+    ev.participants.forEach(p => participantsSet.add(p));
+    (ev.absent || []).forEach(a => participantsSet.add(a));
+  });
+
+  const participants = [...participantsSet];
+  let embedText = '';
+  let txtText = '';
+
+  participants.forEach(memberId => {
+    const name = guild.members.cache.get(memberId)?.displayName || memberId;
+    let attended = 0;
+    let block: string[] = [];
+
+    events.forEach(ev => {
+      let status = '-';
+      if (ev.participants.includes(memberId)) status = '✓';
+      else if (ev.absent?.includes(memberId)) status = '✗';
+      if (status === '✓') attended++;
+      block.push(`${ev.name}  ${status}`);
+    });
+
+    const percent = Math.round((attended / events.length) * 100);
+    const line = `${name}\n${block.join('\n')}\nAttendance: ${attended}/${events.length} (${percent}%)\n\n----------------------\n\n`;
+
+    embedText += line;
+    txtText += line;
+  });
+
+  const embedChunks = chunkEventEmbedDescription(embedText);
+  const txtChunks = chunkTextFile(txtText);
+
+  return { embedChunks, txtChunks };
 }
