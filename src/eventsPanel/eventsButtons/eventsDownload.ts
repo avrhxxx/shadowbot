@@ -5,11 +5,12 @@ import path from "path";
 import fs from "fs";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+import { fragmentText } from "../../helpers/heavyTaskHelper";
 
 /**
  * Download participant lists
  * - singleEventId -> one event
- * - otherwise -> all events in single file and message
+ * - otherwise -> all events with fragmentation for large data
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -33,7 +34,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const tempDir = path.join(__dirname, "../../temp");
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  // 🔹 Single event download (bez Connect Control)
+  // 🔹 Single event download (bez heavy task switch)
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
     if (!event) {
@@ -77,8 +78,8 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 Download all events in one file — Connect Control
-  await interaction.deferReply({ ephemeral: true }); // <=== Connect Control defer
+  // 🔹 Download all events (Heavy Task Switch + fragmentation)
+  await interaction.deferReply({ ephemeral: true });
 
   if (!allEvents.length) {
     await interaction.editReply({ content: "No events to download.", components: [] });
@@ -106,18 +107,24 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   });
 
   const finalMessage = fullMessage.join("\n\n====================\n\n");
-  const filePath = path.join(tempDir, `all_events_${Date.now()}.txt`);
-  fs.writeFileSync(filePath, finalMessage);
 
-  const attachment = new AttachmentBuilder(filePath);
+  // 🔹 fragmentujemy jeśli wiadomość jest za duża
+  const fragments = fragmentText(finalMessage, 1900); // Discord max 2000 znaków w wiadomości
 
-  await channel.send({
-    content: `Participant lists for all events:\n\n${finalMessage}\n\nYou can also download this as a TXT file attached below.`,
-    files: [attachment]
-  });
+  for (let i = 0; i < fragments.length; i++) {
+    const fragmentFilePath = path.join(tempDir, `all_events_part_${i + 1}_${Date.now()}.txt`);
+    fs.writeFileSync(fragmentFilePath, fragments[i]);
 
-  await interaction.editReply({ // <=== Connect Control edit
-    content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`,
+    const attachment = new AttachmentBuilder(fragmentFilePath);
+
+    await channel.send({
+      content: `Participant lists for all events — part ${i + 1}:\n\n${fragments[i]}\n\nYou can also download this as a TXT file attached below.`,
+      files: [attachment]
+    });
+  }
+
+  await interaction.editReply({
+    content: `Participant lists for all events sent to <#${config.downloadChannelId}> in ${fragments.length} parts.`,
     components: []
   });
 }
