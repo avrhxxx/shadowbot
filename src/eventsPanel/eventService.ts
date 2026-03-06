@@ -1,5 +1,6 @@
 // src/eventsPanel/eventService.ts
-import * as EventStorage from "./eventStorage";
+// 🔹 Podmieniony import na Google Sheets storage
+import * as EventStorage from "./googleSheetsStorage";
 import { EmbedBuilder, TextChannel, Guild, AttachmentBuilder } from "discord.js";
 
 export interface EventObject {
