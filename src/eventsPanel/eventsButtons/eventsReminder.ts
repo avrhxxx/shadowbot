@@ -1,6 +1,6 @@
 // src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder } from "discord.js";
-import * as EventStorage from "../eventStorage";
+import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 // co ile sprawdzamy eventy (ms)
@@ -10,7 +10,7 @@ const CHECK_INTERVAL = 30_000;
 let intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 
 // Rozszerzamy EventObject o pola do reminderów
-export interface EventWithReminder extends EventStorage.EventObject {
+export interface EventWithReminder extends EventObject {
   reminderSent?: boolean;
   started?: boolean;
 }
@@ -31,20 +31,19 @@ export function stopEventReminders(guildId: string) {
 }
 
 async function checkEvents(guild: Guild) {
-  const events = await EventStorage.getEvents(guild.id) as EventWithReminder[];
-  const now = Date.now(); // 🔹 UTC timestamp
+  const events = await getEvents(guild.id) as EventWithReminder[];
+  const now = Date.now();
 
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
-    // 🔹 używamy literalnego roku zapisanego w evencie
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime(); // 🔹 UTC timestamp
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
 
     // Reminder
     if (event.reminderBefore !== undefined) {
       const reminderTime = eventTime - event.reminderBefore * 60_000;
       if (!event.reminderSent && now >= reminderTime) {
-        const config = await EventStorage.getConfig(guild.id);
+        const config = await getConfig(guild.id);
         if (!config?.notificationChannelId) continue;
 
         const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
@@ -52,13 +51,13 @@ async function checkEvents(guild: Guild) {
 
         await sendReminderMessage(channel, event);
         event.reminderSent = true;
-        await EventStorage.saveEvents(guild.id, events);
+        await saveEvents(guild.id, events);
       }
     }
 
     // Event started
     if (!event.started && now >= eventTime) {
-      const config = await EventStorage.getConfig(guild.id);
+      const config = await getConfig(guild.id);
       if (!config?.notificationChannelId) continue;
 
       const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
@@ -67,13 +66,13 @@ async function checkEvents(guild: Guild) {
       await sendEventStarted(channel, event, guild);
       event.started = true;
       event.status = "PAST";
-      await EventStorage.saveEvents(guild.id, events);
+      await saveEvents(guild.id, events);
     }
   }
 }
 
 export async function sendEventCreatedNotification(event: EventWithReminder, guild: Guild) {
-  const config = await EventStorage.getConfig(guild.id);
+  const config = await getConfig(guild.id);
   if (!config?.notificationChannelId) return;
 
   const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
