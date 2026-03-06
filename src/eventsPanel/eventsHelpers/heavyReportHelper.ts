@@ -1,15 +1,9 @@
-// src/eventsPanel/eventsHelpers/heavyReportHelper.ts
 import { EmbedBuilder, Guild, TextChannel, AttachmentBuilder } from "discord.js";
 import { EventObject } from "../eventService";
-import * as EventStorage from "../eventStorage";
 
-// ==========================
-// KONFIGURACJA LIMITÓW
-// ==========================
-const MAX_EMBED_CHARS = 6000; // max znaków w jednym embedzie Discord
-const MAX_MESSAGE_CHARS = 2000; 
-const MAX_FILE_CHARS = 1_000_000; 
-const CHUNK_EVENTS = 5; 
+const MAX_EMBED_CHARS = 6000;
+const MAX_FILE_CHARS = 1_000_000;
+const CHUNK_EVENTS = 5;
 
 // ==========================
 // HEAVY LOAD CHECK
@@ -63,7 +57,7 @@ export function generateReportFragments(events: EventObject[]) {
 }
 
 // ==========================
-// OBSŁUGA SEND DO CHANNEL
+// ASYNC SEND HEAVY REPORT
 // ==========================
 export async function sendHeavyReport(guild: Guild, events: EventObject[], downloadChannelId?: string) {
   if (!downloadChannelId) return;
@@ -72,20 +66,22 @@ export async function sendHeavyReport(guild: Guild, events: EventObject[], downl
 
   const { embedFragments, fileFragments } = generateReportFragments(events);
 
-  // 🔹 Wysyłka embedów
+  // 🔹 Wysyłka embedów po batchach, aby nie blokować
   for (const embed of embedFragments) {
     await channel.send({ embeds: [embed] });
+    await new Promise(res => setTimeout(res, 50)); // mała przerwa, żeby Discord nie timeoutował
   }
 
-  // 🔹 Wysyłka plików
+  // 🔹 Wysyłka plików po batchach
   for (const file of fileFragments) {
     const attachment = new AttachmentBuilder(Buffer.from(file.content, "utf-8"), { name: file.name });
     await channel.send({ files: [attachment] });
+    await new Promise(res => setTimeout(res, 50));
   }
 }
 
 // ==========================
-// FUNKCJA POMOCNICZA — DZIELI PACZKI PO EVENTACH
+// DZIELENIE PACZEK EVENTÓW
 // ==========================
 export function chunkEvents(events: EventObject[], chunkSize: number = CHUNK_EVENTS): EventObject[][] {
   const chunks: EventObject[][] = [];
