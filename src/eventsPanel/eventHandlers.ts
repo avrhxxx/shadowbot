@@ -94,7 +94,8 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_clear_")) {
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find(e => e.id === eventId);
+      // Porównanie ID jako string
+      const event = events.find(e => e.id.toString() === eventId.toString());
       if (!event) return void interaction.reply({ content: "Event not found.", ephemeral: true });
       await handleClearEventButton(interaction, eventId, event.name);
       return;
@@ -152,7 +153,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
       const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find(e => e.id === selectedEventId);
+      const event = events.find(e => e.id.toString() === selectedEventId.toString());
       if (!event) return void interaction.update({ content: "Event not found.", components: [] });
 
       const config = await EventStorage.getConfig(interaction.guildId!);
@@ -172,8 +173,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_remove_modal_")) { await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", "")); return; }
     if (customId.startsWith("event_absent_modal_")) { await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", "")); return; }
     if (customId === "event_create_modal") { await handleCreateSubmit(interaction); return; }
-
-    // Usuń referencje do nieistniejącego handleClearEventSubmit
   }
 }
 
