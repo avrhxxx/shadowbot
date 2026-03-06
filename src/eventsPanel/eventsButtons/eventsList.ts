@@ -30,7 +30,6 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 usunięcie updateEventStatuses — status bierze się z reminderów
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const eventDateUTCStr = formatEventUTCObj(e);
@@ -52,7 +51,8 @@ export async function handleList(interaction: ButtonInteraction) {
     );
 
     const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
     );
 
     const messagePayload = { embeds: [embed], components: [row1, row2], ephemeral: true };
@@ -125,7 +125,8 @@ export async function updateEventEmbed(message: any, eventId: string) {
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
   );
 
   await message.edit({ embeds: [embed], components: [row1, row2] });
