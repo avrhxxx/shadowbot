@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import { getConfig, setConfig } from "./googleSheetsStorage";
+import { getConfig as gsGetConfig, setConfig as gsSetConfig } from "./googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -27,7 +27,7 @@ export interface EventConfig {
 }
 
 // --------------------------
-// EVENT CRUD (lokalnie, bo googleSheetsStorage.ts nie ma getEvents/saveEvents)
+// LOCAL EVENT STORAGE
 // --------------------------
 const eventsMap: Record<string, EventObject[]> = {};
 
@@ -99,11 +99,15 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
 // --------------------------
 // CONFIG HELPERS
 // --------------------------
-export async function fetchConfig(guildId: string): Promise<EventConfig> {
-  return await getConfig(guildId);
+export async function getConfig(guildId: string): Promise<EventConfig> {
+  return await gsGetConfig(guildId);
 }
 
-// wrapper, żeby zapisać cały obiekt config (setConfig wymaga 3 argumentów)
+export async function setConfig(guildId: string, key: string, value: string) {
+  await gsSetConfig(guildId, key, value);
+}
+
+// wrapper, żeby zapisać cały obiekt config
 export async function saveConfig(guildId: string, config: EventConfig) {
   for (const key in config) {
     const value = config[key];
@@ -114,19 +118,19 @@ export async function saveConfig(guildId: string, config: EventConfig) {
 }
 
 export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await fetchConfig(guildId);
+  const config = await getConfig(guildId);
   config.notificationChannel = channelId;
   await saveConfig(guildId, config);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await fetchConfig(guildId);
+  const config = await getConfig(guildId);
   config.downloadChannel = channelId;
   await saveConfig(guildId, config);
 }
 
 export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
-  const config = await fetchConfig(guildId);
+  const config = await getConfig(guildId);
   return config.downloadChannel;
 }
 
@@ -136,7 +140,7 @@ export async function getDownloadChannel(guildId: string): Promise<string | unde
 export async function sendManualReminders(guild: Guild) {
   const guildId = guild.id;
   const events = await getActiveEvents(guildId);
-  const config = await fetchConfig(guildId);
+  const config = await getConfig(guildId);
 
   if (!config.notificationChannel) return;
 
