@@ -1,12 +1,7 @@
 import { google } from "googleapis";
-import fs from "fs";
-import path from "path";
 
-// 🔹 Ścieżka do klucza konta serwisowego
-const SERVICE_ACCOUNT_PATH = path.join(__dirname, "../../service-account.json");
-
-// 🔹 Wczytaj dane konta serwisowego
-const credentials = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
+// 🔹 Wczytaj dane konta serwisowego ze zmiennej środowiskowej
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT!);
 
 // 🔹 Arkusz BotDB
 const SHEET_ID = "1SLBamj7aJzV0Uv7p_Lvn_qjihPuV_SqKPDkPYs-q0CE";
