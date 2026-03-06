@@ -49,6 +49,9 @@ import {
 // Manual Reminder
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
+// Heavy Report
+import { sendHeavyReport, isHeavyLoad } from "./eventsHelpers/heavyReportHelper";
+
 /* =======================================================
    🔹 Handler interakcji dla całego Event Panelu
 ======================================================= */
@@ -111,7 +114,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Download All → poprawiony na CompareAllDownload
+    // Download All
     if (customId === "download_all_events") {
       await handleCompareAllDownload(interaction);
       return;
@@ -124,6 +127,26 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId === "show_all_lists") {
       await handleShowAllLists(interaction);
+      return;
+    }
+
+    // Heavy Report Confirmation
+    if (customId === "heavy_report_yes" || customId === "heavy_report_no") {
+      const guildId = guild.id;
+      const events = await EventStorage.getEvents(guildId);
+      if (!events.length) {
+        await interaction.update({ content: "No events found.", components: [] });
+        return;
+      }
+
+      if (customId === "heavy_report_yes") {
+        await interaction.update({ content: "Generating heavy report...", components: [] });
+        const config = await EventStorage.getConfig(guildId);
+        await sendHeavyReport(guild, events, config?.downloadChannelId);
+        await interaction.followUp({ content: "Heavy report generated in download channel.", ephemeral: true });
+      } else {
+        await interaction.update({ content: "Report generation cancelled.", components: [] });
+      }
       return;
     }
 
