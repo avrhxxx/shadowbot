@@ -1,47 +1,37 @@
 import { google } from "googleapis";
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-  throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SERVICE_ACCOUNT!");
-}
-
-// 🔹 Klucz Google z ENV
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-
-// 🔹 ID arkusza z ENV
-const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-if (!SHEET_ID) {
-  throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SHEET_ID!");
-}
-
-// 🔹 Nazwy zakładek
-const EVENTS_TAB = "events";
+const SHEET_ID = process.env.GOOGLE_SHEET_ID as string;
 const CONFIG_TAB = "config";
 
-// 🔹 Autoryzacja Google Sheets
+if (!SHEET_ID) {
+  throw new Error("GOOGLE_SHEET_ID env variable is missing");
+}
+
 const auth = new google.auth.GoogleAuth({
-  credentials,
+  credentials: {
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+  },
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
 const sheets = google.sheets({ version: "v4", auth });
 
-// ==========================
-// UTILS
-// ==========================
-async function readSheet(tab: string): Promise<string[][]> {
+// simple in-memory cache
+let configCache: Record<string, any> | null = null;
+let lastFetch = 0;
+const CACHE_TTL = 30 * 1000; // 30s
+
+async function readSheet(tab: string) {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: tab,
   });
+
   return res.data.values || [];
 }
 
-async function writeSheet(tab: string, values: string[][]) {
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: SHEET_ID,
-    range: tab,
-  });
-
+async function writeSheet(tab: string, values: any[][]) {
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: tab,
@@ -50,105 +40,69 @@ async function writeSheet(tab: string, values: string[][]) {
   });
 }
 
-// ==========================
-// EVENT STORAGE
-// ==========================
-export type EventObject = {
-  [key: string]: any;
-  id: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  year?: number;
-  reminderBefore?: number;
-  status: "ACTIVE" | "PAST" | "CANCELED";
-  participants: string[];
-  createdAt: number;
-  guildId: string;
-  reminderSent?: boolean;
-  started?: boolean;
-};
+export async function getConfig(guildId: string) {
+  const now = Date.now();
 
-export async function getEvents(guildId: string): Promise<EventObject[]> {
-  const rows = await readSheet(EVENTS_TAB);
-  const headers = rows[0] || [];
-  const data = rows.slice(1);
+  if (configCache && now - lastFetch < CACHE_TTL) {
+    return configCache[guildId] || {};
+  }
 
-  return data
-    .map(row => {
-      const obj: any = {};
-      headers.forEach((header, i) => (obj[header] = row[i]));
-      obj.day = Number(obj.day);
-      obj.month = Number(obj.month);
-      obj.hour = Number(obj.hour);
-      obj.minute = Number(obj.minute);
-      obj.participants = obj.participants ? JSON.parse(obj.participants) : [];
-      obj.createdAt = Number(obj.createdAt);
-      obj.reminderSent = obj.reminderSent === "true";
-      obj.started = obj.started === "true";
-      return obj as EventObject;
-    })
-    .filter(e => e.guildId === guildId);
-}
-
-export async function saveEvents(guildId: string, events: EventObject[]) {
-  const rows = await readSheet(EVENTS_TAB);
-  const headers = rows[0] || [
-    "id","name","day","month","hour","minute","year","reminderBefore",
-    "status","participants","createdAt","guildId","reminderSent","started",
-  ];
-
-  const otherRows = rows.slice(1).filter(row => row[headers.indexOf("guildId")] !== guildId);
-
-  const newRows = events.map(e =>
-    headers.map(h => {
-      switch (h) {
-        case "id": return e.id;
-        case "name": return e.name;
-        case "day": return e.day;
-        case "month": return e.month;
-        case "hour": return e.hour;
-        case "minute": return e.minute;
-        case "year": return e.year ?? "";
-        case "reminderBefore": return e.reminderBefore ?? "";
-        case "status": return e.status;
-        case "participants": return JSON.stringify(e.participants);
-        case "createdAt": return e.createdAt;
-        case "guildId": return e.guildId;
-        case "reminderSent": return e.reminderSent ? "true" : "false";
-        case "started": return e.started ? "true" : "false";
-        default: return e[h] ?? "";
-      }
-    })
-  );
-
-  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...newRows]);
-}
-
-// ==========================
-// CONFIG STORAGE
-// ==========================
-export async function getConfig(guildId: string): Promise<any> {
   const rows = await readSheet(CONFIG_TAB);
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  const row = data.find(r => r[headers.indexOf("guildId")] === guildId);
-  if (!row) return {};
+  const map: Record<string, any> = {};
 
-  const obj: any = {};
-  headers.forEach((h, i) => (obj[h] = row[i]));
-  return obj;
+  for (const row of data) {
+    const obj: any = {};
+
+    headers.forEach((h: string, i: number) => {
+      const value = row[i];
+
+      if (value === undefined || value === "") obj[h] = null;
+      else obj[h] = String(value).trim();
+    });
+
+    if (obj.guildId) map[obj.guildId] = obj;
+  }
+
+  configCache = map;
+  lastFetch = now;
+
+  return map[guildId] || {};
 }
 
-export async function saveConfig(guildId: string, config: any) {
+export async function setConfig(guildId: string, key: string, value: string) {
   const rows = await readSheet(CONFIG_TAB);
-  const headers = rows[0] || ["guildId", ...Object.keys(config)];
 
-  const otherRows = rows.slice(1).filter(r => r[headers.indexOf("guildId")] !== guildId);
-  const newRow = headers.map(h => (h === "guildId" ? guildId : config[h] ?? ""));
+  const headers = rows[0];
+  const data = rows.slice(1);
 
-  await writeSheet(CONFIG_TAB, [headers, ...otherRows, newRow]);
+  const guildIndex = headers.indexOf("guildId");
+  const keyIndex = headers.indexOf(key);
+
+  if (keyIndex === -1) {
+    throw new Error(`Column ${key} not found in config sheet`);
+  }
+
+  let rowIndex = data.findIndex(r => r[guildIndex] === guildId);
+
+  if (rowIndex === -1) {
+    const newRow = new Array(headers.length).fill("");
+    newRow[guildIndex] = guildId;
+    newRow[keyIndex] = value;
+
+    data.push(newRow);
+  } else {
+    data[rowIndex][keyIndex] = value;
+  }
+
+  await writeSheet(CONFIG_TAB, [headers, ...data]);
+
+  // clear cache
+  configCache = null;
+}
+
+export function isConfigured(config: any) {
+  return Boolean(config?.notificationChannel && config?.downloadChannel);
 }
