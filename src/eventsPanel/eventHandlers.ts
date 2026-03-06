@@ -49,7 +49,7 @@ import {
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
 // Clear Event Data
-import { handleClearEventButton, handleClearEventSubmit } from "./eventsButtons/eventsClear";
+import { handleClearEventButton, handleClearEventSubmit, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
 /* =======================================================
    🔹 Handler interakcji dla całego Event Panelu
@@ -113,7 +113,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Clear Event Data
+    // 🔹 CLEAR EVENT DATA – SHOW CONFIRM MODAL
     if (customId.startsWith("event_clear_")) {
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
@@ -123,6 +123,19 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
       await handleClearEventButton(interaction, eventId, event.name);
+      return;
+    }
+
+    // 🔹 CLEAR EVENT DATA – CONFIRM BUTTON
+    if (customId.startsWith("event_clear_confirm_")) {
+      const eventId = customId.replace("event_clear_confirm_", "");
+      await handleClearEventConfirm(interaction, eventId);
+      return;
+    }
+
+    // 🔹 CLEAR EVENT DATA – ABORT BUTTON
+    if (customId === "event_clear_abort") {
+      await handleClearEventAbort(interaction);
       return;
     }
 
@@ -222,7 +235,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Clear Event Submit Modal
+    // 🔹 CLEAR EVENT DATA – MODAL SUBMIT
     if (customId.startsWith("confirm_clear_event_")) {
       await handleClearEventSubmit(interaction);
       return;
@@ -277,20 +290,4 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
   const select = new StringSelectMenuBuilder()
     .setCustomId("manual_reminder_select")
     .setPlaceholder("Select an event to manually send a reminder")
-    .addOptions(
-      upcomingEvents.map(ev =>
-        new StringSelectMenuOptionBuilder()
-          .setLabel(ev.name)
-          .setDescription(`UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`)
-          .setValue(ev.id)
-      )
-    );
-
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-
-  await interaction.reply({
-    content: "Select an event to manually send a reminder:",
-    components: [row],
-    ephemeral: true
-  });
-}
+    .addOptions
