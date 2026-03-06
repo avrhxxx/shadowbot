@@ -95,7 +95,8 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleCompareAll(interaction);
       return;
     }
-    if (customId === "compare_all_download") {
+    // ✅ ZMIANA: startsWith zamiast ===
+    if (customId.startsWith("compare_all_download")) {
       await handleCompareAllDownload(interaction);
       return;
     }
