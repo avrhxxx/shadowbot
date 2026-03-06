@@ -7,8 +7,7 @@ import {
   TextInputStyle, 
   ActionRowBuilder 
 } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { EventObject } from "../eventService";
+import { getEvents, saveEvents, EventObject } from "../eventService";
 
 /**
  * Upewnij się, że EventObject ma pole absent
@@ -45,7 +44,7 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
@@ -61,11 +60,10 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
       event.participants.push(nick);
       added.push(nick);
     }
-    // Usuń z absent jeśli wraca do participants
     event.absent = event.absent.filter(n => n !== nick);
   }
 
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
 
   await interaction.editReply({
     content: added.length
@@ -101,7 +99,7 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
@@ -113,11 +111,10 @@ export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInte
     return;
   }
 
-  // Usuń z participants i absent (jeśli był)
   event.participants = event.participants.filter(nick => nick !== input);
   event.absent = (event.absent || []).filter(n => n !== input);
 
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
 
   await interaction.editReply({ content: `${input} removed from **${event.name}**` });
 }
@@ -149,7 +146,7 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
   const guildId = interaction.guildId!;
   const input = interaction.fields.getTextInputValue("user_input");
 
-  const events = await EventStorage.getEvents(guildId) as EventObjectWithAbsent[];
+  const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
@@ -158,17 +155,15 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
 
   event.absent = event.absent || [];
 
-  // Dodaj do absent tylko jeśli jest w participants
   if (!event.participants.includes(input)) {
     await interaction.editReply({ content: `${input} is not a participant in **${event.name}**, cannot mark absent.` });
     return;
   }
 
-  // Przenieś z participants do absent
   event.participants = event.participants.filter(nick => nick !== input);
   if (!event.absent.includes(input)) event.absent.push(input);
 
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
 
   await interaction.editReply({ content: `${input} marked as absent for **${event.name}**` });
 }
