@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
@@ -72,7 +73,8 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const guildId = interaction.guildId!;
   let events: EventObject[] = await EventStorage.getEvents(guildId);
 
-  const event = events.find(e => e.id === eventId);
+  // Porównanie ID jako string
+  const event = events.find(e => e.id.toString() === eventId.toString());
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
@@ -103,7 +105,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
 
   let events: EventObject[] = await EventStorage.getEvents(guildId);
 
-  const e = events.find(ev => ev.id === eventId);
+  const e = events.find(ev => ev.id.toString() === eventId.toString());
   if (!e) return;
 
   const eventDateUTCStr = formatEventUTCObj(e);
