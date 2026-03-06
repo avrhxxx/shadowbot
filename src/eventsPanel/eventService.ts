@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
-import * as EventStorage from "./googleSheetsStorage";
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
+import { getEvents, saveEvents, getConfig, setConfig } from "./googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -10,14 +10,12 @@ export interface EventObject {
   month: number;
   hour: number;
   minute: number;
-  year?: number;           // dodane dla Next Year
-  reminderBefore?: number; // OPTIONAL
+  year?: number;
+  reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
   absent?: string[];
   createdAt: number;
-
-  // nowe pola dla reminderów
   reminderSent?: boolean;
   started?: boolean;
 }
@@ -35,7 +33,7 @@ export async function createEvent(data: {
   year?: number;
   reminderBefore?: number;
 }): Promise<EventObject> {
-  const events = await EventStorage.getEvents(data.guildId);
+  const events = await getEvents(data.guildId);
 
   const newEvent: EventObject = {
     id: `${Date.now()}`,
@@ -49,40 +47,32 @@ export async function createEvent(data: {
   };
 
   events.push(newEvent);
-  await EventStorage.saveEvents(data.guildId, events);
+  await saveEvents(data.guildId, events);
   return newEvent;
 }
 
-export async function getEvents(guildId: string): Promise<EventObject[]> {
-  return await EventStorage.getEvents(guildId);
-}
-
-export async function saveEvents(guildId: string, events: EventObject[]) {
-  await EventStorage.saveEvents(guildId, events);
-}
-
 export async function getActiveEvents(guildId: string): Promise<EventObject[]> {
-  const events = await EventStorage.getEvents(guildId);
-  return events.filter(e => e.status === "ACTIVE");
+  const events = await getEvents(guildId);
+  return events.filter((e: EventObject) => e.status === "ACTIVE");
 }
 
 export async function getPastEvents(guildId: string): Promise<EventObject[]> {
-  const events = await EventStorage.getEvents(guildId);
-  return events.filter(e => e.status === "PAST");
+  const events = await getEvents(guildId);
+  return events.filter((e: EventObject) => e.status === "PAST");
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await EventStorage.getEvents(guildId);
-  return events.find(e => e.id === eventId) || null;
+  const events = await getEvents(guildId);
+  return events.find((e: EventObject) => e.id === eventId) || null;
 }
 
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const events = await getEvents(guildId);
+  const event = events.find((e: EventObject) => e.id === eventId);
   if (!event) return null;
 
   event.status = "CANCELED";
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
   return event;
 }
 
@@ -90,38 +80,37 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
    CONFIG HELPERS
 ========================= */
 export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await EventStorage.getConfig(guildId);
+  const config = await getConfig(guildId);
   config.notificationChannelId = channelId;
-  await EventStorage.saveConfig(guildId, config);
+  await setConfig(guildId, config);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await EventStorage.getConfig(guildId);
+  const config = await getConfig(guildId);
   config.downloadChannelId = channelId;
-  await EventStorage.saveConfig(guildId, config);
+  await setConfig(guildId, config);
 }
 
 export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
-  const config = await EventStorage.getConfig(guildId);
+  const config = await getConfig(guildId);
   return config.downloadChannelId;
 }
 
-// 🔹 Dodane do kompatybilności
 export async function getConfig(guildId: string) {
-  return await EventStorage.getConfig(guildId);
+  return await getConfig(guildId);
 }
 
 export async function saveConfig(guildId: string, config: any) {
-  await EventStorage.saveConfig(guildId, config);
+  await setConfig(guildId, config);
 }
 
 /* =========================
    MANUAL REMINDERS
 ========================= */
-export async function sendManualReminders(guild: any) {
+export async function sendManualReminders(guild: Guild) {
   const guildId = guild.id;
   const events = await getActiveEvents(guildId);
-  const config = await EventStorage.getConfig(guildId);
+  const config = await getConfig(guildId);
 
   if (!config.notificationChannelId) return;
 
@@ -148,12 +137,12 @@ export function generateEventListEmbed(events: EventObject[]) {
     .setDescription(
       events.length === 0
         ? "No events found."
-        : events.map(e => `• ${e.name} (${e.status})`).join("\n")
+        : events.map((e: EventObject) => `• ${e.name} (${e.status})`).join("\n")
     );
 }
 
 export function generateEventListEmbedDetailed(events: EventObject[]) {
-  return events.map(e =>
+  return events.map((e: EventObject) =>
     new EmbedBuilder()
       .setTitle(e.name)
       .setDescription(
@@ -193,7 +182,7 @@ export function chunkTextFile(content: string, maxChars = 1900000): string[] {
 ========================= */
 export function buildReportFragments(events: EventObject[], guild: Guild) {
   const participantsSet = new Set<string>();
-  events.forEach(ev => {
+  events.forEach((ev: EventObject) => {
     ev.participants.forEach(p => participantsSet.add(p));
     (ev.absent || []).forEach(a => participantsSet.add(a));
   });
@@ -207,7 +196,7 @@ export function buildReportFragments(events: EventObject[], guild: Guild) {
     let attended = 0;
     let block: string[] = [];
 
-    events.forEach(ev => {
+    events.forEach((ev: EventObject) => {
       let status = '-';
       if (ev.participants.includes(memberId)) status = '✓';
       else if (ev.absent?.includes(memberId)) status = '✗';
