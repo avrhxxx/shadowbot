@@ -4,12 +4,20 @@ if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
   throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SERVICE_ACCOUNT!");
 }
 
+// 🔹 Klucz Google z ENV
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-const SHEET_ID = "1SLBamj7aJzV0Uv7p_Lvn_qjihPuV_SqKPDkPYs-q0CE";
+// 🔹 ID arkusza z ENV
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+if (!SHEET_ID) {
+  throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SHEET_ID!");
+}
+
+// 🔹 Nazwy zakładek
 const EVENTS_TAB = "events";
 const CONFIG_TAB = "config";
 
+// 🔹 Autoryzacja Google Sheets
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
