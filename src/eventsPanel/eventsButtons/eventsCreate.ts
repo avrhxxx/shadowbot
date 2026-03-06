@@ -13,17 +13,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
 
-    // 🔹 sprawdzenie czy system jest skonfigurowany
-    const config = await getConfig(interaction.guildId!);
-
-    if (!config?.notificationChannelId || !config?.downloadChannelId) {
-        await interaction.reply({
-            content:
-                "⚠️ Event system is not configured yet.\n\n" +
-                "Please use the ⚙️ **Settings** button first and configure:\n" +
-                "• Notification Channel\n" +
-                "• Download Channel",
-            ephemeral: true
         });
         return;
     }
