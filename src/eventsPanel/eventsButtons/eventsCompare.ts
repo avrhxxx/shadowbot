@@ -10,7 +10,7 @@ import {
   TextChannel,
   AttachmentBuilder
 } from "discord.js";
-import { EventObject, getEvents, saveEvents } from "../eventService";
+import { EventObject, getEvents, saveEvents, getConfig } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 // ==========================
@@ -86,7 +86,7 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   if (!eventA || !eventB) return interaction.reply({ content: "Events not found.", ephemeral: true });
 
   const result = buildComparisonAB(eventA, eventB, guild);
-  const config = await EventStorage.getConfig(guildId);
+  const config = await getConfig(guildId);
   if (!config?.downloadChannelId) return interaction.reply({ content: "Download channel not configured.", ephemeral: true });
 
   const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
@@ -123,7 +123,7 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
 
   const result = buildComparisonAll(events, guild);
-  const config = await EventStorage.getConfig(guild.id);
+  const config = await getConfig(guild.id);
   const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
   if (!channel || !channel.isTextBased()) return interaction.editReply({ content: "Download channel invalid.", components: [] });
 
