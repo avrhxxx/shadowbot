@@ -137,7 +137,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
 
-      // Tak = generujemy raport
+      // 🔹 Tak = generujemy raport
       await interaction.deferReply({ ephemeral: true }); // pozwala na długą operację
 
       const guildId = guild.id;
@@ -154,10 +154,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
 
-      // Wywołanie faktycznego wysyłania raportu
+      // 🔹 Wywołanie faktycznego wysyłania raportu w helperze
       await sendHeavyReport(guild, events, downloadChannelId);
 
-      // Potwierdzenie dla użytkownika
+      // 🔹 Potwierdzenie dla użytkownika
       await interaction.followUp({ content: "✅ Heavy report generated in download channel.", ephemeral: true });
       return;
     }
