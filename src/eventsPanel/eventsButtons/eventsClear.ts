@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsClear.ts
 import {
   ButtonInteraction,
   ButtonBuilder,
@@ -36,10 +35,11 @@ export async function handleClearEventButton(
       .setStyle(ButtonStyle.Secondary)
   );
 
+  // 🔹 Wyślij jako normalną wiadomość w kanale, nie ephemeral
   if (interaction.deferred || interaction.replied) {
     await interaction.editReply({ content: "", embeds: [embed], components: [row] });
   } else {
-    await interaction.reply({ content: "", embeds: [embed], components: [row], ephemeral: true });
+    await interaction.reply({ content: "", embeds: [embed], components: [row] });
   }
 }
 
@@ -53,7 +53,7 @@ export async function handleClearEventConfirm(
   const guildId = interaction.guildId!;
   let events = await EventStorage.getEvents(guildId);
 
-  // Porównanie ID jako string, dla bezpieczeństwa
+  // Porównanie ID jako string
   const eventIndex = events.findIndex(e => e.id.toString() === eventId.toString());
   if (eventIndex === -1) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -71,7 +71,7 @@ export async function handleClearEventConfirm(
     .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
     .setColor("Red");
 
-  // Aktualizacja reply
+  // Aktualizacja wiadomości
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
   // Spróbuj zaktualizować embed listy w kanale (jeżeli wiadomość istnieje)
@@ -88,9 +88,6 @@ export async function handleClearEventConfirm(
    🔹 STEP 3 – ABORT BUTTON
 ====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-  await interaction.update({
-    content: "Clear action aborted.",
-    embeds: [],
-    components: []
-  });
+  // Wyślij jako ephemeral reply, jeśli była normalna wiadomość
+  await interaction.reply({ content: "Clear action aborted.", ephemeral: true });
 }
