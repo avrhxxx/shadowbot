@@ -3,7 +3,6 @@ import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Download participant lists
@@ -12,9 +11,7 @@ import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
-  const guildId = interaction.guildId;
-  if (!guildId) return;
-
+  const guildId = interaction.guildId!;
   const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
   const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
 
@@ -29,13 +26,10 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 Single event download (bez Connect Control)
+  // 🔹 Single event download
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
-    if (!event) {
-      await interaction.reply({ content: "Event not found.", ephemeral: true });
-      return;
-    }
+    if (!event) return interaction.reply({ content: "Event not found.", ephemeral: true });
 
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
@@ -69,7 +63,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 Download all events — Connect Control
+  // 🔹 Download all events
   await interaction.deferReply({ ephemeral: true });
 
   if (!allEvents.length) {
@@ -77,14 +71,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 jeśli heavy load, użyj helpera
-  if (isHeavyLoad(allEvents)) {
-    await sendHeavyReport(interaction.guild!, allEvents, config.downloadChannelId);
-    await interaction.editReply({ content: `Heavy report sent to <#${config.downloadChannelId}>.`, components: [] });
-    return;
-  }
-
-  // 🔹 standardowy tryb dla mniejszych raportów
   const finalMessage: string[] = allEvents.map(event => {
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
