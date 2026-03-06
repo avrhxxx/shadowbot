@@ -1,16 +1,14 @@
 // src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import * as EventStorage from "../eventStorage";
-import path from "path";
-import fs from "fs";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { fragmentText } from "../../helpers/heavyTaskHelper";
+import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Download participant lists
  * - singleEventId -> one event
- * - otherwise -> all events with fragmentation for large data
+ * - otherwise -> all events in single file and message
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
@@ -31,10 +29,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  const tempDir = path.join(__dirname, "../../temp");
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
-  // 🔹 Single event download (bez heavy task switch)
+  // 🔹 Single event download (bez Connect Control)
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
     if (!event) {
@@ -49,7 +44,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     const messageContent = [
@@ -60,14 +54,11 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
       `**Absent:**\n${absent}`
     ].join("\n\n");
 
-    const filePath = path.join(tempDir, `${event.id}.txt`);
-    fs.writeFileSync(filePath, messageContent);
-
-    const attachment = new AttachmentBuilder(filePath);
+    const file = new AttachmentBuilder(Buffer.from(messageContent, "utf-8"), { name: `${event.id}.txt` });
 
     await channel.send({
       content: `${messageContent}\n\nYou can also download this as a TXT file attached below.`,
-      files: [attachment]
+      files: [file]
     });
 
     await interaction.reply({
@@ -78,7 +69,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  // 🔹 Download all events (Heavy Task Switch + fragmentation)
+  // 🔹 Download all events — Connect Control
   await interaction.deferReply({ ephemeral: true });
 
   if (!allEvents.length) {
@@ -86,7 +77,15 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     return;
   }
 
-  const fullMessage: string[] = allEvents.map(event => {
+  // 🔹 jeśli heavy load, użyj helpera
+  if (isHeavyLoad(allEvents)) {
+    await sendHeavyReport(interaction.guild!, allEvents, config.downloadChannelId);
+    await interaction.editReply({ content: `Heavy report sent to <#${config.downloadChannelId}>.`, components: [] });
+    return;
+  }
+
+  // 🔹 standardowy tryb dla mniejszych raportów
+  const finalMessage: string[] = allEvents.map(event => {
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
       event.status === "CANCELED" ? "[CANCELED]" :
@@ -94,7 +93,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
 
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
-
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     return [
@@ -106,25 +104,13 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     ].join("\n\n");
   });
 
-  const finalMessage = fullMessage.join("\n\n====================\n\n");
+  const filePath = `all_events_${Date.now()}.txt`;
+  const file = new AttachmentBuilder(Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"), { name: filePath });
 
-  // 🔹 fragmentujemy jeśli wiadomość jest za duża
-  const fragments = fragmentText(finalMessage, 1900); // Discord max 2000 znaków w wiadomości
-
-  for (let i = 0; i < fragments.length; i++) {
-    const fragmentFilePath = path.join(tempDir, `all_events_part_${i + 1}_${Date.now()}.txt`);
-    fs.writeFileSync(fragmentFilePath, fragments[i]);
-
-    const attachment = new AttachmentBuilder(fragmentFilePath);
-
-    await channel.send({
-      content: `Participant lists for all events — part ${i + 1}:\n\n${fragments[i]}\n\nYou can also download this as a TXT file attached below.`,
-      files: [attachment]
-    });
-  }
-
-  await interaction.editReply({
-    content: `Participant lists for all events sent to <#${config.downloadChannelId}> in ${fragments.length} parts.`,
-    components: []
+  await channel.send({
+    content: `Participant lists for all events:\n\n${finalMessage.join("\n\n====================\n\n")}\n\nYou can also download this as a TXT file attached below.`,
+    files: [file]
   });
+
+  await interaction.editReply({ content: `Participant lists for all events sent to <#${config.downloadChannelId}>.`, components: [] });
 }
