@@ -22,6 +22,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     return;
   }
 
+  // 🔹 Normalna lista wydarzeń
   const listText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
@@ -41,11 +42,12 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 }
 
 /**
- * Show all participant lists (ephemeral, do ~3900 znaków)
+ * Show all participant lists
  */
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
+
   if (!events.length) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
@@ -62,6 +64,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
+  // 🔹 Tworzymy fragmenty embedów (max 3900 znaków)
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
 
   for (let i = 0; i < chunks.length; i++) {
