@@ -8,11 +8,11 @@
     "build": "tsc"
   },
   "engines": {
-    "node": "18.x"
+    "node": "16.x"
   },
   "dependencies": {
     "discord.js": "^14.11.0",
-    "node-fetch": "^2.6.9",   
+    "node-fetch": "^2.6.9",
     "dotenv": "^16.3.1",
     "uuid": "^9.0.0",
     "luxon": "^3.4.0",
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "typescript": "^5.2.2",
-    "@types/uuid": "^9.0.0"
+    "@types/uuid": "^9.0.0",
+    "@types/node-fetch": "^2.5.12"
   }
 }
