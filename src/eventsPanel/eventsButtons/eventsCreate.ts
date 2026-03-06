@@ -7,26 +7,9 @@ import {
     ActionRowBuilder 
 } from "discord.js";
 
-import { getConfig } from "../eventService"; // 🔹 zmieniony import
-
 export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
-
-    // 🔹 sprawdzenie czy system jest skonfigurowany
-    const config = await getConfig(interaction.guildId!);
-
-    if (!config?.notificationChannelId || !config?.downloadChannelId) {
-        await interaction.reply({
-            content:
-                "⚠️ Event system is not configured yet.\n\n" +
-                "Please use the ⚙️ **Settings** button first and configure:\n" +
-                "• Notification Channel\n" +
-                "• Download Channel",
-            ephemeral: true
-        });
-        return;
-    }
 
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
@@ -55,8 +38,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
-    // 🔹 Usunięto pole reminderInput z modala
-    // Wszystkie pola dodajemy do modala
+    // Dodanie pól do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
