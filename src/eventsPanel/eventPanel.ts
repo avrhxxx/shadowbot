@@ -15,7 +15,7 @@ export function renderEventPanel(): MessageCreateOptions {
 
     new ButtonBuilder()
       .setCustomId("event_list")
-      .setLabel("List Events")
+      .setLabel("Events List")
       .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
@@ -30,7 +30,7 @@ export function renderEventPanel(): MessageCreateOptions {
 
     new ButtonBuilder()
       .setCustomId("event_show_all")
-      .setLabel("Show All Events")
+      .setLabel("Show All")
       .setStyle(ButtonStyle.Secondary)
   );
 
