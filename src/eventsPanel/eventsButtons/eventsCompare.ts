@@ -14,6 +14,9 @@ import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
+// ==========================
+// HELPERS
+// ==========================
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
@@ -42,6 +45,7 @@ export async function handleCompareButton(interaction: ButtonInteraction, eventI
     .addOptions(pastEvents.map(ev => new StringSelectMenuOptionBuilder().setLabel(ev.name).setDescription(formatEventUTCObj(ev)).setValue(ev.id)));
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
   await interaction.reply({ content: `Select event to compare with **${currentEvent.name}**`, components: [row], ephemeral: true });
 }
 
@@ -62,6 +66,7 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
   if (!eventA || !eventB) return interaction.update({ content: "One of the events no longer exists.", components: [] });
 
   const result = buildComparisonAB(eventA, eventB, guild);
+
   const downloadBtn = new ButtonBuilder().setCustomId(`compare_download_${eventA.id}_${eventB.id}`).setLabel("Download").setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
 
@@ -88,8 +93,9 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
   if (!channel || !channel.isTextBased()) return interaction.reply({ content: "Download channel invalid.", ephemeral: true });
 
+  await channel.send({ content: `📥 Attendance comparison (UTC: ${new Date().toISOString()}):\n${result.embedText}` });
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_${eventA.name}_vs_${eventB.name}.txt` });
-  await channel.send({ content: `📥 Attendance comparison (UTC: ${new Date().toISOString()}):\n${result.embedText}`, files: [file] });
+  await channel.send({ files: [file] });
 
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
@@ -109,7 +115,7 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
   const downloadBtn = new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download").setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
 
-  await interaction.editReply({ content: result.embedText, components: [row] });
+  await interaction.editReply({ content: `Compare All (send to TXT):\n${result.embedText}`, components: [row] });
 }
 
 export async function handleCompareAllDownload(interaction: ButtonInteraction) {
@@ -117,12 +123,14 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-  const config = await EventStorage.getConfig(guildId);
-  const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
 
-  if (!events.length || !channel || !channel.isTextBased()) return interaction.editReply({ content: "No events or invalid download channel.", components: [] });
+  if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
 
   const result = buildComparisonAll(events, guild);
+  const config = await EventStorage.getConfig(guildId);
+  const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
+  if (!channel || !channel.isTextBased()) return interaction.editReply({ content: "Download channel invalid.", components: [] });
+
   const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_all_events.txt` });
   await channel.send({ content: `📥 Attendance comparison for all events (UTC: ${new Date().toISOString()}):\n${result.embedText}`, files: [file] });
   await interaction.editReply({ content: "Comparison sent to download channel.", components: [] });
@@ -181,8 +189,7 @@ function buildComparisonAll(events: EventObject[], guild: Guild) {
       }
       block.push(`${ev.name}  ${status}`);
     });
-    const percent = Math.round((attended / events.length) * 100);
-    const textBlock = `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${percent}%)\n`;
+    const textBlock = `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${Math.round((attended/events.length)*100)}%)\n`;
     embedLines.push(textBlock);
     txtLines.push(textBlock);
   });
