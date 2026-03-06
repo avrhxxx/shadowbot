@@ -3,23 +3,52 @@ import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
 
-const CREDENTIALS_PATH = path.join(__dirname, "../credentials/google-service.json");
-const SPREADSHEET_ID = "TU_WKLEJ_ID_ARCUSZA_GOOGLE"; // wklej ID swojego arkusza
+// 🔹 Ścieżka do klucza konta serwisowego
+const SERVICE_ACCOUNT_PATH = path.join(__dirname, "../../service-account.json");
 
-if (!fs.existsSync(CREDENTIALS_PATH)) throw new Error("Brak pliku z kluczem Google Service Account!");
+// 🔹 Wczytaj dane konta serwisowego
+const credentials = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
 
-// ==========================
-// SETUP GOOGLE SHEETS
-// ==========================
+// 🔹 Arkusz BotDB
+const SHEET_ID = "1SLBamj7aJzV0Uv7p_Lvn_qjihPuV_SqKPDkPYs-q0CE";
+const EVENTS_TAB = "events";
+const CONFIG_TAB = "config";
+
+// 🔹 Autoryzacja z kontem serwisowym
 const auth = new google.auth.GoogleAuth({
-  keyFile: CREDENTIALS_PATH,
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+  credentials,
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
 const sheets = google.sheets({ version: "v4", auth });
 
 // ==========================
-// TYPES
+// UTILS
+// ==========================
+async function readSheet(tab: string): Promise<string[][]> {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: tab,
+  });
+  return res.data.values || [];
+}
+
+async function writeSheet(tab: string, values: string[][]) {
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: tab,
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: tab,
+    valueInputOption: "RAW",
+    requestBody: { values },
+  });
+}
+
+// ==========================
+// EVENT STORAGE
 // ==========================
 export type EventObject = {
   id: string;
@@ -38,113 +67,96 @@ export type EventObject = {
   started?: boolean;
 };
 
-// ==========================
-// EVENTS
-// ==========================
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "events!A:Z"
-  });
+  const rows = await readSheet(EVENTS_TAB);
+  // Zakładamy, że pierwszy wiersz to nagłówki
+  const headers = rows[0] || [];
+  const data = rows.slice(1);
 
-  const rows = res.data.values || [];
-  if (!rows.length) return [];
+  const events: EventObject[] = data
+    .map(row => {
+      const obj: any = {};
+      headers.forEach((header, i) => {
+        obj[header] = row[i];
+      });
+      // Parsowanie typów
+      obj.day = Number(obj.day);
+      obj.month = Number(obj.month);
+      obj.hour = Number(obj.hour);
+      obj.minute = Number(obj.minute);
+      obj.participants = obj.participants ? JSON.parse(obj.participants) : [];
+      obj.createdAt = Number(obj.createdAt);
+      obj.reminderSent = obj.reminderSent === "true";
+      obj.started = obj.started === "true";
+      return obj as EventObject;
+    })
+    .filter(e => e.guildId === guildId);
 
-  // Zakładamy nagłówek: guildId | id | name | day | month | hour | minute | year | status | participants (JSON) | createdAt | reminderSent | started
-  const header = rows[0];
-  const dataRows = rows.slice(1);
-  return dataRows
-    .filter(r => r[0] === guildId)
-    .map(r => ({
-      guildId: r[0],
-      id: r[1],
-      name: r[2],
-      day: Number(r[3]),
-      month: Number(r[4]),
-      hour: Number(r[5]),
-      minute: Number(r[6]),
-      year: r[7] ? Number(r[7]) : undefined,
-      status: r[8] as "ACTIVE" | "PAST" | "CANCELED",
-      participants: r[9] ? JSON.parse(r[9]) : [],
-      createdAt: Number(r[10]),
-      reminderSent: r[11] === "true",
-      started: r[12] === "true"
-    }));
+  return events;
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  // Pobierz wszystkie wiersze
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "events!A:Z"
-  });
-  const rows = res.data.values || [];
-  const header = rows[0] || ["guildId","id","name","day","month","hour","minute","year","status","participants","createdAt","reminderSent","started"];
-  const otherRows = rows.slice(1).filter(r => r[0] !== guildId); // zachowaj inne guildId
+  const rows = await readSheet(EVENTS_TAB);
+  const headers = rows[0] || [
+    "id",
+    "name",
+    "day",
+    "month",
+    "hour",
+    "minute",
+    "year",
+    "reminderBefore",
+    "status",
+    "participants",
+    "createdAt",
+    "guildId",
+    "reminderSent",
+    "started",
+  ];
 
-  const newRows = events.map(ev => [
-    ev.guildId,
-    ev.id,
-    ev.name,
-    ev.day.toString(),
-    ev.month.toString(),
-    ev.hour.toString(),
-    ev.minute.toString(),
-    ev.year ? ev.year.toString() : "",
-    ev.status,
-    JSON.stringify(ev.participants),
-    ev.createdAt.toString(),
-    ev.reminderSent ? "true" : "false",
-    ev.started ? "true" : "false"
-  ]);
+  // Pobierz wszystkie inne wiersze (inne guildId)
+  const otherRows = rows.slice(1).filter(row => row[headers.indexOf("guildId")] !== guildId);
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "events!A1",
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [header, ...otherRows, ...newRows]
-    }
-  });
+  // Zamień eventy na wiersze
+  const newRows = events.map(e =>
+    headers.map(h => {
+      if (h === "participants") return JSON.stringify(e.participants);
+      if (h === "reminderSent" || h === "started") return e[h] ? "true" : "false";
+      return e[h] ?? "";
+    })
+  );
+
+  // Połącz wiersze i zapisz
+  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...newRows]);
 }
 
 // ==========================
-// CONFIG
+// CONFIG STORAGE
 // ==========================
-export async function getConfig(guildId: string) {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "config!A:B"
+export async function getConfig(guildId: string): Promise<any> {
+  const rows = await readSheet(CONFIG_TAB);
+  const headers = rows[0] || [];
+  const data = rows.slice(1);
+
+  const row = data.find(r => r[headers.indexOf("guildId")] === guildId);
+  if (!row) return {};
+
+  const obj: any = {};
+  headers.forEach((h, i) => {
+    obj[h] = row[i];
   });
-  const rows = res.data.values || [];
-  const conf: Record<string, any> = {};
-  rows.forEach(r => {
-    if (r[0] === guildId) {
-      conf[guildId] = JSON.parse(r[1]);
-    }
-  });
-  return conf[guildId] || {};
+
+  return obj;
 }
 
 export async function saveConfig(guildId: string, config: any) {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "config!A:B"
-  });
-  const rows = res.data.values || [];
-  const header = ["guildId","config"];
-  const otherRows = rows.slice(1).filter(r => r[0] !== guildId);
+  const rows = await readSheet(CONFIG_TAB);
+  const headers = rows[0] || ["guildId", ...Object.keys(config)];
 
-  const newRows = [
-    [guildId, JSON.stringify(config)]
-  ];
+  // Usuń stare wiersze dla tej guild
+  const otherRows = rows.slice(1).filter(r => r[headers.indexOf("guildId")] !== guildId);
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "config!A1",
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [header, ...otherRows, ...newRows]
-    }
-  });
+  const newRow = headers.map(h => (h === "guildId" ? guildId : config[h] ?? ""));
+
+  await writeSheet(CONFIG_TAB, [headers, ...otherRows, newRow]);
 }
