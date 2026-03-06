@@ -1,13 +1,12 @@
 import { google } from "googleapis";
-import path from "path";
-import fs from "fs";
 
-const CREDENTIALS_PATH = path.join(__dirname, "../credentials/google-service-account.json");
+if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+  throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SERVICE_ACCOUNT!");
+}
 
-// Wczytaj plik JSON z konta usługi
-const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
+// 🔹 Wczytaj dane konta serwisowego ze zmiennej środowiskowej
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-// Ustawienie klienta Google Sheets
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
