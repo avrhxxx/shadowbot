@@ -1,8 +1,9 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
 import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel } from "discord.js";
+import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { handleCompareAll } from "./eventsCompare";
+import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
 import { handleDownload } from "./eventsDownload";
 import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
@@ -22,7 +23,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
   // 🔹 Sprawdzenie heavy load
   if (isHeavyLoad(events)) {
     await interaction.deferReply({ ephemeral: true });
-    const config = await import("../eventStorage").then(m => m.getConfig(guildId));
+    const config = await EventStorage.getConfig(guildId);
     await sendHeavyReport(guild, events, config?.downloadChannelId);
     await interaction.editReply({ content: "Heavy report generated in download channel.", components: [] });
     return;
@@ -47,8 +48,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 }
 
 /**
- * Show all participant lists in embed (bez pobierania pliku)
- * Obsługuje fragmentację jeśli treść za długa
+ * Show all participant lists in embeds (fragmented if too long)
  */
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   const guild = interaction.guild!;
@@ -62,7 +62,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
 
   if (isHeavyLoad(events)) {
     await interaction.deferReply({ ephemeral: true });
-    const config = await import("../eventStorage").then(m => m.getConfig(guildId));
+    const config = await EventStorage.getConfig(guildId);
     await sendHeavyReport(guild, events, config?.downloadChannelId);
     await interaction.editReply({ content: "Heavy report generated in download channel.", components: [] });
     return;
@@ -79,6 +79,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
+  // Fragmentacja dużego tekstu na Discord
   const { fragmentText } = await import("../../helpers/heavyTaskHelper");
   const fragments = fragmentText(fullText, 3900);
 
