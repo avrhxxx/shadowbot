@@ -1,11 +1,11 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
-import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel, Guild } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { handleCompareAll } from "./eventsCompare";
+import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
 import { handleDownload } from "./eventsDownload";
-import { isHeavyLoad, sendHeavyReport, generateReportFragments } from "../eventsHelpers/heavyReportHelper";
+import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -20,7 +20,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 Sprawdzenie heavy load
+  // 🔹 Przy dużym loadzie wysyłamy plik do kanału download
   if (isHeavyLoad(events)) {
     await interaction.deferReply({ ephemeral: true });
     const config = await EventStorage.getConfig(guildId);
@@ -29,6 +29,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     return;
   }
 
+  // 🔹 Normalna lista
   const listText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
@@ -48,7 +49,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 }
 
 /**
- * Show all participant lists in embeds (fragmented if too long)
+ * Show all participant lists
  */
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   const guild = interaction.guild!;
@@ -60,6 +61,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     return;
   }
 
+  // 🔹 Duży load → wyślij plik do download channel
   if (isHeavyLoad(events)) {
     await interaction.deferReply({ ephemeral: true });
     const config = await EventStorage.getConfig(guildId);
@@ -68,12 +70,32 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 Generowanie fragmentów z heavyReportHelper
-  const { embedFragments } = generateReportFragments(events);
+  // 🔹 Mały load → generujemy embed z listą uczestników i przyciskami
+  const fullText = events
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map(e => {
+      const date = `${e.day}/${e.month} ${e.hour}:${e.minute} UTC`;
+      const status = e.status;
+      const participants = e.participants.length ? e.participants.join("\n") : "None";
+      const absent = e.absent?.length ? e.absent.join("\n") : "None";
+      return `**${e.name}** — ${date} (${status})\nParticipants:\n${participants}\nAbsent:\n${absent}`;
+    })
+    .join("\n\n====================\n\n");
 
-  for (let i = 0; i < embedFragments.length; i++) {
-    const embed = embedFragments[i];
-    if (i === 0) await interaction.reply({ embeds: [embed], ephemeral: true });
+  // Tworzymy fragmenty, jeśli trzeba
+  const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
+
+  const compareBtn = new ButtonBuilder().setCustomId("compare_all_events").setLabel("Compare All").setStyle(ButtonStyle.Primary);
+  const downloadBtn = new ButtonBuilder().setCustomId("download_all_events").setLabel("Download All").setStyle(ButtonStyle.Secondary);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(compareBtn, downloadBtn);
+
+  for (let i = 0; i < chunks.length; i++) {
+    const embed = new EmbedBuilder()
+      .setTitle(`📋 All Event Participant Lists${chunks.length > 1 ? ` — part ${i + 1}` : ""}`)
+      .setColor(0x00ff00)
+      .setDescription(chunks[i]);
+
+    if (i === 0) await interaction.reply({ embeds: [embed], components: row ? [row] : [], ephemeral: true });
     else await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 }
