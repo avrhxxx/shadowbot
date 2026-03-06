@@ -1,11 +1,10 @@
-// src/eventsPanel/eventsHandler.ts
+// src/eventsPanel/eventHandlers.ts
 import {
   Interaction,
   ButtonInteraction,
   StringSelectMenuInteraction,
   ActionRowBuilder,
   StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
   TextChannel,
 } from "discord.js";
 import * as EventStorage from "./eventStorage";
@@ -50,7 +49,7 @@ import {
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
 // Clear Event Data
-import { handleClearEventButton, handleClearEventSubmit, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
+import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
 /* =======================================================
    🔹 Handler interakcji dla całego Event Panelu
@@ -96,7 +95,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
       const event = events.find(e => e.id === eventId);
-      if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
+      if (!event) return void interaction.reply({ content: "Event not found.", ephemeral: true });
       await handleClearEventButton(interaction, eventId, event.name);
       return;
     }
@@ -120,7 +119,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     // New Year Buttons
     if (customId === "next_year_yes" || customId === "next_year_no") {
       const storedData = tempEventStore.get(tempKey);
-      if (!storedData) return await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+      if (!storedData) return void interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
       if (customId === "next_year_no") { tempEventStore.delete(tempKey); await interaction.update({ content: "Event was not added.", components: [] }); return; }
       storedData.year = new Date().getUTCFullYear() + 1;
       await showReminderSelect(interaction, tempKey);
@@ -154,11 +153,11 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       const selectedEventId = interaction.values[0];
       const events = await EventStorage.getEvents(interaction.guildId!);
       const event = events.find(e => e.id === selectedEventId);
-      if (!event) return await interaction.update({ content: "Event not found.", components: [] });
+      if (!event) return void interaction.update({ content: "Event not found.", components: [] });
 
       const config = await EventStorage.getConfig(interaction.guildId!);
       const channel = guild.channels.cache.get(config?.notificationChannelId ?? "") as TextChannel;
-      if (!channel || !channel.isTextBased()) return await interaction.update({ content: "Notification channel invalid.", components: [] });
+      if (!channel || !channel.isTextBased()) return void interaction.update({ content: "Notification channel invalid.", components: [] });
 
       await sendReminderMessage(channel, event);
       await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
@@ -174,8 +173,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_absent_modal_")) { await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", "")); return; }
     if (customId === "event_create_modal") { await handleCreateSubmit(interaction); return; }
 
-    // 🔹 CLEAR EVENT DATA – MODAL SUBMIT
-    if (customId.startsWith("confirm_clear_event_")) { await handleClearEventSubmit(interaction); return; }
+    // Usuń referencje do nieistniejącego handleClearEventSubmit
   }
 }
 
@@ -189,7 +187,7 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
   const events = await EventStorage.getEvents(interaction.guildId!);
   const upcomingEvents = events.filter(e => e.status !== "PAST");
 
-  if (!upcomingEvents.length) return await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
+  if (!upcomingEvents.length) return void interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId("manual_reminder_select")
