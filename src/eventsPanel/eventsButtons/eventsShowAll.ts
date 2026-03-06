@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsShowAll.ts
 import { 
   ButtonInteraction, 
   ActionRowBuilder, 
@@ -8,8 +7,6 @@ import {
 } from "discord.js";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
-import { handleDownload } from "./eventsDownload";
 
 /**
  * Show All Events Panel
@@ -23,7 +20,6 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 Normalna lista wydarzeń
   const listText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
@@ -43,12 +39,11 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 }
 
 /**
- * Show all participant lists
+ * Show all participant lists (ephemeral, do ~3900 znaków)
  */
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-
   if (!events.length) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
@@ -65,12 +60,8 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
-  // 🔹 Tworzymy fragmenty embedów (max 3900 znaków)
+  // 🔹 Chunkujemy po 3900 znaków
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
-
-  const compareBtn = new ButtonBuilder().setCustomId("compare_all_events").setLabel("Compare All").setStyle(ButtonStyle.Primary);
-  const downloadBtn = new ButtonBuilder().setCustomId("download_all_events").setLabel("Download All").setStyle(ButtonStyle.Secondary);
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(compareBtn, downloadBtn);
 
   for (let i = 0; i < chunks.length; i++) {
     const embed = new EmbedBuilder()
@@ -78,7 +69,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
       .setColor(0x00ff00)
       .setDescription(chunks[i]);
 
-    if (i === 0) await interaction.reply({ embeds: [embed], components: row ? [row] : [], ephemeral: true });
+    if (i === 0) await interaction.reply({ embeds: [embed], ephemeral: true });
     else await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 }
