@@ -1,5 +1,5 @@
 import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
-import * as EventStorage from "../eventStorage";
+import { getEvents, saveEvents } from "../eventService";
 
 // osobny store tylko dla clear event
 const clearEventStore = new Map<string, string>();
@@ -51,7 +51,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
     return;
   }
 
-  let events = await EventStorage.getEvents(guildId);
+  let events = await getEvents(guildId);
 
   const index = events.findIndex(e => e.id.toString() === eventId.toString());
 
@@ -68,7 +68,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
 
   events.splice(index, 1);
 
-  await EventStorage.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
 
   clearEventStore.delete(interaction.user.id);
 
