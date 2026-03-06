@@ -1,11 +1,11 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
-import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel } from "discord.js";
+import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
 import { handleDownload } from "./eventsDownload";
-import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
+import { isHeavyLoad, sendHeavyReport, fragmentText } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -80,7 +80,6 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     .join("\n\n====================\n\n");
 
   // Fragmentacja dużego tekstu na Discord
-  const { fragmentText } = await import("../../helpers/heavyTaskHelper");
   const fragments = fragmentText(fullText, 3900);
 
   for (let i = 0; i < fragments.length; i++) {
