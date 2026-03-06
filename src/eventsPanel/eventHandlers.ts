@@ -6,58 +6,26 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   TextChannel,
-  Guild,
 } from "discord.js";
 
-// 🔹 import do Google Sheets storage, bez podmian
-import * as EventStorage from "./googleSheetsStorage";
+import * as EventStorage from "./eventService";
 
-// Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, showReminderSelect } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
-import {
-  handleCancel,
-  handleCancelSelect,
-  handleCancelConfirm,
-  handleCancelAbort
-} from "./eventsButtons/eventsCancel";
+import { handleCancel, handleCancelSelect, handleCancelConfirm, handleCancelAbort } from "./eventsButtons/eventsCancel";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
-
-// Compare
-import {
-  handleCompareButton,
-  handleCompareSelect,
-  handleCompareDownload,
-  handleCompareAll,
-  handleCompareAllDownload
-} from "./eventsButtons/eventsCompare";
-
-// Show All
+import { handleCompareButton, handleCompareSelect, handleCompareDownload, handleCompareAll, handleCompareAllDownload } from "./eventsButtons/eventsCompare";
 import { handleShowAllEvents, handleShowAllLists } from "./eventsButtons/eventsShowAll";
-
-// Participants
-import {
-  handleAddParticipant,
-  handleRemoveParticipant,
-  handleAbsentParticipant,
-  handleAddParticipantSubmit,
-  handleRemoveParticipantSubmit,
-  handleAbsentParticipantSubmit
-} from "./eventsButtons/eventsParticipants";
-
-// Reminder
+import { handleAddParticipant, handleRemoveParticipant, handleAbsentParticipant, handleAddParticipantSubmit, handleRemoveParticipantSubmit, handleAbsentParticipantSubmit } from "./eventsButtons/eventsParticipants";
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
-
-// Clear Event
 import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
 /* =======================================================
    EVENT INTERACTION HANDLER
 ======================================================= */
-
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
@@ -75,7 +43,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* BUTTONS */
   if (interaction.isButton()) {
-
     // Participants
     if (customId.startsWith("event_add_")) {
       await handleAddParticipant(interaction, customId.replace("event_add_", ""));
@@ -174,29 +141,14 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
     /* PANEL BUTTONS */
     switch (customId) {
-      case "event_create":
-        await handleCreate(interaction);
-        break;
-      case "event_list":
-        await handleList(interaction);
-        break;
-      case "event_cancel":
-        await handleCancel(interaction);
-        break;
-      case "event_cancel_abort":
-        await handleCancelAbort(interaction);
-        break;
-      case "event_settings":
-        await handleSettings(interaction);
-        break;
-      case "event_help":
-        await handleHelp(interaction);
-        break;
-      case "event_manual_reminder":
-        await handleManualReminder(interaction);
-        break;
-      default:
-        console.warn(`Unsupported event customId: ${customId}`);
+      case "event_create": await handleCreate(interaction); break;
+      case "event_list": await handleList(interaction); break;
+      case "event_cancel": await handleCancel(interaction); break;
+      case "event_cancel_abort": await handleCancelAbort(interaction); break;
+      case "event_settings": await handleSettings(interaction); break;
+      case "event_help": await handleHelp(interaction); break;
+      case "event_manual_reminder": await handleManualReminder(interaction); break;
+      default: console.warn(`Unsupported event customId: ${customId}`);
     }
   }
 
@@ -220,15 +172,14 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
-      const events = await EventStorage.getEvents(interaction.guildId!);
-      const event = events.find(e => e.id === selectedEventId);
+      const event = (await EventStorage.getEvents(interaction.guildId!)).find(e => e.id === selectedEventId);
       if (!event) {
         await interaction.update({ content: "Event not found.", components: [] });
         return;
       }
       const config = await EventStorage.getConfig(interaction.guildId!);
-      const channel = guild.channels.cache.get(config?.notificationChannelId ?? "") as TextChannel;
-      if (!channel || !channel.isTextBased()) {
+      const channel = guild.channels.cache.get(config?.notificationChannel ?? "") as TextChannel;
+      if (!channel?.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
         return;
       }
@@ -239,33 +190,20 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* MODALS */
   if (interaction.isModalSubmit()) {
-    if (customId.startsWith("event_add_modal_")) {
-      await handleAddParticipantSubmit(interaction, customId.replace("event_add_modal_", ""));
-      return;
-    }
-    if (customId.startsWith("event_remove_modal_")) {
-      await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", ""));
-      return;
-    }
-    if (customId.startsWith("event_absent_modal_")) {
-      await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", ""));
-      return;
-    }
-    if (customId === "event_create_modal") {
-      await handleCreateSubmit(interaction);
-      return;
-    }
+    if (customId.startsWith("event_add_modal_")) await handleAddParticipantSubmit(interaction, customId.replace("event_add_modal_", ""));
+    if (customId.startsWith("event_remove_modal_")) await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", ""));
+    if (customId.startsWith("event_absent_modal_")) await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", ""));
+    if (customId === "event_create_modal") await handleCreateSubmit(interaction);
   }
 }
 
 /* MANUAL REMINDER */
-async function handleManualReminder(interaction: ButtonInteraction): Promise<void> {
+async function handleManualReminder(interaction: ButtonInteraction) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  const events = await EventStorage.getEvents(interaction.guildId!);
-  const upcomingEvents = events.filter(e => e.status !== "PAST");
-  if (!upcomingEvents.length) {
+  const events = await EventStorage.getActiveEvents(interaction.guildId!);
+  if (!events.length) {
     await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
     return;
   }
@@ -273,13 +211,11 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
   const select = new StringSelectMenuBuilder()
     .setCustomId("manual_reminder_select")
     .setPlaceholder("Select an event to manually send a reminder")
-    .addOptions(
-      upcomingEvents.map(ev => ({
-        label: ev.name,
-        description: `UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`,
-        value: ev.id
-      }))
-    );
+    .addOptions(events.map(ev => ({
+      label: ev.name,
+      description: `UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`,
+      value: ev.id
+    })));
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
