@@ -10,8 +10,7 @@ import {
   TextChannel,
   AttachmentBuilder
 } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { EventObject } from "../eventService";
+import { EventObject, getEvents, saveEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 // ==========================
@@ -31,7 +30,7 @@ function getMemberName(guild: Guild, id: string) {
 // ==========================
 export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await getEvents(guildId);
   const currentEvent = events.find(e => e.id === eventId);
   if (!currentEvent) return interaction.reply({ content: "Event not found.", ephemeral: true });
   if (currentEvent.status !== "PAST") return interaction.reply({ content: "You can only compare past events.", ephemeral: true });
@@ -59,7 +58,7 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
   const selectedEventId = interaction.values[0];
   const currentEventId = interaction.customId.replace("compare_select_", "");
 
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await getEvents(guildId);
   const eventA = events.find(e => e.id === currentEventId);
   const eventB = events.find(e => e.id === selectedEventId);
 
@@ -81,7 +80,7 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   const guildId = guild.id;
 
   const [_, __, eventAId, eventBId] = interaction.customId.split("_");
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await getEvents(guildId);
   const eventA = events.find(e => e.id === eventAId);
   const eventB = events.find(e => e.id === eventBId);
   if (!eventA || !eventB) return interaction.reply({ content: "Events not found.", ephemeral: true });
@@ -106,7 +105,7 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
 export async function handleCompareAll(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild as Guild;
-  const events: EventObject[] = await EventStorage.getEvents(guild.id);
+  const events: EventObject[] = await getEvents(guild.id);
 
   if (!events.length) return interaction.editReply({ content: "No events to compare.", components: [] });
 
@@ -119,7 +118,7 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
 export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild as Guild;
-  const events: EventObject[] = await EventStorage.getEvents(guild.id);
+  const events: EventObject[] = await getEvents(guild.id);
 
   if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
 
