@@ -1,5 +1,14 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
-import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel, Guild } from "discord.js";
+import {
+  ButtonInteraction,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  TextChannel,
+  Guild,
+  Message
+} from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
@@ -20,12 +29,34 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 Przy dużym loadzie wysyłamy plik do kanału download
+  // 🔹 Duży load → zapytaj użytkownika, czy chce plik
   if (isHeavyLoad(events)) {
-    await interaction.deferReply({ ephemeral: true });
-    const config = await EventStorage.getConfig(guildId);
-    await sendHeavyReport(guild, events, config?.downloadChannelId);
-    await interaction.editReply({ content: "Heavy report generated in download channel.", components: [] });
+    const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("heavy_report_yes").setLabel("✅ Yes, generate file").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("heavy_report_no").setLabel("❌ Cancel").setStyle(ButtonStyle.Danger)
+    );
+
+    await interaction.reply({
+      content: "⚠️ This report is very large. Do you want to generate it as a text file in the download channel?",
+      components: [confirmRow],
+      ephemeral: true
+    });
+
+    // Listener dla przycisków
+    const filter = (i: ButtonInteraction) => i.user.id === interaction.user.id;
+    const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60000, max: 1 });
+
+    collector?.on("collect", async (i: ButtonInteraction) => {
+      if (i.customId === "heavy_report_yes") {
+        await i.update({ content: "Generating heavy report...", components: [] });
+        const config = await EventStorage.getConfig(guildId);
+        await sendHeavyReport(guild, events, config?.downloadChannelId);
+        await i.followUp({ content: "Heavy report generated in download channel.", ephemeral: true });
+      } else if (i.customId === "heavy_report_no") {
+        await i.update({ content: "Report generation cancelled.", components: [] });
+      }
+    });
+
     return;
   }
 
@@ -61,16 +92,37 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     return;
   }
 
-  // 🔹 Duży load → wyślij plik do download channel
+  // 🔹 Duży load → zapytaj użytkownika
   if (isHeavyLoad(events)) {
-    await interaction.deferReply({ ephemeral: true });
-    const config = await EventStorage.getConfig(guildId);
-    await sendHeavyReport(guild, events, config?.downloadChannelId);
-    await interaction.editReply({ content: "Heavy report generated in download channel.", components: [] });
+    const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("heavy_report_yes").setLabel("✅ Yes, generate file").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("heavy_report_no").setLabel("❌ Cancel").setStyle(ButtonStyle.Danger)
+    );
+
+    await interaction.reply({
+      content: "⚠️ This participant list is very large. Generate it as a text file in the download channel?",
+      components: [confirmRow],
+      ephemeral: true
+    });
+
+    const filter = (i: ButtonInteraction) => i.user.id === interaction.user.id;
+    const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60000, max: 1 });
+
+    collector?.on("collect", async (i: ButtonInteraction) => {
+      if (i.customId === "heavy_report_yes") {
+        await i.update({ content: "Generating heavy report...", components: [] });
+        const config = await EventStorage.getConfig(guildId);
+        await sendHeavyReport(guild, events, config?.downloadChannelId);
+        await i.followUp({ content: "Heavy report generated in download channel.", ephemeral: true });
+      } else if (i.customId === "heavy_report_no") {
+        await i.update({ content: "Report generation cancelled.", components: [] });
+      }
+    });
+
     return;
   }
 
-  // 🔹 Mały load → generujemy embed z listą uczestników i przyciskami
+  // 🔹 Mały load → generujemy embed z listą uczestników
   const fullText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
@@ -82,7 +134,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
-  // Tworzymy fragmenty, jeśli trzeba
+  // Tworzymy fragmenty
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
 
   const compareBtn = new ButtonBuilder().setCustomId("compare_all_events").setLabel("Compare All").setStyle(ButtonStyle.Primary);
@@ -95,7 +147,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
       .setColor(0x00ff00)
       .setDescription(chunks[i]);
 
-    if (i === 0) await interaction.reply({ embeds: [embed], components: row ? [row] : [], ephemeral: true });
+    if (i === 0) await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     else await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 }
