@@ -5,15 +5,18 @@ import {
   ButtonStyle,
   ActionRowBuilder,
   EmbedBuilder,
-  Message
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
 
 /* ======================================================
-   🔹 STEP 1 – BUTTON → CONFIRMATION
+   🔹 STEP 1 – SHOW CONFIRMATION
 ====================================================== */
-export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
+export async function handleClearEventButton(
+  interaction: ButtonInteraction,
+  eventId: string,
+  eventName: string
+) {
   const embed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Clear Event Data")
     .setDescription(
@@ -43,19 +46,17 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
 /* ======================================================
    🔹 STEP 2 – CONFIRM BUTTON
 ====================================================== */
-export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
+export async function handleClearEventConfirm(
+  interaction: ButtonInteraction,
+  eventId: string
+) {
   const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+  let events = await EventStorage.getEvents(guildId);
 
-  // Porównanie jako string – zawsze pasuje do customId
-  const eventIndex = events.findIndex(e => e.id.toString() === eventId);
-
+  // Porównanie ID jako string, dla bezpieczeństwa
+  const eventIndex = events.findIndex(e => e.id.toString() === eventId.toString());
   if (eventIndex === -1) {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ content: "Event not found.", embeds: [], components: [] });
-    } else {
-      await interaction.reply({ content: "Event not found.", ephemeral: true });
-    }
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
@@ -70,12 +71,13 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
     .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
     .setColor("Red");
 
+  // Aktualizacja reply
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
-  // Aktualizacja embed listy w kanale, jeśli istnieje
+  // Spróbuj zaktualizować embed listy w kanale (jeżeli wiadomość istnieje)
   if (interaction.message) {
     try {
-      await updateEventEmbed(interaction.message as Message, eventId);
+      await updateEventEmbed(interaction.message, eventId);
     } catch (err) {
       console.warn("Could not update event embed after clearing:", err);
     }
@@ -86,9 +88,9 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
    🔹 STEP 3 – ABORT BUTTON
 ====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-  if (interaction.deferred || interaction.replied) {
-    await interaction.editReply({ content: "Clear action aborted.", embeds: [], components: [] });
-  } else {
-    await interaction.update({ content: "Clear action aborted.", embeds: [], components: [] });
-  }
+  await interaction.update({
+    content: "Clear action aborted.",
+    embeds: [],
+    components: []
+  });
 }
