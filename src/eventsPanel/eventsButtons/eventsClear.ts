@@ -1,21 +1,12 @@
-import {
-  ButtonInteraction,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
-  EmbedBuilder,
-} from "discord.js";
+import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
+import { tempEventStore } from "./eventsCreateSubmit"; // już masz mapę do temporary storage
 
-/* ======================================================
-   🔹 STEP 1 – SHOW CONFIRMATION
-====================================================== */
-export async function handleClearEventButton(
-  interaction: ButtonInteraction,
-  eventId: string,
-  eventName: string
-) {
+export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
+  // zapisujemy do tymczasowego store
+  tempEventStore.set(interaction.user.id, eventId);
+
   const embed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Clear Event Data")
     .setDescription(
@@ -26,7 +17,7 @@ export async function handleClearEventButton(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`event_clear_confirm_${eventId}`)
+      .setCustomId(`event_clear_confirm`)
       .setLabel("Confirm")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
@@ -35,46 +26,41 @@ export async function handleClearEventButton(
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // 🔹 Wyślij jako normalną wiadomość w kanale, nie ephemeral
   if (interaction.deferred || interaction.replied) {
     await interaction.editReply({ content: "", embeds: [embed], components: [row] });
   } else {
-    await interaction.reply({ content: "", embeds: [embed], components: [row] });
+    await interaction.reply({ content: "", embeds: [embed], components: [row], ephemeral: true });
   }
 }
 
-/* ======================================================
-   🔹 STEP 2 – CONFIRM BUTTON
-====================================================== */
-export async function handleClearEventConfirm(
-  interaction: ButtonInteraction,
-  eventId: string
-) {
+export async function handleClearEventConfirm(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  let events = await EventStorage.getEvents(guildId);
+  const eventId = tempEventStore.get(interaction.user.id);
+  if (!eventId) {
+    await interaction.reply({ content: "Temporary event info not found. Please try again.", ephemeral: true });
+    return;
+  }
 
-  // Porównanie ID jako string
+  let events = await EventStorage.getEvents(guildId);
   const eventIndex = events.findIndex(e => e.id.toString() === eventId.toString());
   if (eventIndex === -1) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
+    tempEventStore.delete(interaction.user.id);
     return;
   }
 
   const eventName = events[eventIndex].name;
-
-  // Usuń event z bazy
   events.splice(eventIndex, 1);
   await EventStorage.saveEvents(guildId, events);
+  tempEventStore.delete(interaction.user.id);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Cleared")
     .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
     .setColor("Red");
 
-  // Aktualizacja wiadomości
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
-  // Spróbuj zaktualizować embed listy w kanale (jeżeli wiadomość istnieje)
   if (interaction.message) {
     try {
       await updateEventEmbed(interaction.message, eventId);
@@ -84,10 +70,11 @@ export async function handleClearEventConfirm(
   }
 }
 
-/* ======================================================
-   🔹 STEP 3 – ABORT BUTTON
-====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-  // Wyślij jako ephemeral reply, jeśli była normalna wiadomość
-  await interaction.reply({ content: "Clear action aborted.", ephemeral: true });
+  tempEventStore.delete(interaction.user.id); // usuń entry
+  await interaction.update({
+    content: "Clear action aborted.",
+    embeds: [],
+    components: []
+  });
 }
