@@ -1,5 +1,6 @@
+// src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
-import * as EventStorage from "../eventStorage";
+import { getEvents, getConfig } from "../eventService";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
@@ -11,8 +12,8 @@ import { formatEventUTC } from "../../utils/timeUtils";
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.isButton()) return;
   const guildId = interaction.guildId!;
-  const allEvents: EventObject[] = await EventStorage.getEvents(guildId);
-  const config: { downloadChannelId?: string } = await EventStorage.getConfig(guildId);
+  const allEvents: EventObject[] = await getEvents(guildId);
+  const config = await getConfig(guildId);
 
   if (!config.downloadChannelId) {
     await interaction.reply({ content: "Download channel is not set.", ephemeral: true });
