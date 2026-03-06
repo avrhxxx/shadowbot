@@ -10,6 +10,9 @@ import {
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
 
+/* ======================================================
+   🔹 STEP 1 – BUTTON → CONFIRMATION
+====================================================== */
 export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
   const embed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Clear Event Data")
@@ -37,6 +40,9 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
   }
 }
 
+/* ======================================================
+   🔹 STEP 2 – CONFIRM BUTTON
+====================================================== */
 export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await EventStorage.getEvents(guildId);
@@ -49,6 +55,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
 
   const eventName = events[eventIndex].name;
 
+  // Usuń event z bazy
   events.splice(eventIndex, 1);
   await EventStorage.saveEvents(guildId, events);
 
@@ -59,8 +66,8 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
 
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
-  // Aktualizacja embed listy – tylko jeśli wiadomość nie jest ephemeral
-  if (interaction.message && !interaction.message.ephemeral) {
+  // Aktualizacja embed listy w kanale (bez użycia ephemeral)
+  if (interaction.message) {
     try {
       await updateEventEmbed(interaction.message as Message, eventId);
     } catch (err) {
@@ -69,6 +76,9 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
   }
 }
 
+/* ======================================================
+   🔹 STEP 3 – ABORT BUTTON
+====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
   await interaction.update({
     content: "Clear action aborted.",
