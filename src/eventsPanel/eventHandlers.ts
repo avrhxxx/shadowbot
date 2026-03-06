@@ -1,4 +1,3 @@
-// src/eventsPanel/eventHandlers.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -131,9 +130,21 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    /* CLEAR EVENT DATA */
+    /* =========================================
+       CLEAR EVENT DATA (FIXED ORDER)
+    ========================================= */
 
-    if (customId.startsWith("event_clear_") && customId !== "event_clear_confirm" && customId !== "event_clear_abort") {
+    if (customId === "event_clear_confirm") {
+      await handleClearEventConfirm(interaction);
+      return;
+    }
+
+    if (customId === "event_clear_abort") {
+      await handleClearEventAbort(interaction);
+      return;
+    }
+
+    if (customId.startsWith("event_clear_")) {
 
       const eventId = customId.replace("event_clear_", "");
 
@@ -147,20 +158,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       }
 
       await handleClearEventButton(interaction, eventId, event.name);
-
-      return;
-    }
-
-    if (customId === "event_clear_confirm") {
-
-      await handleClearEventConfirm(interaction);
-
-      return;
-    }
-
-    if (customId === "event_clear_abort") {
-
-      await handleClearEventAbort(interaction);
 
       return;
     }
