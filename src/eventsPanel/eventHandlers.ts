@@ -48,6 +48,9 @@ import {
 // Manual Reminder
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
+// Clear Event Data
+import { handleClearEventButton, handleClearEventSubmit } from "./eventsButtons/eventsClear";
+
 /* =======================================================
    🔹 Handler interakcji dla całego Event Panelu
 ======================================================= */
@@ -95,7 +98,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleCompareAll(interaction);
       return;
     }
-    // ✅ ZMIANA: startsWith zamiast ===
     if (customId.startsWith("compare_all_download")) {
       await handleCompareAllDownload(interaction);
       return;
@@ -108,6 +110,19 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId.startsWith("event_download_single_")) {
       await handleDownload(interaction, customId.replace("event_download_single_", ""));
+      return;
+    }
+
+    // Clear Event Data
+    if (customId.startsWith("event_clear_")) {
+      const eventId = customId.replace("event_clear_", "");
+      const events = await EventStorage.getEvents(interaction.guildId!);
+      const event = events.find(e => e.id === eventId);
+      if (!event) {
+        await interaction.reply({ content: "Event not found.", ephemeral: true });
+        return;
+      }
+      await handleClearEventButton(interaction, eventId, event.name);
       return;
     }
 
@@ -204,6 +219,12 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId === "event_create_modal") {
       await handleCreateSubmit(interaction);
+      return;
+    }
+
+    // Clear Event Submit Modal
+    if (customId.startsWith("confirm_clear_event_")) {
+      await handleClearEventSubmit(interaction);
       return;
     }
   }
