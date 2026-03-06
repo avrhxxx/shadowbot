@@ -94,18 +94,27 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     if (customId.startsWith("event_clear_")) {
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
-      // Porównanie ID jako string
       const event = events.find(e => e.id.toString() === eventId.toString());
       if (!event) return void interaction.reply({ content: "Event not found.", ephemeral: true });
+
+      // zapisujemy do temp store
+      tempEventStore.set(interaction.user.id, eventId);
+
       await handleClearEventButton(interaction, eventId, event.name);
       return;
     }
-    if (customId.startsWith("event_clear_confirm_")) {
-      const eventId = customId.replace("event_clear_confirm_", "");
+
+    if (customId === "event_clear_confirm") {
+      const eventId = tempEventStore.get(interaction.user.id); // pobieramy z mapy
+      if (!eventId) return void interaction.reply({ content: "Temporary event info not found. Please try again.", ephemeral: true });
+
       await handleClearEventConfirm(interaction, eventId);
+      tempEventStore.delete(interaction.user.id); // usuń entry
       return;
     }
+
     if (customId === "event_clear_abort") {
+      tempEventStore.delete(interaction.user.id); // usuń entry
       await handleClearEventAbort(interaction);
       return;
     }
