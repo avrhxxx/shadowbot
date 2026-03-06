@@ -7,6 +7,8 @@ import {
 } from "discord.js";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
+import { handleDownload } from "./eventsDownload";
 
 /**
  * Show All Events Panel
@@ -60,7 +62,6 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
-  // 🔹 Chunkujemy po 3900 znaków
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
 
   for (let i = 0; i < chunks.length; i++) {
