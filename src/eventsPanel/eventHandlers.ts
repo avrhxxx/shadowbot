@@ -6,7 +6,9 @@ import {
   StringSelectMenuBuilder,
   TextChannel,
 } from "discord.js";
-import * as EventStorage from "./eventStorage";
+
+// 🔹 tutaj podmieniamy na Google Sheets storage
+import * as EventStorage from "./googleSheetsStorage";
 
 // Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
