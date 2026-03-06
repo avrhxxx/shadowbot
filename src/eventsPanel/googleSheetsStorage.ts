@@ -1,5 +1,8 @@
+// src/eventsPanel/googleSheetsStorage.ts
 import { google } from "googleapis";
+import { EventObject } from "./eventService"; // typ EventObject z eventService
 
+// ------------------ GOOGLE SHEETS CONFIG ------------------
 const SHEET_ID = process.env.GOOGLE_SHEET_ID as string;
 const CONFIG_TAB = "config";
 
@@ -17,7 +20,7 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
-// simple in-memory cache
+// simple in-memory cache for config
 let configCache: Record<string, any> | null = null;
 let lastFetch = 0;
 const CACHE_TTL = 30 * 1000; // 30s
@@ -27,7 +30,6 @@ async function readSheet(tab: string) {
     spreadsheetId: SHEET_ID,
     range: tab,
   });
-
   return res.data.values || [];
 }
 
@@ -55,14 +57,10 @@ export async function getConfig(guildId: string) {
 
   for (const row of data) {
     const obj: any = {};
-
     headers.forEach((h: string, i: number) => {
       const value = row[i];
-
-      if (value === undefined || value === "") obj[h] = null;
-      else obj[h] = String(value).trim();
+      obj[h] = value === undefined || value === "" ? null : String(value).trim();
     });
-
     if (obj.guildId) map[obj.guildId] = obj;
   }
 
@@ -74,7 +72,6 @@ export async function getConfig(guildId: string) {
 
 export async function setConfig(guildId: string, key: string, value: string) {
   const rows = await readSheet(CONFIG_TAB);
-
   const headers = rows[0];
   const data = rows.slice(1);
 
@@ -91,18 +88,29 @@ export async function setConfig(guildId: string, key: string, value: string) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
     newRow[keyIndex] = value;
-
     data.push(newRow);
   } else {
     data[rowIndex][keyIndex] = value;
   }
 
   await writeSheet(CONFIG_TAB, [headers, ...data]);
-
-  // clear cache
   configCache = null;
 }
 
 export function isConfigured(config: any) {
   return Boolean(config?.notificationChannel && config?.downloadChannel);
+}
+
+// ------------------ EVENT STORAGE (IN-MEMORY) ------------------
+
+// in-memory map for events
+const eventsMap: Record<string, EventObject[]> = {};
+
+export async function getEvents(guildId: string): Promise<EventObject[]> {
+  if (!eventsMap[guildId]) eventsMap[guildId] = [];
+  return eventsMap[guildId];
+}
+
+export async function saveEvents(guildId: string, events: EventObject[]) {
+  eventsMap[guildId] = events;
 }
