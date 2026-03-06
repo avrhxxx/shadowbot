@@ -7,14 +7,14 @@ import {
     ActionRowBuilder 
 } from "discord.js";
 
-import * as EventStorage from "../eventStorage"; // 🔹 dodane
+import { getConfig } from "../eventService"; // 🔹 zmieniony import
 
 export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
 
     // 🔹 sprawdzenie czy system jest skonfigurowany
-    const config = await EventStorage.getConfig(interaction.guildId!);
+    const config = await getConfig(interaction.guildId!);
 
     if (!config?.notificationChannelId || !config?.downloadChannelId) {
         await interaction.reply({
