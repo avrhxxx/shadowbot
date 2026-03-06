@@ -1,19 +1,15 @@
 import { google } from "googleapis";
-import path from "path";
-import fs from "fs";
 
-// 🔹 Ścieżka do pliku z kontem serwisowym
-const CREDENTIALS_PATH = path.join(__dirname, "../credentials/google-service-account.json");
+if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+  throw new Error("Brakuje zmiennej środowiskowej GOOGLE_SERVICE_ACCOUNT!");
+}
 
-// 🔹 Wczytanie pliku JSON
-const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-// 🔹 Arkusz BotDB
 const SHEET_ID = "1SLBamj7aJzV0Uv7p_Lvn_qjihPuV_SqKPDkPYs-q0CE";
 const EVENTS_TAB = "events";
 const CONFIG_TAB = "config";
 
-// 🔹 Autoryzacja z kontem serwisowym
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
@@ -92,20 +88,8 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 export async function saveEvents(guildId: string, events: EventObject[]) {
   const rows = await readSheet(EVENTS_TAB);
   const headers = rows[0] || [
-    "id",
-    "name",
-    "day",
-    "month",
-    "hour",
-    "minute",
-    "year",
-    "reminderBefore",
-    "status",
-    "participants",
-    "createdAt",
-    "guildId",
-    "reminderSent",
-    "started",
+    "id","name","day","month","hour","minute","year","reminderBefore",
+    "status","participants","createdAt","guildId","reminderSent","started",
   ];
 
   const otherRows = rows.slice(1).filter(row => row[headers.indexOf("guildId")] !== guildId);
@@ -156,7 +140,6 @@ export async function saveConfig(guildId: string, config: any) {
   const headers = rows[0] || ["guildId", ...Object.keys(config)];
 
   const otherRows = rows.slice(1).filter(r => r[headers.indexOf("guildId")] !== guildId);
-
   const newRow = headers.map(h => (h === "guildId" ? guildId : config[h] ?? ""));
 
   await writeSheet(CONFIG_TAB, [headers, ...otherRows, newRow]);
