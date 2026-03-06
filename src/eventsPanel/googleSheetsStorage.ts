@@ -1,7 +1,12 @@
 import { google } from "googleapis";
+import path from "path";
+import fs from "fs";
 
-// 🔹 Wczytaj dane konta serwisowego ze zmiennej środowiskowej
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT!);
+// 🔹 Ścieżka do pliku z kontem serwisowym
+const CREDENTIALS_PATH = path.join(__dirname, "../credentials/google-service-account.json");
+
+// 🔹 Wczytanie pliku JSON
+const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
 
 // 🔹 Arkusz BotDB
 const SHEET_ID = "1SLBamj7aJzV0Uv7p_Lvn_qjihPuV_SqKPDkPYs-q0CE";
@@ -45,7 +50,7 @@ async function writeSheet(tab: string, values: string[][]) {
 // EVENT STORAGE
 // ==========================
 export type EventObject = {
-  [key: string]: any; // 🔹 indeks stringowy
+  [key: string]: any;
   id: string;
   name: string;
   day: number;
@@ -67,12 +72,10 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  const events: EventObject[] = data
+  return data
     .map(row => {
       const obj: any = {};
-      headers.forEach((header, i) => {
-        obj[header] = row[i];
-      });
+      headers.forEach((header, i) => (obj[header] = row[i]));
       obj.day = Number(obj.day);
       obj.month = Number(obj.month);
       obj.hour = Number(obj.hour);
@@ -84,8 +87,6 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
       return obj as EventObject;
     })
     .filter(e => e.guildId === guildId);
-
-  return events;
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
@@ -111,7 +112,7 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
 
   const newRows = events.map(e =>
     headers.map(h => {
-      switch(h) {
+      switch (h) {
         case "id": return e.id;
         case "name": return e.name;
         case "day": return e.day;
@@ -146,10 +147,7 @@ export async function getConfig(guildId: string): Promise<any> {
   if (!row) return {};
 
   const obj: any = {};
-  headers.forEach((h, i) => {
-    obj[h] = row[i];
-  });
-
+  headers.forEach((h, i) => (obj[h] = row[i]));
   return obj;
 }
 
