@@ -1,34 +1,87 @@
-// src/eventsPanel/eventsButtons/eventsClear.ts
+// src/eventsPanel/eventsButtons/eventsCancel.ts
 import {
   ButtonInteraction,
+  StringSelectMenuInteraction,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActionRowBuilder,
-  EmbedBuilder,
-  Message
+  EmbedBuilder
 } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { updateEventEmbed } from "./eventsList";
+import { EventObject, getEvents, saveEvents } from "../eventService";
+import { formatEventUTC } from "../../utils/timeUtils";
 
 /* ======================================================
-   🔹 STEP 1 – BUTTON → CONFIRMATION
+   🔹 STEP 1 – BUTTON → SELECT
 ====================================================== */
-export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
+export async function handleCancel(interaction: ButtonInteraction) {
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const events = await getEvents(guildId);
+  const activeEvents = events.filter(e => e.status === "ACTIVE");
+
+  if (!activeEvents.length) {
+    await interaction.reply({
+      content: "No active events to cancel.",
+      ephemeral: true
+    });
+    return;
+  }
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId("event_cancel_select")
+    .setPlaceholder("Select an event to cancel")
+    .addOptions(
+      activeEvents.map(e => ({
+        label: e.name,
+        description: formatEventUTC(e.day, e.month, e.hour, e.minute, e.year),
+        value: e.id
+      }))
+    );
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+  await interaction.reply({
+    content: "Select event to cancel:",
+    components: [row],
+    ephemeral: true
+  });
+}
+
+/* ======================================================
+   🔹 STEP 2 – SELECT → CONFIRMATION
+====================================================== */
+export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
+  const guildId = interaction.guildId!;
+  const eventId = interaction.values[0];
+
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+
+  if (!event) {
+    await interaction.reply({
+      content: "Event not found.",
+      ephemeral: true
+    });
+    return;
+  }
+
   const embed = new EmbedBuilder()
-    .setTitle("⚠️ Confirm Clear Event Data")
+    .setTitle("Confirm Cancellation")
     .setDescription(
-      `Are you sure you want to **clear all data** for event **${eventName}**?\n\n` +
-      `This will permanently delete **all participants, absences, and other event data**. This action **cannot be undone**.`
+      `Are you sure you want to cancel **${event.name}**?\n\n` +
+      `📅 ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}`
     )
-    .setColor("Red");
+    .setColor("Orange");
 
   const confirmBtn = new ButtonBuilder()
-    .setCustomId(`event_clear_confirm_${eventId}`)
+    .setCustomId(`event_cancel_confirm_${eventId}`)
     .setLabel("Confirm")
     .setStyle(ButtonStyle.Danger);
 
   const abortBtn = new ButtonBuilder()
-    .setCustomId(`event_clear_abort`)
+    .setCustomId("event_cancel_abort")
     .setLabel("Abort")
     .setStyle(ButtonStyle.Secondary);
 
@@ -39,51 +92,39 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
     embeds: [embed],
     components: [row]
   });
-};
+}
 
 /* ======================================================
-   🔹 STEP 2 – CONFIRM BUTTON
+   🔹 STEP 3 – CONFIRM BUTTON
 ====================================================== */
-export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
+export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
-  const eventIndex = events.findIndex(e => e.id === eventId);
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
 
-  if (eventIndex === -1) {
+  if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
   }
 
-  const eventName = events[eventIndex].name;
-
-  // Usuń event z bazy
-  events.splice(eventIndex, 1);
-  await EventStorage.saveEvents(guildId, events);
+  event.status = "CANCELED";
+  await saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
-    .setTitle("Event Cleared")
-    .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
+    .setTitle("Event Canceled")
+    .setDescription(`**${event.name}** has been canceled.`)
     .setColor("Red");
 
   await interaction.update({ content: "", embeds: [embed], components: [] });
-
-  // Aktualizacja embed listy w kanale, jeśli istnieje
-  try {
-    if (interaction.message) {
-      await updateEventEmbed(interaction.message as Message, eventId);
-    }
-  } catch (err) {
-    console.warn("Could not update event embed after clearing:", err);
-  }
-};
+}
 
 /* ======================================================
-   🔹 STEP 3 – ABORT BUTTON
+   🔹 STEP 4 – ABORT BUTTON
 ====================================================== */
-export async function handleClearEventAbort(interaction: ButtonInteraction) {
+export async function handleCancelAbort(interaction: ButtonInteraction) {
   await interaction.update({
-    content: "Clear action aborted.",
+    content: "Cancellation aborted.",
     embeds: [],
     components: []
   });
-};
+}
