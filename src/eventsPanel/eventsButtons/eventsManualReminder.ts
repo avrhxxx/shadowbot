@@ -1,6 +1,6 @@
 // src/eventsPanel/eventsButtons/eventsManualReminder.ts
 import { ButtonInteraction, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder } from "discord.js";
-import * as EventStorage from "../eventStorage";
+import { getEvents } from "../eventService";
 import { sendReminderMessage } from "./eventsReminder";
 import { formatEventUTC } from "../../utils/timeUtils";
 
@@ -10,7 +10,7 @@ import { formatEventUTC } from "../../utils/timeUtils";
  */
 export async function handleManualReminder(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  const events = await EventStorage.getEvents(guildId);
+  const events = await getEvents(guildId);
 
   const upcomingEvents = events.filter(e => e.status !== "PAST");
   if (upcomingEvents.length === 0) {
