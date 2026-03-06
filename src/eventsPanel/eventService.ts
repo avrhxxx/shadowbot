@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import { getEvents, saveEvents, getConfig, setConfig } from "./googleSheetsStorage";
+import { getConfig, setConfig } from "./googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -20,9 +20,29 @@ export interface EventObject {
   started?: boolean;
 }
 
-/* =========================
-   EVENT CRUD / HELPERS
-========================= */
+export interface EventConfig {
+  notificationChannel?: string;
+  downloadChannel?: string;
+  [key: string]: any;
+}
+
+// --------------------------
+// EVENT CRUD (lokalnie, bo googleSheetsStorage.ts nie ma getEvents/saveEvents)
+// --------------------------
+const eventsMap: Record<string, EventObject[]> = {};
+
+export async function getEvents(guildId: string): Promise<EventObject[]> {
+  if (!eventsMap[guildId]) eventsMap[guildId] = [];
+  return eventsMap[guildId];
+}
+
+export async function saveEvents(guildId: string, events: EventObject[]) {
+  eventsMap[guildId] = events;
+}
+
+// --------------------------
+// EVENT HELPERS
+// --------------------------
 export async function createEvent(data: {
   guildId: string;
   name: string;
@@ -76,45 +96,51 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   return event;
 }
 
-/* =========================
-   CONFIG HELPERS
-========================= */
-export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.notificationChannelId = channelId;
-  await setConfig(guildId, config);
-}
-
-export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.downloadChannelId = channelId;
-  await setConfig(guildId, config);
-}
-
-export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
-  const config = await getConfig(guildId);
-  return config.downloadChannelId;
-}
-
-export async function getConfig(guildId: string) {
+// --------------------------
+// CONFIG HELPERS
+// --------------------------
+export async function fetchConfig(guildId: string): Promise<EventConfig> {
   return await getConfig(guildId);
 }
 
-export async function saveConfig(guildId: string, config: any) {
-  await setConfig(guildId, config);
+// wrapper, żeby zapisać cały obiekt config (setConfig wymaga 3 argumentów)
+export async function saveConfig(guildId: string, config: EventConfig) {
+  for (const key in config) {
+    const value = config[key];
+    if (value !== undefined) {
+      await setConfig(guildId, key, String(value));
+    }
+  }
 }
 
-/* =========================
-   MANUAL REMINDERS
-========================= */
+export async function setNotificationChannel(guildId: string, channelId: string) {
+  const config = await fetchConfig(guildId);
+  config.notificationChannel = channelId;
+  await saveConfig(guildId, config);
+}
+
+export async function setDownloadChannel(guildId: string, channelId: string) {
+  const config = await fetchConfig(guildId);
+  config.downloadChannel = channelId;
+  await saveConfig(guildId, config);
+}
+
+export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
+  const config = await fetchConfig(guildId);
+  return config.downloadChannel;
+}
+
+// --------------------------
+// MANUAL REMINDERS
+// --------------------------
 export async function sendManualReminders(guild: Guild) {
   const guildId = guild.id;
   const events = await getActiveEvents(guildId);
-  const config = await getConfig(guildId);
+  const config = await fetchConfig(guildId);
 
-  if (!config.notificationChannelId) return;
+  if (!config.notificationChannel) return;
 
-  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
+  const channel = guild.channels.cache.get(config.notificationChannel) as TextChannel;
   if (!channel || !channel.isTextBased()) return;
 
   for (const event of events) {
@@ -128,9 +154,9 @@ export async function sendManualReminders(guild: Guild) {
   }
 }
 
-/* =========================
-   EMBED GENERATORS
-========================= */
+// --------------------------
+// EMBED GENERATORS
+// --------------------------
 export function generateEventListEmbed(events: EventObject[]) {
   return new EmbedBuilder()
     .setTitle("Event List")
@@ -154,32 +180,9 @@ export function generateEventListEmbedDetailed(events: EventObject[]) {
   );
 }
 
-/* =========================
-   FRAGMENTATION HELPERS
-========================= */
-export function chunkEventEmbedDescription(description: string, maxChars = 6000): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < description.length) {
-    chunks.push(description.slice(start, start + maxChars));
-    start += maxChars;
-  }
-  return chunks;
-}
-
-export function chunkTextFile(content: string, maxChars = 1900000): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < content.length) {
-    chunks.push(content.slice(start, start + maxChars));
-    start += maxChars;
-  }
-  return chunks;
-}
-
-/* =========================
-   BUILD REPORT FRAGMENTS
-========================= */
+// --------------------------
+// BUILD REPORT
+// --------------------------
 export function buildReportFragments(events: EventObject[], guild: Guild) {
   const participantsSet = new Set<string>();
   events.forEach((ev: EventObject) => {
@@ -215,4 +218,24 @@ export function buildReportFragments(events: EventObject[], guild: Guild) {
   const txtChunks = chunkTextFile(txtText);
 
   return { embedChunks, txtChunks };
+}
+
+export function chunkEventEmbedDescription(description: string, maxChars = 6000): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < description.length) {
+    chunks.push(description.slice(start, start + maxChars));
+    start += maxChars;
+  }
+  return chunks;
+}
+
+export function chunkTextFile(content: string, maxChars = 1900000): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < content.length) {
+    chunks.push(content.slice(start, start + maxChars));
+    start += maxChars;
+  }
+  return chunks;
 }
