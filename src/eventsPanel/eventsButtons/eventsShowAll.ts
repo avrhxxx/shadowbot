@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsShowAll.ts
 import { 
   ButtonInteraction, 
   ActionRowBuilder, 
@@ -11,8 +12,8 @@ import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
-import { isHeavyLoad } from "../eventsHelpers/heavyReportHelper";
-import { sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
+import { handleDownload } from "./eventsDownload";
+import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -40,7 +41,7 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
       ephemeral: true
     });
 
-    // ❌ Usuwamy lokalny collector – globalny handler już obsłuży kliknięcia
+    // 🔹 Obsługa przycisków heavy_report_yes / no jest w eventHandlers.ts
     return;
   }
 
