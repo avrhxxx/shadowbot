@@ -46,10 +46,16 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
 export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await EventStorage.getEvents(guildId);
-  const eventIndex = events.findIndex(e => e.id === eventId);
+
+  // Porównanie jako string – zawsze pasuje do customId
+  const eventIndex = events.findIndex(e => e.id.toString() === eventId);
 
   if (eventIndex === -1) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: "Event not found.", embeds: [], components: [] });
+    } else {
+      await interaction.reply({ content: "Event not found.", ephemeral: true });
+    }
     return;
   }
 
@@ -66,7 +72,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
 
   await interaction.update({ content: "", embeds: [embed], components: [] });
 
-  // Aktualizacja embed listy w kanale (bez użycia ephemeral)
+  // Aktualizacja embed listy w kanale, jeśli istnieje
   if (interaction.message) {
     try {
       await updateEventEmbed(interaction.message as Message, eventId);
@@ -80,9 +86,9 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction, ev
    🔹 STEP 3 – ABORT BUTTON
 ====================================================== */
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-  await interaction.update({
-    content: "Clear action aborted.",
-    embeds: [],
-    components: []
-  });
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply({ content: "Clear action aborted.", embeds: [], components: [] });
+  } else {
+    await interaction.update({ content: "Clear action aborted.", embeds: [], components: [] });
+  }
 }
