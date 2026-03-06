@@ -1,3 +1,4 @@
+
 // src/eventsPanel/eventsButtons/eventsCompare.ts
 import {
   ButtonInteraction,
@@ -14,11 +15,11 @@ import {
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { fragmentText } from "../../helpers/heavyTaskHelper";
+import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
-/* ===================================================== */
-/*  HELPERS                                              */
-/* ===================================================== */
+// ==========================
+// HELPERS
+// ==========================
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
@@ -28,57 +29,32 @@ function getMemberName(guild: Guild, id: string) {
   return member ? member.displayName : id;
 }
 
-/* ===================================================== */
-/*  SINGLE COMPARE BUTTON (A vs B)                       */
-/* ===================================================== */
+// ==========================
+// SINGLE COMPARE
+// ==========================
 export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events: EventObject[] = await EventStorage.getEvents(guildId);
-
   const currentEvent = events.find(e => e.id === eventId);
-  if (!currentEvent) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
-    return;
-  }
+  if (!currentEvent) return interaction.reply({ content: "Event not found.", ephemeral: true });
+  if (currentEvent.status !== "PAST") return interaction.reply({ content: "You can only compare past events.", ephemeral: true });
 
-  if (currentEvent.status !== "PAST") {
-    await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
-    return;
-  }
-
-  const pastEvents = events
-    .filter(e => e.status === "PAST" && e.id !== eventId)
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  if (!pastEvents.length) {
-    await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
-    return;
-  }
+  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== eventId).sort((a, b) => b.createdAt - a.createdAt);
+  if (!pastEvents.length) return interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`compare_select_${eventId}`)
     .setPlaceholder("Select event to compare with")
-    .addOptions(
-      pastEvents.map(ev =>
-        new StringSelectMenuOptionBuilder()
-          .setLabel(ev.name)
-          .setDescription(formatEventUTCObj(ev))
-          .setValue(ev.id)
-      )
-    );
+    .addOptions(pastEvents.map(ev => new StringSelectMenuOptionBuilder().setLabel(ev.name).setDescription(formatEventUTCObj(ev)).setValue(ev.id)));
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
-  await interaction.reply({
-    content: `Select event to compare with **${currentEvent.name}**`,
-    components: [row],
-    ephemeral: true
-  });
+  await interaction.reply({ content: `Select event to compare with **${currentEvent.name}**`, components: [row], ephemeral: true });
 }
 
-/* ===================================================== */
-/*  HANDLE SELECT MENU (A vs B)                          */
-/* ===================================================== */
+// ==========================
+// HANDLE SELECT
+// ==========================
 export async function handleCompareSelect(interaction: StringSelectMenuInteraction) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
@@ -90,76 +66,92 @@ export async function handleCompareSelect(interaction: StringSelectMenuInteracti
   const eventA = events.find(e => e.id === currentEventId);
   const eventB = events.find(e => e.id === selectedEventId);
 
-  if (!eventA || !eventB) {
-    await interaction.update({ content: "One of the events no longer exists.", components: [] });
-    return;
-  }
+  if (!eventA || !eventB) return interaction.update({ content: "One of the events no longer exists.", components: [] });
 
   const result = buildComparisonAB(eventA, eventB, guild);
 
-  const downloadBtn = new ButtonBuilder()
-    .setCustomId(`compare_download_${eventA.id}_${eventB.id}`)
-    .setLabel("Download")
-    .setStyle(ButtonStyle.Primary);
-
+  const downloadBtn = new ButtonBuilder().setCustomId(`compare_download_${eventA.id}_${eventB.id}`).setLabel("Download").setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
 
-  await interaction.update({
-    content: result.embedText,
-    components: [row]
-  });
+  await interaction.update({ content: result.embedText, components: [row] });
 }
 
-/* ===================================================== */
-/*  DOWNLOAD BUTTON (A vs B)                             */
-/* ===================================================== */
+// ==========================
+// DOWNLOAD A vs B
+// ==========================
 export async function handleCompareDownload(interaction: ButtonInteraction) {
   const guild = interaction.guild as Guild;
   const guildId = guild.id;
 
-  const parts = interaction.customId.split("_");
-  const eventAId = parts[2];
-  const eventBId = parts[3];
-
+  const [_, __, eventAId, eventBId] = interaction.customId.split("_");
   const events: EventObject[] = await EventStorage.getEvents(guildId);
   const eventA = events.find(e => e.id === eventAId);
   const eventB = events.find(e => e.id === eventBId);
-
-  if (!eventA || !eventB) {
-    await interaction.reply({ content: "Events not found.", ephemeral: true });
-    return;
-  }
+  if (!eventA || !eventB) return interaction.reply({ content: "Events not found.", ephemeral: true });
 
   const result = buildComparisonAB(eventA, eventB, guild);
-
   const config = await EventStorage.getConfig(guildId);
-  if (!config?.downloadChannelId) {
-    await interaction.reply({ content: "Download channel not configured.", ephemeral: true });
-    return;
-  }
+  if (!config?.downloadChannelId) return interaction.reply({ content: "Download channel not configured.", ephemeral: true });
 
   const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
-  if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Download channel invalid.", ephemeral: true });
-    return;
-  }
+  if (!channel || !channel.isTextBased()) return interaction.reply({ content: "Download channel invalid.", ephemeral: true });
 
-  const utcNow = new Date().toISOString();
-  await channel.send({
-    content: `📥 Attendance comparison (UTC: ${utcNow}):\n${result.embedText}`
-  });
-
-  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), {
-    name: `compare_${eventA.name}_vs_${eventB.name}.txt`
-  });
+  await channel.send({ content: `📥 Attendance comparison (UTC: ${new Date().toISOString()}):\n${result.embedText}` });
+  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_${eventA.name}_vs_${eventB.name}.txt` });
   await channel.send({ files: [file] });
 
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
 
-/* ===================================================== */
-/*  BUILD SINGLE COMPARE LOGIC (A vs B)                 */
-/* ===================================================== */
+// ==========================
+// COMPARE ALL
+// ==========================
+export async function handleCompareAll(interaction: ButtonInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+  const guild = interaction.guild as Guild;
+  const guildId = guild.id;
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
+
+  if (!events.length) return interaction.editReply({ content: "No events to compare.", components: [] });
+
+  if (isHeavyLoad(events)) {
+    await sendHeavyReport(guild, events, (await EventStorage.getConfig(guildId))?.downloadChannelId);
+    return interaction.editReply({ content: "Heavy report sent.", components: [] });
+  }
+
+  const result = buildComparisonAll(events, guild);
+  const downloadBtn = new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download").setStyle(ButtonStyle.Primary);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
+
+  await interaction.editReply({ content: result.embedText, components: [row] });
+}
+
+export async function handleCompareAllDownload(interaction: ButtonInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+  const guild = interaction.guild as Guild;
+  const guildId = guild.id;
+  const events: EventObject[] = await EventStorage.getEvents(guildId);
+
+  if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
+
+  if (isHeavyLoad(events)) {
+    await sendHeavyReport(guild, events, (await EventStorage.getConfig(guildId))?.downloadChannelId);
+    return interaction.editReply({ content: "Heavy report sent.", components: [] });
+  }
+
+  const result = buildComparisonAll(events, guild);
+  const config = await EventStorage.getConfig(guildId);
+  const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
+  if (!channel || !channel.isTextBased()) return interaction.editReply({ content: "Download channel invalid.", components: [] });
+
+  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_all_events.txt` });
+  await channel.send({ content: `📥 Attendance comparison for all events (UTC: ${new Date().toISOString()}):\n${result.embedText}`, files: [file] });
+  await interaction.editReply({ content: "Comparison sent to download channel.", components: [] });
+}
+
+// ==========================
+// LOGIC
+// ==========================
 function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guild) {
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
@@ -185,34 +177,21 @@ function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guil
   return { embedText, txtText };
 }
 
-/* ===================================================== */
-/*  COMPARE ALL EVENTS (Heavy Task + Fragmentation)     */
-/* ===================================================== */
-export async function handleCompareAll(interaction: ButtonInteraction) {
-  // Connect Control
-  await interaction.deferReply({ ephemeral: true });
-
-  const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
-  if (!events.length) {
-    await interaction.editReply({ content: "No events to compare.", components: [] });
-    return;
-  }
-
+function buildComparisonAll(events: EventObject[], guild: Guild) {
   const allParticipants = new Set<string>();
   events.forEach(ev => {
     ev.participants.forEach(p => allParticipants.add(p));
     (ev.absent || []).forEach(a => allParticipants.add(a));
   });
+
   const participants = [...allParticipants];
+  let embedLines: string[] = [];
+  let txtLines: string[] = [];
 
-  const lines: string[] = participants.map(memberId => {
+  participants.forEach(memberId => {
     const name = getMemberName(guild, memberId);
-    const block: string[] = [];
     let attended = 0;
-
+    const block: string[] = [];
     events.forEach(ev => {
       let status = "-";
       if (ev.participants.includes(memberId)) {
@@ -223,93 +202,14 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
       }
       block.push(`${ev.name}  ${status}`);
     });
-
     const percent = Math.round((attended / events.length) * 100);
-    return `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${percent}%)\n`;
+    const textBlock = `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${percent}%)\n`;
+    embedLines.push(textBlock);
+    txtLines.push(textBlock);
   });
 
-  const fragments = fragmentText(lines.join("\n----------------------\n\n"), 3900);
-
-  const downloadBtn = new ButtonBuilder()
-    .setCustomId("compare_all_download")
-    .setLabel("Download")
-    .setStyle(ButtonStyle.Primary);
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
-
-  // Wyświetlenie pierwszego fragmentu (reszta followUp)
-  await interaction.editReply({ content: `All Events Comparison\n\`\`\`\n${fragments[0]}\n\`\`\``, components: [row] });
-
-  for (let i = 1; i < fragments.length; i++) {
-    await interaction.followUp({ content: `\`\`\`\n${fragments[i]}\n\`\`\``, ephemeral: true });
-  }
-}
-
-/* ===================================================== */
-/*  DOWNLOAD ALL COMPARE                                  */
-/* ===================================================== */
-export async function handleCompareAllDownload(interaction: ButtonInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
-
-  if (!events.length) {
-    await interaction.editReply({ content: "No events to download.", components: [] });
-    return;
-  }
-
-  const allParticipants = new Set<string>();
-  events.forEach(ev => {
-    ev.participants.forEach(p => allParticipants.add(p));
-    (ev.absent || []).forEach(a => allParticipants.add(a));
-  });
-  const participants = [...allParticipants];
-
-  const lines: string[] = participants.map(memberId => {
-    const name = getMemberName(guild, memberId);
-    const block: string[] = [];
-    let attended = 0;
-
-    events.forEach(ev => {
-      let status = "-";
-      if (ev.participants.includes(memberId)) {
-        status = "✓";
-        attended++;
-      } else if (ev.absent?.includes(memberId)) {
-        status = "✗";
-      }
-      block.push(`${ev.name}  ${status}`);
-    });
-
-    const percent = Math.round((attended / events.length) * 100);
-    return `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${percent}%)\n`;
-  });
-
-  const finalText = lines.join("\n----------------------\n\n");
-
-  const config = await EventStorage.getConfig(guildId);
-  if (!config?.downloadChannelId) {
-    await interaction.editReply({ content: "Download channel not configured.", components: [] });
-    return;
-  }
-
-  const channel = guild.channels.cache.get(config.downloadChannelId) as TextChannel;
-  if (!channel || !channel.isTextBased()) {
-    await interaction.editReply({ content: "Download channel invalid.", components: [] });
-    return;
-  }
-
-  const utcNow = new Date().toISOString();
-  const file = new AttachmentBuilder(Buffer.from(finalText, "utf-8"), {
-    name: `compare_all_events.txt`
-  });
-
-  await channel.send({
-    content: `📥 Attendance comparison for all events (UTC: ${utcNow})`,
-    files: [file]
-  });
-
-  await interaction.editReply({ content: "Comparison sent to download channel.", components: [] });
+  return {
+    embedText: `All Events Comparison\n\`\`\`\n${embedLines.join("\n----------------------\n\n")}\n\`\`\``,
+    txtText: `All Events Comparison\n\n${txtLines.join("\n----------------------\n\n")}`
+  };
 }
