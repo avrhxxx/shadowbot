@@ -34,11 +34,11 @@ async function seedEventsSafe(guildId: string) {
     const event = await createEvent({
       guildId,
       name: `Event ${i}`,
-      day: 5,
+      day: 6,         // 🔹 6 marca
       month: 3,
       year: 2026,
-      hour: 0,
-      minute: 5,
+      hour: 8,        // 🔹 08:30 UTC
+      minute: 30,
     });
 
     // Ustawiamy event jako PAST
