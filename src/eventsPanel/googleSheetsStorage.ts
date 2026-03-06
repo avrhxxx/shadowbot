@@ -1,4 +1,3 @@
-// src/eventsPanel/googleSheetsStorage.ts
 import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
@@ -51,6 +50,7 @@ async function writeSheet(tab: string, values: string[][]) {
 // EVENT STORAGE
 // ==========================
 export type EventObject = {
+  [key: string]: any; // 🔹 indeks stringowy
   id: string;
   name: string;
   day: number;
@@ -69,7 +69,6 @@ export type EventObject = {
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
   const rows = await readSheet(EVENTS_TAB);
-  // Zakładamy, że pierwszy wiersz to nagłówki
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
@@ -79,7 +78,6 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
       headers.forEach((header, i) => {
         obj[header] = row[i];
       });
-      // Parsowanie typów
       obj.day = Number(obj.day);
       obj.month = Number(obj.month);
       obj.hour = Number(obj.hour);
@@ -114,19 +112,30 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
     "started",
   ];
 
-  // Pobierz wszystkie inne wiersze (inne guildId)
   const otherRows = rows.slice(1).filter(row => row[headers.indexOf("guildId")] !== guildId);
 
-  // Zamień eventy na wiersze
   const newRows = events.map(e =>
     headers.map(h => {
-      if (h === "participants") return JSON.stringify(e.participants);
-      if (h === "reminderSent" || h === "started") return e[h] ? "true" : "false";
-      return e[h] ?? "";
+      switch(h) {
+        case "id": return e.id;
+        case "name": return e.name;
+        case "day": return e.day;
+        case "month": return e.month;
+        case "hour": return e.hour;
+        case "minute": return e.minute;
+        case "year": return e.year ?? "";
+        case "reminderBefore": return e.reminderBefore ?? "";
+        case "status": return e.status;
+        case "participants": return JSON.stringify(e.participants);
+        case "createdAt": return e.createdAt;
+        case "guildId": return e.guildId;
+        case "reminderSent": return e.reminderSent ? "true" : "false";
+        case "started": return e.started ? "true" : "false";
+        default: return e[h] ?? "";
+      }
     })
   );
 
-  // Połącz wiersze i zapisz
   await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...newRows]);
 }
 
@@ -153,7 +162,6 @@ export async function saveConfig(guildId: string, config: any) {
   const rows = await readSheet(CONFIG_TAB);
   const headers = rows[0] || ["guildId", ...Object.keys(config)];
 
-  // Usuń stare wiersze dla tej guild
   const otherRows = rows.slice(1).filter(r => r[headers.indexOf("guildId")] !== guildId);
 
   const newRow = headers.map(h => (h === "guildId" ? guildId : config[h] ?? ""));
