@@ -130,23 +130,35 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Heavy Report Confirmation
+    // 🔹 Heavy Report Confirmation
     if (customId === "heavy_report_yes" || customId === "heavy_report_no") {
-      const guildId = guild.id;
-      const events = await EventStorage.getEvents(guildId);
-      if (!events.length) {
-        await interaction.update({ content: "No events found.", components: [] });
+      if (customId === "heavy_report_no") {
+        await interaction.update({ content: "Report generation cancelled.", components: [] });
         return;
       }
 
-      if (customId === "heavy_report_yes") {
-        await interaction.update({ content: "Generating heavy report...", components: [] });
-        const config = await EventStorage.getConfig(guildId);
-        await sendHeavyReport(guild, events, config?.downloadChannelId);
-        await interaction.followUp({ content: "Heavy report generated in download channel.", ephemeral: true });
-      } else {
-        await interaction.update({ content: "Report generation cancelled.", components: [] });
+      // Tak = generujemy raport
+      await interaction.deferReply({ ephemeral: true }); // pozwala na długą operację
+
+      const guildId = guild.id;
+      const events = await EventStorage.getEvents(guildId);
+      if (!events.length) {
+        await interaction.followUp({ content: "No events found.", ephemeral: true });
+        return;
       }
+
+      const config = await EventStorage.getConfig(guildId);
+      const downloadChannelId = config?.downloadChannelId;
+      if (!downloadChannelId) {
+        await interaction.followUp({ content: "Download channel not configured.", ephemeral: true });
+        return;
+      }
+
+      // Wywołanie faktycznego wysyłania raportu
+      await sendHeavyReport(guild, events, downloadChannelId);
+
+      // Potwierdzenie dla użytkownika
+      await interaction.followUp({ content: "✅ Heavy report generated in download channel.", ephemeral: true });
       return;
     }
 
