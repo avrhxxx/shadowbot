@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsHandler.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -56,225 +57,131 @@ import { handleClearEventButton, handleClearEventSubmit, handleClearEventConfirm
 ======================================================= */
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
-
   const { customId, guild } = interaction;
   if (!guild) return;
 
-  /* 🔹 DYNAMIC – CONFIRM CANCEL */
+  const tempKey = `${interaction.user.id}-temp`;
+
+  /* =============================
+     🔹 DYNAMIC – CANCEL CONFIRM
+  ============================= */
   if (interaction.isButton() && customId.startsWith("event_cancel_confirm_")) {
     const eventId = customId.replace("event_cancel_confirm_", "");
     await handleCancelConfirm(interaction, eventId);
     return;
   }
 
-  /* 🔹 DYNAMIC – BUTTONS */
+  /* =============================
+     🔹 DYNAMIC BUTTONS
+  ============================= */
   if (interaction.isButton()) {
-    const tempKey = `${interaction.user.id}-temp`;
 
     // Participants
-    if (customId.startsWith("event_add_")) {
-      await handleAddParticipant(interaction, customId.replace("event_add_", ""));
-      return;
-    }
-    if (customId.startsWith("event_remove_")) {
-      await handleRemoveParticipant(interaction, customId.replace("event_remove_", ""));
-      return;
-    }
-    if (customId.startsWith("event_absent_")) {
-      await handleAbsentParticipant(interaction, customId.replace("event_absent_", ""));
-      return;
-    }
+    if (customId.startsWith("event_add_")) { await handleAddParticipant(interaction, customId.replace("event_add_", "")); return; }
+    if (customId.startsWith("event_remove_")) { await handleRemoveParticipant(interaction, customId.replace("event_remove_", "")); return; }
+    if (customId.startsWith("event_absent_")) { await handleAbsentParticipant(interaction, customId.replace("event_absent_", "")); return; }
 
     // Compare
-    if (customId.startsWith("event_compare_")) {
-      await handleCompareButton(interaction, customId.replace("event_compare_", ""));
-      return;
-    }
-    if (customId.startsWith("compare_download_")) {
-      await handleCompareDownload(interaction);
-      return;
-    }
-    if (customId === "compare_all_events") {
-      await handleCompareAll(interaction);
-      return;
-    }
-    if (customId.startsWith("compare_all_download")) {
-      await handleCompareAllDownload(interaction);
-      return;
-    }
+    if (customId.startsWith("event_compare_")) { await handleCompareButton(interaction, customId.replace("event_compare_", "")); return; }
+    if (customId.startsWith("compare_download_")) { await handleCompareDownload(interaction); return; }
+    if (customId === "compare_all_events") { await handleCompareAll(interaction); return; }
+    if (customId.startsWith("compare_all_download")) { await handleCompareAllDownload(interaction); return; }
 
-    // Show List / Download Single
-    if (customId.startsWith("event_show_list_")) {
-      await handleShowList(interaction, customId.replace("event_show_list_", ""));
-      return;
-    }
-    if (customId.startsWith("event_download_single_")) {
-      await handleDownload(interaction, customId.replace("event_download_single_", ""));
-      return;
-    }
+    // Show / Download
+    if (customId.startsWith("event_show_list_")) { await handleShowList(interaction, customId.replace("event_show_list_", "")); return; }
+    if (customId.startsWith("event_download_single_")) { await handleDownload(interaction, customId.replace("event_download_single_", "")); return; }
 
-    // 🔹 CLEAR EVENT DATA – SHOW CONFIRM MODAL
+    // 🔹 CLEAR EVENT DATA – wszystkie warianty
     if (customId.startsWith("event_clear_")) {
       const eventId = customId.replace("event_clear_", "");
       const events = await EventStorage.getEvents(interaction.guildId!);
       const event = events.find(e => e.id === eventId);
-      if (!event) {
-        await interaction.reply({ content: "Event not found.", ephemeral: true });
-        return;
-      }
+      if (!event) return await interaction.reply({ content: "Event not found.", ephemeral: true });
       await handleClearEventButton(interaction, eventId, event.name);
       return;
     }
-
-    // 🔹 CLEAR EVENT DATA – CONFIRM BUTTON
     if (customId.startsWith("event_clear_confirm_")) {
       const eventId = customId.replace("event_clear_confirm_", "");
       await handleClearEventConfirm(interaction, eventId);
       return;
     }
-
-    // 🔹 CLEAR EVENT DATA – ABORT BUTTON
     if (customId === "event_clear_abort") {
       await handleClearEventAbort(interaction);
       return;
     }
 
-    // Download All – zwykły przycisk
-    if (customId === "download_all_events") {
-      await handleDownload(interaction);
-      return;
-    }
+    // Download All
+    if (customId === "download_all_events") { await handleDownload(interaction); return; }
 
     // Show All / Show All Lists
-    if (customId === "event_show_all") {
-      await handleShowAllEvents(interaction);
-      return;
-    }
-    if (customId === "show_all_lists") {
-      await handleShowAllLists(interaction);
-      return;
-    }
+    if (customId === "event_show_all") { await handleShowAllEvents(interaction); return; }
+    if (customId === "show_all_lists") { await handleShowAllLists(interaction); return; }
 
     // New Year Buttons
     if (customId === "next_year_yes" || customId === "next_year_no") {
       const storedData = tempEventStore.get(tempKey);
-      if (!storedData) {
-        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
-        return;
-      }
-
-      if (customId === "next_year_no") {
-        tempEventStore.delete(tempKey);
-        await interaction.update({ content: "Event was not added.", components: [] });
-        return;
-      }
-
+      if (!storedData) return await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+      if (customId === "next_year_no") { tempEventStore.delete(tempKey); await interaction.update({ content: "Event was not added.", components: [] }); return; }
       storedData.year = new Date().getUTCFullYear() + 1;
       await showReminderSelect(interaction, tempKey);
       return;
     }
+
+    // 🔹 STANDARD BUTTONS – Event Panel
+    switch (customId) {
+      case "event_create": await handleCreate(interaction); break;
+      case "event_list": await handleList(interaction); break;
+      case "event_cancel": await handleCancel(interaction); break;
+      case "event_cancel_abort": await handleCancelAbort(interaction); break;
+      case "event_settings": await handleSettings(interaction); break;
+      case "event_help": await handleHelp(interaction); break;
+      case "event_manual_reminder": await handleManualReminder(interaction); break;
+      default:
+        console.warn(`Unsupported event customId: ${customId}`);
+    }
   }
 
-  /* 🔹 SELECT MENUS */
+  /* =============================
+     🔹 SELECT MENUS
+  ============================= */
   if (interaction.isStringSelectMenu()) {
-    if (customId.startsWith("reminder_select_")) {
-      await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
-      return;
-    }
-    if (customId.startsWith("compare_select_")) {
-      await handleCompareSelect(interaction);
-      return;
-    }
-    if (customId === "event_settings_notification" || customId === "event_settings_download") {
-      await handleSettingsSelect(interaction);
-      return;
-    }
-    if (customId === "event_cancel_select") {
-      await handleCancelSelect(interaction);
-      return;
-    }
+    if (customId.startsWith("reminder_select_")) { await finalizeEventWithReminder(interaction as StringSelectMenuInteraction); return; }
+    if (customId.startsWith("compare_select_")) { await handleCompareSelect(interaction); return; }
+    if (customId === "event_settings_notification" || customId === "event_settings_download") { await handleSettingsSelect(interaction); return; }
+    if (customId === "event_cancel_select") { await handleCancelSelect(interaction); return; }
 
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
       const events = await EventStorage.getEvents(interaction.guildId!);
       const event = events.find(e => e.id === selectedEventId);
-      if (!event) {
-        await interaction.update({ content: "Event not found.", components: [] });
-        return;
-      }
+      if (!event) return await interaction.update({ content: "Event not found.", components: [] });
 
       const config = await EventStorage.getConfig(interaction.guildId!);
       const channel = guild.channels.cache.get(config?.notificationChannelId ?? "") as TextChannel;
-      if (!channel || !channel.isTextBased()) {
-        await interaction.update({ content: "Notification channel invalid.", components: [] });
-        return;
-      }
+      if (!channel || !channel.isTextBased()) return await interaction.update({ content: "Notification channel invalid.", components: [] });
 
       await sendReminderMessage(channel, event);
       await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
-      return;
     }
   }
 
-  /* 🔹 MODALS */
+  /* =============================
+     🔹 MODALS
+  ============================= */
   if (interaction.isModalSubmit()) {
-    if (customId.startsWith("event_add_modal_")) {
-      await handleAddParticipantSubmit(interaction, customId.replace("event_add_modal_", ""));
-      return;
-    }
-    if (customId.startsWith("event_remove_modal_")) {
-      await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", ""));
-      return;
-    }
-    if (customId.startsWith("event_absent_modal_")) {
-      await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", ""));
-      return;
-    }
-    if (customId === "event_create_modal") {
-      await handleCreateSubmit(interaction);
-      return;
-    }
+    if (customId.startsWith("event_add_modal_")) { await handleAddParticipantSubmit(interaction, customId.replace("event_add_modal_", "")); return; }
+    if (customId.startsWith("event_remove_modal_")) { await handleRemoveParticipantSubmit(interaction, customId.replace("event_remove_modal_", "")); return; }
+    if (customId.startsWith("event_absent_modal_")) { await handleAbsentParticipantSubmit(interaction, customId.replace("event_absent_modal_", "")); return; }
+    if (customId === "event_create_modal") { await handleCreateSubmit(interaction); return; }
 
     // 🔹 CLEAR EVENT DATA – MODAL SUBMIT
-    if (customId.startsWith("confirm_clear_event_")) {
-      await handleClearEventSubmit(interaction);
-      return;
-    }
-  }
-
-  /* 🔹 STANDARD BUTTONS – Event Panel */
-  if (interaction.isButton()) {
-    switch (customId) {
-      case "event_create":
-        await handleCreate(interaction);
-        break;
-      case "event_list":
-        await handleList(interaction);
-        break;
-      case "event_cancel":
-        await handleCancel(interaction);
-        break;
-      case "event_cancel_abort":
-        await handleCancelAbort(interaction);
-        break;
-      case "event_settings":
-        await handleSettings(interaction);
-        break;
-      case "event_help":
-        await handleHelp(interaction);
-        break;
-      case "event_manual_reminder":
-        await handleManualReminder(interaction);
-        break;
-      default:
-        console.warn(`Unsupported event customId: ${customId}`);
-    }
+    if (customId.startsWith("confirm_clear_event_")) { await handleClearEventSubmit(interaction); return; }
   }
 }
 
-/* =======================================================
-   🔹 Funkcja dla przycisku Manual Reminder
-======================================================= */
+/* =============================
+   🔹 Manual Reminder helper
+============================= */
 async function handleManualReminder(interaction: ButtonInteraction): Promise<void> {
   const guild = interaction.guild;
   if (!guild) return;
@@ -282,12 +189,18 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
   const events = await EventStorage.getEvents(interaction.guildId!);
   const upcomingEvents = events.filter(e => e.status !== "PAST");
 
-  if (!upcomingEvents.length) {
-    await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
-    return;
-  }
+  if (!upcomingEvents.length) return await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId("manual_reminder_select")
     .setPlaceholder("Select an event to manually send a reminder")
-    .addOptions
+    .addOptions(
+      upcomingEvents.map(ev =>
+        ({ label: ev.name, description: `UTC: ${ev.day}/${ev.month} ${ev.hour}:${ev.minute}`, value: ev.id })
+      )
+    );
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
+  await interaction.reply({ content: "Select an event to manually send a reminder:", components: [row], ephemeral: true });
+}
