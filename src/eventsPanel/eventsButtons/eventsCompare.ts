@@ -1,4 +1,3 @@
-
 // src/eventsPanel/eventsButtons/eventsCompare.ts
 import {
   ButtonInteraction,
@@ -15,7 +14,6 @@ import {
 import * as EventStorage from "../eventStorage";
 import { EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 // ==========================
 // HELPERS
@@ -114,11 +112,6 @@ export async function handleCompareAll(interaction: ButtonInteraction) {
 
   if (!events.length) return interaction.editReply({ content: "No events to compare.", components: [] });
 
-  if (isHeavyLoad(events)) {
-    await sendHeavyReport(guild, events, (await EventStorage.getConfig(guildId))?.downloadChannelId);
-    return interaction.editReply({ content: "Heavy report sent.", components: [] });
-  }
-
   const result = buildComparisonAll(events, guild);
   const downloadBtn = new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download").setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
@@ -133,11 +126,6 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   const events: EventObject[] = await EventStorage.getEvents(guildId);
 
   if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
-
-  if (isHeavyLoad(events)) {
-    await sendHeavyReport(guild, events, (await EventStorage.getConfig(guildId))?.downloadChannelId);
-    return interaction.editReply({ content: "Heavy report sent.", components: [] });
-  }
 
   const result = buildComparisonAll(events, guild);
   const config = await EventStorage.getConfig(guildId);
