@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsShowAll.ts
 import { 
   ButtonInteraction, 
   ActionRowBuilder, 
@@ -6,15 +5,14 @@ import {
   ButtonStyle, 
   EmbedBuilder, 
   TextChannel, 
-  Guild, 
-  Interaction 
+  Guild 
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 import { handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
-import { handleDownload } from "./eventsDownload";
-import { isHeavyLoad, sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
+import { isHeavyLoad } from "../eventsHelpers/heavyReportHelper";
+import { sendHeavyReport } from "../eventsHelpers/heavyReportHelper";
 
 /**
  * Show All Events Panel
@@ -36,28 +34,13 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     const noBtn = new ButtonBuilder().setCustomId("heavy_report_no").setLabel("No").setStyle(ButtonStyle.Danger);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(yesBtn, noBtn);
 
-    const confirmMessage = await interaction.reply({
+    await interaction.reply({
       content: "⚠️ This report is very large. Do you want to generate it as a text file in the download channel?",
       components: [row],
       ephemeral: true
     });
 
-    // 🔹 Collector dla przycisków
-    const collector = confirmMessage.createMessageComponentCollector({
-      filter: (i): i is ButtonInteraction => i.isButton() && i.user.id === interaction.user.id,
-      time: 30000
-    });
-
-    collector.on("collect", async i => {
-      if (i.customId === "heavy_report_yes") {
-        const config = await EventStorage.getConfig(guildId);
-        await sendHeavyReport(guild, events, config?.downloadChannelId);
-        await i.update({ content: "✅ Heavy report generated in download channel.", components: [] });
-      } else {
-        await i.update({ content: "❌ Heavy report cancelled.", components: [] });
-      }
-    });
-
+    // ❌ Usuwamy lokalny collector – globalny handler już obsłuży kliknięcia
     return;
   }
 
