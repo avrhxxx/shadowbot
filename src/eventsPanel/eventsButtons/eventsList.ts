@@ -1,7 +1,6 @@
 // src/eventsPanel/eventsButtons/eventsList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import * as EventStorage from "../eventStorage";
-import { EventObject } from "../eventService";
+import { getEvents, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 /**
@@ -24,7 +23,7 @@ function formatEventUTCObj(e: EventObject) {
  */
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
   if (!events || events.length === 0) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
@@ -71,7 +70,7 @@ export async function handleList(interaction: ButtonInteraction) {
  */
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
   // Porównanie ID jako string
   const event = events.find(e => e.id.toString() === eventId.toString());
@@ -103,7 +102,7 @@ export async function updateEventEmbed(message: any, eventId: string) {
   const guildId = message.guildId;
   if (!guildId) return;
 
-  let events: EventObject[] = await EventStorage.getEvents(guildId);
+  let events: EventObject[] = await getEvents(guildId);
 
   const e = events.find(ev => ev.id.toString() === eventId.toString());
   if (!e) return;
