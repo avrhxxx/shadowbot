@@ -1,60 +1,52 @@
 // src/eventsPanel/eventsButtons/eventsClear.ts
 import {
   ButtonInteraction,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle,
   ActionRowBuilder,
+  EmbedBuilder,
   Message
 } from "discord.js";
 import * as EventStorage from "../eventStorage";
 import { updateEventEmbed } from "./eventsList";
 
-/**
- * Wyświetla modal confirm dla przycisku Clear Event Data
- */
-export async function handleClearEventButton(
-  interaction: ButtonInteraction,
-  eventId: string,
-  eventName: string
-) {
-  const modal = new ModalBuilder()
-    .setCustomId(`confirm_clear_event_${eventId}`)
-    .setTitle("Confirm Clear Event Data");
+/* ======================================================
+   🔹 STEP 1 – BUTTON → CONFIRMATION
+====================================================== */
+export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string, eventName: string) {
+  const embed = new EmbedBuilder()
+    .setTitle("⚠️ Confirm Clear Event Data")
+    .setDescription(
+      `Are you sure you want to **clear all data** for event **${eventName}**?\n\n` +
+      `This will permanently delete **all participants, absences, and other event data**. This action **cannot be undone**.`
+    )
+    .setColor("Red");
 
-  const warningInput = new TextInputBuilder()
-    .setCustomId("confirm_text")
-    .setLabel(`Type CLEAR to delete all data for "${eventName}"`)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Type CLEAR to confirm")
-    .setRequired(true);
+  const confirmBtn = new ButtonBuilder()
+    .setCustomId(`event_clear_confirm_${eventId}`)
+    .setLabel("Confirm")
+    .setStyle(ButtonStyle.Danger);
 
-  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(warningInput);
-  modal.addComponents(row);
+  const abortBtn = new ButtonBuilder()
+    .setCustomId(`event_clear_abort`)
+    .setLabel("Abort")
+    .setStyle(ButtonStyle.Secondary);
 
-  await interaction.showModal(modal);
-}
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
 
-/**
- * Handler submit modal confirm
- */
-export async function handleClearEventSubmit(interaction: any) {
-  const customId = interaction.customId as string;
-  if (!customId.startsWith("confirm_clear_event_")) return;
+  await interaction.update({
+    content: "",
+    embeds: [embed],
+    components: [row]
+  });
+};
 
-  const eventId = customId.replace("confirm_clear_event_", "");
-  const confirmText = interaction.fields.getTextInputValue("confirm_text");
-
-  if (confirmText !== "CLEAR") {
-    await interaction.reply({
-      content: "Clear action canceled. You did not type CLEAR.",
-      ephemeral: true
-    });
-    return;
-  }
-
+/* ======================================================
+   🔹 STEP 2 – CONFIRM BUTTON
+====================================================== */
+export async function handleClearEventConfirm(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  let events = await EventStorage.getEvents(guildId);
+  const events = await EventStorage.getEvents(guildId);
   const eventIndex = events.findIndex(e => e.id === eventId);
 
   if (eventIndex === -1) {
@@ -68,19 +60,30 @@ export async function handleClearEventSubmit(interaction: any) {
   events.splice(eventIndex, 1);
   await EventStorage.saveEvents(guildId, events);
 
-  // Odpowiedź ephemeral dla użytkownika
-  await interaction.reply({
-    content: `✅ All data for **${eventName}** has been cleared.`,
-    ephemeral: true
-  });
+  const embed = new EmbedBuilder()
+    .setTitle("Event Cleared")
+    .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
+    .setColor("Red");
 
-  // Spróbuj zaktualizować embed w kanale, jeśli istnieje
+  await interaction.update({ content: "", embeds: [embed], components: [] });
+
+  // Aktualizacja embed listy w kanale, jeśli istnieje
   try {
-    const message = interaction.message as Message | undefined;
-    if (message) {
-      await updateEventEmbed(message, eventId);
+    if (interaction.message) {
+      await updateEventEmbed(interaction.message as Message, eventId);
     }
   } catch (err) {
     console.warn("Could not update event embed after clearing:", err);
   }
-}
+};
+
+/* ======================================================
+   🔹 STEP 3 – ABORT BUTTON
+====================================================== */
+export async function handleClearEventAbort(interaction: ButtonInteraction) {
+  await interaction.update({
+    content: "Clear action aborted.",
+    embeds: [],
+    components: []
+  });
+};
