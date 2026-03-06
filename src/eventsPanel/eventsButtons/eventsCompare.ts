@@ -106,34 +106,35 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
 export async function handleCompareAll(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await EventStorage.getEvents(guild.id);
 
   if (!events.length) return interaction.editReply({ content: "No events to compare.", components: [] });
 
-  const result = buildComparisonAll(events, guild);
-  const downloadBtn = new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download").setStyle(ButtonStyle.Primary);
+  const downloadBtn = new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download All (TXT)").setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(downloadBtn);
 
-  await interaction.editReply({ content: `Compare All (send to TXT):\n${result.embedText}`, components: [row] });
+  await interaction.editReply({ content: `📥 Comparison for all events ready. Click Download All (TXT) to get the file.`, components: [row] });
 }
 
 export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-  const events: EventObject[] = await EventStorage.getEvents(guildId);
+  const events: EventObject[] = await EventStorage.getEvents(guild.id);
 
   if (!events.length) return interaction.editReply({ content: "No events to download.", components: [] });
 
   const result = buildComparisonAll(events, guild);
-  const config = await EventStorage.getConfig(guildId);
+  const config = await EventStorage.getConfig(guild.id);
   const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
   if (!channel || !channel.isTextBased()) return interaction.editReply({ content: "Download channel invalid.", components: [] });
 
-  const file = new AttachmentBuilder(Buffer.from(result.txtText, "utf-8"), { name: `compare_all_events.txt` });
-  await channel.send({ content: `📥 Attendance comparison for all events (UTC: ${new Date().toISOString()}):\n${result.embedText}`, files: [file] });
-  await interaction.editReply({ content: "Comparison sent to download channel.", components: [] });
+  const txtChunks = result.txtText.match(/[\s\S]{1,1900}/g) || [];
+  for (let i = 0; i < txtChunks.length; i++) {
+    const file = new AttachmentBuilder(Buffer.from(txtChunks[i], "utf-8"), { name: `compare_all_part_${i + 1}.txt` });
+    await channel.send({ content: `📥 Attendance comparison for all events (part ${i + 1} of ${txtChunks.length})`, files: [file] });
+  }
+
+  await interaction.editReply({ content: `Comparison for all events sent to <#${config?.downloadChannelId}>`, components: [] });
 }
 
 // ==========================
