@@ -13,10 +13,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
 
-        });
-        return;
-    }
-
     const modal = new ModalBuilder()
         .setCustomId("event_create_modal")
         .setTitle("Create Event");
@@ -44,7 +40,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
-    // 🔹 Usunięto pole reminderInput z modala
     // Wszystkie pola dodajemy do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
