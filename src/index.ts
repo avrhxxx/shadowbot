@@ -24,8 +24,8 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 // 🔹 Seedowanie eventów i uczestników (bezpiecznie)
 async function seedEventsSafe(guildId: string) {
-  const totalEvents = 20;
-  const totalUsers = 50;
+  const totalEvents = 5;
+  const totalUsers = 25;
 
   const userIds = Array.from({ length: totalUsers }, (_, i) => `nick${i + 1}`);
   const events: any[] = [];
@@ -34,20 +34,20 @@ async function seedEventsSafe(guildId: string) {
     const event = await createEvent({
       guildId,
       name: `Event ${i}`,
-      day: 6,         // 🔹 6 marca
+      day: 6,        // 6 marca
       month: 3,
       year: 2026,
-      hour: 8,        // 🔹 08:30 UTC
-      minute: 30,
+      hour: 10,
+      minute: 40,
     });
 
-    // Ustawiamy event jako PAST
-    event.status = "PAST";
+    // 🔹 Status ACTIVE, aby event był aktywny
+    event.status = "ACTIVE";
 
     // Dodajemy uczestników
     event.participants = [...userIds];
 
-    // Losowo generujemy absent (30% szans)
+    // Losowe absent (30% szans)
     const absentSet = new Set<string>();
     for (const userId of userIds) {
       if (Math.random() < 0.3) absentSet.add(userId);
@@ -57,11 +57,8 @@ async function seedEventsSafe(guildId: string) {
     event.participants = event.participants.filter(u => !absentSet.has(u));
     event.absent = Array.from(absentSet);
 
-    // Zapisz pojedynczy event
     events.push(event);
     await saveEvents(guildId, events);
-
-    // Delay między eventami
     await delay(200);
   }
 
