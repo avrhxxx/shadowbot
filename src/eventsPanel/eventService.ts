@@ -1,5 +1,5 @@
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import { getConfig as gsGetConfig, setConfig as gsSetConfig } from "./googleSheetsStorage";
+import * as GS from "./googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -22,19 +22,23 @@ export interface EventObject {
 export interface EventConfig {
   notificationChannel?: string;
   downloadChannel?: string;
+  [key: string]: any;
 }
 
-const eventsMap: Record<string, EventObject[]> = {};
-
+// --------------------------
+// EVENTS
+// --------------------------
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  if (!eventsMap[guildId]) eventsMap[guildId] = [];
-  return eventsMap[guildId];
+  return await GS.getEvents(guildId);
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  eventsMap[guildId] = events;
+  await GS.saveEvents(guildId, events);
 }
 
+// --------------------------
+// CREATE / CANCEL / FIND
+// --------------------------
 export async function createEvent(data: {
   guildId: string;
   name: string;
@@ -45,9 +49,7 @@ export async function createEvent(data: {
   year?: number;
   reminderBefore?: number;
 }): Promise<EventObject> {
-
   const events = await getEvents(data.guildId);
-
   const newEvent: EventObject = {
     id: `${Date.now()}`,
     ...data,
@@ -56,23 +58,11 @@ export async function createEvent(data: {
     absent: [],
     createdAt: Date.now(),
     reminderSent: false,
-    started: false
+    started: false,
   };
-
   events.push(newEvent);
   await saveEvents(data.guildId, events);
-
   return newEvent;
-}
-
-export async function getActiveEvents(guildId: string): Promise<EventObject[]> {
-  const events = await getEvents(guildId);
-  return events.filter(e => e.status === "ACTIVE");
-}
-
-export async function getPastEvents(guildId: string): Promise<EventObject[]> {
-  const events = await getEvents(guildId);
-  return events.filter(e => e.status === "PAST");
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -83,76 +73,63 @@ export async function getEventById(guildId: string, eventId: string): Promise<Ev
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
-
   if (!event) return null;
-
   event.status = "CANCELED";
-
   await saveEvents(guildId, events);
-
   return event;
 }
 
+// --------------------------
+// CONFIG
+// --------------------------
 export async function getConfig(guildId: string): Promise<EventConfig> {
-  return await gsGetConfig(guildId);
+  return await GS.getConfig(guildId);
 }
 
 export async function setConfig(guildId: string, key: string, value: string) {
-  await gsSetConfig(guildId, key, value);
+  await GS.setConfig(guildId, key, value);
 }
 
 export async function saveConfig(guildId: string, config: EventConfig) {
-
   for (const key in config) {
-
-    const value = config[key as keyof EventConfig];
-
-    if (value !== undefined) {
-      await setConfig(guildId, key, String(value));
-    }
+    const value = config[key];
+    if (value !== undefined) await setConfig(guildId, key, String(value));
   }
 }
 
+// --------------------------
+// CHANNEL HELPERS
+// --------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
-
   const config = await getConfig(guildId);
-
   config.notificationChannel = channelId;
-
   await saveConfig(guildId, config);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-
   const config = await getConfig(guildId);
-
   config.downloadChannel = channelId;
-
   await saveConfig(guildId, config);
 }
 
+// --------------------------
+// MANUAL REMINDERS
+// --------------------------
 export async function sendManualReminders(guild: Guild) {
-
   const guildId = guild.id;
-
-  const events = await getActiveEvents(guildId);
-
+  const events = (await getEvents(guildId)).filter(e => e.status === "ACTIVE");
   const config = await getConfig(guildId);
-
   if (!config.notificationChannel) return;
 
   const channel = guild.channels.cache.get(config.notificationChannel) as TextChannel;
-
   if (!channel?.isTextBased()) return;
 
   for (const event of events) {
-
     const embed = new EmbedBuilder()
       .setTitle(`Reminder: ${event.name}`)
       .setDescription(
         `Event starts on ${event.day}/${event.month}${event.year ? `/${event.year}` : ""} at ${event.hour}:${event.minute}`
       );
-
     await channel.send({ embeds: [embed] });
   }
 }
