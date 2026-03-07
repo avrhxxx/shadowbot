@@ -7,24 +7,23 @@ import {
   TextChannel,
 } from "discord.js";
 
-// 🔹 tutaj podmieniamy na Google Sheets storage
 import * as EventStorage from "./googleSheetsStorage";
 
-// Buttons / modals / selects
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, showReminderSelect } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
+
 import {
   handleCancel,
   handleCancelSelect,
   handleCancelConfirm,
   handleCancelAbort
 } from "./eventsButtons/eventsCancel";
+
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
 
-// Compare
 import {
   handleCompareButton,
   handleCompareSelect,
@@ -33,10 +32,8 @@ import {
   handleCompareAllDownload
 } from "./eventsButtons/eventsCompare";
 
-// Show All
 import { handleShowAllEvents, handleShowAllLists } from "./eventsButtons/eventsShowAll";
 
-// Participants
 import {
   handleAddParticipant,
   handleRemoveParticipant,
@@ -46,10 +43,8 @@ import {
   handleAbsentParticipantSubmit
 } from "./eventsButtons/eventsParticipants";
 
-// Reminder
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 
-// Clear Event
 import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
 /* =======================================================
@@ -81,8 +76,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   if (interaction.isButton()) {
 
-    // Participants
-
     if (customId.startsWith("event_add_")) {
       await handleAddParticipant(interaction, customId.replace("event_add_", ""));
       return;
@@ -97,8 +90,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleAbsentParticipant(interaction, customId.replace("event_absent_", ""));
       return;
     }
-
-    // Compare
 
     if (customId.startsWith("event_compare_")) {
       await handleCompareButton(interaction, customId.replace("event_compare_", ""));
@@ -120,8 +111,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Show / Download
-
     if (customId.startsWith("event_show_list_")) {
       await handleShowList(interaction, customId.replace("event_show_list_", ""));
       return;
@@ -131,10 +120,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       await handleDownload(interaction, customId.replace("event_download_single_", ""));
       return;
     }
-
-    /* =========================================
-       CLEAR EVENT DATA (FIXED ORDER)
-    ========================================= */
 
     if (customId === "event_clear_confirm") {
       await handleClearEventConfirm(interaction);
@@ -164,14 +149,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // Download All
-
     if (customId === "download_all_events") {
       await handleDownload(interaction);
       return;
     }
-
-    // Show All
 
     if (customId === "event_show_all") {
       await handleShowAllEvents(interaction);
@@ -183,14 +164,17 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
       return;
     }
 
-    // New Year
+    /* YEAR CHECK */
 
     if (customId === "next_year_yes" || customId === "next_year_no") {
 
       const storedData = tempEventStore.get(tempKey);
 
       if (!storedData) {
-        await interaction.update({ content: "Temporary event data not found. Please try again.", components: [] });
+        await interaction.update({
+          content: "Temporary event data not found. Please try again.",
+          components: []
+        });
         return;
       }
 
@@ -255,7 +239,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
   if (interaction.isStringSelectMenu()) {
 
     if (customId.startsWith("reminder_select_")) {
-      await finalizeEventWithReminder(interaction as StringSelectMenuInteraction);
+      await finalizeEventWithReminder(interaction);
       return;
     }
 
