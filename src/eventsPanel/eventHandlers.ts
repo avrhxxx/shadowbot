@@ -44,7 +44,7 @@ import {
   handleRemoveParticipantSubmit,
   handleAbsentParticipantSubmit,
 } from "./eventsButtons/eventsParticipants";
-import { sendReminderMessage } from "./eventsButtons/eventsReminder";
+import { sendReminderMessage, sendEventCreatedNotification } from "./eventsButtons/eventsReminder";
 import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
 /* =======================================================
@@ -67,6 +67,21 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* BUTTONS */
   if (interaction.isButton()) {
+
+    // --- NOWE: POWIADOMIENIE O CREATE ---
+    if (customId.startsWith("notify_create_")) {
+      const tempData = tempEventStore.get(tempKey);
+      if (!tempData) {
+        await interaction.update({ content: "Temporary event data not found.", components: [] });
+        return;
+      }
+      const sendNotification = customId === "notify_create_yes";
+      tempData.sendNotification = sendNotification;
+
+      // Finalizacja eventu po wyborze
+      await finalizeEvent(tempKey, interaction);
+      return;
+    }
 
     // PARTICIPANTS
     if (customId.startsWith("event_add_")) {
@@ -192,7 +207,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* SELECT MENUS */
   if (interaction.isStringSelectMenu()) {
-    // --- POPRAWKA: wywołanie finalizacji remindera tylko z interaction ---
     if (customId.startsWith("reminder_select_")) {
       await finalizeEventWithReminder(interaction);
       return;
@@ -289,4 +303,45 @@ async function handleManualReminder(interaction: ButtonInteraction): Promise<voi
     components: [row],
     ephemeral: true
   });
+}
+
+/* ==========================================================
+   FINALIZE EVENT (po wyborze remindera i powiadomienia)
+========================================================== */
+async function finalizeEvent(tempKey: string, interaction: ButtonInteraction) {
+  const tempData = tempEventStore.get(tempKey);
+  if (!tempData) {
+    await interaction.update({ content: "Temporary event data not found.", components: [] });
+    return;
+  }
+
+  const events = await EventService.getEvents(tempData.guildId);
+
+  const newEvent: EventService.EventObject = {
+    id: tempData.id || `${Date.now()}`, // jeśli generateEventId w createSubmit, może tu użyć
+    guildId: tempData.guildId,
+    name: tempData.name,
+    day: tempData.day,
+    month: tempData.month,
+    hour: tempData.hour,
+    minute: tempData.minute,
+    year: tempData.year!,
+    status: "ACTIVE",
+    participants: [],
+    absent: [],
+    createdAt: Date.now(),
+    reminderSent: false,
+    started: false,
+    ...(tempData.reminderBefore && { reminderBefore: tempData.reminderBefore }),
+  };
+
+  await EventService.saveEvents(tempData.guildId, [...events, newEvent]);
+  tempEventStore.delete(tempKey);
+
+  // --- POWIADOMIENIE --- 
+  if (tempData.sendNotification && interaction.guild) {
+    await sendEventCreatedNotification(newEvent, interaction.guild);
+  }
+
+  await interaction.update({ content: `Event **${newEvent.name}** scheduled successfully.`, components: [] });
 }
