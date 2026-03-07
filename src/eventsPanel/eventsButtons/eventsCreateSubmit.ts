@@ -2,7 +2,6 @@
 import {
     ModalSubmitInteraction,
     ActionRowBuilder,
-    StringSelectMenuBuilder,
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuInteraction,
@@ -27,7 +26,7 @@ export type TempEventData = {
     year?: number;
     reminderBefore?: number;
     notifyOnCreate?: boolean;
-    eventId?: string; // <-- ID generowane w Create some bit
+    eventId?: string;
 };
 
 export const tempEventStore = new Map<string, TempEventData>();
@@ -57,14 +56,9 @@ function canReply(interaction: BaseInteraction): interaction is
 // SAFE REPLY (ephemeral poprawione)
 // -----------------------------------------------------------
 async function safeReply(interaction: any, payload: any) {
-    if (interaction.replied || interaction.deferred) {
-        return interaction.editReply(payload);
-    }
-    if ("update" in interaction && typeof interaction.update === "function") {
-        return interaction.update(payload); // update nie obsługuje ephemeral
-    }
+    if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+    if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
 
-    // deprecated ephemeral → flags
     if (payload.ephemeral) {
         payload.flags = 64;
         delete payload.ephemeral;
@@ -85,7 +79,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const parsed = parseEventDateTime(datetimeRaw);
     if (!name || !parsed) {
         if (canReply(interaction)) {
-            await interaction.reply({ content: "Invalid date/time format.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
         }
         return;
     }
@@ -93,6 +87,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const { day, month, hour, minute } = parsed;
     const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
+
     const nowUTC = new Date();
     let eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
@@ -102,7 +97,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
-        await interaction.reply({
+        await safeReply(interaction, {
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
             components: [
                 new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -110,62 +105,31 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     new ButtonBuilder().setCustomId("next_year_no").setLabel("No").setStyle(ButtonStyle.Danger)
                 )
             ],
-            flags: 64
+            ephemeral: true
         });
         return;
     }
 
-    // zapisz dane tymczasowe, w tym ID eventu z Create some bit (jeśli istnieje)
-    tempEventStore.set(tempKey, { 
-        name, day, month, hour, minute, guildId, year: year ?? eventDateUTC.getUTCFullYear() 
+    // zapis tymczasowy + reminderBefore stałe 60 minut
+    tempEventStore.set(tempKey, {
+        name,
+        day,
+        month,
+        hour,
+        minute,
+        guildId,
+        year: year ?? eventDateUTC.getUTCFullYear(),
+        reminderBefore: 60 // <-- stały reminder przed eventem
     });
-    await showReminderSelect(interaction, tempKey);
-}
 
-// -----------------------------------------------------------
-// SHOW REMINDER SELECT
-// -----------------------------------------------------------
-export async function showReminderSelect(
-    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction,
-    tempKey: string
-) {
-    const tempData = tempEventStore.get(tempKey);
-    if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
-        return;
-    }
-
-    const options = [
-        { label: "No reminder", value: "0" },
-        { label: "5 min before", value: "5" },
-        { label: "10 min before", value: "10" },
-        { label: "15 min before", value: "15" },
-        { label: "20 min before", value: "20" },
-        { label: "30 min before", value: "30" },
-        { label: "45 min before", value: "45" },
-        { label: "1h before", value: "60" },
-        { label: "1h30m before", value: "90" },
-        { label: "2h before", value: "120" },
-        { label: "3h before", value: "180" },
-        { label: "6h before", value: "360" },
-        { label: "12h before", value: "720" },
-        { label: "24h before", value: "1440" }
-    ];
-
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`reminder_select-${tempKey}`)
-        .setPlaceholder("Set reminder before event (optional)")
-        .addOptions(options);
-
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-    await safeReply(interaction, { content: `Event **${tempData.name}** created. Please select a reminder time:`, components: [row], ephemeral: true });
+    await showCreateNotificationConfirm(interaction, tempKey);
 }
 
 // -----------------------------------------------------------
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempKey: string
 ) {
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -188,7 +152,7 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
 
     const events: EventObject[] = await getEvents(tempData.guildId);
     const newEvent: EventObject = {
-        id: tempData.eventId || `${Date.now()}`, // ID z Create some bit albo tymczasowe
+        id: tempData.eventId || `${Date.now()}`,
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -202,7 +166,7 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        ...(tempData.reminderBefore !== undefined && { reminderBefore: tempData.reminderBefore })
+        reminderBefore: tempData.reminderBefore
     };
 
     await saveEvents(tempData.guildId, [...events, newEvent]);
@@ -213,23 +177,6 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
     }
 
     await safeReply(interaction, { content: `Event **${newEvent.name}** scheduled successfully.`, components: [], ephemeral: true });
-}
-
-// -----------------------------------------------------------
-// FINALIZE EVENT WITH REMINDER
-// -----------------------------------------------------------
-export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
-    const tempKey = interaction.customId.split("-")[1];
-    const tempData = tempEventStore.get(tempKey);
-    if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
-        return;
-    }
-
-    const reminderValue = parseInt(interaction.values[0], 10);
-    tempData.reminderBefore = reminderValue > 0 ? reminderValue : undefined;
-
-    await showCreateNotificationConfirm(interaction, tempKey);
 }
 
 // -----------------------------------------------------------
@@ -259,5 +206,5 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     }
 
     tempData.year = new Date().getUTCFullYear() + 1;
-    await showReminderSelect(interaction, tempKey);
+    await showCreateNotificationConfirm(interaction, tempKey);
 }
