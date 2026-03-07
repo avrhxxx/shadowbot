@@ -1,6 +1,5 @@
 import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
-import { getEvents } from "../eventService";
-import { deleteEvent } from "../googleSheetsStorage";
+import { getEvents, deleteEvent as serviceDeleteEvent } from "../eventService";
 
 const clearEventStore = new Map<string, string>();
 
@@ -57,8 +56,8 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
 
   const eventName = event.name;
 
-  // Usuń event permanentnie z arkusza
-  await deleteEvent(guildId, eventId);
+  // Usuń event permanentnie przez serwis (nie bezpośrednio w Sheets)
+  await serviceDeleteEvent(guildId, eventId);
 
   clearEventStore.delete(interaction.user.id);
 
