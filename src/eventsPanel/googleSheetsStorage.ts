@@ -102,6 +102,28 @@ export async function saveEvents(guildId: string, events: any[]) {
 }
 
 // --------------------------
+// DELETE SINGLE EVENT BY ID
+// --------------------------
+export async function deleteEvent(guildId: string, eventId: string) {
+  const rows = await readSheet(EVENTS_TAB);
+  const headers = rows[0] || [];
+  const data = rows.slice(1);
+
+  // Filtrujemy tylko eventy dla tego guildId, ale pomijamy ten o danym ID
+  const filteredRows = data.filter(row => !(row[1] === guildId && row[0] === eventId));
+
+  // Zachowujemy inne guildy
+  const otherRows = data.filter(row => row[1] !== guildId);
+
+  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...filteredRows]);
+
+  // Aktualizacja cache
+  if (eventsCache[guildId]) {
+    eventsCache[guildId] = eventsCache[guildId].filter(e => e.id !== eventId);
+  }
+}
+
+// --------------------------
 // CONFIG STORAGE
 // --------------------------
 export async function getConfig(guildId: string) {
