@@ -23,6 +23,8 @@ export type TempEventData = {
     minute: number;
     guildId: string;
     year?: number;
+    reminderBefore?: number;
+    notifyOnCreate?: boolean; // <-- nowa flaga
 };
 
 export const tempEventStore = new Map<string, TempEventData>();
@@ -175,7 +177,7 @@ export async function showReminderSelect(
     ];
 
     const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("reminder_select")
+        .setCustomId(`reminder_select-${tempKey}`) // <- przekazujemy tempKey w customId
         .setPlaceholder("Set reminder before event (optional)")
         .addOptions(options);
 
@@ -188,12 +190,34 @@ export async function showReminderSelect(
 }
 
 // ============================================================
-// FINALIZE EVENT WITH REMINDER
+// SHOW CREATE NOTIFICATION CONFIRM
 // ============================================================
-export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
-    const tempKey = `${interaction.user.id}-temp`;
-    const tempData = tempEventStore.get(tempKey);
+export async function showCreateNotificationConfirm(
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    tempKey: string
+) {
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`notify_create_yes-${tempKey}`)
+            .setLabel("Yes")
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`notify_create_no-${tempKey}`)
+            .setLabel("No")
+            .setStyle(ButtonStyle.Danger)
+    );
 
+    await safeReply(interaction, {
+        content: "Do you want to send a notification about creating this event?",
+        components: [row]
+    });
+}
+
+// ============================================================
+// FINALIZE EVENT
+// ============================================================
+export async function finalizeEvent(interaction: ButtonInteraction | StringSelectMenuInteraction, tempKey: string) {
+    const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
         await safeReply(interaction, {
             content: "Temporary event data not found.",
@@ -202,13 +226,10 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         return;
     }
 
-    const reminderValue = parseInt(interaction.values[0], 10);
-    const reminderBefore = reminderValue > 0 ? reminderValue : undefined;
-
     const events: EventObject[] = await getEvents(tempData.guildId);
 
     const newEvent: EventObject = {
-        id: generateEventId(), // <-- now unikalne ID
+        id: generateEventId(),
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -222,13 +243,13 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        ...(reminderBefore !== undefined && { reminderBefore })
+        ...(tempData.reminderBefore !== undefined && { reminderBefore: tempData.reminderBefore })
     };
 
-    await saveEvents(tempData.guildId, [...events, newEvent]); // przekazanie do serwisu
+    await saveEvents(tempData.guildId, [...events, newEvent]);
     tempEventStore.delete(tempKey);
 
-    if (interaction.guild) {
+    if (interaction.guild && tempData.notifyOnCreate) {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
@@ -239,10 +260,10 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
 }
 
 // ============================================================
-// FINALIZE NEXT YEAR EVENT
+// FINALIZE EVENT WITH REMINDER
 // ============================================================
-export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-    const tempKey = `${interaction.user.id}-temp`;
+export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
+    const tempKey = interaction.customId.split("-")[1]; // <-- pobieramy tempKey z customId
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
@@ -250,6 +271,40 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
             content: "Temporary event data not found.",
             components: []
         });
+        return;
+    }
+
+    const reminderValue = parseInt(interaction.values[0], 10);
+    tempData.reminderBefore = reminderValue > 0 ? reminderValue : undefined;
+
+    // po przypomnieniu pokazujemy opcję powiadomienia
+    await showCreateNotificationConfirm(interaction, tempKey);
+}
+
+// ============================================================
+// HANDLE NOTIFICATION RESPONSE
+// ============================================================
+export async function handleNotificationResponse(interaction: ButtonInteraction) {
+    const [action, tempKey] = interaction.customId.split("-")[0].split("_").concat(interaction.customId.split("-")[1]);
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        return;
+    }
+
+    tempData.notifyOnCreate = action === "notify_create_yes";
+
+    await finalizeEvent(interaction, tempKey);
+}
+
+// ============================================================
+// FINALIZE NEXT YEAR EVENT
+// ============================================================
+export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+    const tempKey = `${interaction.user.id}-temp`;
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
         return;
     }
 
