@@ -192,12 +192,22 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await interaction.update({ content: "Event not found.", components: [] });
         return;
       }
+
+      // --- Poprawka: użycie pierwszego elementu tablicy ---
       const config = await EventService.getConfig(guild.id);
-      const channel = guild.channels.cache.get(config.notificationChannel ?? "") as TextChannel;
-      if (!channel || !channel.isTextBased()) {
+      const channelId = config.notificationChannel?.[0];
+      if (!channelId) {
+        await interaction.update({ content: "Notification channel not set.", components: [] });
+        return;
+      }
+
+      const rawChannel = guild.channels.cache.get(channelId);
+      if (!rawChannel || !rawChannel.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
         return;
       }
+
+      const channel = rawChannel as TextChannel;
       await sendReminderMessage(channel, event);
       await interaction.update({ content: `Manual reminder sent for **${event.name}**`, components: [] });
     }
