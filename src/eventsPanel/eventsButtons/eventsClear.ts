@@ -57,7 +57,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
 
   const eventName = event.name;
 
-  // Usuń event permanentnie z arkusza i cache
+  // Usuń event permanentnie z arkusza
   await deleteEvent(guildId, eventId);
 
   clearEventStore.delete(interaction.user.id);
