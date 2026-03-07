@@ -5,7 +5,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuInteraction
 } from "discord.js";
-import { getConfig, setConfig } from "../eventService";
+import { setConfig, getConfig } from "../eventService";
 
 /**
  * Handler przycisku „Settings” – tworzy dwa select menu dla kanałów
@@ -13,7 +13,10 @@ import { getConfig, setConfig } from "../eventService";
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  const channels = interaction.guild!.channels.cache
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const channels = guild.channels.cache
     .filter(c => c.isTextBased())
     .map(c => ({ label: c.name, value: c.id }));
 
@@ -43,28 +46,38 @@ export async function handleSettings(interaction: Interaction) {
 }
 
 /**
- * Handler select menu – zapisuje wybrany kanał w config
+ * Handler select menu – zapisuje wybrany kanał w arkuszu
  */
 export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
-  if (!interaction.guildId) return;
-
   const guildId = interaction.guildId;
+  if (!guildId) return;
+
   const selectedChannelId = interaction.values[0];
   if (!selectedChannelId) {
     await interaction.reply({ content: "No channel selected.", ephemeral: true });
     return;
   }
 
-  if (interaction.customId === "event_settings_notification") {
-    await setConfig(guildId, "notificationChannel", selectedChannelId);
+  try {
+    if (interaction.customId === "event_settings_notification") {
+      await setConfig(guildId, "notificationChannel", selectedChannelId);
+      await interaction.reply({
+        content: `Notification channel set to <#${selectedChannelId}>.`,
+        ephemeral: true
+      });
+    } else if (interaction.customId === "event_settings_download") {
+      await setConfig(guildId, "downloadChannel", selectedChannelId);
+      await interaction.reply({
+        content: `Download channel set to <#${selectedChannelId}>.`,
+        ephemeral: true
+      });
+    } else {
+      await interaction.reply({ content: "Unknown selection.", ephemeral: true });
+    }
+  } catch (err) {
+    console.error("Error saving channel to sheet:", err);
     await interaction.reply({
-      content: `Notification channel set to <#${selectedChannelId}>.`,
-      ephemeral: true
-    });
-  } else if (interaction.customId === "event_settings_download") {
-    await setConfig(guildId, "downloadChannel", selectedChannelId);
-    await interaction.reply({
-      content: `Download channel set to <#${selectedChannelId}>.`,
+      content: "Failed to save channel. Please try again later.",
       ephemeral: true
     });
   }
