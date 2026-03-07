@@ -33,13 +33,10 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  // ⚠️ Zapisujemy całą listę do cache + arkusz tylko jeśli lista jest kompletna
+  // zapisujemy całą listę w arkuszu bez cache
   await GS.saveEvents(guildId, events);
 }
 
-// --------------------------
-// CREATE / CANCEL / FIND
-// --------------------------
 export async function createEvent(data: {
   guildId: string;
   name: string;
@@ -61,33 +58,12 @@ export async function createEvent(data: {
     started: false,
   };
 
-  // zapisujemy tylko nowy event w arkuszu, nie całą listę
-  await saveEventToSheets(newEvent);
-
-  // aktualizacja cache: pobieramy istniejące, dodajemy nowy
+  // zapis nowego eventu w arkuszu
   const events = await getEvents(data.guildId);
   events.push(newEvent);
-  await GS.saveEvents(data.guildId, events); // zapis cache + lista w arkuszu
+  await saveEvents(data.guildId, events);
 
   return newEvent;
-}
-
-export async function saveEventToSheets(event: EventObject) {
-  const existingEvent = await GS.getEventById(event.guildId, event.id);
-  if (existingEvent) {
-    // aktualizacja w arkuszu tylko tego eventu
-    const events = await getEvents(event.guildId);
-    const index = events.findIndex(e => e.id === event.id);
-    if (index !== -1) {
-      events[index] = event;
-      await GS.saveEvents(event.guildId, events); // zapis całej listy w arkuszu
-    }
-  } else {
-    // zapis nowego eventu w arkuszu
-    const events = await getEvents(event.guildId);
-    events.push(event);
-    await GS.saveEvents(event.guildId, events);
-  }
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -99,9 +75,14 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
+
   event.status = "CANCELED";
-  await saveEventToSheets(event); // aktualizacja tylko tego eventu
+  await saveEvents(guildId, events);
   return event;
+}
+
+export async function deleteEvent(guildId: string, eventId: string) {
+  await GS.deleteEvent(guildId, eventId);
 }
 
 // --------------------------
