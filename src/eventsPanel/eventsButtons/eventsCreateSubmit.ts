@@ -92,7 +92,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
-    const tempKey = `${interaction.user.id}-temp`;
+    const tempKey = interaction.user.id;
 
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
 
@@ -129,13 +129,14 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         year: year ?? eventDateUTC.getUTCFullYear()
     });
 
-    await showReminderSelect(interaction, tempKey);
+    await showReminderSelect(interaction);
 }
 
 export async function showReminderSelect(
-    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction,
-    tempKey: string
+    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction
 ) {
+
+    const tempKey = interaction.user.id;
 
     const tempData = tempEventStore.get(tempKey);
 
@@ -165,7 +166,7 @@ export async function showReminderSelect(
     ];
 
     const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`reminder_select_${tempKey}`)
+        .setCustomId("reminder_select")
         .setPlaceholder("Set reminder before event (optional)")
         .addOptions(options);
 
@@ -180,7 +181,7 @@ export async function showReminderSelect(
 
 export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
 
-    const tempKey = interaction.customId.replace("reminder_select_", "");
+    const tempKey = interaction.user.id;
 
     const tempData = tempEventStore.get(tempKey);
 
@@ -243,7 +244,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
 
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
 
-    const tempKey = `${interaction.user.id}-temp`;
+    const tempKey = interaction.user.id;
 
     const tempData = tempEventStore.get(tempKey);
 
@@ -259,5 +260,5 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
 
     tempData.year = new Date().getUTCFullYear() + 1;
 
-    await showReminderSelect(interaction, tempKey);
+    await showReminderSelect(interaction);
 }
