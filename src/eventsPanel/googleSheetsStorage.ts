@@ -1,4 +1,3 @@
-// src/eventsPanel/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID as string;
@@ -16,13 +15,16 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
-// simple cache
+// cache
 let configCache: Record<string, any> | null = null;
 let lastFetch = 0;
 const CACHE_TTL = 30 * 1000;
 
 async function readSheet(tab: string) {
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: tab });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: tab,
+  });
   return res.data.values || [];
 }
 
@@ -37,7 +39,10 @@ async function writeSheet(tab: string, values: any[][]) {
 
 export async function getConfig(guildId: string) {
   const now = Date.now();
-  if (configCache && now - lastFetch < CACHE_TTL) return configCache[guildId] || {};
+
+  if (configCache && now - lastFetch < CACHE_TTL) {
+    return configCache[guildId] || {};
+  }
 
   const rows = await readSheet(CONFIG_TAB);
   const headers = rows[0] || [];
@@ -47,9 +52,11 @@ export async function getConfig(guildId: string) {
 
   for (const row of data) {
     const obj: any = {};
+
     headers.forEach((h: string, i: number) => {
       obj[h] = row[i] !== undefined && row[i] !== "" ? String(row[i]).trim() : null;
     });
+
     if (obj.guildId) map[obj.guildId] = obj;
   }
 
@@ -66,9 +73,11 @@ export async function setConfig(guildId: string, key: string, value: string) {
 
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
+
   if (keyIndex === -1) throw new Error(`Column ${key} not found`);
 
   let rowIndex = data.findIndex(r => r[guildIndex] === guildId);
+
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
@@ -79,9 +88,10 @@ export async function setConfig(guildId: string, key: string, value: string) {
   }
 
   await writeSheet(CONFIG_TAB, [headers, ...data]);
+
   configCache = null;
 }
 
 export function isConfigured(config: any) {
-  return Boolean(config?.notificationChannel && config?.downloadChannel);
+  return Boolean(config?.notificationChannelId && config?.downloadChannelId);
 }
