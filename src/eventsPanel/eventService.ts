@@ -1,6 +1,7 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
 import * as GS from "../googleSheetsStorage";
+import { v4 as uuidv4 } from "uuid";
 
 export interface EventObject {
   id: string;
@@ -21,8 +22,8 @@ export interface EventObject {
 }
 
 export interface EventConfig {
-  notificationChannel?: string[];
-  downloadChannel?: string[];
+  notificationChannel?: string;
+  downloadChannel?: string;
   [key: string]: any;
 }
 
@@ -135,7 +136,7 @@ export async function createEvent(data: {
   reminderBefore?: number;
 }): Promise<EventObject> {
   const newEvent: EventObject = {
-    id: `${Date.now()}`,
+    id: `${uuidv4()}-${Date.now()}`, // unikalne ID
     ...data,
     status: "ACTIVE",
     participants: [],
@@ -193,11 +194,7 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
   headers.forEach((h, i) => {
     if (h === "notificationChannel" || h === "downloadChannel") {
-      try {
-        obj[h] = row[i] ? JSON.parse(row[i]) : [];
-      } catch {
-        obj[h] = [];
-      }
+      obj[h] = row[i] ?? null; // teraz tylko pojedynczy ID
     } else {
       obj[h] = row[i] ?? null;
     }
@@ -211,7 +208,6 @@ async function saveConfig(guildId: string, key: string, value: any) {
   let headers = rows[0] || [];
   let dataRows = rows.slice(1);
 
-  // jeśli kolumna nie istnieje, dodajemy ją
   if (!headers.includes(key)) {
     headers.push(key);
     dataRows = dataRows.map(r => {
@@ -223,13 +219,15 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   let rowIndex = dataRows.findIndex(r => r[guildIndex] === guildId);
 
+  const valueToSave = typeof value === "object" ? value[0] : value; // tylko pojedynczy ID
+
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
-    newRow[headers.indexOf(key)] = typeof value === "object" ? JSON.stringify(value) : value;
+    newRow[headers.indexOf(key)] = valueToSave;
     dataRows.push(newRow);
   } else {
-    dataRows[rowIndex][headers.indexOf(key)] = typeof value === "object" ? JSON.stringify(value) : value;
+    dataRows[rowIndex][headers.indexOf(key)] = valueToSave;
   }
 
   await GS.writeConfigSheet([headers, ...dataRows]);
@@ -247,15 +245,11 @@ export async function setConfig(guildId: string, key: string, value: any) {
 // CHANNEL HELPERS
 // --------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.notificationChannel = [channelId];
-  await setConfig(guildId, "notificationChannel", config.notificationChannel);
+  await setConfig(guildId, "notificationChannel", channelId);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.downloadChannel = [channelId];
-  await setConfig(guildId, "downloadChannel", config.downloadChannel);
+  await setConfig(guildId, "downloadChannel", channelId);
 }
 
 // --------------------------
@@ -266,7 +260,7 @@ export async function sendManualReminders(guild: Guild) {
   const events = (await getEvents(guildId)).filter(e => e.status === "ACTIVE");
   const config = await getConfig(guildId);
 
-  const channelId = config.notificationChannel?.[0];
+  const channelId = config.notificationChannel;
   if (!channelId) return;
 
   const rawChannel = guild.channels.cache.get(channelId);
