@@ -79,7 +79,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     }
 
     const { day, month, hour, minute } = parsed;
-    const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
+
+    const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
+    const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
+
     const nowUTC = new Date();
     let eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
@@ -89,6 +92,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
+
         await interaction.reply({
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
             components: [
@@ -105,6 +109,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
             ],
             ephemeral: true
         });
+
         return;
     }
 
@@ -129,8 +134,12 @@ export async function showReminderSelect(
     tempKey: string
 ) {
     const tempData = tempEventStore.get(tempKey);
+
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, {
+            content: "Temporary event data not found.",
+            components: []
+        });
         return;
     }
 
@@ -172,7 +181,10 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, {
+            content: "Temporary event data not found.",
+            components: []
+        });
         return;
     }
 
@@ -192,13 +204,13 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         year: tempData.year!,
         status: "ACTIVE",
         participants: [],
+        absent: [],
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
-    // Zapis całej listy do arkusza
     await saveEvents(tempData.guildId, [...events, newEvent]);
 
     tempEventStore.delete(tempKey);
@@ -221,7 +233,10 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, {
+            content: "Temporary event data not found.",
+            components: []
+        });
         return;
     }
 
