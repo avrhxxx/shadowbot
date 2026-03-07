@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import * as GS from "../googleSheetsStorage"; // poprawiona ścieżka
+import * as GS from "../googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -46,7 +46,7 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
       obj.reminderSent = obj.reminderSent === "true" || obj.reminderSent === true;
       obj.started = obj.started === "true" || obj.started === true;
 
-      return obj;
+      return obj as EventObject;
     })
     .filter(e => e.guildId === guildId);
 }
