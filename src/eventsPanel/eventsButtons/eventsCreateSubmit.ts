@@ -13,6 +13,7 @@ import {
 import { getEvents, saveEvents, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
+import { v4 as uuidv4 } from "uuid";
 
 export type TempEventData = {
     name: string;
@@ -58,6 +59,21 @@ async function safeReply(interaction: any, payload: any) {
 }
 
 // ============================================================
+// GENERATE UNIQUE EVENT ID
+// ============================================================
+function generateEventId(): string {
+    const now = new Date();
+    const datePart =
+        now.getUTCFullYear().toString() +
+        String(now.getUTCMonth() + 1).padStart(2, "0") +
+        String(now.getUTCDate()).padStart(2, "0") +
+        "-" +
+        String(now.getUTCHours()).padStart(2, "0") +
+        String(now.getUTCMinutes()).padStart(2, "0");
+    return `EVT-${datePart}-${uuidv4()}`;
+}
+
+// ============================================================
 // HANDLE CREATE SUBMIT
 // ============================================================
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
@@ -88,7 +104,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     const tempKey = `${interaction.user.id}-temp`;
 
-    // Event w przeszłości, brak roku -> zapytaj o next year
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
 
@@ -112,7 +127,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         return;
     }
 
-    // Normalny przypadek -> zapis do temp store
     tempEventStore.set(tempKey, {
         name,
         day,
@@ -194,7 +208,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     const events: EventObject[] = await getEvents(tempData.guildId);
 
     const newEvent: EventObject = {
-        id: `${Date.now()}`,
+        id: generateEventId(), // <-- now unikalne ID
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -211,7 +225,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
-    await saveEvents(tempData.guildId, [...events, newEvent]);
+    await saveEvents(tempData.guildId, [...events, newEvent]); // przekazanie do serwisu
     tempEventStore.delete(tempKey);
 
     if (interaction.guild) {
