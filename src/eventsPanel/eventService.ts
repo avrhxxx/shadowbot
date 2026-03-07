@@ -1,5 +1,5 @@
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import * as GS from "./googleSheetsStorage";
+import * as GS from "../googleSheetsStorage"; // poprawiona ścieżka
 
 export interface EventObject {
   id: string;
@@ -60,10 +60,9 @@ export async function createEvent(data: {
     started: false,
   };
 
-  // zapis nowego eventu
   const events = await getEvents(data.guildId);
   events.push(newEvent);
-  await GS.saveEvents(data.guildId, events);
+  await saveEvents(data.guildId, events);
 
   return newEvent;
 }
@@ -78,8 +77,20 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
   event.status = "CANCELED";
-  await GS.saveEvents(guildId, events);
+  await saveEvents(guildId, events);
   return event;
+}
+
+// --------------------------
+// DELETE EVENT (PHYSICAL)
+// --------------------------
+export async function deleteEvent(guildId: string, eventId: string) {
+  const events = await getEvents(guildId);
+  const index = events.findIndex(e => e.id === eventId);
+  if (index !== -1) {
+    events.splice(index, 1); // usuwa z tablicy
+    await saveEvents(guildId, events); // zapisuje zmiany do arkusza
+  }
 }
 
 // --------------------------
