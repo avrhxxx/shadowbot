@@ -192,10 +192,9 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* SELECT MENUS */
   if (interaction.isStringSelectMenu()) {
-    // --- POPRAWKA: dopasowanie customId remindera ---
+    // --- POPRAWKA: wywołanie finalizacji remindera tylko z interaction ---
     if (customId.startsWith("reminder_select_")) {
-      const tempKeyFromId = customId.replace("reminder_select_", "");
-      await finalizeEventWithReminder(interaction, tempKeyFromId);
+      await finalizeEventWithReminder(interaction);
       return;
     }
     if (customId.startsWith("compare_select_")) {
