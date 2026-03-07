@@ -5,7 +5,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuInteraction
 } from "discord.js";
-import { getConfig, saveConfig } from "../eventService";
+import { getConfig, setConfig } from "../eventService";
 
 /**
  * Handler przycisku „Settings” – tworzy dwa select menu dla kanałów
@@ -55,19 +55,16 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
     return;
   }
 
-  // Pobieramy konfigurację, zawsze zwracamy obiekt
   const config = await getConfig(guildId) || {};
 
   if (interaction.customId === "event_settings_notification") {
-    config.notificationChannelId = selectedChannelId;
-    await saveConfig(guildId, config);
+    await setConfig(guildId, "notificationChannel", selectedChannelId);
     await interaction.reply({
       content: `Notification channel set to <#${selectedChannelId}>.`,
       ephemeral: true
     });
   } else if (interaction.customId === "event_settings_download") {
-    config.downloadChannelId = selectedChannelId;
-    await saveConfig(guildId, config);
+    await setConfig(guildId, "downloadChannel", selectedChannelId);
     await interaction.reply({
       content: `Download channel set to <#${selectedChannelId}>.`,
       ephemeral: true
