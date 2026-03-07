@@ -7,6 +7,9 @@ const CHECK_INTERVAL = 30_000;
 
 let intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 
+/* ----------------------
+   INIT / STOP REMINDERS
+----------------------- */
 export async function initEventReminders(guild: Guild) {
   if (intervalHandles.has(guild.id)) return;
 
@@ -25,10 +28,22 @@ export function stopEventReminders(guildId: string) {
   }
 }
 
+/* ----------------------
+   CHECK EVENTS
+----------------------- */
 async function checkEvents(guild: Guild) {
   const events = await getEvents(guild.id);
   const now = Date.now();
   let changed = false;
+
+  const config = await getConfig(guild.id);
+  const channelId = config.notificationChannel;
+  if (!channelId) return;
+
+  const rawChannel = guild.channels.cache.get(channelId);
+  if (!rawChannel || !rawChannel.isTextBased()) return;
+
+  const channel = rawChannel as TextChannel;
 
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
@@ -42,37 +57,18 @@ async function checkEvents(guild: Guild) {
     ).getTime();
 
     // reminder
-    if (event.reminderBefore !== undefined) {
-      const reminderTime = eventTime - event.reminderBefore * 60_000;
+    const reminderMinutes = event.reminderBefore ?? 60; // domyślnie 1h
+    const reminderTime = eventTime - reminderMinutes * 60_000;
 
-      if (!event.reminderSent && now >= reminderTime) {
-        const config = await getConfig(guild.id);
-        if (!config?.notificationChannelId) continue;
-
-        const rawChannel = guild.channels.cache.get(config.notificationChannelId);
-        if (!rawChannel || !rawChannel.isTextBased()) continue;
-
-        const channel = rawChannel as TextChannel;
-
-        await sendReminderMessage(channel, event);
-
-        event.reminderSent = true;
-        changed = true;
-      }
+    if (!event.reminderSent && now >= reminderTime) {
+      await sendReminderMessage(channel, event);
+      event.reminderSent = true;
+      changed = true;
     }
 
     // event start
     if (!event.started && now >= eventTime) {
-      const config = await getConfig(guild.id);
-      if (!config?.notificationChannelId) continue;
-
-      const rawChannel = guild.channels.cache.get(config.notificationChannelId);
-      if (!rawChannel || !rawChannel.isTextBased()) continue;
-
-      const channel = rawChannel as TextChannel;
-
       await sendEventStarted(channel, event);
-
       event.started = true;
       event.status = "PAST";
       changed = true;
@@ -84,11 +80,15 @@ async function checkEvents(guild: Guild) {
   }
 }
 
+/* ----------------------
+   NOTIFICATIONS
+----------------------- */
 export async function sendEventCreatedNotification(event: EventObject, guild: Guild) {
   const config = await getConfig(guild.id);
-  if (!config?.notificationChannelId) return;
+  const channelId = config.notificationChannel;
+  if (!channelId) return;
 
-  const rawChannel = guild.channels.cache.get(config.notificationChannelId);
+  const rawChannel = guild.channels.cache.get(channelId);
   if (!rawChannel || !rawChannel.isTextBased()) return;
 
   const channel = rawChannel as TextChannel;
@@ -101,20 +101,17 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
     event.year
   );
 
+  const reminderText =
+    event.reminderBefore !== undefined
+      ? `\nReminder set for ${event.reminderBefore} minutes before event start.`
+      : "\nReminder set for 60 minutes before event start.";
+
   const embed = new EmbedBuilder()
     .setTitle(`🎉 Event Created: ${event.name}`)
-    .setDescription(
-      `Event scheduled for ${eventDateStr}` +
-        (event.reminderBefore !== undefined
-          ? `\nReminder set for ${event.reminderBefore} minutes before event start.`
-          : "\nNo reminder set.")
-    )
+    .setDescription(`Event scheduled for ${eventDateStr}${reminderText}`)
     .setColor("Green");
 
-  await channel.send({
-    content: "@everyone",
-    embeds: [embed]
-  });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
@@ -131,10 +128,7 @@ export async function sendReminderMessage(channel: TextChannel, event: EventObje
     .setDescription(`Event starts on ${eventDateStr}`)
     .setColor("Orange");
 
-  await channel.send({
-    content: "@everyone",
-    embeds: [embed]
-  });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 async function sendEventStarted(channel: TextChannel, event: EventObject) {
@@ -151,8 +145,5 @@ async function sendEventStarted(channel: TextChannel, event: EventObject) {
     .setDescription(`The event scheduled for ${eventDateStr} has just started!`)
     .setColor("Blue");
 
-  await channel.send({
-    content: "@everyone",
-    embeds: [embed]
-  });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
