@@ -10,7 +10,7 @@ export interface EventObject {
   month: number;
   hour: number;
   minute: number;
-  year?: number;
+  year: number;
   reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
@@ -38,15 +38,26 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
 
   return dataRows
     .map(row => {
-      const obj: any = {};
+      const obj: Record<string, any> = {};
       headers.forEach((h, i) => (obj[h] = row[i] ?? null));
 
-      obj.participants = obj.participants ? JSON.parse(obj.participants) : [];
-      obj.absent = obj.absent ? JSON.parse(obj.absent) : [];
-      obj.reminderSent = obj.reminderSent === "true" || obj.reminderSent === true;
-      obj.started = obj.started === "true" || obj.started === true;
-
-      return obj as EventObject;
+      return {
+        id: obj.id,
+        guildId: obj.guildId,
+        name: obj.name,
+        day: Number(obj.day),
+        month: Number(obj.month),
+        hour: Number(obj.hour),
+        minute: Number(obj.minute),
+        year: obj.year ? Number(obj.year) : new Date().getUTCFullYear(),
+        reminderBefore: obj.reminderBefore ? Number(obj.reminderBefore) : undefined,
+        status: obj.status as "ACTIVE" | "PAST" | "CANCELED",
+        participants: obj.participants ? JSON.parse(obj.participants) : [],
+        absent: obj.absent ? JSON.parse(obj.absent) : [],
+        createdAt: Number(obj.createdAt),
+        reminderSent: obj.reminderSent === "true" || obj.reminderSent === true,
+        started: obj.started === "true" || obj.started === true,
+      } as EventObject;
     })
     .filter(e => e.guildId === guildId);
 }
@@ -80,7 +91,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     copy.absent = JSON.stringify(copy.absent || []);
     copy.reminderSent = copy.reminderSent ? "true" : "false";
     copy.started = copy.started ? "true" : "false";
-    return headers.map(h => copy[h] ?? "");
+    return headers.map(h => copy[h as keyof EventObject] ?? "");
   });
 
   await GS.writeEventsSheet([headers, ...otherRows, ...guildRows]);
@@ -116,6 +127,7 @@ export async function createEvent(data: {
     createdAt: Date.now(),
     reminderSent: false,
     started: false,
+    year: data.year ?? new Date().getUTCFullYear(),
   };
 
   const events = await getEvents(data.guildId);
@@ -165,7 +177,11 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
   headers.forEach((h, i) => {
     if (h === "notificationChannel" || h === "downloadChannel") {
-      obj[h] = row[i] ? JSON.parse(row[i]) : [];
+      try {
+        obj[h] = row[i] ? JSON.parse(row[i]) : [];
+      } catch {
+        obj[h] = [];
+      }
     } else {
       obj[h] = row[i] ?? null;
     }
