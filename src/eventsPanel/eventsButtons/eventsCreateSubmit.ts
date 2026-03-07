@@ -10,7 +10,7 @@ import {
     BaseInteraction
 } from "discord.js";
 
-import { getEvents, saveEvents, EventObject, saveEventToSheets } from "../eventService";
+import { getEvents, saveEvents, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
@@ -198,11 +198,8 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
-    // Zapis w pamięci
+    // Zapis całej listy do arkusza
     await saveEvents(tempData.guildId, [...events, newEvent]);
-
-    // Zapis do Google Sheets
-    await saveEventToSheets(newEvent);
 
     tempEventStore.delete(tempKey);
 
