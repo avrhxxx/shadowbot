@@ -21,8 +21,8 @@ export interface EventObject {
 }
 
 export interface EventConfig {
-  notificationChannel: string[];
-  downloadChannel: string[];
+  notificationChannel?: string[];
+  downloadChannel?: string[];
   [key: string]: any;
 }
 
@@ -45,21 +45,13 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
       let absent: string[] = [];
 
       try {
-        participants = Array.isArray(obj.participants)
-          ? obj.participants
-          : obj.participants
-          ? JSON.parse(obj.participants)
-          : [];
+        participants = obj.participants ? JSON.parse(obj.participants) : [];
       } catch {
         participants = [];
       }
 
       try {
-        absent = Array.isArray(obj.absent)
-          ? obj.absent
-          : obj.absent
-          ? JSON.parse(obj.absent)
-          : [];
+        absent = obj.absent ? JSON.parse(obj.absent) : [];
       } catch {
         absent = [];
       }
@@ -78,8 +70,8 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
         participants,
         absent,
         createdAt: Number(obj.createdAt),
-        reminderSent: Boolean(obj.reminderSent),
-        started: Boolean(obj.started),
+        reminderSent: obj.reminderSent === "true" || obj.reminderSent === true,
+        started: obj.started === "true" || obj.started === true,
       } as EventObject;
     })
     .filter(e => e.guildId === guildId);
@@ -112,6 +104,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
+    // TS-friendly: boolean -> string przy zapisie
     copy.reminderSent = copy.reminderSent ? "true" : "false";
     copy.started = copy.started ? "true" : "false";
     return headers.map(h => copy[h as keyof EventObject] ?? "");
@@ -187,21 +180,21 @@ export async function deleteEvent(guildId: string, eventId: string) {
 // --------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
-  if (rows.length === 0) return { notificationChannel: [], downloadChannel: [] };
+  if (rows.length === 0) return {};
 
   const headers = rows[0];
   const dataRows = rows.slice(1);
-  const obj: EventConfig = { notificationChannel: [], downloadChannel: [] };
+  const obj: any = {};
   const guildIndex = headers.indexOf("guildId");
-  if (guildIndex === -1) return obj;
+  if (guildIndex === -1) return {};
 
   const row = dataRows.find(r => r[guildIndex] === guildId);
-  if (!row) return obj;
+  if (!row) return {};
 
   headers.forEach((h, i) => {
     if (h === "notificationChannel" || h === "downloadChannel") {
       try {
-        obj[h] = row[i] ? JSON.parse(row[i]) : [];
+        obj[h] = Array.isArray(row[i]) ? row[i] : JSON.parse(row[i] ?? "[]");
       } catch {
         obj[h] = [];
       }
@@ -227,10 +220,10 @@ async function saveConfig(guildId: string, key: string, value: any) {
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
-    newRow[keyIndex] = typeof value === "object" ? JSON.stringify(value) : value;
+    newRow[keyIndex] = Array.isArray(value) ? JSON.stringify(value) : value;
     dataRows.push(newRow);
   } else {
-    dataRows[rowIndex][keyIndex] = typeof value === "object" ? JSON.stringify(value) : value;
+    dataRows[rowIndex][keyIndex] = Array.isArray(value) ? JSON.stringify(value) : value;
   }
 
   await GS.writeConfigSheet([headers, ...dataRows]);
@@ -248,15 +241,13 @@ export async function setConfig(guildId: string, key: string, value: any) {
 // CHANNEL HELPERS
 // --------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.notificationChannel = [channelId];
-  await setConfig(guildId, "notificationChannel", config.notificationChannel);
+  // Poprawnie zapisujemy string w tablicy
+  await setConfig(guildId, "notificationChannel", [channelId]);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await getConfig(guildId);
-  config.downloadChannel = [channelId];
-  await setConfig(guildId, "downloadChannel", config.downloadChannel);
+  // Poprawnie zapisujemy string w tablicy
+  await setConfig(guildId, "downloadChannel", [channelId]);
 }
 
 // --------------------------
