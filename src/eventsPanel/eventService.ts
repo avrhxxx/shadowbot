@@ -21,8 +21,8 @@ export interface EventObject {
 }
 
 export interface EventConfig {
-  notificationChannel?: string[];
-  downloadChannel?: string[];
+  notificationChannel: string[];
+  downloadChannel: string[];
   [key: string]: any;
 }
 
@@ -45,13 +45,21 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
       let absent: string[] = [];
 
       try {
-        participants = obj.participants ? JSON.parse(obj.participants) : [];
+        participants = Array.isArray(obj.participants)
+          ? obj.participants
+          : obj.participants
+          ? JSON.parse(obj.participants)
+          : [];
       } catch {
         participants = [];
       }
 
       try {
-        absent = obj.absent ? JSON.parse(obj.absent) : [];
+        absent = Array.isArray(obj.absent)
+          ? obj.absent
+          : obj.absent
+          ? JSON.parse(obj.absent)
+          : [];
       } catch {
         absent = [];
       }
@@ -70,8 +78,8 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
         participants,
         absent,
         createdAt: Number(obj.createdAt),
-        reminderSent: obj.reminderSent === "true" || obj.reminderSent === true,
-        started: obj.started === "true" || obj.started === true,
+        reminderSent: Boolean(obj.reminderSent),
+        started: Boolean(obj.started),
       } as EventObject;
     })
     .filter(e => e.guildId === guildId);
@@ -179,16 +187,16 @@ export async function deleteEvent(guildId: string, eventId: string) {
 // --------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
-  if (rows.length === 0) return {};
+  if (rows.length === 0) return { notificationChannel: [], downloadChannel: [] };
 
   const headers = rows[0];
   const dataRows = rows.slice(1);
-  const obj: any = {};
+  const obj: EventConfig = { notificationChannel: [], downloadChannel: [] };
   const guildIndex = headers.indexOf("guildId");
-  if (guildIndex === -1) return {};
+  if (guildIndex === -1) return obj;
 
   const row = dataRows.find(r => r[guildIndex] === guildId);
-  if (!row) return {};
+  if (!row) return obj;
 
   headers.forEach((h, i) => {
     if (h === "notificationChannel" || h === "downloadChannel") {
