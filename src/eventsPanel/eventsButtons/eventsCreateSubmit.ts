@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import {
     ModalSubmitInteraction,
     ActionRowBuilder,
@@ -9,7 +10,7 @@ import {
     BaseInteraction
 } from "discord.js";
 
-import { getEvents, saveEvents, EventObject } from "../eventService";
+import { getEvents, saveEvents, EventObject, saveEventToSheets } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
@@ -26,9 +27,7 @@ export type TempEventData = {
 export const tempEventStore = new Map<string, TempEventData>();
 
 function parseEventDateTime(input: string) {
-
     const match = input.trim().match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
-
     if (!match) return null;
 
     const day = parseInt(match[1], 10);
@@ -45,27 +44,24 @@ function canReply(interaction: BaseInteraction): interaction is
     | ModalSubmitInteraction
     | ButtonInteraction
     | StringSelectMenuInteraction {
-
     return "reply" in interaction;
 }
 
 async function safeReply(interaction: any, payload: any) {
-
     if (interaction.replied || interaction.deferred) {
         return interaction.editReply(payload);
     }
-
     if ("update" in interaction && typeof interaction.update === "function") {
         return interaction.update(payload);
     }
-
     return interaction.reply(payload);
 }
 
+// ============================================================
+// HANDLE CREATE SUBMIT
+// ============================================================
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
-
     const guildId = interaction.guildId!;
-
     const name = interaction.fields.getTextInputValue("event_name");
     const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
     const yearRaw = interaction.fields.getTextInputValue("event_year");
@@ -83,11 +79,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     }
 
     const { day, month, hour, minute } = parsed;
-
     const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
-
     const nowUTC = new Date();
-
     let eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
@@ -95,9 +88,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const tempKey = interaction.user.id;
 
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-
         tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
-
         await interaction.reply({
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
             components: [
@@ -106,7 +97,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                         .setCustomId("next_year_yes")
                         .setLabel("Yes")
                         .setStyle(ButtonStyle.Success),
-
                     new ButtonBuilder()
                         .setCustomId("next_year_no")
                         .setLabel("No")
@@ -115,7 +105,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
             ],
             ephemeral: true
         });
-
         return;
     }
 
@@ -129,22 +118,19 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         year: year ?? eventDateUTC.getUTCFullYear()
     });
 
-    await showReminderSelect(interaction);
+    await showReminderSelect(interaction, tempKey);
 }
 
+// ============================================================
+// SHOW REMINDER SELECT
+// ============================================================
 export async function showReminderSelect(
-    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction
+    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction,
+    tempKey: string
 ) {
-
-    const tempKey = interaction.user.id;
-
     const tempData = tempEventStore.get(tempKey);
-
     if (!tempData) {
-        await safeReply(interaction, {
-            content: "Temporary event data not found.",
-            components: []
-        });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
         return;
     }
 
@@ -170,8 +156,7 @@ export async function showReminderSelect(
         .setPlaceholder("Set reminder before event (optional)")
         .addOptions(options);
 
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-        .addComponents(selectMenu);
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
     await safeReply(interaction, {
         content: `Event **${tempData.name}** created. Please select a reminder time:`,
@@ -179,56 +164,45 @@ export async function showReminderSelect(
     });
 }
 
+// ============================================================
+// FINALIZE EVENT WITH REMINDER
+// ============================================================
 export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
-
     const tempKey = interaction.user.id;
-
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
-        await safeReply(interaction, {
-            content: "Temporary event data not found.",
-            components: []
-        });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
         return;
     }
 
     const reminderValue = parseInt(interaction.values[0], 10);
-
     const reminderBefore = reminderValue > 0 ? reminderValue : undefined;
 
     const events: EventObject[] = await getEvents(tempData.guildId);
 
     const newEvent: EventObject = {
-
         id: `${Date.now()}`,
-
         guildId: tempData.guildId,
-
         name: tempData.name,
-
         day: tempData.day,
         month: tempData.month,
-
         hour: tempData.hour,
         minute: tempData.minute,
-
         year: tempData.year!,
-
         status: "ACTIVE",
-
         participants: [],
-
         createdAt: Date.now(),
-
         reminderSent: false,
-
         started: false,
-
         ...(reminderBefore !== undefined && { reminderBefore })
     };
 
+    // Zapis w pamięci
     await saveEvents(tempData.guildId, [...events, newEvent]);
+
+    // Zapis do Google Sheets
+    await saveEventToSheets(newEvent);
 
     tempEventStore.delete(tempKey);
 
@@ -242,23 +216,18 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     });
 }
 
+// ============================================================
+// FINALIZE NEXT YEAR EVENT
+// ============================================================
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-
     const tempKey = interaction.user.id;
-
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
-
-        await safeReply(interaction, {
-            content: "Temporary event data not found.",
-            components: []
-        });
-
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
         return;
     }
 
     tempData.year = new Date().getUTCFullYear() + 1;
-
-    await showReminderSelect(interaction);
+    await showReminderSelect(interaction, tempKey);
 }
