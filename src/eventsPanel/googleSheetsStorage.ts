@@ -17,15 +17,6 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: "v4", auth });
 
 // --------------------------
-// CACHE
-// --------------------------
-let eventsCache: Record<string, any[]> = {};
-let configCache: Record<string, any> = {};
-let lastEventsFetch = 0;
-let lastConfigFetch = 0;
-const CACHE_TTL = 30 * 1000;
-
-// --------------------------
 // UTILS
 // --------------------------
 async function readSheet(tab: string) {
@@ -49,33 +40,19 @@ async function writeSheet(tab: string, values: any[][]) {
 // EVENTS STORAGE
 // --------------------------
 export async function getEvents(guildId: string) {
-  const now = Date.now();
-  if (eventsCache[guildId] && now - lastEventsFetch < CACHE_TTL) return eventsCache[guildId];
-
   const rows = await readSheet(EVENTS_TAB);
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  const events: any[] = data
+  return data
     .map(row => {
       const obj: any = {};
-      headers.forEach((h, i) => {
-        obj[h] = row[i] !== undefined && row[i] !== "" ? row[i] : null;
-      });
-      if (obj.participants) {
-        try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; }
-      }
-      if (obj.absent) {
-        try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; }
-      }
+      headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
+      if (obj.participants) { try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; } }
+      if (obj.absent) { try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; } }
       return obj;
     })
     .filter(e => e.guildId === guildId);
-
-  eventsCache[guildId] = events;
-  lastEventsFetch = now;
-
-  return events;
 }
 
 export async function saveEvents(guildId: string, events: any[]) {
@@ -85,49 +62,36 @@ export async function saveEvents(guildId: string, events: any[]) {
     "status","participants","absent","createdAt","reminderSent","started"
   ];
 
-  // Zachowujemy wiersze dla innych guildId
+  // zachowujemy inne guildId
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
-  // Zamieniamy eventy guildId na wiersze
-  const guildEvents = events.map(e => {
+  const guildRows = events.map(e => {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
     return headers.map(h => copy[h] ?? "");
   });
 
-  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...guildEvents]);
-
-  eventsCache[guildId] = events;
+  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...guildRows]);
 }
 
 // --------------------------
-// DELETE SINGLE EVENT BY ID
+// DELETE SINGLE EVENT
 // --------------------------
 export async function deleteEvent(guildId: string, eventId: string) {
   const rows = await readSheet(EVENTS_TAB);
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  // filtrujemy tylko event o tym ID dla tego guildId
-  const filteredRows = data.filter(row => !(row[1] === guildId && row[0] === eventId));
+  const filteredRows = data.filter(r => !(r[1] === guildId && r[0] === eventId));
 
-  // zapisujemy wszystkie pozostałe wiersze z powrotem
   await writeSheet(EVENTS_TAB, [headers, ...filteredRows]);
-
-  // aktualizacja cache
-  if (eventsCache[guildId]) {
-    eventsCache[guildId] = eventsCache[guildId].filter(e => e.id !== eventId);
-  }
 }
 
 // --------------------------
 // CONFIG STORAGE
 // --------------------------
 export async function getConfig(guildId: string) {
-  const now = Date.now();
-  if (configCache[guildId] && now - lastConfigFetch < CACHE_TTL) return configCache[guildId];
-
   const rows = await readSheet(CONFIG_TAB);
   const headers = rows[0] || [];
   const data = rows.slice(1);
@@ -139,9 +103,6 @@ export async function getConfig(guildId: string) {
     if (obj.guildId) map[obj.guildId] = obj;
   }
 
-  configCache = map;
-  lastConfigFetch = now;
-
   return map[guildId] || {};
 }
 
@@ -152,7 +113,6 @@ export async function setConfig(guildId: string, key: string, value: string) {
 
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
-
   if (keyIndex === -1) throw new Error(`Column ${key} not found: ${key}`);
 
   let rowIndex = data.findIndex(r => r[guildIndex] === guildId);
@@ -166,8 +126,6 @@ export async function setConfig(guildId: string, key: string, value: string) {
   }
 
   await writeSheet(CONFIG_TAB, [headers, ...data]);
-
-  configCache = {};
 }
 
 // --------------------------
