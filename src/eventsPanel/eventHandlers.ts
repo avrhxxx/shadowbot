@@ -1,3 +1,4 @@
+// src/eventsPanel/eventHandlers.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -10,16 +11,39 @@ import {
 import * as EventService from "./eventService";
 
 import { handleCreate } from "./eventsButtons/eventsCreate";
-import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, showReminderSelect } from "./eventsButtons/eventsCreateSubmit";
+import {
+  handleCreateSubmit,
+  tempEventStore,
+  finalizeEventWithReminder,
+  showReminderSelect,
+} from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
 
-import { handleCancel, handleCancelSelect, handleCancelConfirm, handleCancelAbort } from "./eventsButtons/eventsCancel";
+import {
+  handleCancel,
+  handleCancelSelect,
+  handleCancelConfirm,
+  handleCancelAbort,
+} from "./eventsButtons/eventsCancel";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
 import { handleHelp } from "./eventsButtons/eventsHelp";
-import { handleCompareButton, handleCompareSelect, handleCompareDownload, handleCompareAll, handleCompareAllDownload } from "./eventsButtons/eventsCompare";
+import {
+  handleCompareButton,
+  handleCompareSelect,
+  handleCompareDownload,
+  handleCompareAll,
+  handleCompareAllDownload,
+} from "./eventsButtons/eventsCompare";
 import { handleShowAllEvents, handleShowAllLists } from "./eventsButtons/eventsShowAll";
-import { handleAddParticipant, handleRemoveParticipant, handleAbsentParticipant, handleAddParticipantSubmit, handleRemoveParticipantSubmit, handleAbsentParticipantSubmit } from "./eventsButtons/eventsParticipants";
+import {
+  handleAddParticipant,
+  handleRemoveParticipant,
+  handleAbsentParticipant,
+  handleAddParticipantSubmit,
+  handleRemoveParticipantSubmit,
+  handleAbsentParticipantSubmit,
+} from "./eventsButtons/eventsParticipants";
 import { sendReminderMessage } from "./eventsButtons/eventsReminder";
 import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort } from "./eventsButtons/eventsClear";
 
@@ -168,8 +192,10 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
 
   /* SELECT MENUS */
   if (interaction.isStringSelectMenu()) {
+    // --- POPRAWKA: dopasowanie customId remindera ---
     if (customId.startsWith("reminder_select_")) {
-      await finalizeEventWithReminder(interaction);
+      const tempKeyFromId = customId.replace("reminder_select_", "");
+      await finalizeEventWithReminder(interaction, tempKeyFromId);
       return;
     }
     if (customId.startsWith("compare_select_")) {
@@ -193,7 +219,6 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         return;
       }
 
-      // --- Poprawka: użycie pierwszego elementu tablicy ---
       const config = await EventService.getConfig(guild.id);
       const channelId = config.notificationChannel?.[0];
       if (!channelId) {
