@@ -44,15 +44,23 @@ export async function getEvents(guildId: string) {
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  return data
+  const events: any[] = data
     .map(row => {
       const obj: any = {};
-      headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
-      if (obj.participants) { try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; } }
-      if (obj.absent) { try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; } }
+      headers.forEach((h, i) => {
+        obj[h] = row[i] !== undefined && row[i] !== "" ? row[i] : null;
+      });
+      if (obj.participants) {
+        try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; }
+      }
+      if (obj.absent) {
+        try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; }
+      }
       return obj;
     })
     .filter(e => e.guildId === guildId);
+
+  return events;
 }
 
 export async function saveEvents(guildId: string, events: any[]) {
@@ -62,28 +70,29 @@ export async function saveEvents(guildId: string, events: any[]) {
     "status","participants","absent","createdAt","reminderSent","started"
   ];
 
-  // zachowujemy inne guildId
+  // Zachowujemy wiersze dla innych guildId
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
-  const guildRows = events.map(e => {
+  const guildEvents = events.map(e => {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
     return headers.map(h => copy[h] ?? "");
   });
 
-  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...guildRows]);
+  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...guildEvents]);
 }
 
 // --------------------------
-// DELETE SINGLE EVENT
+// DELETE SINGLE EVENT BY ID
 // --------------------------
 export async function deleteEvent(guildId: string, eventId: string) {
   const rows = await readSheet(EVENTS_TAB);
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  const filteredRows = data.filter(r => !(r[1] === guildId && r[0] === eventId));
+  // usuwamy dokładnie ten event
+  const filteredRows = data.filter(row => !(row[1] === guildId && row[0] === eventId));
 
   await writeSheet(EVENTS_TAB, [headers, ...filteredRows]);
 }
@@ -113,6 +122,7 @@ export async function setConfig(guildId: string, key: string, value: string) {
 
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
+
   if (keyIndex === -1) throw new Error(`Column ${key} not found: ${key}`);
 
   let rowIndex = data.findIndex(r => r[guildIndex] === guildId);
