@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
-import * as GS from "../googleSheetsStorage"; // poprawiona ścieżka
+import * as GS from "../googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -14,7 +14,7 @@ export interface EventObject {
   reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
-  absent?: string[];
+  absent: string[];
   createdAt: number;
   reminderSent?: boolean;
   started?: boolean;
@@ -39,15 +39,20 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
   return dataRows
     .map(row => {
       const obj: any = {};
-      headers.forEach((h, i) => {
-        obj[h] = row[i] ?? null;
-      });
-      if (obj.participants) {
-        try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; }
-      }
-      if (obj.absent) {
-        try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; }
-      }
+      headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
+
+      obj.participants = obj.participants ? JSON.parse(obj.participants) : [];
+      obj.absent = obj.absent ? JSON.parse(obj.absent) : [];
+      obj.day = Number(obj.day);
+      obj.month = Number(obj.month);
+      obj.hour = Number(obj.hour);
+      obj.minute = Number(obj.minute);
+      obj.year = obj.year ? Number(obj.year) : undefined;
+      obj.reminderBefore = obj.reminderBefore ? Number(obj.reminderBefore) : undefined;
+      obj.createdAt = Number(obj.createdAt);
+      obj.reminderSent = obj.reminderSent === "true" || obj.reminderSent === true;
+      obj.started = obj.started === "true" || obj.started === true;
+
       return obj;
     })
     .filter(e => e.guildId === guildId);
@@ -66,7 +71,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
-    return headers.map(h => copy[h] ?? "");
+    return headers.map(h => (copy as any)[h] ?? "");
   });
 
   await GS.writeEventsSheet([headers, ...otherRows, ...guildRows]);
@@ -142,14 +147,13 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
   const headers = rows[0];
   const dataRows = rows.slice(1);
-
-  const obj: any = {};
   const guildIndex = headers.indexOf("guildId");
   if (guildIndex === -1) return {};
 
   const row = dataRows.find(r => r[guildIndex] === guildId);
   if (!row) return {};
 
+  const obj: any = {};
   headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
   return obj;
 }
@@ -197,6 +201,29 @@ export async function setDownloadChannel(guildId: string, channelId: string) {
   const config = await getConfig(guildId);
   config.downloadChannel = channelId;
   await setConfig(guildId, "downloadChannel", channelId);
+}
+
+// --------------------------
+// PARTICIPANTS HELPERS
+// --------------------------
+export async function addParticipants(guildId: string, eventId: string, users: string | string[]) {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) return;
+
+  const newUsers = Array.isArray(users) ? users : [users];
+  event.participants = Array.from(new Set([...(event.participants || []), ...newUsers]));
+  await saveEvents(guildId, events);
+}
+
+export async function removeParticipants(guildId: string, eventId: string, users: string | string[]) {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+  if (!event) return;
+
+  const removeUsers = Array.isArray(users) ? users : [users];
+  event.participants = (event.participants || []).filter(u => !removeUsers.includes(u));
+  await saveEvents(guildId, events);
 }
 
 // --------------------------
