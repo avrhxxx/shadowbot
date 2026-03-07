@@ -5,7 +5,6 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   TextChannel,
-  Guild
 } from "discord.js";
 
 import * as EventService from "./eventService";
@@ -13,6 +12,7 @@ import * as EventService from "./eventService";
 import { handleCreate } from "./eventsButtons/eventsCreate";
 import { handleCreateSubmit, tempEventStore, finalizeEventWithReminder, showReminderSelect } from "./eventsButtons/eventsCreateSubmit";
 import { handleList, handleShowList } from "./eventsButtons/eventsList";
+
 import { handleCancel, handleCancelSelect, handleCancelConfirm, handleCancelAbort } from "./eventsButtons/eventsCancel";
 import { handleDownload } from "./eventsButtons/eventsDownload";
 import { handleSettings, handleSettingsSelect } from "./eventsButtons/eventsSettings";
@@ -27,11 +27,9 @@ import { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort 
    EVENT INTERACTION HANDLER
 ======================================================= */
 export async function handleEventInteraction(interaction: Interaction): Promise<void> {
-
   if (!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
 
   const { customId, guild } = interaction;
-
   if (!guild) return;
 
   const tempKey = `${interaction.user.id}-temp`;
@@ -188,14 +186,14 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
     }
     if (customId === "manual_reminder_select") {
       const selectedEventId = interaction.values[0];
-      const events = await EventService.getEvents(interaction.guild!.id);
+      const events = await EventService.getEvents(guild.id);
       const event = events.find(e => e.id === selectedEventId);
       if (!event) {
         await interaction.update({ content: "Event not found.", components: [] });
         return;
       }
-      const config = await EventService.getConfig(interaction.guild!.id);
-      const channel = guild!.channels.cache.get(config.notificationChannel ?? "") as TextChannel;
+      const config = await EventService.getConfig(guild.id);
+      const channel = guild.channels.cache.get(config.notificationChannel ?? "") as TextChannel;
       if (!channel || !channel.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
         return;
