@@ -41,6 +41,21 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
       const obj: Record<string, any> = {};
       headers.forEach((h, i) => (obj[h] = row[i] ?? null));
 
+      let participants: string[] = [];
+      let absent: string[] = [];
+
+      try {
+        participants = obj.participants ? JSON.parse(obj.participants) : [];
+      } catch {
+        participants = [];
+      }
+
+      try {
+        absent = obj.absent ? JSON.parse(obj.absent) : [];
+      } catch {
+        absent = [];
+      }
+
       return {
         id: obj.id,
         guildId: obj.guildId,
@@ -52,8 +67,8 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
         year: obj.year ? Number(obj.year) : new Date().getUTCFullYear(),
         reminderBefore: obj.reminderBefore ? Number(obj.reminderBefore) : undefined,
         status: obj.status as "ACTIVE" | "PAST" | "CANCELED",
-        participants: obj.participants ? JSON.parse(obj.participants) : [],
-        absent: obj.absent ? JSON.parse(obj.absent) : [],
+        participants,
+        absent,
         createdAt: Number(obj.createdAt),
         reminderSent: obj.reminderSent === "true" || obj.reminderSent === true,
         started: obj.started === "true" || obj.started === true,
@@ -200,6 +215,7 @@ async function saveConfig(guildId: string, key: string, value: any) {
   if (keyIndex === -1) throw new Error(`Column ${key} not found: ${key}`);
 
   let rowIndex = dataRows.findIndex(r => r[guildIndex] === guildId);
+
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
@@ -242,17 +258,24 @@ export async function sendManualReminders(guild: Guild) {
   const guildId = guild.id;
   const events = (await getEvents(guildId)).filter(e => e.status === "ACTIVE");
   const config = await getConfig(guildId);
-  if (!config.notificationChannel || config.notificationChannel.length === 0) return;
 
-  const channel = guild.channels.cache.get(config.notificationChannel[0]) as TextChannel;
-  if (!channel?.isTextBased()) return;
+  const channelId = config.notificationChannel?.[0];
+  if (!channelId) return;
+
+  const rawChannel = guild.channels.cache.get(channelId);
+  if (!rawChannel || !rawChannel.isTextBased()) return;
+
+  const channel = rawChannel as TextChannel;
 
   for (const event of events) {
     const embed = new EmbedBuilder()
       .setTitle(`Reminder: ${event.name}`)
       .setDescription(
-        `Event starts on ${event.day}/${event.month}${event.year ? `/${event.year}` : ""} at ${event.hour}:${event.minute}`
+        `Event starts on ${event.day}/${event.month}/${event.year} at ${event.hour}:${event.minute
+          .toString()
+          .padStart(2, "0")}`
       );
+
     await channel.send({ embeds: [embed] });
   }
 }
