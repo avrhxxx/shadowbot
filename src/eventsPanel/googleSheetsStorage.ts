@@ -57,7 +57,7 @@ export async function getEvents(guildId: string) {
   const data = rows.slice(1);
 
   const events: any[] = data
-    .map((row) => {
+    .map(row => {
       const obj: any = {};
       headers.forEach((h, i) => {
         obj[h] = row[i] !== undefined && row[i] !== "" ? row[i] : null;
@@ -70,7 +70,7 @@ export async function getEvents(guildId: string) {
       }
       return obj;
     })
-    .filter((e) => e.guildId === guildId);
+    .filter(e => e.guildId === guildId);
 
   eventsCache[guildId] = events;
   lastEventsFetch = now;
@@ -85,10 +85,10 @@ export async function saveEvents(guildId: string, events: any[]) {
     "status","participants","absent","createdAt","reminderSent","started"
   ];
 
-  // Zachowujemy inne guildId
+  // Zachowujemy wiersze dla innych guildId
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
-  // Zamieniamy eventy na wiersze
+  // Zamieniamy eventy guildId na wiersze
   const guildEvents = events.map(e => {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
@@ -109,15 +109,13 @@ export async function deleteEvent(guildId: string, eventId: string) {
   const headers = rows[0] || [];
   const data = rows.slice(1);
 
-  // Filtrujemy tylko eventy dla tego guildId, ale pomijamy ten o danym ID
+  // filtrujemy tylko event o tym ID dla tego guildId
   const filteredRows = data.filter(row => !(row[1] === guildId && row[0] === eventId));
 
-  // Zachowujemy inne guildy
-  const otherRows = data.filter(row => row[1] !== guildId);
+  // zapisujemy wszystkie pozostałe wiersze z powrotem
+  await writeSheet(EVENTS_TAB, [headers, ...filteredRows]);
 
-  await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...filteredRows]);
-
-  // Aktualizacja cache
+  // aktualizacja cache
   if (eventsCache[guildId]) {
     eventsCache[guildId] = eventsCache[guildId].filter(e => e.id !== eventId);
   }
