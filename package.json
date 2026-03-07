@@ -4,7 +4,7 @@
   "description": "Discord bot z przewijalnym embedem tłumaczeń",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && cp -r src/credentials dist/credentials",
+    "build": "tsc",
     "start": "node dist/index.js"
   },
   "engines": {
