@@ -101,9 +101,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
   const guildRows = events.map(e => {
-    // Tworzymy osobny obiekt do zapisu w arkuszu
     const copyForSheet: Record<string, any> = { ...e };
-
     copyForSheet.participants = JSON.stringify(copyForSheet.participants || []);
     copyForSheet.absent = JSON.stringify(copyForSheet.absent || []);
     copyForSheet.reminderSent = copyForSheet.reminderSent ? "true" : "false";
@@ -210,22 +208,28 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
 async function saveConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
-  const headers = rows[0];
-  const dataRows = rows.slice(1);
+  let headers = rows[0] || [];
+  let dataRows = rows.slice(1);
+
+  // jeśli kolumna nie istnieje, dodajemy ją
+  if (!headers.includes(key)) {
+    headers.push(key);
+    dataRows = dataRows.map(r => {
+      while (r.length < headers.length) r.push("");
+      return r;
+    });
+  }
 
   const guildIndex = headers.indexOf("guildId");
-  const keyIndex = headers.indexOf(key);
-  if (keyIndex === -1) throw new Error(`Column ${key} not found: ${key}`);
-
   let rowIndex = dataRows.findIndex(r => r[guildIndex] === guildId);
 
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
-    newRow[keyIndex] = typeof value === "object" ? JSON.stringify(value) : value;
+    newRow[headers.indexOf(key)] = typeof value === "object" ? JSON.stringify(value) : value;
     dataRows.push(newRow);
   } else {
-    dataRows[rowIndex][keyIndex] = typeof value === "object" ? JSON.stringify(value) : value;
+    dataRows[rowIndex][headers.indexOf(key)] = typeof value === "object" ? JSON.stringify(value) : value;
   }
 
   await GS.writeConfigSheet([headers, ...dataRows]);
