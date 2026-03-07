@@ -62,6 +62,10 @@ export async function createEvent(data: {
   };
   events.push(newEvent);
   await saveEvents(data.guildId, events);
+
+  // ✅ zapis do Google Sheets w zakładce Events
+  await saveEventToSheets(newEvent);
+
   return newEvent;
 }
 
@@ -132,4 +136,15 @@ export async function sendManualReminders(guild: Guild) {
       );
     await channel.send({ embeds: [embed] });
   }
+}
+
+// --------------------------
+// GOOGLE SHEETS SAVE
+// --------------------------
+export async function saveEventToSheets(event: EventObject) {
+  // zapisujemy cały obiekt eventu w zakładce "Events"
+  await GS.saveEvents(event.guildId, [
+    ...(await GS.getEvents(event.guildId)),
+    event
+  ]);
 }
