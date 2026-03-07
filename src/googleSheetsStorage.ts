@@ -1,4 +1,3 @@
-// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -40,7 +39,7 @@ async function writeSheet(tab: string, values: any[][]) {
 // --------------------------
 // EVENTS STORAGE
 // --------------------------
-export async function readEventsSheet() {
+export async function readEventsSheet(): Promise<any[][]> {
   return await readSheet(EVENTS_TAB);
 }
 
@@ -51,18 +50,10 @@ export async function writeEventsSheet(values: any[][]) {
 // --------------------------
 // CONFIG STORAGE
 // --------------------------
-export async function readConfigSheet() {
+export async function readConfigSheet(): Promise<any[][]> {
   return await readSheet(EVENTS_CONFIG_TAB);
 }
 
 export async function writeConfigSheet(values: any[][]) {
   await writeSheet(EVENTS_CONFIG_TAB, values);
 }
-
-// --------------------------
-// ALIASY DLA SERWISU (kompatybilność wstecz)
-// --------------------------
-export const getEvents = readEventsSheet;
-export const saveEvents = writeEventsSheet;
-export const getConfig = readConfigSheet;
-export const setConfig = writeConfigSheet;
