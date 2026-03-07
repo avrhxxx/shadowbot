@@ -1,4 +1,3 @@
-// src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
 import { getConfig as gsGetConfig, setConfig as gsSetConfig } from "./googleSheetsStorage";
 
@@ -23,12 +22,8 @@ export interface EventObject {
 export interface EventConfig {
   notificationChannel?: string;
   downloadChannel?: string;
-  [key: string]: any;
 }
 
-// --------------------------
-// LOCAL EVENT STORAGE
-// --------------------------
 const eventsMap: Record<string, EventObject[]> = {};
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
@@ -40,9 +35,6 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
   eventsMap[guildId] = events;
 }
 
-// --------------------------
-// EVENT HELPERS
-// --------------------------
 export async function createEvent(data: {
   guildId: string;
   name: string;
@@ -53,6 +45,7 @@ export async function createEvent(data: {
   year?: number;
   reminderBefore?: number;
 }): Promise<EventObject> {
+
   const events = await getEvents(data.guildId);
 
   const newEvent: EventObject = {
@@ -63,11 +56,12 @@ export async function createEvent(data: {
     absent: [],
     createdAt: Date.now(),
     reminderSent: false,
-    started: false,
+    started: false
   };
 
   events.push(newEvent);
   await saveEvents(data.guildId, events);
+
   return newEvent;
 }
 
@@ -89,16 +83,17 @@ export async function getEventById(guildId: string, eventId: string): Promise<Ev
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
+
   if (!event) return null;
+
   event.status = "CANCELED";
+
   await saveEvents(guildId, events);
+
   return event;
 }
 
-// --------------------------
-// CONFIG HELPERS
-// --------------------------
-export async function getConfig(guildId: string) {
+export async function getConfig(guildId: string): Promise<EventConfig> {
   return await gsGetConfig(guildId);
 }
 
@@ -107,42 +102,57 @@ export async function setConfig(guildId: string, key: string, value: string) {
 }
 
 export async function saveConfig(guildId: string, config: EventConfig) {
+
   for (const key in config) {
-    const value = config[key];
-    if (value !== undefined) await setConfig(guildId, key, String(value));
+
+    const value = config[key as keyof EventConfig];
+
+    if (value !== undefined) {
+      await setConfig(guildId, key, String(value));
+    }
   }
 }
 
 export async function setNotificationChannel(guildId: string, channelId: string) {
+
   const config = await getConfig(guildId);
+
   config.notificationChannel = channelId;
+
   await saveConfig(guildId, config);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
+
   const config = await getConfig(guildId);
+
   config.downloadChannel = channelId;
+
   await saveConfig(guildId, config);
 }
 
-// --------------------------
-// MANUAL REMINDERS
-// --------------------------
 export async function sendManualReminders(guild: Guild) {
+
   const guildId = guild.id;
+
   const events = await getActiveEvents(guildId);
+
   const config = await getConfig(guildId);
+
   if (!config.notificationChannel) return;
 
   const channel = guild.channels.cache.get(config.notificationChannel) as TextChannel;
+
   if (!channel?.isTextBased()) return;
 
   for (const event of events) {
+
     const embed = new EmbedBuilder()
       .setTitle(`Reminder: ${event.name}`)
       .setDescription(
         `Event starts on ${event.day}/${event.month}${event.year ? `/${event.year}` : ""} at ${event.hour}:${event.minute}`
       );
+
     await channel.send({ embeds: [embed] });
   }
 }
