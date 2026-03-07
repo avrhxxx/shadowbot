@@ -61,12 +61,22 @@ export async function createEvent(data: {
     started: false,
   };
   events.push(newEvent);
-  await saveEvents(data.guildId, events);
 
-  // ✅ zapis do Google Sheets w zakładce Events
+  // zapisujemy tylko ten event w arkuszu
   await saveEventToSheets(newEvent);
 
+  // zapis całej listy w cache
+  await saveEvents(data.guildId, events);
+
   return newEvent;
+}
+
+export async function saveEventToSheets(event: EventObject) {
+  const events = await GS.getEvents(event.guildId);
+  const index = events.findIndex(e => e.id === event.id);
+  if (index !== -1) events[index] = event;
+  else events.push(event);
+  await GS.saveEvents(event.guildId, events);
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -80,6 +90,7 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   if (!event) return null;
   event.status = "CANCELED";
   await saveEvents(guildId, events);
+  await saveEventToSheets(event);
   return event;
 }
 
@@ -136,15 +147,4 @@ export async function sendManualReminders(guild: Guild) {
       );
     await channel.send({ embeds: [embed] });
   }
-}
-
-// --------------------------
-// GOOGLE SHEETS SAVE
-// --------------------------
-export async function saveEventToSheets(event: EventObject) {
-  // zapisujemy cały obiekt eventu w zakładce "Events"
-  await GS.saveEvents(event.guildId, [
-    ...(await GS.getEvents(event.guildId)),
-    event
-  ]);
 }
