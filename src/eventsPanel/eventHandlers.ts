@@ -1,4 +1,3 @@
-// src/eventsPanel/eventHandlers.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -195,7 +194,7 @@ export async function handleEventInteraction(interaction: Interaction): Promise<
         await interaction.update({ content: "Event not found.", components: [] });
         return;
       }
-      const config = await EventService.fetchConfig(interaction.guild!.id);
+      const config = await EventService.getConfig(interaction.guild!.id);
       const channel = guild!.channels.cache.get(config.notificationChannel ?? "") as TextChannel;
       if (!channel || !channel.isTextBased()) {
         await interaction.update({ content: "Notification channel invalid.", components: [] });
