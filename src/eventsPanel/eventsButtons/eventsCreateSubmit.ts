@@ -13,7 +13,6 @@ import {
 import { getEvents, saveEvents, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
-import { v4 as uuidv4 } from "uuid";
 
 // -----------------------------------------------------------
 // TEMP DATA TYPE
@@ -27,7 +26,8 @@ export type TempEventData = {
     guildId: string;
     year?: number;
     reminderBefore?: number;
-    notifyOnCreate?: boolean; // flaga do powiadomień przy create
+    notifyOnCreate?: boolean;
+    eventId?: string; // <-- ID generowane w Create some bit
 };
 
 export const tempEventStore = new Map<string, TempEventData>();
@@ -53,25 +53,24 @@ function canReply(interaction: BaseInteraction): interaction is
     return "reply" in interaction;
 }
 
+// -----------------------------------------------------------
+// SAFE REPLY (ephemeral poprawione)
+// -----------------------------------------------------------
 async function safeReply(interaction: any, payload: any) {
-    if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
-    if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
-    return interaction.reply(payload);
-}
+    if (interaction.replied || interaction.deferred) {
+        return interaction.editReply(payload);
+    }
+    if ("update" in interaction && typeof interaction.update === "function") {
+        return interaction.update(payload); // update nie obsługuje ephemeral
+    }
 
-// -----------------------------------------------------------
-// GENERATE EVENT ID
-// -----------------------------------------------------------
-function generateEventId(): string {
-    const now = new Date();
-    const datePart =
-        now.getUTCFullYear().toString() +
-        String(now.getUTCMonth() + 1).padStart(2, "0") +
-        String(now.getUTCDate()).padStart(2, "0") +
-        "-" +
-        String(now.getUTCHours()).padStart(2, "0") +
-        String(now.getUTCMinutes()).padStart(2, "0");
-    return `EVT-${datePart}-${uuidv4()}`;
+    // deprecated ephemeral → flags
+    if (payload.ephemeral) {
+        payload.flags = 64;
+        delete payload.ephemeral;
+    }
+
+    return interaction.reply(payload);
 }
 
 // -----------------------------------------------------------
@@ -111,12 +110,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
                     new ButtonBuilder().setCustomId("next_year_no").setLabel("No").setStyle(ButtonStyle.Danger)
                 )
             ],
-            ephemeral: true
+            flags: 64
         });
         return;
     }
 
-    tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId, year: year ?? eventDateUTC.getUTCFullYear() });
+    // zapisz dane tymczasowe, w tym ID eventu z Create some bit (jeśli istnieje)
+    tempEventStore.set(tempKey, { 
+        name, day, month, hour, minute, guildId, year: year ?? eventDateUTC.getUTCFullYear() 
+    });
     await showReminderSelect(interaction, tempKey);
 }
 
@@ -129,7 +131,7 @@ export async function showReminderSelect(
 ) {
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
@@ -156,7 +158,7 @@ export async function showReminderSelect(
         .addOptions(options);
 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-    await safeReply(interaction, { content: `Event **${tempData.name}** created. Please select a reminder time:`, components: [row] });
+    await safeReply(interaction, { content: `Event **${tempData.name}** created. Please select a reminder time:`, components: [row], ephemeral: true });
 }
 
 // -----------------------------------------------------------
@@ -171,7 +173,7 @@ export async function showCreateNotificationConfirm(
         new ButtonBuilder().setCustomId(`notify_create_no-${tempKey}`).setLabel("No").setStyle(ButtonStyle.Danger)
     );
 
-    await safeReply(interaction, { content: "Do you want to send a notification about creating this event?", components: [row] });
+    await safeReply(interaction, { content: "Do you want to send a notification about creating this event?", components: [row], ephemeral: true });
 }
 
 // -----------------------------------------------------------
@@ -180,13 +182,13 @@ export async function showCreateNotificationConfirm(
 export async function finalizeEvent(interaction: ButtonInteraction | StringSelectMenuInteraction, tempKey: string) {
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
     const events: EventObject[] = await getEvents(tempData.guildId);
     const newEvent: EventObject = {
-        id: generateEventId(),
+        id: tempData.eventId || `${Date.now()}`, // ID z Create some bit albo tymczasowe
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -210,7 +212,7 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
-    await safeReply(interaction, { content: `Event **${newEvent.name}** scheduled successfully.`, components: [] });
+    await safeReply(interaction, { content: `Event **${newEvent.name}** scheduled successfully.`, components: [], ephemeral: true });
 }
 
 // -----------------------------------------------------------
@@ -220,14 +222,13 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     const tempKey = interaction.customId.split("-")[1];
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
     const reminderValue = parseInt(interaction.values[0], 10);
     tempData.reminderBefore = reminderValue > 0 ? reminderValue : undefined;
 
-    // po wybraniu remindera pokazujemy confirm powiadomienia
     await showCreateNotificationConfirm(interaction, tempKey);
 }
 
@@ -238,7 +239,7 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
     const [action, tempKey] = interaction.customId.split("-"); // notify_create_yes / no
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
@@ -253,7 +254,7 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     const tempKey = `${interaction.user.id}-temp`;
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
-        await safeReply(interaction, { content: "Temporary event data not found.", components: [] });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
