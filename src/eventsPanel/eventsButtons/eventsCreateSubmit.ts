@@ -79,17 +79,16 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     }
 
     const { day, month, hour, minute } = parsed;
-
     const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
-
     const nowUTC = new Date();
     let eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
-    const tempKey = interaction.user.id;
+    const tempKey = `${interaction.user.id}-temp`;
 
+    // Event w przeszłości, brak roku -> zapytaj o next year
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
         tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
 
@@ -113,6 +112,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         return;
     }
 
+    // Normalny przypadek -> zapis do temp store
     tempEventStore.set(tempKey, {
         name,
         day,
@@ -177,7 +177,7 @@ export async function showReminderSelect(
 // FINALIZE EVENT WITH REMINDER
 // ============================================================
 export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
-    const tempKey = interaction.user.id;
+    const tempKey = `${interaction.user.id}-temp`;
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
@@ -212,7 +212,6 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
     };
 
     await saveEvents(tempData.guildId, [...events, newEvent]);
-
     tempEventStore.delete(tempKey);
 
     if (interaction.guild) {
@@ -229,7 +228,7 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
 // FINALIZE NEXT YEAR EVENT
 // ============================================================
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-    const tempKey = interaction.user.id;
+    const tempKey = `${interaction.user.id}-temp`;
     const tempData = tempEventStore.get(tempKey);
 
     if (!tempData) {
