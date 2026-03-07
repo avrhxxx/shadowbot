@@ -58,3 +58,11 @@ export async function readConfigSheet() {
 export async function writeConfigSheet(values: any[][]) {
   await writeSheet(EVENTS_CONFIG_TAB, values);
 }
+
+// --------------------------
+// ALIASY DLA SERWISU (kompatybilność wstecz)
+// --------------------------
+export const getEvents = readEventsSheet;
+export const saveEvents = writeEventsSheet;
+export const getConfig = readConfigSheet;
+export const setConfig = writeConfigSheet;
