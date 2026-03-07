@@ -1,10 +1,9 @@
 // src/eventsPanel/eventService.ts
 import { EmbedBuilder, TextChannel, Guild } from "discord.js";
 import * as GS from "../googleSheetsStorage";
-import { v4 as uuidv4 } from "uuid";
 
 export interface EventObject {
-  id: string;
+  id: string;                  // <-- ID przyjmowane z handlera
   guildId: string;
   name: string;
   day: number;
@@ -125,32 +124,12 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
   await saveEventsSheet(guildId, events);
 }
 
-export async function createEvent(data: {
-  guildId: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  year?: number;
-  reminderBefore?: number;
-}): Promise<EventObject> {
-  const newEvent: EventObject = {
-    id: `${uuidv4()}-${Date.now()}`, // unikalne ID
-    ...data,
-    status: "ACTIVE",
-    participants: [],
-    absent: [],
-    createdAt: Date.now(),
-    reminderSent: false,
-    started: false,
-    year: data.year ?? new Date().getUTCFullYear(),
-  };
-
+// Tworzymy event przyjmując już kompletne dane, w tym ID wygenerowane w handlerze
+export async function createEvent(data: EventObject): Promise<EventObject> {
   const events = await getEvents(data.guildId);
-  events.push(newEvent);
+  events.push(data); // ID już jest w data
   await saveEvents(data.guildId, events);
-  return newEvent;
+  return data;
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -194,7 +173,7 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
   headers.forEach((h, i) => {
     if (h === "notificationChannel" || h === "downloadChannel") {
-      obj[h] = row[i] ?? null; // teraz tylko pojedynczy ID
+      obj[h] = row[i] ?? null;
     } else {
       obj[h] = row[i] ?? null;
     }
