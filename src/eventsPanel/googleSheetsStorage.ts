@@ -1,4 +1,3 @@
-// src/eventsPanel/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -8,9 +7,6 @@ const EVENTS_TAB = "events";
 if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
 if (!process.env.GOOGLE_SERVICE_ACCOUNT) throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
 
-// --------------------------
-// GOOGLE AUTH
-// --------------------------
 const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
 const auth = new google.auth.GoogleAuth({
@@ -66,21 +62,11 @@ export async function getEvents(guildId: string) {
       headers.forEach((h, i) => {
         obj[h] = row[i] !== undefined && row[i] !== "" ? row[i] : null;
       });
-
-      // Parsujemy tablice, jeśli są w stringu JSON
       if (obj.participants) {
-        try {
-          obj.participants = JSON.parse(obj.participants);
-        } catch {
-          obj.participants = [];
-        }
+        try { obj.participants = JSON.parse(obj.participants); } catch { obj.participants = []; }
       }
       if (obj.absent) {
-        try {
-          obj.absent = JSON.parse(obj.absent);
-        } catch {
-          obj.absent = [];
-        }
+        try { obj.absent = JSON.parse(obj.absent); } catch { obj.absent = []; }
       }
       return obj;
     })
@@ -95,32 +81,20 @@ export async function getEvents(guildId: string) {
 export async function saveEvents(guildId: string, events: any[]) {
   const rows = await readSheet(EVENTS_TAB);
   const headers = rows[0] || [
-    "id",
-    "guildId",
-    "name",
-    "day",
-    "month",
-    "hour",
-    "minute",
-    "year",
-    "reminderBefore",
-    "status",
-    "participants",
-    "absent",
-    "createdAt",
-    "reminderSent",
-    "started",
+    "id","guildId","name","day","month","hour","minute","year","reminderBefore",
+    "status","participants","absent","createdAt","reminderSent","started"
   ];
 
-  const guildEvents = events.map((e) => {
+  // Zachowujemy inne guildId
+  const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
+
+  // Zamieniamy eventy na wiersze
+  const guildEvents = events.map(e => {
     const copy = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
-    return headers.map((h) => copy[h] ?? "");
+    return headers.map(h => copy[h] ?? "");
   });
-
-  // Filtrujemy pozostałe guildy
-  const otherRows = rows.slice(1).filter((r) => r[1] !== guildId);
 
   await writeSheet(EVENTS_TAB, [headers, ...otherRows, ...guildEvents]);
 
@@ -141,9 +115,7 @@ export async function getConfig(guildId: string) {
   const map: Record<string, any> = {};
   for (const row of data) {
     const obj: any = {};
-    headers.forEach((h, i) => {
-      obj[h] = row[i] !== undefined && row[i] !== "" ? row[i] : null;
-    });
+    headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
     if (obj.guildId) map[obj.guildId] = obj;
   }
 
@@ -163,7 +135,7 @@ export async function setConfig(guildId: string, key: string, value: string) {
 
   if (keyIndex === -1) throw new Error(`Column ${key} not found: ${key}`);
 
-  let rowIndex = data.findIndex((r) => r[guildIndex] === guildId);
+  let rowIndex = data.findIndex(r => r[guildIndex] === guildId);
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
