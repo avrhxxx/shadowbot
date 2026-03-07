@@ -33,10 +33,12 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  // zapisujemy całą listę w arkuszu bez cache
   await GS.saveEvents(guildId, events);
 }
 
+// --------------------------
+// CREATE / CANCEL / FIND
+// --------------------------
 export async function createEvent(data: {
   guildId: string;
   name: string;
@@ -58,10 +60,10 @@ export async function createEvent(data: {
     started: false,
   };
 
-  // zapis nowego eventu w arkuszu
+  // zapis nowego eventu
   const events = await getEvents(data.guildId);
   events.push(newEvent);
-  await saveEvents(data.guildId, events);
+  await GS.saveEvents(data.guildId, events);
 
   return newEvent;
 }
@@ -75,14 +77,9 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
   if (!event) return null;
-
   event.status = "CANCELED";
-  await saveEvents(guildId, events);
+  await GS.saveEvents(guildId, events);
   return event;
-}
-
-export async function deleteEvent(guildId: string, eventId: string) {
-  await GS.deleteEvent(guildId, eventId);
 }
 
 // --------------------------
@@ -96,26 +93,19 @@ export async function setConfig(guildId: string, key: string, value: string) {
   await GS.setConfig(guildId, key, value);
 }
 
-export async function saveConfig(guildId: string, config: EventConfig) {
-  for (const key in config) {
-    const value = config[key];
-    if (value !== undefined) await setConfig(guildId, key, String(value));
-  }
-}
-
 // --------------------------
 // CHANNEL HELPERS
 // --------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   const config = await getConfig(guildId);
   config.notificationChannel = channelId;
-  await saveConfig(guildId, config);
+  await setConfig(guildId, "notificationChannel", channelId);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
   const config = await getConfig(guildId);
   config.downloadChannel = channelId;
-  await saveConfig(guildId, config);
+  await setConfig(guildId, "downloadChannel", channelId);
 }
 
 // --------------------------
