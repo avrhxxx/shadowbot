@@ -1,7 +1,7 @@
 import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
 import { getEvents, saveEvents } from "../eventService";
+import { deleteEvent } from "../googleSheetsStorage"; // nowa funkcja
 
-// osobny store tylko dla clear event
 const clearEventStore = new Map<string, string>();
 
 export async function handleClearEventButton(
@@ -9,7 +9,6 @@ export async function handleClearEventButton(
   eventId: string,
   eventName: string
 ) {
-
   clearEventStore.set(interaction.user.id, eventId);
 
   const embed = new EmbedBuilder()
@@ -39,36 +38,27 @@ export async function handleClearEventButton(
 }
 
 export async function handleClearEventConfirm(interaction: ButtonInteraction) {
-
   const guildId = interaction.guildId!;
   const eventId = clearEventStore.get(interaction.user.id);
 
   if (!eventId) {
-    await interaction.reply({
-      content: "Temporary event info not found. Please try again.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "Temporary event info not found. Please try again.", ephemeral: true });
     return;
   }
 
-  let events = await getEvents(guildId);
-
+  const events = await getEvents(guildId);
   const index = events.findIndex(e => e.id.toString() === eventId.toString());
 
   if (index === -1) {
-    await interaction.reply({
-      content: "Event not found.",
-      ephemeral: true
-    });
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
     clearEventStore.delete(interaction.user.id);
     return;
   }
 
   const eventName = events[index].name;
 
-  events.splice(index, 1);
-
-  await saveEvents(guildId, events);
+  // Usuń event z pamięci i arkusza
+  await deleteEvent(guildId, eventId);
 
   clearEventStore.delete(interaction.user.id);
 
@@ -77,18 +67,10 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
     .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
     .setColor("Red");
 
-  await interaction.reply({
-    embeds: [embed],
-    ephemeral: true
-  });
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-
   clearEventStore.delete(interaction.user.id);
-
-  await interaction.reply({
-    content: "Clear action aborted.",
-    ephemeral: true
-  });
+  await interaction.reply({ content: "Clear action aborted.", ephemeral: true });
 }
