@@ -4,8 +4,7 @@
  * event_add_E-97cf152c-c669-4966-a35b-6657e6a96557
  */
 export function parseEventId(customId: string): string {
-  // Bierzemy wszystko po prefiksie akcji
-  // Prefix = pierwsze 2 segmenty (np. "event_add")
+  // Bierzemy wszystko po prefiksie akcji (wszystko po drugim "_")
   return customId.split("_").slice(2).join("_");
 }
 
