@@ -27,7 +27,7 @@ export interface EventConfig {
 }
 
 // -----------------------------
-// HELPERS PRO TIP
+// HELPERS
 // -----------------------------
 function safeJSONParse<T>(value: any, fallback: T): T {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
@@ -78,12 +78,26 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
 
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
+  // Mapa istniejących wierszy po ID
+  const guildExistingRows: Record<string, any[]> = {};
+  rows.slice(1).filter(r => r[1] === guildId).forEach(r => {
+    guildExistingRows[r[0]] = r; // ID w kolumnie 0
+  });
+
   const guildRows = events.map(e => {
     const copy: Record<string, any> = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
     copy.reminderSent = e.reminderSent ? "true" : "false";
     copy.started = e.started ? "true" : "false";
+
+    // Nadpisz jeśli ID już istnieje
+    if (guildExistingRows[e.id]) {
+      const existingRow = guildExistingRows[e.id];
+      return headers.map(h => copy[h] ?? existingRow[headers.indexOf(h)] ?? "");
+    }
+
+    // Nowy wiersz
     return headers.map(h => copy[h] ?? "");
   });
 
