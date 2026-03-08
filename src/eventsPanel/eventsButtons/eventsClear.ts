@@ -1,12 +1,18 @@
+// src/eventsPanel/eventsButtons/eventsClear.ts
 import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
-import { getEvents, deleteEvent as serviceDeleteEvent } from "../eventService";
+import { getEvents, deleteEvent as serviceDeleteEvent, EventObject } from "../eventService";
 
 const clearEventStore = new Map<string, string>();
 
+async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
+  return event || null;
+}
+
 export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = await getEventById(guildId, eventId);
 
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -35,11 +41,7 @@ export async function handleClearEventButton(interaction: ButtonInteraction, eve
       .setStyle(ButtonStyle.Secondary)
   );
 
-  await interaction.reply({
-    embeds: [embed],
-    components: [row],
-    ephemeral: true
-  });
+  await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
 }
 
 export async function handleClearEventConfirm(interaction: ButtonInteraction) {
@@ -51,9 +53,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
     return;
   }
 
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
-
+  const event = await getEventById(guildId, eventId);
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     clearEventStore.delete(interaction.user.id);
