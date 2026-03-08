@@ -7,31 +7,11 @@ import {
   TextInputStyle, 
   ActionRowBuilder 
 } from "discord.js";
-import { getEvents, saveEvents, EventObject } from "../eventService";
-
-/**
- * Upewnij się, że EventObject ma pole absent
- */
-interface EventObjectWithAbsent extends EventObject {
-  absent: string[];
-}
+import { getEventById, updateEventCell, EventObject } from "../eventService";
 
 // ==========================
 // HELPERS
 // ==========================
-async function getEvent(guildId: string, eventId: string): Promise<EventObjectWithAbsent | null> {
-  const events = await getEvents(guildId) as EventObjectWithAbsent[];
-  // ✅ Trim i porównanie stringowe dla bezpieczeństwa
-  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
-  if (!event) return null;
-  event.absent = event.absent || [];
-  return event;
-}
-
-async function saveEventChanges(guildId: string, events: EventObjectWithAbsent[]) {
-  await saveEvents(guildId, events);
-}
-
 async function showTextModal(interaction: ButtonInteraction, title: string, customId: string, placeholder?: string) {
   const modal = new ModalBuilder().setCustomId(customId).setTitle(title);
   const input = new TextInputBuilder()
@@ -66,7 +46,7 @@ export async function handleAbsentParticipant(interaction: ButtonInteraction, ev
 async function updateParticipants(
   interaction: ModalSubmitInteraction,
   eventId: string,
-  updater: (event: EventObjectWithAbsent, input: string[]) => string[]
+  updater: (event: EventObject, input: string[]) => string[]
 ) {
   await interaction.deferReply({ ephemeral: true });
 
@@ -74,17 +54,17 @@ async function updateParticipants(
   const inputRaw = interaction.fields.getTextInputValue("user_input");
   const input = inputRaw.split(",").map(n => n.trim()).filter(Boolean);
 
-  // ✅ Używamy helpera getEvent
-  const event = await getEvent(guildId, eventId);
+  const event = await getEventById(guildId, eventId);
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
     return;
   }
 
-  const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const updatedItems = updater(event, input);
 
-  await saveEventChanges(guildId, events);
+  // 🔹 Aktualizacja pojedynczych komórek
+  await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
+  await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
 
   await interaction.editReply({
     content: updatedItems.length
@@ -125,10 +105,7 @@ export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInte
   await updateParticipants(interaction, eventId, (event, nicknames) => {
     const marked: string[] = [];
     for (const nick of nicknames) {
-      if (!event.participants.includes(nick)) {
-        // cannot mark absent if not a participant
-        continue;
-      }
+      if (!event.participants.includes(nick)) continue;
       event.participants = event.participants.filter(n => n !== nick);
       if (!event.absent.includes(nick)) event.absent.push(nick);
       marked.push(nick);
