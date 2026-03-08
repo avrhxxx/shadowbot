@@ -52,7 +52,7 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promi
   [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminder(i),
   [IDS.BUTTONS.SHOW_ALL]: async (i) => await EB.handleShowAllEvents(i),
   [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => await EB.handleShowAllLists(i),
-  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownload(i), // ✅ wszystkie eventy
+  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownload(i),
   [IDS.BUTTONS.COMPARE_ALL]: async (i) => await EB.handleCompareAll(i),
 };
 
@@ -93,22 +93,22 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       const handler = BUTTON_HANDLERS[id];
       if (handler) return await handler(interaction);
 
-      // Dynamic confirm dla cancel
+      // Cancel confirm
       if (id.startsWith("event_cancel_confirm_")) {
         const eventId = id.replace("event_cancel_confirm_", "");
         return await EB.handleCancelConfirm(interaction, eventId);
       }
 
-      // Notify create (Yes/No)
+      // Notify create
       if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
         return await EB.handleNotificationResponse(interaction);
       }
 
-      // Next year (Yes/No)
+      // Next year
       if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
       if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
-      // Dynamic participant buttons
+      // Participants
       if (id.startsWith("event_add_"))
         return await EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -118,19 +118,30 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id.startsWith("event_absent_"))
         return await EB.handleAbsentParticipant(interaction, parseEventId(id));
 
+      // Event list
       if (id.startsWith("event_show_list_"))
         return await EB.handleShowList(interaction, parseEventId(id));
 
+      // Download single
       if (id.startsWith("event_download_single_"))
         return await EB.handleDownload(interaction, parseEventId(id));
 
+      // Compare events
       if (id.startsWith("event_compare_"))
         return await EB.handleCompareButton(interaction, parseEventId(id));
 
+      // 🔹 Compare All Download (NOWA OBSŁUGA)
+      if (id === "compare_all_download")
+        return await EB.handleCompareAllDownload(interaction);
+
+      // Clear event
       if (id.startsWith("event_clear_"))
         return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
+    // ----------------------------
+    // Select menus
+    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
@@ -139,12 +150,18 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleCompareSelect(interaction);
     }
 
+    // ----------------------------
+    // Modal submit
+    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
   } catch (error) {
     console.error("Error handling event interaction:", error);
     if (interaction.isRepliable())
-      await interaction.reply({ content: "❌ An error occurred while processing this interaction.", ephemeral: true });
+      await interaction.reply({
+        content: "❌ An error occurred while processing this interaction.",
+        ephemeral: true
+      });
   }
 }
