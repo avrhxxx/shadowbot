@@ -39,7 +39,7 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> =
   [IDS.BUTTONS.CANCEL]: EB.handleCancel,
   [IDS.BUTTONS.CANCEL_ABORT]: EB.handleCancelAbort,
   [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
-  [IDS.BUTTONS.HELP]: EB.handleHelp,
+  [IDS.BUTTONS.HELP]: EB.handleHelp, // <-- help już jest w stałych i handlers
   [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
 };
 
@@ -74,6 +74,7 @@ export async function handleEventInteraction(interaction: Interaction) {
 
     const id = interaction.customId;
 
+    // dynamiczne przyciski uczestników
     if (id.startsWith("event_add_"))
       return EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -93,7 +94,7 @@ export async function handleEventInteraction(interaction: Interaction) {
       return EB.handleCompareButton(interaction, parseEventId(id));
 
     if (id.startsWith("event_clear_"))
-      return EB.handleClearEventButton(interaction, parseEventId(id));
+      return EB.handleClearEventButton(interaction, parseEventId(id)); // <-- teraz pasuje do nowego clear
   }
 
   if (interaction.isStringSelectMenu()) {
