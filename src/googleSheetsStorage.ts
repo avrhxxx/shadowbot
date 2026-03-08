@@ -1,3 +1,4 @@
+// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -47,6 +48,16 @@ export async function writeEventsSheet(values: any[][]) {
   await writeSheet(EVENTS_TAB, values);
 }
 
+// **NOWOŚĆ: aktualizacja jednej komórki w arkuszu eventu**
+export async function updateEventCell(row: number, col: number, value: any) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${EVENTS_TAB}!R${row}C${col}`, // R1C1 notation
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
 // --------------------------
 // CONFIG STORAGE
 // --------------------------
@@ -56,4 +67,14 @@ export async function readConfigSheet(): Promise<any[][]> {
 
 export async function writeConfigSheet(values: any[][]) {
   await writeSheet(EVENTS_CONFIG_TAB, values);
+}
+
+// **NOWOŚĆ: aktualizacja jednej komórki w config**
+export async function updateConfigCell(row: number, col: number, value: any) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${EVENTS_CONFIG_TAB}!R${row}C${col}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
 }
