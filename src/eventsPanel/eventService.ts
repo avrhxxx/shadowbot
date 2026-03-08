@@ -163,8 +163,11 @@ export async function deleteEvent(guildId: string, eventId: string) {
 export async function getConfig(guildId: string): Promise<EventConfig> {
   const rows: any[][] = await GS.readConfigSheet();
   if (!rows.length) return {};
-  const headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
-  const dataRows: any[][] = rows.slice(1);
+  let headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  let dataRows: any[][] = rows.slice(1);
+
+  // dodaj brakujące nagłówki
+  if (headers.length === 0) headers = ["guildId","notificationChannel","downloadChannel"];
 
   const guildIndex = headers.indexOf("guildId");
   if (guildIndex === -1) return {};
@@ -173,15 +176,16 @@ export async function getConfig(guildId: string): Promise<EventConfig> {
   if (!row) return {};
 
   const config: EventConfig = {};
-  headers.forEach((h: string, i: number) => config[h] = row[i] ?? null);
+  headers.forEach((h, i) => config[h] = row[i] ?? null);
   return config;
 }
 
 export async function setConfig(guildId: string, key: string, value: any) {
-  const rows: any[][] = await GS.readConfigSheet();
+  let rows: any[][] = await GS.readConfigSheet();
   let headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   let dataRows: any[][] = rows.slice(1);
 
+  // jeśli nagłówki nie zawierają klucza, dodaj na końcu
   if (!headers.includes(key)) {
     headers.push(key);
     dataRows = dataRows.map((r: any[]) => { while(r.length < headers.length) r.push(""); return r; });
@@ -190,6 +194,7 @@ export async function setConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
+  // znajdź wiersz dla gildii
   let row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   let rowIndex: number;
 
@@ -197,12 +202,16 @@ export async function setConfig(guildId: string, key: string, value: any) {
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
-    rowIndex = dataRows.length; // +1 dla nagłówka
+    rowIndex = dataRows.length; // wiersz w Sheets (1-indexed, +1 dla nagłówka)
   } else {
-    rowIndex = dataRows.indexOf(row) + 1;
+    rowIndex = dataRows.indexOf(row) + 1; // +1 bo nagłówek w wierszu 1
   }
 
-  await GS.updateConfigCell(rowIndex, keyIndex + 1, value);
+  // zapisz nagłówki jeśli puste
+  await GS.writeConfigSheet([headers, ...dataRows]);
+
+  // aktualizacja pojedynczej komórki
+  await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value); // +1 dla A1 notation
 }
 
 // -----------------------------
