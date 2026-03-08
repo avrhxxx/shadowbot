@@ -70,22 +70,29 @@ function handleModal(interaction: ModalSubmitInteraction) {
 export async function handleEventInteraction(interaction: Interaction) {
 
   if (interaction.isButton()) {
-    const handler = BUTTON_HANDLERS[interaction.customId];
-    if (handler) return handler(interaction);
-
     const id = interaction.customId;
+
+    // ----------------------------
+    // Stałe buttony
+    // ----------------------------
+    const handler = BUTTON_HANDLERS[id];
+    if (handler) return handler(interaction);
 
     // ----------------------------
     // Nowe przyciski Create event
     // ----------------------------
-    if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no"))
+    if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
       return EB.handleNotificationResponse(interaction);
+    }
 
-    if (id === "next_year_yes")
-      return EB.finalizeNextYearEvent(interaction);
+    if (id.startsWith("next_year_yes") || id.startsWith("next_year_no")) {
+      // rozdzielamy tylko pierwszy myślnik, reszta pozostaje w tempId
+      const [, tempId] = id.split(/-(.+)/);
+      if (!tempId) return;
 
-    if (id === "next_year_no")
-      return EB.handleCancelAbort(interaction);
+      if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction, tempId);
+      if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
+    }
 
     // ----------------------------
     // dynamiczne przyciski uczestników
