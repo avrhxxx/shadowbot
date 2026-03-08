@@ -2,7 +2,13 @@
 // EVENTS CREATE
 // -----------------------------
 export { handleCreate } from "./eventsCreate";
-export { handleCreateSubmit, tempEventStore, showCreateNotificationConfirm } from "./eventsCreateSubmit";
+export {
+  handleCreateSubmit,
+  tempEventStore,
+  showCreateNotificationConfirm,
+  handleNotificationResponse,   // <-- nowy eksport
+  finalizeNextYearEvent         // <-- nowy eksport
+} from "./eventsCreateSubmit";
 
 // -----------------------------
 // EVENTS LIST
