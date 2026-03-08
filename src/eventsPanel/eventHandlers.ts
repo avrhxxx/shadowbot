@@ -69,7 +69,8 @@ export async function handleEventInteraction(interaction: Interaction) {
     if (interaction.customId.startsWith("event_absent_")) return EB.handleAbsentParticipant(interaction, parseEventId(interaction.customId));
     if (interaction.customId.startsWith("event_show_list_")) return EB.handleShowList(interaction, parseEventId(interaction.customId));
     if (interaction.customId.startsWith("event_download_single_")) return EB.handleDownload(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_compare_")) return EB.handleCompareButton(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_compare_")) 
+      return EB.handleCompareButton(interaction, parseEventId(interaction.customId), interaction.guildId!);
     if (interaction.customId.startsWith("event_clear_")) return EB.handleClearEventButton(interaction, parseEventId(interaction.customId));
   }
 
