@@ -16,17 +16,19 @@ import { formatEventUTC } from "../../utils/timeUtils";
 // ==========================
 // HELPERS
 // ==========================
-const formatEventUTCObj = (e: EventObject) => formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
+function formatEventUTCObj(e: EventObject) {
+  return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
+}
 
-const getMemberName = (guild: Guild, id: string) => guild.members.cache.get(id)?.displayName || id;
+function getMemberName(guild: Guild, id: string) {
+  const member = guild.members.cache.get(id);
+  return member ? member.displayName : id;
+}
 
-const mapAttendance = (event: EventObject) => ({
-  participants: new Set(event.participants),
-  absent: new Set(event.absent || [])
-});
-
-const formatComparisonText = (members: string[], title: string, guild: Guild) =>
-  members.length ? members.map(id => getMemberName(guild, id)).join("\n") : "None";
+async function sendComparisonFile(channel: TextChannel, name: string, content: string) {
+  const file = new AttachmentBuilder(Buffer.from(content, "utf-8"), { name });
+  await channel.send({ content: `📥 ${name}`, files: [file] });
+}
 
 // ==========================
 // SINGLE COMPARE
@@ -34,74 +36,58 @@ const formatComparisonText = (members: string[], title: string, guild: Guild) =>
 export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const currentEvent = events.find(e => e.id === eventId);
-  if (!currentEvent) return interaction.reply({ content: "Event not found.", ephemeral: true });
-  if (currentEvent.status !== "PAST") return interaction.reply({ content: "You can only compare past events.", ephemeral: true });
+  const current = events.find(e => e.id === eventId);
+  if (!current) return interaction.reply({ content: "Event not found.", ephemeral: true });
+  if (current.status !== "PAST") return interaction.reply({ content: "You can only compare past events.", ephemeral: true });
 
-  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== eventId)
-    .sort((a, b) => b.createdAt - a.createdAt);
-
+  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== eventId).sort((a, b) => b.createdAt - a.createdAt);
   if (!pastEvents.length) return interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`compare_select_${eventId}`)
     .setPlaceholder("Select event to compare with")
-    .addOptions(pastEvents.map(ev => new StringSelectMenuOptionBuilder().setLabel(ev.name).setDescription(formatEventUTCObj(ev)).setValue(ev.id)));
+    .addOptions(pastEvents.map(ev => new StringSelectMenuOptionBuilder()
+      .setLabel(ev.name)
+      .setDescription(formatEventUTCObj(ev))
+      .setValue(ev.id)
+    ));
 
-  await interaction.reply({
-    content: `Select event to compare with **${currentEvent.name}**`,
-    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
-    ephemeral: true
-  });
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+  await interaction.reply({ content: `Select event to compare with **${current.name}**`, components: [row], ephemeral: true });
 }
 
-// ==========================
-// HANDLE SELECT
-// ==========================
 export async function handleCompareSelect(interaction: StringSelectMenuInteraction) {
   const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-
-  const selectedEventId = interaction.values[0];
-  const currentEventId = interaction.customId.replace("compare_select_", "");
-
-  const events = await getEvents(guildId);
-  const eventA = events.find(e => e.id === currentEventId);
-  const eventB = events.find(e => e.id === selectedEventId);
-
+  const selectedId = interaction.values[0];
+  const currentId = interaction.customId.replace("compare_select_", "");
+  const events = await getEvents(guild.id);
+  const eventA = events.find(e => e.id === currentId);
+  const eventB = events.find(e => e.id === selectedId);
   if (!eventA || !eventB) return interaction.update({ content: "One of the events no longer exists.", components: [] });
 
   const { embedText, txtText } = buildComparisonAB(eventA, eventB, guild);
 
-  await interaction.update({
-    content: embedText,
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`compare_download_${eventA.id}_${eventB.id}`).setLabel("Download").setStyle(ButtonStyle.Primary)
-    )]
-  });
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`compare_download_${eventA.id}_${eventB.id}`).setLabel("Download").setStyle(ButtonStyle.Primary)
+  );
+
+  await interaction.update({ content: embedText, components: [row] });
 }
 
-// ==========================
-// DOWNLOAD A vs B
-// ==========================
 export async function handleCompareDownload(interaction: ButtonInteraction) {
   const guild = interaction.guild as Guild;
-  const guildId = guild.id;
-
-  const [_, __, eventAId, eventBId] = interaction.customId.split("_");
-  const events = await getEvents(guildId);
-  const eventA = events.find(e => e.id === eventAId);
-  const eventB = events.find(e => e.id === eventBId);
+  const [_, __, idA, idB] = interaction.customId.split("_");
+  const events = await getEvents(guild.id);
+  const eventA = events.find(e => e.id === idA);
+  const eventB = events.find(e => e.id === idB);
   if (!eventA || !eventB) return interaction.reply({ content: "Events not found.", ephemeral: true });
 
   const { embedText, txtText } = buildComparisonAB(eventA, eventB, guild);
-  const config = await getConfig(guildId);
+  const config = await getConfig(guild.id);
   const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
   if (!channel || !channel.isTextBased()) return interaction.reply({ content: "Download channel invalid.", ephemeral: true });
 
-  await channel.send({ content: `📥 Attendance comparison (UTC: ${new Date().toISOString()}):\n${embedText}` });
-  await channel.send({ files: [new AttachmentBuilder(Buffer.from(txtText, "utf-8"), { name: `compare_${eventA.name}_vs_${eventB.name}.txt` })] });
-
+  await sendComparisonFile(channel, `compare_${eventA.name}_vs_${eventB.name}.txt`, txtText);
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
 
@@ -110,16 +96,14 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
 // ==========================
 export async function handleCompareAll(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
-  const guild = interaction.guild as Guild;
-  const events = await getEvents(guild.id);
+  const events = await getEvents(interaction.guildId!);
   if (!events.length) return interaction.editReply({ content: "No events to compare.", components: [] });
 
-  await interaction.editReply({
-    content: `📥 Comparison for all events ready. Click Download All (TXT) to get the file.`,
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download All (TXT)").setStyle(ButtonStyle.Primary)
-    )]
-  });
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("compare_all_download").setLabel("Download All (TXT)").setStyle(ButtonStyle.Primary)
+  );
+
+  await interaction.editReply({ content: `📥 Comparison for all events ready. Click Download All (TXT) to get the file.`, components: [row] });
 }
 
 export async function handleCompareAllDownload(interaction: ButtonInteraction) {
@@ -133,10 +117,9 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   const channel = guild.channels.cache.get(config?.downloadChannelId!) as TextChannel;
   if (!channel || !channel.isTextBased()) return interaction.editReply({ content: "Download channel invalid.", components: [] });
 
-  const txtChunks = txtText.match(/[\s\S]{1,1900}/g) || [];
-  for (let i = 0; i < txtChunks.length; i++) {
-    const file = new AttachmentBuilder(Buffer.from(txtChunks[i], "utf-8"), { name: `compare_all_part_${i + 1}.txt` });
-    await channel.send({ content: `📥 Attendance comparison for all events (part ${i + 1} of ${txtChunks.length})`, files: [file] });
+  const chunks = txtText.match(/[\s\S]{1,1900}/g) || [];
+  for (let i = 0; i < chunks.length; i++) {
+    await sendComparisonFile(channel, `compare_all_part_${i + 1}.txt`, chunks[i]);
   }
 
   await interaction.editReply({ content: `Comparison for all events sent to <#${config?.downloadChannelId}>`, components: [] });
@@ -146,8 +129,10 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
 // LOGIC
 // ==========================
 function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guild) {
-  const { participants: participantsA, absent: absentA } = mapAttendance(eventA);
-  const { participants: participantsB, absent: absentB } = mapAttendance(eventB);
+  const participantsA = new Set(eventA.participants);
+  const participantsB = new Set(eventB.participants);
+  const absentA = new Set(eventA.absent || []);
+  const absentB = new Set(eventB.absent || []);
 
   const reliable = [...participantsA].filter(id => participantsB.has(id));
   const missedOnce = [...participantsA].filter(id => absentB.has(id));
@@ -155,15 +140,15 @@ function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guil
 
   const embedText =
     `Comparing:\nEvent A: ${eventA.name} (${formatEventUTCObj(eventA)})\nEvent B: ${eventB.name} (${formatEventUTCObj(eventB)})\n\n` +
-    `🟢 Reliable (${reliable.length})\n${formatComparisonText(reliable, "Reliable", guild)}\n\n` +
-    `🟡 Missed Once (${missedOnce.length})\n${formatComparisonText(missedOnce, "Missed Once", guild)}\n\n` +
-    `🔴 Missed Twice (${missedTwice.length})\n${formatComparisonText(missedTwice, "Missed Twice", guild)}`;
+    `🟢 Reliable (${reliable.length})\n${reliable.length ? reliable.map(id => getMemberName(guild, id)).join("\n") : "None"}\n\n` +
+    `🟡 Missed Once (${missedOnce.length})\n${missedOnce.length ? missedOnce.map(id => getMemberName(guild, id)).join("\n") : "None"}\n\n` +
+    `🔴 Missed Twice (${missedTwice.length})\n${missedTwice.length ? missedTwice.map(id => getMemberName(guild, id)).join("\n") : "None"}`;
 
   const txtText =
     `Attendance Comparison\n=====================\n\nEvent A: ${eventA.name} (${formatEventUTCObj(eventA)})\nEvent B: ${eventB.name} (${formatEventUTCObj(eventB)})\n\n` +
-    `Reliable (${reliable.length})\n${formatComparisonText(reliable, "Reliable", guild)}\n\n` +
-    `Missed Once (${missedOnce.length})\n${formatComparisonText(missedOnce, "Missed Once", guild)}\n\n` +
-    `Missed Twice (${missedTwice.length})\n${formatComparisonText(missedTwice, "Missed Twice", guild)}`;
+    `Reliable (${reliable.length})\n${reliable.length ? reliable.map(id => getMemberName(guild, id)).join("\n") : ""}\n\n` +
+    `Missed Once (${missedOnce.length})\n${missedOnce.length ? missedOnce.map(id => getMemberName(guild, id)).join("\n") : ""}\n\n` +
+    `Missed Twice (${missedTwice.length})\n${missedTwice.length ? missedTwice.map(id => getMemberName(guild, id)).join("\n") : ""}`;
 
   return { embedText, txtText };
 }
@@ -176,20 +161,27 @@ function buildComparisonAll(events: EventObject[], guild: Guild) {
   });
 
   const participants = [...allParticipants];
-  const lines: string[] = participants.map(memberId => {
+  const txtLines: string[] = [];
+
+  participants.forEach(memberId => {
     const name = getMemberName(guild, memberId);
     let attended = 0;
-    const block = events.map(ev => {
+    const block: string[] = [];
+    events.forEach(ev => {
       let status = "-";
-      if (ev.participants.includes(memberId)) { status = "✓"; attended++; }
-      else if (ev.absent?.includes(memberId)) status = "✗";
-      return `${ev.name}  ${status}`;
+      if (ev.participants.includes(memberId)) {
+        status = "✓";
+        attended++;
+      } else if (ev.absent?.includes(memberId)) {
+        status = "✗";
+      }
+      block.push(`${ev.name}  ${status}`);
     });
-    return `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${Math.round((attended/events.length)*100)}%)\n`;
+    txtLines.push(`${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${Math.round((attended/events.length)*100)}%)\n`);
   });
 
   return {
-    embedText: `All Events Comparison\n\`\`\`\n${lines.join("\n----------------------\n\n")}\n\`\`\``,
-    txtText: `All Events Comparison\n\n${lines.join("\n----------------------\n\n")}`
+    embedText: `All Events Comparison\n\`\`\`\n${txtLines.join("\n----------------------\n\n")}\n\`\`\``,
+    txtText: `All Events Comparison\n\n${txtLines.join("\n----------------------\n\n")}`
   };
 }
