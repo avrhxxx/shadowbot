@@ -20,7 +20,9 @@ export const IDS = {
     HELP: "event_help",
     MANUAL_REMINDER: "event_manual_reminder",
     SHOW_ALL: "event_show_all",
-    SHOW_ALL_LISTS: "event_show_all_lists",
+    SHOW_ALL_LISTS: "show_all_lists",
+    DOWNLOAD_ALL: "download_all_events",
+    COMPARE_ALL: "compare_all_events",
   },
   SELECTS: {
     MANUAL_REMINDER: "manual_reminder_select",
@@ -41,25 +43,27 @@ export const IDS = {
 // Stałe button handlers
 // ----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
-  [IDS.BUTTONS.CREATE]: async (i) => { await EB.handleCreate(i); },
-  [IDS.BUTTONS.LIST]: async (i) => { await EB.handleList(i); },
-  [IDS.BUTTONS.CANCEL]: async (i) => { await EB.handleCancel(i); },
-  [IDS.BUTTONS.CANCEL_ABORT]: async (i) => { await EB.handleCancelAbort(i); },
-  [IDS.BUTTONS.SETTINGS]: async (i) => { await EB.handleSettings(i); },
-  [IDS.BUTTONS.HELP]: async (i) => { await EB.handleHelp(i); },
-  [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => { await EB.handleManualReminder(i); },
-  [IDS.BUTTONS.SHOW_ALL]: async (i) => { await EB.handleShowAllEvents(i); },
-  [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => { await EB.handleShowAllLists(i); },
+  [IDS.BUTTONS.CREATE]: async (i) => await EB.handleCreate(i),
+  [IDS.BUTTONS.LIST]: async (i) => await EB.handleList(i),
+  [IDS.BUTTONS.CANCEL]: async (i) => await EB.handleCancel(i),
+  [IDS.BUTTONS.CANCEL_ABORT]: async (i) => await EB.handleCancelAbort(i),
+  [IDS.BUTTONS.SETTINGS]: async (i) => await EB.handleSettings(i),
+  [IDS.BUTTONS.HELP]: async (i) => await EB.handleHelp(i),
+  [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminder(i),
+  [IDS.BUTTONS.SHOW_ALL]: async (i) => await EB.handleShowAllEvents(i),
+  [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => await EB.handleShowAllLists(i),
+  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownloadAll(i),
+  [IDS.BUTTONS.COMPARE_ALL]: async (i) => await EB.handleCompareAll(i),
 };
 
 // ----------------------------
 // Stałe select handlers
 // ----------------------------
 const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<void>> = {
-  [IDS.SELECTS.MANUAL_REMINDER]: async (i) => { await EB.handleManualReminderSelect(i); },
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => { await EB.handleSettingsSelect(i); },
-  [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => { await EB.handleSettingsSelect(i); },
-  [IDS.SELECTS.CANCEL_SELECT]: async (i) => { await EB.handleCancelSelect(i); },
+  [IDS.SELECTS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminderSelect(i),
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await EB.handleSettingsSelect(i),
+  [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => await EB.handleSettingsSelect(i),
+  [IDS.SELECTS.CANCEL_SELECT]: async (i) => await EB.handleCancelSelect(i),
 };
 
 // ----------------------------
@@ -86,36 +90,26 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
     if (interaction.isButton()) {
       const id = interaction.customId;
 
-      // ----------------------------
-      // Stałe przyciski
-      // ----------------------------
+      // Stałe tlačidlá
       const handler = BUTTON_HANDLERS[id];
       if (handler) return await handler(interaction);
 
-      // ----------------------------
-      // Dynamiczne confirm dla cancel
-      // ----------------------------
+      // Dynamic confirm pre cancel
       if (id.startsWith("event_cancel_confirm_")) {
         const eventId = id.replace("event_cancel_confirm_", "");
         return await EB.handleCancelConfirm(interaction, eventId);
       }
 
-      // ----------------------------
-      // Przycisk notify_create (Yes / No)
-      // ----------------------------
+      // Notify create (Yes/No)
       if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
         return await EB.handleNotificationResponse(interaction);
       }
 
-      // ----------------------------
-      // Przycisk next_year (Yes / No)
-      // ----------------------------
+      // Next year (Yes/No)
       if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
       if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
-      // ----------------------------
-      // Dynamiczne przyciski uczestników
-      // ----------------------------
+      // Dynamic participant buttons
       if (id.startsWith("event_add_"))
         return await EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -138,9 +132,6 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
-    // ----------------------------
-    // Select menu
-    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
@@ -149,9 +140,6 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleCompareSelect(interaction);
     }
 
-    // ----------------------------
-    // Modal submit
-    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
