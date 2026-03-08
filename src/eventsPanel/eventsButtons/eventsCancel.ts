@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCancel.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -28,7 +29,7 @@ export async function handleCancel(interaction: ButtonInteraction) {
     return;
   }
 
-  const uniqueActiveEvents = Array.from(new Map(activeEvents.map(e => [e.id, e])).values()); // ✅ unikalne ID
+  const uniqueActiveEvents = Array.from(new Map(activeEvents.map(e => [e.id, e])).values());
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId("event_cancel_select")
@@ -54,6 +55,8 @@ export async function handleCancel(interaction: ButtonInteraction) {
    🔹 STEP 2 – SELECT → CONFIRMATION
 ====================================================== */
 export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
+  await interaction.deferUpdate(); // ✅ defer update, bo później update używamy
+
   const guildId = interaction.guildId!;
   const eventId = interaction.values[0];
 
@@ -61,7 +64,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
-    await interaction.reply({
+    await interaction.followUp({
       content: "Event not found.",
       ephemeral: true
     });
@@ -88,7 +91,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
 
-  await interaction.update({
+  await interaction.editReply({
     content: "",
     embeds: [embed],
     components: [row]
@@ -99,12 +102,14 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
    🔹 STEP 3 – CONFIRM BUTTON
 ====================================================== */
 export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
+  await interaction.deferUpdate();
+
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.followUp({ content: "Event not found.", ephemeral: true });
     return;
   }
 
@@ -116,7 +121,7 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
     .setDescription(`**${event.name}** has been canceled.`)
     .setColor("Red");
 
-  await interaction.update({ content: "", embeds: [embed], components: [] });
+  await interaction.editReply({ content: "", embeds: [embed], components: [] });
 }
 
 /* ======================================================
