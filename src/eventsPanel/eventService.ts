@@ -1,4 +1,4 @@
-// src/eventsPanel/eventServiceProTip.ts
+// src/eventsPanel/eventService.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
