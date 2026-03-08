@@ -1,8 +1,13 @@
 // src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
-import { getEvents, getConfig } from "../eventService";
-import { EventObject } from "../eventService";
+import { getEvents, getConfig, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+
+async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
+  return event || null;
+}
 
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
   if (!interaction.guild || !interaction.guildId) return;
@@ -11,7 +16,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   const allEvents: EventObject[] = await getEvents(guildId);
   const config = await getConfig(guildId);
 
-  // ✅ poprawione pole configu
   if (!config || !config.downloadChannel) {
     await interaction.reply({
       content: "❌ Download channel is not set in event settings.",
@@ -21,7 +25,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   }
 
   const channel = interaction.guild.channels.cache.get(config.downloadChannel);
-
   if (!channel || !(channel instanceof TextChannel)) {
     await interaction.reply({
       content: "❌ Download channel not found or not a text channel.",
@@ -34,7 +37,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   // SINGLE EVENT
   // -------------------------
   if (singleEventId) {
-    const event = allEvents.find(e => e.id === singleEventId);
+    const event = await getEventById(guildId, singleEventId);
 
     if (!event) {
       await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -84,7 +87,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   }
 
   // -------------------------
-  // ALL EVENTS
+  // ALL EVENTS (nie zmieniamy)
   // -------------------------
   await interaction.deferReply({ ephemeral: true });
 
