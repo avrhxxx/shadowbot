@@ -88,7 +88,7 @@ export async function updateEventCell(eventId: string, columnName: string, value
   const colIndex = headers.indexOf(columnName);
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+  const rowIndex = rows.findIndex((r: any[]) => r[0]?.toString().trim() === eventId.toString().trim());
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
@@ -97,7 +97,7 @@ export async function updateEventCell(eventId: string, columnName: string, value
 export async function deleteEventRow(eventId: string) {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+  const rowIndex = rows.findIndex((r: any[]) => r[0]?.toString().trim() === eventId.toString().trim());
   if (rowIndex === -1) return;
   await GS.deleteEventRow(rowIndex + 1);
 }
@@ -108,14 +108,22 @@ export async function deleteEventRow(eventId: string) {
 export async function addParticipants(eventId: string, nicknames: string[]) {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-  const rowIndex = rows.findIndex(r => r[0] === eventId);
+
+  console.log("ROWS (first 5):", rows.slice(0, 5));
+  console.log("Looking for eventId:", eventId);
+
+  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
+  console.log("Found rowIndex:", rowIndex);
   if (rowIndex === -1) throw new Error("Event not found");
 
   const participantsCol = headers.indexOf("participants");
   const absentCol = headers.indexOf("absent");
 
-  const participants = safeJSONParse(rows[rowIndex][participantsCol], []);
-  const absent = safeJSONParse(rows[rowIndex][absentCol], []);
+  let participants = safeJSONParse(rows[rowIndex][participantsCol], []);
+  let absent = safeJSONParse(rows[rowIndex][absentCol], []);
+
+  console.log("Current participants:", participants);
+  console.log("Current absent:", absent);
 
   for (const nick of nicknames) {
     if (!participants.includes(nick)) participants.push(nick);
@@ -126,26 +134,37 @@ export async function addParticipants(eventId: string, nicknames: string[]) {
   await updateEventCell(eventId, "participants", JSON.stringify(participants));
   await updateEventCell(eventId, "absent", JSON.stringify(newAbsent));
 
+  console.log("Updated participants:", participants);
+  console.log("Updated absent:", newAbsent);
+
   return participants;
 }
 
 export async function removeParticipants(eventId: string, nicknames: string[]) {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-  const rowIndex = rows.findIndex(r => r[0] === eventId);
+
+  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
   if (rowIndex === -1) throw new Error("Event not found");
 
   const participantsCol = headers.indexOf("participants");
   const absentCol = headers.indexOf("absent");
 
-  const participants = safeJSONParse(rows[rowIndex][participantsCol], []);
-  const absent = safeJSONParse(rows[rowIndex][absentCol], []);
+  let participants = safeJSONParse(rows[rowIndex][participantsCol], []);
+  let absent = safeJSONParse(rows[rowIndex][absentCol], []);
 
-  const newParticipants = participants.filter((n: string) => !nicknames.includes(n));
-  const newAbsent = absent.filter((n: string) => !nicknames.includes(n));
+  console.log("Remove participants input:", nicknames);
+  console.log("Current participants:", participants);
+  console.log("Current absent:", absent);
+
+  const newParticipants = participants.filter(n => !nicknames.includes(n));
+  const newAbsent = absent.filter(n => !nicknames.includes(n));
 
   await updateEventCell(eventId, "participants", JSON.stringify(newParticipants));
   await updateEventCell(eventId, "absent", JSON.stringify(newAbsent));
+
+  console.log("Updated participants:", newParticipants);
+  console.log("Updated absent:", newAbsent);
 
   return newParticipants;
 }
@@ -153,11 +172,16 @@ export async function removeParticipants(eventId: string, nicknames: string[]) {
 export async function markAbsent(eventId: string, nicknames: string[]) {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-  const rowIndex = rows.findIndex(r => r[0] === eventId);
+
+  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
   if (rowIndex === -1) throw new Error("Event not found");
 
   let participants = safeJSONParse(rows[rowIndex][headers.indexOf("participants")], []);
   let absent = safeJSONParse(rows[rowIndex][headers.indexOf("absent")], []);
+
+  console.log("Mark absent input:", nicknames);
+  console.log("Current participants:", participants);
+  console.log("Current absent:", absent);
 
   for (const nick of nicknames) {
     if (!participants.includes(nick)) continue;
@@ -167,6 +191,9 @@ export async function markAbsent(eventId: string, nicknames: string[]) {
 
   await updateEventCell(eventId, "participants", JSON.stringify(participants));
   await updateEventCell(eventId, "absent", JSON.stringify(absent));
+
+  console.log("Updated participants:", participants);
+  console.log("Updated absent:", absent);
 
   return absent;
 }
@@ -206,11 +233,9 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
     return (data as any)[h] ?? "";
   });
 
-  // Tutaj zakładamy, że GS.appendEventRow dodaje cały wiersz na końcu
   if (typeof GS.appendEventRow === "function") {
     await GS.appendEventRow(newRow);
   } else {
-    // fallback: przepisywanie całego arkusza
     await GS.writeEventsSheet([headers, ...rows.slice(1), newRow]);
   }
 
