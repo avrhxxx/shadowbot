@@ -83,8 +83,6 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
   const rowMap: Record<string, any[]> = {};
   dataRows.forEach(r => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
 
-  const newRows: any[][] = [];
-
   for (const e of events) {
     const copy: Record<string, any> = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
@@ -96,7 +94,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
       // Nadpisz istniejący wiersz minimalnie
       const existingRow = rowMap[e.id];
       const newRow = headers.map((h, i) => copy[h] ?? existingRow[i] ?? "");
-      rowMap[e.id] = newRow; // aktualizacja mapy
+      rowMap[e.id] = newRow;
     } else {
       // Nowy wiersz
       const newRow = headers.map(h => copy[h] ?? "");
@@ -150,7 +148,7 @@ export async function deleteEvent(guildId: string, eventId: string) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS (minimal overwrite)
+// CONFIG SHEET HELPERS (minimal overwrite + poprawka)
 // -----------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
@@ -202,7 +200,8 @@ async function saveConfig(guildId: string, key: string, value: any) {
 
   // przygotowanie finalnego arkusza
   const otherRows = Object.values(rowMap).filter(r => r[guildIndex] !== guildId);
-  await GS.writeConfigSheet([headers, ...otherRows, ...rowMap[guildId]]);
+  const finalRows = [headers, ...otherRows, rowMap[guildId]]; // rowMap[guildId] w tablicy
+  await GS.writeConfigSheet(finalRows);
 }
 
 // -----------------------------
