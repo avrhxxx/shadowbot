@@ -21,7 +21,8 @@ interface EventObjectWithAbsent extends EventObject {
 // ==========================
 async function getEvent(guildId: string, eventId: string): Promise<EventObjectWithAbsent | null> {
   const events = await getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find(e => e.id === eventId);
+  // ✅ Trim i porównanie stringowe dla bezpieczeństwa
+  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
   if (!event) return null;
   event.absent = event.absent || [];
   return event;
@@ -73,13 +74,14 @@ async function updateParticipants(
   const inputRaw = interaction.fields.getTextInputValue("user_input");
   const input = inputRaw.split(",").map(n => n.trim()).filter(Boolean);
 
-  const events = await getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find(e => e.id === eventId);
+  // ✅ Używamy helpera getEvent
+  const event = await getEvent(guildId, eventId);
   if (!event) {
     await interaction.editReply({ content: "Event not found." });
     return;
   }
 
+  const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const updatedItems = updater(event, input);
 
   await saveEventChanges(guildId, events);
