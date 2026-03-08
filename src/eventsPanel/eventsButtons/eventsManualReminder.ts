@@ -1,11 +1,13 @@
 // src/eventsPanel/eventsButtons/eventsManualReminder.ts
 import {
   ButtonInteraction,
+  StringSelectMenuInteraction,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
-  ActionRowBuilder
+  ActionRowBuilder,
+  TextChannel
 } from "discord.js";
-import { getEvents, EventObject } from "../eventService";
+import { getEvents, EventObject, getConfig } from "../eventService";
 import { sendReminderMessage } from "./eventsReminder";
 import { formatEventUTC } from "../../utils/timeUtils";
 
@@ -41,11 +43,55 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
     return;
   }
 
-  const row = createEventSelectMenu(upcomingEvents, "manual_reminder_select", "Select an event to manually send a reminder");
+  const row = createEventSelectMenu(
+    upcomingEvents,
+    "manual_reminder_select",
+    "Select an event to manually send a reminder"
+  );
 
   await interaction.reply({
     content: "Select an event to manually send a reminder:",
     components: [row],
     ephemeral: true
+  });
+}
+
+/* ======================================================
+   HANDLE MANUAL REMINDER SELECT
+====================================================== */
+export async function handleManualReminderSelect(interaction: StringSelectMenuInteraction) {
+  const guildId = interaction.guildId!;
+  const selectedEventId = interaction.values[0];
+  if (!selectedEventId) {
+    await interaction.reply({ content: "No event selected.", ephemeral: true });
+    return;
+  }
+
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === selectedEventId);
+  if (!event) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
+  }
+
+  const config = await getConfig(guildId);
+  const channelId = config.notificationChannel;
+  if (!channelId) {
+    await interaction.reply({ content: "Notification channel not set.", ephemeral: true });
+    return;
+  }
+
+  const rawChannel = interaction.guild?.channels.cache.get(channelId);
+  if (!rawChannel || !rawChannel.isTextBased()) {
+    await interaction.reply({ content: "Notification channel invalid.", ephemeral: true });
+    return;
+  }
+
+  const channel = rawChannel as TextChannel;
+  await sendReminderMessage(channel, event);
+
+  await interaction.update({
+    content: `Manual reminder sent for **${event.name}**`,
+    components: []
   });
 }
