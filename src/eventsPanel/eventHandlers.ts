@@ -1,9 +1,7 @@
-// src/eventsPanel/eventHandlers.ts
 import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ModalSubmitInteraction } from "discord.js";
 import * as EB from "./eventsButtons"; // wszystkie funkcje buttonów, selectów, modali w index.ts
 import { parseEventId } from "./eventsButtons/utils";
 
-// CENTRALNE CUSTOM ID
 export const IDS = {
   BUTTONS: {
     CREATE: "event_create",
@@ -29,7 +27,6 @@ export const IDS = {
   },
 };
 
-// MAPY HANDLERÓW
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> = {
   [IDS.BUTTONS.CREATE]: EB.handleCreate,
   [IDS.BUTTONS.LIST]: EB.handleList,
@@ -47,7 +44,6 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction) => Promis
   [IDS.SELECTS.CANCEL_SELECT]: EB.handleCancelSelect,
 };
 
-// DYNAMICZNE MODALE
 function handleModal(interaction: ModalSubmitInteraction) {
   const { customId } = interaction;
 
@@ -57,7 +53,6 @@ function handleModal(interaction: ModalSubmitInteraction) {
   if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) return EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
 }
 
-// GŁÓWNY HANDLER
 export async function handleEventInteraction(interaction: Interaction) {
   if (interaction.isButton()) {
     const handler = BUTTON_HANDLERS[interaction.customId];
@@ -70,7 +65,7 @@ export async function handleEventInteraction(interaction: Interaction) {
     if (interaction.customId.startsWith("event_show_list_")) return EB.handleShowList(interaction, parseEventId(interaction.customId));
     if (interaction.customId.startsWith("event_download_single_")) return EB.handleDownload(interaction, parseEventId(interaction.customId));
     if (interaction.customId.startsWith("event_compare_"))
-      return EB.handleCompareButton(interaction, parseEventId(interaction.customId)); // <-- poprawione, tylko 2 argumenty
+      return EB.handleCompareButton(interaction, parseEventId(interaction.customId)); // <-- 2 argumenty
     if (interaction.customId.startsWith("event_clear_")) return EB.handleClearEventButton(interaction, parseEventId(interaction.customId));
   }
 
