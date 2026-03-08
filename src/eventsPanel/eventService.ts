@@ -78,7 +78,6 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
 
   const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
 
-  // Mapa istniejących wierszy po ID
   const guildExistingRows: Record<string, any[]> = {};
   rows.slice(1).filter(r => r[1] === guildId).forEach(r => {
     guildExistingRows[r[0]] = r; // ID w kolumnie 0
@@ -91,13 +90,11 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     copy.reminderSent = e.reminderSent ? "true" : "false";
     copy.started = e.started ? "true" : "false";
 
-    // Nadpisz jeśli ID już istnieje
     if (guildExistingRows[e.id]) {
       const existingRow = guildExistingRows[e.id];
       return headers.map(h => copy[h] ?? existingRow[headers.indexOf(h)] ?? "");
     }
 
-    // Nowy wiersz
     return headers.map(h => copy[h] ?? "");
   });
 
@@ -162,6 +159,7 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
   return config;
 }
 
+// Poprawione zapisywanie konfiguracji kanałów
 async function saveConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
   let headers = rows[0] || [];
@@ -175,12 +173,19 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   let rowIndex = dataRows.findIndex(r => r[guildIndex] === guildId);
 
+  // Jeśli wiersz nie istnieje, tworzymy nowy
   if (rowIndex === -1) {
     const newRow = new Array(headers.length).fill("");
     newRow[guildIndex] = guildId;
     newRow[headers.indexOf(key)] = value;
     dataRows.push(newRow);
   } else {
+    // Sprawdzamy, czy wartość już się zgadza
+    const existingValue = dataRows[rowIndex][headers.indexOf(key)];
+    if (existingValue === value) {
+      return; // nic nie robimy, kanał już ustawiony
+    }
+    // Nadpisujemy istniejący wiersz
     dataRows[rowIndex][headers.indexOf(key)] = value;
   }
 
