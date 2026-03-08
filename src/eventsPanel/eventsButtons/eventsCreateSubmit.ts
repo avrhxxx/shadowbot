@@ -196,14 +196,14 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
 // HANDLE NOTIFICATION RESPONSE
 // -----------------------------------------------------------
 export async function handleNotificationResponse(interaction: ButtonInteraction) {
-    const [action, tempId] = interaction.customId.split("-").slice(0, 2);
+    const [, tempId] = interaction.customId.split(/-(.+)/); // <- poprawione
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
-    tempData.notifyOnCreate = action === "notify_create_yes";
+    tempData.notifyOnCreate = interaction.customId.startsWith("notify_create_yes");
     await finalizeEvent(interaction, tempId);
 }
 
@@ -211,7 +211,7 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
 // FINALIZE NEXT YEAR EVENT
 // -----------------------------------------------------------
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-    const tempId = interaction.customId.split("-")[1]; // wyciągamy tempId z przycisku
+    const [, tempId] = interaction.customId.split(/-(.+)/); // <- poprawione
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
