@@ -63,13 +63,14 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     .join("\n\n====================\n\n");
 
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
+
   for (let i = 0; i < chunks.length; i++) {
     const embed = new EmbedBuilder()
       .setTitle(`📋 All Event Participant Lists${chunks.length > 1 ? ` — part ${i + 1}` : ""}`)
       .setColor(0x00ff00)
       .setDescription(chunks[i]);
 
-    if (i === 0) await interaction.editReply({ embeds: [embed] });
-    else await interaction.followUp({ embeds: [embed], ephemeral: true });
+    if (i === 0) await interaction.editReply({ embeds: [embed] }); // ✅ pierwsza część
+    else await interaction.followUp({ embeds: [embed], ephemeral: true }); // ✅ kolejne części
   }
 }
