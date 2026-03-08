@@ -34,6 +34,9 @@ export const IDS = {
   },
 };
 
+// ----------------------------
+// Stałe button handlers
+// ----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> = {
   [IDS.BUTTONS.CREATE]: EB.handleCreate,
   [IDS.BUTTONS.LIST]: EB.handleList,
@@ -44,6 +47,9 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> =
   [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
 };
 
+// ----------------------------
+// Stałe select handlers
+// ----------------------------
 const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction) => Promise<void>> = {
   [IDS.SELECTS.MANUAL_REMINDER]: EB.handleManualReminderSelect,
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: EB.handleSettingsSelect,
@@ -51,6 +57,9 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction) => Promis
   [IDS.SELECTS.CANCEL_SELECT]: EB.handleCancelSelect,
 };
 
+// ----------------------------
+// Modal submit handler
+// ----------------------------
 function handleModal(interaction: ModalSubmitInteraction) {
   const { customId } = interaction;
 
@@ -67,32 +76,32 @@ function handleModal(interaction: ModalSubmitInteraction) {
     return EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
 }
 
+// ----------------------------
+// Główny handler interakcji
+// ----------------------------
 export async function handleEventInteraction(interaction: Interaction) {
 
   if (interaction.isButton()) {
     const id = interaction.customId;
 
     // ----------------------------
-    // Stałe buttony
+    // Stałe przyciski
     // ----------------------------
     const handler = BUTTON_HANDLERS[id];
     if (handler) return handler(interaction);
 
     // ----------------------------
-    // Nowe przyciski Create event
+    // Przycisk notify_create (Yes / No)
     // ----------------------------
     if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
       return EB.handleNotificationResponse(interaction);
     }
 
-    if (id.startsWith("next_year_yes") || id.startsWith("next_year_no")) {
-      // rozdzielamy tylko pierwszy myślnik, reszta pozostaje w tempId
-      const [, tempId] = id.split(/-(.+)/);
-      if (!tempId) return;
-
-      if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction, tempId);
-      if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
-    }
+    // ----------------------------
+    // Przycisk next_year (Yes / No)
+    // ----------------------------
+    if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction);
+    if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
 
     // ----------------------------
     // dynamiczne przyciski uczestników
@@ -119,6 +128,9 @@ export async function handleEventInteraction(interaction: Interaction) {
       return EB.handleClearEventButton(interaction, parseEventId(id));
   }
 
+  // ----------------------------
+  // Select menu
+  // ----------------------------
   if (interaction.isStringSelectMenu()) {
     const handler = SELECT_HANDLERS[interaction.customId];
     if (handler) return handler(interaction);
@@ -127,6 +139,9 @@ export async function handleEventInteraction(interaction: Interaction) {
       return EB.handleCompareSelect(interaction);
   }
 
+  // ----------------------------
+  // Modal submit
+  // ----------------------------
   if (interaction.isModalSubmit()) {
     return handleModal(interaction);
   }
