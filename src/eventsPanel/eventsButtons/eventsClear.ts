@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsClear.ts
 import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
 import { getEvents, deleteEvent as serviceDeleteEvent, EventObject } from "../eventService";
 
@@ -62,7 +61,9 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
 
   const eventName = event.name;
 
-  await serviceDeleteEvent(guildId, eventId);
+  // 🔹 POPRAWKA: usuwamy guildId, bo deleteEvent przyjmuje tylko eventId
+  await serviceDeleteEvent(eventId);
+
   clearEventStore.delete(interaction.user.id);
 
   const embed = new EmbedBuilder()
