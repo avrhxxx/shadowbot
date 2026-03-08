@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsManualReminder.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -15,7 +14,8 @@ import { formatEventUTC } from "../../utils/timeUtils";
    HELPERS
 ====================================================== */
 function createEventSelectMenu(events: EventObject[], customId: string, placeholder: string) {
-  const options = events.map(ev =>
+  const uniqueEvents = Array.from(new Map(events.map(e => [e.id, e])).values()); // ✅ unikalne ID
+  const options = uniqueEvents.map(ev =>
     new StringSelectMenuOptionBuilder()
       .setLabel(ev.name)
       .setDescription(formatEventUTC(ev.day, ev.month, ev.hour, ev.minute, ev.year))
