@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import { v4 as uuidv4 } from "uuid";
 
-import { getEvents, saveEvents, EventObject } from "../eventService";
+import { getEvents, createEvent, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
@@ -156,14 +156,16 @@ export async function showCreateNotificationConfirm(
 // -----------------------------------------------------------
 // FINALIZE EVENT
 // -----------------------------------------------------------
-export async function finalizeEvent(interaction: ButtonInteraction | StringSelectMenuInteraction, tempId: string) {
+export async function finalizeEvent(
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    tempId: string
+) {
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
-    const events: EventObject[] = await getEvents(tempData.guildId);
     const newEvent: EventObject = {
         id: tempData.id,
         guildId: tempData.guildId,
@@ -182,21 +184,26 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
         reminderBefore: tempData.reminderBefore
     };
 
-    await saveEvents(tempData.guildId, [...events, newEvent]);
+    // 🔹 zapis do arkusza po wierszu (nowy serwis)
+    await createEvent(newEvent);
     tempEventStore.delete(tempId);
 
     if (interaction.guild && tempData.notifyOnCreate) {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
-    await safeReply(interaction, { content: `Event **${newEvent.name}** scheduled successfully.`, components: [], ephemeral: true });
+    await safeReply(interaction, {
+        content: `Event **${newEvent.name}** scheduled successfully.`,
+        components: [],
+        ephemeral: true
+    });
 }
 
 // -----------------------------------------------------------
 // HANDLE NOTIFICATION RESPONSE
 // -----------------------------------------------------------
 export async function handleNotificationResponse(interaction: ButtonInteraction) {
-    const [, tempId] = interaction.customId.split(/-(.+)/); // <- poprawione
+    const [, tempId] = interaction.customId.split(/-(.+)/);
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
@@ -211,7 +218,7 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
 // FINALIZE NEXT YEAR EVENT
 // -----------------------------------------------------------
 export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-    const [, tempId] = interaction.customId.split(/-(.+)/); // <- poprawione
+    const [, tempId] = interaction.customId.split(/-(.+)/);
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
