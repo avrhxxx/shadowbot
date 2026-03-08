@@ -42,7 +42,7 @@ export const IDS = {
 // ----------------------------
 // Stałe button handlers
 // ----------------------------
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
+const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
   [IDS.BUTTONS.CREATE]: async (i) => await EB.handleCreate(i),
   [IDS.BUTTONS.LIST]: async (i) => await EB.handleList(i),
   [IDS.BUTTONS.CANCEL]: async (i) => await EB.handleCancel(i),
@@ -59,7 +59,7 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promi
 // ----------------------------
 // Stałe select handlers
 // ----------------------------
-const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<void>> = {
+const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
   [IDS.SELECTS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminderSelect(i),
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await EB.handleSettingsSelect(i),
   [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => await EB.handleSettingsSelect(i),
@@ -130,7 +130,7 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id.startsWith("event_compare_"))
         return await EB.handleCompareButton(interaction, parseEventId(id));
 
-      // 🔹 Compare All Download (NOWA OBSŁUGA)
+      // Compare All Download
       if (id === "compare_all_download")
         return await EB.handleCompareAllDownload(interaction);
 
