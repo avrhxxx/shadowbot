@@ -1,5 +1,4 @@
 // src/eventsPanel/eventService.ts
-import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
 export interface EventObject {
@@ -38,7 +37,7 @@ function toBool(value: any) { return value === true || value === "true"; }
 // -----------------------------
 // EVENTS SHEET HELPERS
 // -----------------------------
-async function loadEvents(guildId: string): Promise<EventObject[]> {
+export async function loadEvents(guildId: string): Promise<EventObject[]> {
   const rows = await GS.readEventsSheet();
   if (!rows.length) return [];
 
@@ -83,8 +82,7 @@ export async function updateEventCell(eventId: string, columnName: string, value
   const rowIndex = rows.findIndex(r => r[0] === eventId);
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
-  // aktualizacja pojedynczej komórki w Google Sheets
-  await GS.updateEventCell(rowIndex + 1, colIndex + 1, value); // 1-indexed dla Sheets API
+  await GS.updateEventCell(rowIndex + 1, colIndex + 1, value); // 1-indexed dla Sheets
 }
 
 export async function deleteEventRow(eventId: string) {
@@ -94,7 +92,7 @@ export async function deleteEventRow(eventId: string) {
   const rowIndex = rows.findIndex(r => r[0] === eventId);
   if (rowIndex === -1) return;
 
-  await GS.deleteEventRow(rowIndex + 1); // usuwa cały wiersz
+  await GS.deleteEventRow(rowIndex + 1);
 }
 
 // -----------------------------
@@ -105,7 +103,6 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  // dla nowo dodanych eventów zapisujemy całe wiersze
   const rows = await GS.readEventsSheet();
   const headers = rows[0] || [
     "id","guildId","name","day","month","hour","minute","year","reminderBefore","status",
@@ -160,12 +157,12 @@ export async function deleteEvent(guildId: string, eventId: string) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS (nagłówki + update po komórce)
+// CONFIG SHEET HELPERS
 // -----------------------------
-async function loadConfig(guildId: string): Promise<EventConfig> {
+export async function getConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
   if (!rows.length) return {};
-  const headers = rows[0];
+  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   const dataRows = rows.slice(1);
 
   const guildIndex = headers.indexOf("guildId");
@@ -179,7 +176,7 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
   return config;
 }
 
-async function saveConfig(guildId: string, key: string, value: any) {
+export async function setConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
   let headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   let dataRows = rows.slice(1);
@@ -192,31 +189,19 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  // sprawdzamy wiersz dla guildId
   let row = dataRows.find(r => r[guildIndex] === guildId);
-
   let rowIndex: number;
+
   if (!row) {
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
-    rowIndex = dataRows.length; // +1 dla nagłówka w Sheets
+    rowIndex = dataRows.length; // +1 dla nagłówka
   } else {
     rowIndex = dataRows.indexOf(row) + 1;
   }
 
   await GS.updateConfigCell(rowIndex, keyIndex + 1, value);
-}
-
-// -----------------------------
-// CONFIG EXPORTS
-// -----------------------------
-export async function getConfig(guildId: string): Promise<EventConfig> {
-  return await loadConfig(guildId);
-}
-
-export async function setConfig(guildId: string, key: string, value: any) {
-  await saveConfig(guildId, key, value);
 }
 
 export async function setNotificationChannel(guildId: string, channelId: string) {
