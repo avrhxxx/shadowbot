@@ -90,26 +90,26 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
     if (interaction.isButton()) {
       const id = interaction.customId;
 
-      // Stałe tlačidlá
+      // Stałe przyciski
       const handler = BUTTON_HANDLERS[id];
       if (handler) return await handler(interaction);
 
-      // Dynamic confirm pre cancel
+      // Dynamic confirm dla cancel
       if (id.startsWith("event_cancel_confirm_")) {
         const eventId = id.replace("event_cancel_confirm_", "");
         return await EB.handleCancelConfirm(interaction, eventId);
       }
 
-      // Notify create (Yes/No)
+      // Przycisk notify_create (Yes / No)
       if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
         return await EB.handleNotificationResponse(interaction);
       }
 
-      // Next year (Yes/No)
+      // Przycisk next_year (Yes / No)
       if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
       if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
-      // Dynamic participant buttons
+      // Dynamiczne przyciski uczestników
       if (id.startsWith("event_add_"))
         return await EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -132,6 +132,9 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
+    // ----------------------------
+    // Select menu
+    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
@@ -140,6 +143,9 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleCompareSelect(interaction);
     }
 
+    // ----------------------------
+    // Modal submit
+    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
