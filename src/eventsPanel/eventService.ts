@@ -1,4 +1,5 @@
 // src/eventsPanel/eventService.ts
+import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
 export interface EventObject {
@@ -38,14 +39,14 @@ function toBool(value: any) { return value === true || value === "true"; }
 // EVENTS SHEET HELPERS
 // -----------------------------
 export async function loadEvents(guildId: string): Promise<EventObject[]> {
-  const rows = await GS.readEventsSheet();
+  const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return [];
 
-  const headers = rows[0];
+  const headers: string[] = rows[0];
   return rows.slice(1)
-    .map(row => {
+    .map((row: any[]) => {
       const obj: Record<string, any> = {};
-      headers.forEach((h, i) => obj[h] = row[i] ?? null);
+      headers.forEach((h: string, i: number) => obj[h] = row[i] ?? null);
 
       return {
         id: obj.id,
@@ -72,24 +73,24 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
 // UPDATE / DELETE EVENT CELLS
 // -----------------------------
 export async function updateEventCell(eventId: string, columnName: string, value: any) {
-  const rows = await GS.readEventsSheet();
+  const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
 
-  const headers = rows[0];
+  const headers: string[] = rows[0];
   const colIndex = headers.indexOf(columnName);
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex(r => r[0] === eventId);
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value); // 1-indexed dla Sheets
 }
 
 export async function deleteEventRow(eventId: string) {
-  const rows = await GS.readEventsSheet();
+  const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
 
-  const rowIndex = rows.findIndex(r => r[0] === eventId);
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) return;
 
   await GS.deleteEventRow(rowIndex + 1);
@@ -103,17 +104,17 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  const rows = await GS.readEventsSheet();
-  const headers = rows[0] || [
+  const rows: any[][] = await GS.readEventsSheet();
+  const headers: string[] = rows[0] || [
     "id","guildId","name","day","month","hour","minute","year","reminderBefore","status",
     "participants","absent","createdAt","reminderSent","started"
   ];
 
-  const dataRows = rows.slice(1);
+  const dataRows: any[][] = rows.slice(1);
   const guildIndex = 1;
 
   const rowMap: Record<string, any[]> = {};
-  dataRows.forEach(r => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
+  dataRows.forEach((r: any[]) => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
 
   for (const e of events) {
     const copy: Record<string, any> = { ...e };
@@ -128,7 +129,7 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
     }
   }
 
-  const otherRows = dataRows.filter(r => r[guildIndex] !== guildId);
+  const otherRows = dataRows.filter((r: any[]) => r[guildIndex] !== guildId);
   await GS.writeEventsSheet([headers, ...otherRows, ...Object.values(rowMap)]);
 }
 
@@ -160,36 +161,36 @@ export async function deleteEvent(guildId: string, eventId: string) {
 // CONFIG SHEET HELPERS
 // -----------------------------
 export async function getConfig(guildId: string): Promise<EventConfig> {
-  const rows = await GS.readConfigSheet();
+  const rows: any[][] = await GS.readConfigSheet();
   if (!rows.length) return {};
-  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
-  const dataRows = rows.slice(1);
+  const headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const dataRows: any[][] = rows.slice(1);
 
   const guildIndex = headers.indexOf("guildId");
   if (guildIndex === -1) return {};
 
-  const row = dataRows.find(r => r[guildIndex] === guildId);
+  const row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   if (!row) return {};
 
   const config: EventConfig = {};
-  headers.forEach((h, i) => config[h] = row[i] ?? null);
+  headers.forEach((h: string, i: number) => config[h] = row[i] ?? null);
   return config;
 }
 
 export async function setConfig(guildId: string, key: string, value: any) {
-  const rows = await GS.readConfigSheet();
-  let headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
-  let dataRows = rows.slice(1);
+  const rows: any[][] = await GS.readConfigSheet();
+  let headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  let dataRows: any[][] = rows.slice(1);
 
   if (!headers.includes(key)) {
     headers.push(key);
-    dataRows = dataRows.map(r => { while(r.length < headers.length) r.push(""); return r; });
+    dataRows = dataRows.map((r: any[]) => { while(r.length < headers.length) r.push(""); return r; });
   }
 
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  let row = dataRows.find(r => r[guildIndex] === guildId);
+  let row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   let rowIndex: number;
 
   if (!row) {
@@ -204,6 +205,9 @@ export async function setConfig(guildId: string, key: string, value: any) {
   await GS.updateConfigCell(rowIndex, keyIndex + 1, value);
 }
 
+// -----------------------------
+// CONFIG SHORTCUTS
+// -----------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   await setConfig(guildId, "notificationChannel", channelId);
 }
