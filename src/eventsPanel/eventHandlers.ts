@@ -52,9 +52,12 @@ function handleModal(interaction: ModalSubmitInteraction) {
   const { customId } = interaction;
 
   if (customId === IDS.MODALS.CREATE) return EB.handleCreateSubmit(interaction);
-  if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) return EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
-  if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) return EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
-  if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) return EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
+  if (customId.startsWith(IDS.MODALS.ADD_PREFIX))
+    return EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
+  if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX))
+    return EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
+  if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX))
+    return EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
 }
 
 // GŁÓWNY HANDLER
@@ -64,21 +67,28 @@ export async function handleEventInteraction(interaction: Interaction) {
     if (handler) return handler(interaction);
 
     // dynamiczne ID buttonów
-    if (interaction.customId.startsWith("event_add_")) return EB.handleAddParticipant(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_remove_")) return EB.handleRemoveParticipant(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_absent_")) return EB.handleAbsentParticipant(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_show_list_")) return EB.handleShowList(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_download_single_")) return EB.handleDownload(interaction, parseEventId(interaction.customId));
-    if (interaction.customId.startsWith("event_compare_")) 
-      return EB.handleCompareButton(interaction, parseEventId(interaction.customId), interaction.guildId!);
-    if (interaction.customId.startsWith("event_clear_")) return EB.handleClearEventButton(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_add_"))
+      return EB.handleAddParticipant(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_remove_"))
+      return EB.handleRemoveParticipant(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_absent_"))
+      return EB.handleAbsentParticipant(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_show_list_"))
+      return EB.handleShowList(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_download_single_"))
+      return EB.handleDownload(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_compare_"))
+      return EB.handleCompareButton(interaction, parseEventId(interaction.customId));
+    if (interaction.customId.startsWith("event_clear_"))
+      return EB.handleClearEventButton(interaction, parseEventId(interaction.customId));
   }
 
   if (interaction.isStringSelectMenu()) {
     const handler = SELECT_HANDLERS[interaction.customId];
     if (handler) return handler(interaction);
 
-    if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) return EB.handleCompareSelect(interaction);
+    if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX))
+      return EB.handleCompareSelect(interaction);
   }
 
   if (interaction.isModalSubmit()) {
