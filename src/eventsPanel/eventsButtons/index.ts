@@ -77,4 +77,4 @@ export { handleClearEventButton, handleClearEventConfirm, handleClearEventAbort 
 // -----------------------------
 // EVENTS MANUAL REMINDER
 // -----------------------------
-export { handleManualReminder } from "./eventsManualReminder";
+export { handleManualReminder, handleManualReminderSelect } from "./eventsManualReminder";
