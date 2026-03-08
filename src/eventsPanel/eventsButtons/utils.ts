@@ -1,11 +1,15 @@
 /**
  * Wyciąga ID eventu z customId przycisku lub modala.
- * Zakłada, że ID eventu jest po prefiksie akcji, np.:
- * event_add_E-97cf152c-c669-4966-a35b-6657e6a96557
+ * Działa dla wszystkich formatów:
+ * event_add_ID
+ * event_remove_ID
+ * event_show_list_ID
+ * event_download_single_ID
+ * itd.
  */
 export function parseEventId(customId: string): string {
-  // Bierzemy wszystko po prefiksie akcji (wszystko po drugim "_")
-  return customId.split("_").slice(2).join("_");
+  const index = customId.lastIndexOf("_");
+  return customId.substring(index + 1);
 }
 
 /* ===========================
