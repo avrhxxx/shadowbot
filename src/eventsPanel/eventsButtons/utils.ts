@@ -1,5 +1,3 @@
-// src/eventsPanel/eventsButtons/utils.ts
-
 /**
  * Wyciąga ID eventu z customId przycisku lub modala.
  * Zakłada, że ID eventu jest ostatnią częścią po "_"
