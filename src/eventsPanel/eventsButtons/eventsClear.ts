@@ -3,11 +3,17 @@ import { getEvents, deleteEvent as serviceDeleteEvent } from "../eventService";
 
 const clearEventStore = new Map<string, string>();
 
-export async function handleClearEventButton(
-  interaction: ButtonInteraction,
-  eventId: string,
-  eventName: string
-) {
+export async function handleClearEventButton(interaction: ButtonInteraction, eventId: string) {
+  const guildId = interaction.guildId!;
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
+
+  if (!event) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
+  }
+
+  const eventName = event.name;
   clearEventStore.set(interaction.user.id, eventId);
 
   const embed = new EmbedBuilder()
@@ -56,9 +62,7 @@ export async function handleClearEventConfirm(interaction: ButtonInteraction) {
 
   const eventName = event.name;
 
-  // Usuń event permanentnie przez serwis (nie bezpośrednio w Sheets)
   await serviceDeleteEvent(guildId, eventId);
-
   clearEventStore.delete(interaction.user.id);
 
   const embed = new EmbedBuilder()
