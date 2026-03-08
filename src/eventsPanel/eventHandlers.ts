@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsHandler.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -39,7 +40,7 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> =
   [IDS.BUTTONS.CANCEL]: EB.handleCancel,
   [IDS.BUTTONS.CANCEL_ABORT]: EB.handleCancelAbort,
   [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
-  [IDS.BUTTONS.HELP]: EB.handleHelp, // <-- help już jest w stałych i handlers
+  [IDS.BUTTONS.HELP]: EB.handleHelp,
   [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
 };
 
@@ -74,7 +75,21 @@ export async function handleEventInteraction(interaction: Interaction) {
 
     const id = interaction.customId;
 
+    // ----------------------------
+    // Nowe przyciski Create event
+    // ----------------------------
+    if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no"))
+      return EB.handleNotificationResponse(interaction);
+
+    if (id === "next_year_yes")
+      return EB.finalizeNextYearEvent(interaction);
+
+    if (id === "next_year_no")
+      return EB.handleCancelAbort(interaction);
+
+    // ----------------------------
     // dynamiczne przyciski uczestników
+    // ----------------------------
     if (id.startsWith("event_add_"))
       return EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -94,7 +109,7 @@ export async function handleEventInteraction(interaction: Interaction) {
       return EB.handleCompareButton(interaction, parseEventId(id));
 
     if (id.startsWith("event_clear_"))
-      return EB.handleClearEventButton(interaction, parseEventId(id)); // <-- teraz pasuje do nowego clear
+      return EB.handleClearEventButton(interaction, parseEventId(id));
   }
 
   if (interaction.isStringSelectMenu()) {
