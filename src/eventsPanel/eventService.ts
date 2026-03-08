@@ -69,39 +69,32 @@ async function loadEvents(guildId: string): Promise<EventObject[]> {
     .filter(e => e.guildId === guildId);
 }
 
-async function saveEventsSheet(guildId: string, events: EventObject[]) {
+// -----------------------------
+// UPDATE / DELETE EVENT CELLS
+// -----------------------------
+export async function updateEventCell(eventId: string, columnName: string, value: any) {
   const rows = await GS.readEventsSheet();
-  const headers = rows[0] || [
-    "id","guildId","name","day","month","hour","minute","year","reminderBefore","status",
-    "participants","absent","createdAt","reminderSent","started"
-  ];
+  if (!rows.length) return;
 
-  const dataRows = rows.slice(1);
-  const guildIndex = 1; // column guildId
+  const headers = rows[0];
+  const colIndex = headers.indexOf(columnName);
+  if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  // Stwórz mapę istniejących wierszy po ID
-  const rowMap: Record<string, any[]> = {};
-  dataRows.forEach(r => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
+  const rowIndex = rows.findIndex(r => r[0] === eventId);
+  if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
-  for (const e of events) {
-    const copy: Record<string, any> = { ...e };
-    copy.participants = JSON.stringify(copy.participants || []);
-    copy.absent = JSON.stringify(copy.absent || []);
-    copy.reminderSent = e.reminderSent ? "true" : "false";
-    copy.started = e.started ? "true" : "false";
+  // aktualizacja pojedynczej komórki w Google Sheets
+  await GS.updateEventCell(rowIndex + 1, colIndex + 1, value); // 1-indexed dla Sheets API
+}
 
-    if (rowMap[e.id]) {
-      const existingRow = rowMap[e.id];
-      const newRow = headers.map((h, i) => copy[h] ?? existingRow[i] ?? "");
-      rowMap[e.id] = newRow;
-    } else {
-      const newRow = headers.map(h => copy[h] ?? "");
-      rowMap[e.id] = newRow;
-    }
-  }
+export async function deleteEventRow(eventId: string) {
+  const rows = await GS.readEventsSheet();
+  if (!rows.length) return;
 
-  const otherRows = dataRows.filter(r => r[guildIndex] !== guildId);
-  await GS.writeEventsSheet([headers, ...otherRows, ...Object.values(rowMap)]);
+  const rowIndex = rows.findIndex(r => r[0] === eventId);
+  if (rowIndex === -1) return;
+
+  await GS.deleteEventRow(rowIndex + 1); // usuwa cały wiersz
 }
 
 // -----------------------------
@@ -112,7 +105,34 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 }
 
 export async function saveEvents(guildId: string, events: EventObject[]) {
-  await saveEventsSheet(guildId, events);
+  // dla nowo dodanych eventów zapisujemy całe wiersze
+  const rows = await GS.readEventsSheet();
+  const headers = rows[0] || [
+    "id","guildId","name","day","month","hour","minute","year","reminderBefore","status",
+    "participants","absent","createdAt","reminderSent","started"
+  ];
+
+  const dataRows = rows.slice(1);
+  const guildIndex = 1;
+
+  const rowMap: Record<string, any[]> = {};
+  dataRows.forEach(r => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
+
+  for (const e of events) {
+    const copy: Record<string, any> = { ...e };
+    copy.participants = JSON.stringify(copy.participants || []);
+    copy.absent = JSON.stringify(copy.absent || []);
+    copy.reminderSent = e.reminderSent ? "true" : "false";
+    copy.started = e.started ? "true" : "false";
+
+    if (!rowMap[e.id]) {
+      const newRow = headers.map(h => copy[h] ?? "");
+      rowMap[e.id] = newRow;
+    }
+  }
+
+  const otherRows = dataRows.filter(r => r[guildIndex] !== guildId);
+  await GS.writeEventsSheet([headers, ...otherRows, ...Object.values(rowMap)]);
 }
 
 export async function createEvent(data: EventObject): Promise<EventObject> {
@@ -128,22 +148,19 @@ export async function getEventById(guildId: string, eventId: string): Promise<Ev
 }
 
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = await getEventById(guildId, eventId);
   if (!event) return null;
   event.status = "CANCELED";
-  await saveEvents(guildId, events);
+  await updateEventCell(event.id, "status", "CANCELED");
   return event;
 }
 
 export async function deleteEvent(guildId: string, eventId: string) {
-  const events = await getEvents(guildId);
-  const updated = events.filter(e => e.id !== eventId);
-  await saveEvents(guildId, updated);
+  await deleteEventRow(eventId);
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS (update po linijce)
+// CONFIG SHEET HELPERS (nagłówki + update po komórce)
 // -----------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
@@ -164,7 +181,7 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
 
 async function saveConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
-  let headers = rows[0] || [];
+  let headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   let dataRows = rows.slice(1);
 
   if (!headers.includes(key)) {
@@ -175,22 +192,20 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  // Znajdź wiersz dla guildId
+  // sprawdzamy wiersz dla guildId
   let row = dataRows.find(r => r[guildIndex] === guildId);
-  let rowIndex: number;
 
+  let rowIndex: number;
   if (!row) {
-    // nowy wiersz na końcu arkusza
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
-    rowIndex = dataRows.length; // +1 wiersza nagłówka w Sheets
+    rowIndex = dataRows.length; // +1 dla nagłówka w Sheets
   } else {
-    rowIndex = dataRows.indexOf(row) + 1; // +1 dla nagłówka
+    rowIndex = dataRows.indexOf(row) + 1;
   }
 
-  // Nadpisanie tylko jednej komórki w arkuszu
-  await GS.updateConfigCell(rowIndex, keyIndex + 1, value); // kolumny w Sheets są 1-indexed
+  await GS.updateConfigCell(rowIndex, keyIndex + 1, value);
 }
 
 // -----------------------------
