@@ -29,6 +29,15 @@ async function sendComparisonFile(channel: TextChannel, name: string, content: s
 }
 
 // -----------------------------
+// HELPER: GET EVENT BY ID
+// -----------------------------
+async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
+  return event || null;
+}
+
+// -----------------------------
 // BUTTON HANDLERS
 // -----------------------------
 export const handleCompareButton = async (
@@ -36,8 +45,7 @@ export const handleCompareButton = async (
   eventId: string
 ): Promise<void> => {
   const guild = interaction.guild as Guild;
-  const events = await getEvents(interaction.guildId!);
-  const current = events.find(e => e.id === eventId);
+  const current = await getEventById(interaction.guildId!, eventId);
   if (!current) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
     return;
@@ -47,14 +55,15 @@ export const handleCompareButton = async (
     return;
   }
 
-  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== eventId).sort((a, b) => b.createdAt - a.createdAt);
+  const events = await getEvents(interaction.guildId!);
+  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== current.id).sort((a, b) => b.createdAt - a.createdAt);
   if (!pastEvents.length) {
     await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
     return;
   }
 
   const select = new StringSelectMenuBuilder()
-    .setCustomId(`compare_select_${eventId}`)
+    .setCustomId(`compare_select_${current.id}`)
     .setPlaceholder("Select event to compare with")
     .addOptions(
       pastEvents.map(ev =>
@@ -75,9 +84,10 @@ export const handleCompareSelect = async (
   const guild = interaction.guild as Guild;
   const selectedId = interaction.values[0];
   const currentId = interaction.customId.replace("compare_select_", "");
-  const events = await getEvents(guild.id);
-  const eventA = events.find(e => e.id === currentId);
-  const eventB = events.find(e => e.id === selectedId);
+
+  const eventA = await getEventById(guild.id, currentId);
+  const eventB = await getEventById(guild.id, selectedId);
+
   if (!eventA || !eventB) {
     await interaction.update({ content: "One of the events no longer exists.", components: [] });
     return;
@@ -103,9 +113,9 @@ export const handleCompareDownload = async (
   const idA = parts[2];
   const idB = parts[3];
 
-  const events = await getEvents(guild.id);
-  const eventA = events.find(e => e.id === idA);
-  const eventB = events.find(e => e.id === idB);
+  const eventA = await getEventById(guild.id, idA);
+  const eventB = await getEventById(guild.id, idB);
+
   if (!eventA || !eventB) {
     await interaction.reply({ content: "Events not found.", ephemeral: true });
     return;
@@ -130,9 +140,10 @@ export const handleCompareDownload = async (
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 };
 
-export const handleCompareAll = async (
-  interaction: ButtonInteraction
-): Promise<void> => {
+// -----------------------------
+// Compare All (nie ruszamy)
+// -----------------------------
+export const handleCompareAll = async (interaction: ButtonInteraction): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
   const events = await getEvents(interaction.guildId!);
   if (!events.length) {
@@ -150,9 +161,7 @@ export const handleCompareAll = async (
   await interaction.editReply({ content: `📥 Comparison for all events ready. Click Download All (TXT) to get the file.`, components: [row] });
 };
 
-export const handleCompareAllDownload = async (
-  interaction: ButtonInteraction
-): Promise<void> => {
+export const handleCompareAllDownload = async (interaction: ButtonInteraction): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild as Guild;
   const events = await getEvents(guild.id);
