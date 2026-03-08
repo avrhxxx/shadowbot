@@ -8,7 +8,7 @@ import {
   ButtonStyle,
   EmbedBuilder
 } from "discord.js";
-import { EventObject, getEvents, saveEvents } from "../eventService";
+import { cancelEvent, getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 /* ======================================================
@@ -55,7 +55,7 @@ export async function handleCancel(interaction: ButtonInteraction) {
    🔹 STEP 2 – SELECT → CONFIRMATION
 ====================================================== */
 export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
-  await interaction.deferUpdate(); // ✅ defer update, bo później update używamy
+  await interaction.deferUpdate();
 
   const guildId = interaction.guildId!;
   const eventId = interaction.values[0];
@@ -105,16 +105,12 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
   await interaction.deferUpdate();
 
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = await cancelEvent(guildId, eventId); // ✅ użycie cancelEvent aktualizuje arkusz
 
   if (!event) {
     await interaction.followUp({ content: "Event not found.", ephemeral: true });
     return;
   }
-
-  event.status = "CANCELED";
-  await saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Canceled")
