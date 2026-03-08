@@ -36,7 +36,7 @@ function toNumber(value: any, fallback = 0) { return value != null ? Number(valu
 function toBool(value: any) { return value === true || value === "true"; }
 
 // -----------------------------
-// EVENTS SHEET HELPERS
+// EVENTS SHEET HELPERS (minimal overwrite)
 // -----------------------------
 async function loadEvents(guildId: string): Promise<EventObject[]> {
   const rows = await GS.readEventsSheet();
@@ -76,29 +76,39 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     "participants","absent","createdAt","reminderSent","started"
   ];
 
-  const otherRows = rows.slice(1).filter(r => r[1] !== guildId);
+  const dataRows = rows.slice(1);
+  const guildIndex = 1; // column guildId
 
-  const guildExistingRows: Record<string, any[]> = {};
-  rows.slice(1).filter(r => r[1] === guildId).forEach(r => {
-    guildExistingRows[r[0]] = r; // ID w kolumnie 0
-  });
+  // Stwórz mapę istniejących wierszy po ID
+  const rowMap: Record<string, any[]> = {};
+  dataRows.forEach(r => { if(r[guildIndex] === guildId) rowMap[r[0]] = r; });
 
-  const guildRows = events.map(e => {
+  const newRows: any[][] = [];
+
+  for (const e of events) {
     const copy: Record<string, any> = { ...e };
     copy.participants = JSON.stringify(copy.participants || []);
     copy.absent = JSON.stringify(copy.absent || []);
     copy.reminderSent = e.reminderSent ? "true" : "false";
     copy.started = e.started ? "true" : "false";
 
-    if (guildExistingRows[e.id]) {
-      const existingRow = guildExistingRows[e.id];
-      return headers.map(h => copy[h] ?? existingRow[headers.indexOf(h)] ?? "");
+    if (rowMap[e.id]) {
+      // Nadpisz istniejący wiersz minimalnie
+      const existingRow = rowMap[e.id];
+      const newRow = headers.map((h, i) => copy[h] ?? existingRow[i] ?? "");
+      rowMap[e.id] = newRow; // aktualizacja mapy
+    } else {
+      // Nowy wiersz
+      const newRow = headers.map(h => copy[h] ?? "");
+      rowMap[e.id] = newRow;
     }
+  }
 
-    return headers.map(h => copy[h] ?? "");
-  });
+  // Pozostałe wiersze z innych guildów
+  const otherRows = dataRows.filter(r => r[guildIndex] !== guildId);
 
-  await GS.writeEventsSheet([headers, ...otherRows, ...guildRows]);
+  // Finalny zapis minimalny
+  await GS.writeEventsSheet([headers, ...otherRows, ...Object.values(rowMap)]);
 }
 
 // -----------------------------
@@ -140,7 +150,7 @@ export async function deleteEvent(guildId: string, eventId: string) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS
+// CONFIG SHEET HELPERS (minimal overwrite)
 // -----------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
@@ -159,7 +169,6 @@ async function loadConfig(guildId: string): Promise<EventConfig> {
   return config;
 }
 
-// Poprawione zapisywanie konfiguracji kanałów
 async function saveConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
   let headers = rows[0] || [];
@@ -171,22 +180,17 @@ async function saveConfig(guildId: string, key: string, value: any) {
   }
 
   const guildIndex = headers.indexOf("guildId");
-  let rowIndex = dataRows.findIndex(r => r[guildIndex] === guildId);
+  let row = dataRows.find(r => r[guildIndex] === guildId);
 
-  // Jeśli wiersz nie istnieje, tworzymy nowy
-  if (rowIndex === -1) {
-    const newRow = new Array(headers.length).fill("");
-    newRow[guildIndex] = guildId;
-    newRow[headers.indexOf(key)] = value;
-    dataRows.push(newRow);
+  if (!row) {
+    // nowy wiersz
+    row = new Array(headers.length).fill("");
+    row[guildIndex] = guildId;
+    row[headers.indexOf(key)] = value;
+    dataRows.push(row);
   } else {
-    // Sprawdzamy, czy wartość już się zgadza
-    const existingValue = dataRows[rowIndex][headers.indexOf(key)];
-    if (existingValue === value) {
-      return; // nic nie robimy, kanał już ustawiony
-    }
-    // Nadpisujemy istniejący wiersz
-    dataRows[rowIndex][headers.indexOf(key)] = value;
+    // nadpisanie tylko jednej komórki
+    row[headers.indexOf(key)] = value;
   }
 
   await GS.writeConfigSheet([headers, ...dataRows]);
