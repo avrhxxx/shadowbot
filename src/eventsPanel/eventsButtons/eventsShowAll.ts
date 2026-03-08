@@ -3,9 +3,6 @@ import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedB
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
-// ==========================
-// HELPERS
-// ==========================
 const STATUS_EMOJIS: Record<string, string> = {
   ACTIVE: "🟢",
   PAST: "⚪",
@@ -31,8 +28,10 @@ function createEventListText(events: any[]) {
 // SHOW ALL EVENTS
 // ==========================
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
   const events = await getEvents(interaction.guildId!);
-  if (!events.length) return interaction.reply({ content: "No events found.", ephemeral: true });
+  if (!events.length) return interaction.editReply({ content: "No events found." });
 
   const row = createButtonRow(
     new ButtonBuilder().setCustomId("compare_all_events").setLabel("Compare All").setStyle(ButtonStyle.Primary),
@@ -41,15 +40,17 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
   );
 
   const listText = createEventListText(events);
-  await interaction.reply({ content: `📅 **All Events**\n\n${listText}`, components: [row], ephemeral: true });
+  await interaction.editReply({ content: `📅 **All Events**\n\n${listText}`, components: [row] });
 }
 
 // ==========================
 // SHOW ALL PARTICIPANT LISTS
 // ==========================
 export async function handleShowAllLists(interaction: ButtonInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
   const events = await getEvents(interaction.guildId!);
-  if (!events.length) return interaction.reply({ content: "No events found.", ephemeral: true });
+  if (!events.length) return interaction.editReply({ content: "No events found." });
 
   const fullText = events
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -61,7 +62,6 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
     })
     .join("\n\n====================\n\n");
 
-  // Tworzymy fragmenty embedów max 3900 znaków
   const chunks = fullText.match(/[\s\S]{1,3900}/g) || [];
   for (let i = 0; i < chunks.length; i++) {
     const embed = new EmbedBuilder()
@@ -69,7 +69,7 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
       .setColor(0x00ff00)
       .setDescription(chunks[i]);
 
-    if (i === 0) await interaction.reply({ embeds: [embed], ephemeral: true });
+    if (i === 0) await interaction.editReply({ embeds: [embed] });
     else await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 }
