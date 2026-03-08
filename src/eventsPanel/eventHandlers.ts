@@ -4,6 +4,7 @@ import {
   ButtonInteraction,
   StringSelectMenuInteraction,
   ModalSubmitInteraction,
+  CacheType,
 } from "discord.js";
 
 import * as EB from "./eventsButtons";
@@ -18,8 +19,8 @@ export const IDS = {
     SETTINGS: "event_settings",
     HELP: "event_help",
     MANUAL_REMINDER: "event_manual_reminder",
-    SHOW_ALL: "show_all_events",       // ✅ dodany
-    SHOW_ALL_LISTS: "show_all_lists",  // ✅ dodany
+    SHOW_ALL: "event_show_all",
+    SHOW_ALL_LISTS: "event_show_all_lists",
   },
   SELECTS: {
     MANUAL_REMINDER: "manual_reminder_select",
@@ -39,51 +40,48 @@ export const IDS = {
 // ----------------------------
 // Stałe button handlers
 // ----------------------------
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> = {
-  [IDS.BUTTONS.CREATE]: EB.handleCreate,
-  [IDS.BUTTONS.LIST]: EB.handleList,
-  [IDS.BUTTONS.CANCEL]: EB.handleCancel,
-  [IDS.BUTTONS.CANCEL_ABORT]: EB.handleCancelAbort,
-  [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
-  [IDS.BUTTONS.HELP]: EB.handleHelp,
-  [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
-  [IDS.BUTTONS.SHOW_ALL]: EB.handleShowAllEvents,      // ✅ powiązany handler
-  [IDS.BUTTONS.SHOW_ALL_LISTS]: EB.handleShowAllLists, // ✅ powiązany handler
+const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
+  [IDS.BUTTONS.CREATE]: async (i) => { await EB.handleCreate(i); },
+  [IDS.BUTTONS.LIST]: async (i) => { await EB.handleList(i); },
+  [IDS.BUTTONS.CANCEL]: async (i) => { await EB.handleCancel(i); },
+  [IDS.BUTTONS.CANCEL_ABORT]: async (i) => { await EB.handleCancelAbort(i); },
+  [IDS.BUTTONS.SETTINGS]: async (i) => { await EB.handleSettings(i); },
+  [IDS.BUTTONS.HELP]: async (i) => { await EB.handleHelp(i); },
+  [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => { await EB.handleManualReminder(i); },
+  [IDS.BUTTONS.SHOW_ALL]: async (i) => { await EB.handleShowAllEvents(i); },
+  [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => { await EB.handleShowAllLists(i); },
 };
 
 // ----------------------------
 // Stałe select handlers
 // ----------------------------
-const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction) => Promise<void>> = {
-  [IDS.SELECTS.MANUAL_REMINDER]: EB.handleManualReminderSelect,
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: EB.handleSettingsSelect,
-  [IDS.SELECTS.SETTINGS_DOWNLOAD]: EB.handleSettingsSelect,
-  [IDS.SELECTS.CANCEL_SELECT]: EB.handleCancelSelect,
+const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<void>> = {
+  [IDS.SELECTS.MANUAL_REMINDER]: async (i) => { await EB.handleManualReminderSelect(i); },
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => { await EB.handleSettingsSelect(i); },
+  [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => { await EB.handleSettingsSelect(i); },
+  [IDS.SELECTS.CANCEL_SELECT]: async (i) => { await EB.handleCancelSelect(i); },
 };
 
 // ----------------------------
 // Modal submit handler
 // ----------------------------
-function handleModal(interaction: ModalSubmitInteraction) {
+async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
   const { customId } = interaction;
 
   if (customId === IDS.MODALS.CREATE)
-    return EB.handleCreateSubmit(interaction);
-
-  if (customId.startsWith(IDS.MODALS.ADD_PREFIX))
-    return EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
-
-  if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX))
-    return EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
-
-  if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX))
-    return EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
+    await EB.handleCreateSubmit(interaction);
+  else if (customId.startsWith(IDS.MODALS.ADD_PREFIX))
+    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
+  else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX))
+    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
+  else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX))
+    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
 }
 
 // ----------------------------
 // Główny handler interakcji
 // ----------------------------
-export async function handleEventInteraction(interaction: Interaction) {
+export async function handleEventInteraction(interaction: Interaction<CacheType>) {
   try {
     if (interaction.isButton()) {
       const id = interaction.customId;
@@ -92,52 +90,52 @@ export async function handleEventInteraction(interaction: Interaction) {
       // Stałe przyciski
       // ----------------------------
       const handler = BUTTON_HANDLERS[id];
-      if (handler) return handler(interaction);
+      if (handler) return await handler(interaction);
 
       // ----------------------------
       // Dynamiczne confirm dla cancel
       // ----------------------------
       if (id.startsWith("event_cancel_confirm_")) {
         const eventId = id.replace("event_cancel_confirm_", "");
-        return EB.handleCancelConfirm(interaction, eventId);
+        return await EB.handleCancelConfirm(interaction, eventId);
       }
 
       // ----------------------------
       // Przycisk notify_create (Yes / No)
       // ----------------------------
       if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
-        return EB.handleNotificationResponse(interaction);
+        return await EB.handleNotificationResponse(interaction);
       }
 
       // ----------------------------
       // Przycisk next_year (Yes / No)
       // ----------------------------
-      if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction);
-      if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
+      if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
+      if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
       // ----------------------------
-      // dynamiczne przyciski uczestników
+      // Dynamiczne przyciski uczestników
       // ----------------------------
       if (id.startsWith("event_add_"))
-        return EB.handleAddParticipant(interaction, parseEventId(id));
+        return await EB.handleAddParticipant(interaction, parseEventId(id));
 
       if (id.startsWith("event_remove_"))
-        return EB.handleRemoveParticipant(interaction, parseEventId(id));
+        return await EB.handleRemoveParticipant(interaction, parseEventId(id));
 
       if (id.startsWith("event_absent_"))
-        return EB.handleAbsentParticipant(interaction, parseEventId(id));
+        return await EB.handleAbsentParticipant(interaction, parseEventId(id));
 
       if (id.startsWith("event_show_list_"))
-        return EB.handleShowList(interaction, parseEventId(id));
+        return await EB.handleShowList(interaction, parseEventId(id));
 
       if (id.startsWith("event_download_single_"))
-        return EB.handleDownload(interaction, parseEventId(id));
+        return await EB.handleDownload(interaction, parseEventId(id));
 
       if (id.startsWith("event_compare_"))
-        return EB.handleCompareButton(interaction, parseEventId(id));
+        return await EB.handleCompareButton(interaction, parseEventId(id));
 
       if (id.startsWith("event_clear_"))
-        return EB.handleClearEventButton(interaction, parseEventId(id));
+        return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
     // ----------------------------
@@ -145,17 +143,17 @@ export async function handleEventInteraction(interaction: Interaction) {
     // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
-      if (handler) return handler(interaction);
+      if (handler) return await handler(interaction);
 
       if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX))
-        return EB.handleCompareSelect(interaction);
+        return await EB.handleCompareSelect(interaction);
     }
 
     // ----------------------------
     // Modal submit
     // ----------------------------
     if (interaction.isModalSubmit()) {
-      return handleModal(interaction);
+      return await handleModal(interaction);
     }
   } catch (error) {
     console.error("Error handling event interaction:", error);
