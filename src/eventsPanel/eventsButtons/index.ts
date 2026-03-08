@@ -54,12 +54,7 @@ export {
 // -----------------------------
 // EVENTS SHOW ALL
 // -----------------------------
-export {
-  handleShowAllEvents,
-  handleShowAllLists,
-  handleDownloadAll,      // <- teraz poprawnie eksportowany
-  handleCompareAll        // <- teraz poprawnie eksportowany
-} from "./eventsShowAll";
+export { handleShowAllEvents, handleShowAllLists } from "./eventsShowAll";
 
 // -----------------------------
 // EVENTS PARTICIPANTS
