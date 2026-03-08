@@ -16,18 +16,27 @@ interface EventObjectWithAbsent extends EventObject {
   absent: string[];
 }
 
-/* ======================================================
-   🔹 ADD PARTICIPANT (BUTTON → MODAL)
-====================================================== */
-export async function handleAddParticipant(interaction: ButtonInteraction, eventId: string) {
-  const modal = new ModalBuilder()
-    .setCustomId(`event_add_modal_${eventId}`)
-    .setTitle("Add Participant(s)");
+// ==========================
+// HELPERS
+// ==========================
+async function getEvent(guildId: string, eventId: string): Promise<EventObjectWithAbsent | null> {
+  const events = await getEvents(guildId) as EventObjectWithAbsent[];
+  const event = events.find(e => e.id === eventId);
+  if (!event) return null;
+  event.absent = event.absent || [];
+  return event;
+}
 
+async function saveEventChanges(guildId: string, events: EventObjectWithAbsent[]) {
+  await saveEvents(guildId, events);
+}
+
+async function showTextModal(interaction: ButtonInteraction, title: string, customId: string, placeholder?: string) {
+  const modal = new ModalBuilder().setCustomId(customId).setTitle(title);
   const input = new TextInputBuilder()
     .setCustomId("user_input")
-    .setLabel("Enter game nickname(s), separated by commas")
-    .setPlaceholder("e.g. Arek, Allie, DomSugarDaddy...")
+    .setLabel(title)
+    .setPlaceholder(placeholder ?? "")
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
@@ -35,14 +44,34 @@ export async function handleAddParticipant(interaction: ButtonInteraction, event
   await interaction.showModal(modal);
 }
 
-/* ======================================================
-   🔹 ADD PARTICIPANT (MODAL SUBMIT)
-====================================================== */
-export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+// ==========================
+// MODAL SHOW HANDLERS
+// ==========================
+export async function handleAddParticipant(interaction: ButtonInteraction, eventId: string) {
+  await showTextModal(interaction, "Add Participant(s)", `event_add_modal_${eventId}`, "e.g. Arek, Allie, DomSugarDaddy...");
+}
+
+export async function handleRemoveParticipant(interaction: ButtonInteraction, eventId: string) {
+  await showTextModal(interaction, "Remove Participant", `event_remove_modal_${eventId}`);
+}
+
+export async function handleAbsentParticipant(interaction: ButtonInteraction, eventId: string) {
+  await showTextModal(interaction, "Mark Absent", `event_absent_modal_${eventId}`);
+}
+
+// ==========================
+// MODAL SUBMIT HANDLERS
+// ==========================
+async function updateParticipants(
+  interaction: ModalSubmitInteraction,
+  eventId: string,
+  updater: (event: EventObjectWithAbsent, input: string[]) => string[]
+) {
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
-  const input = interaction.fields.getTextInputValue("user_input");
+  const inputRaw = interaction.fields.getTextInputValue("user_input");
+  const input = inputRaw.split(",").map(n => n.trim()).filter(Boolean);
 
   const events = await getEvents(guildId) as EventObjectWithAbsent[];
   const event = events.find(e => e.id === eventId);
@@ -51,119 +80,57 @@ export async function handleAddParticipantSubmit(interaction: ModalSubmitInterac
     return;
   }
 
-  event.absent = event.absent || [];
-  const nicknames = input.split(",").map(n => n.trim()).filter(Boolean);
-  const added: string[] = [];
+  const updatedItems = updater(event, input);
 
-  for (const nick of nicknames) {
-    if (!event.participants.includes(nick)) {
-      event.participants.push(nick);
-      added.push(nick);
-    }
-    event.absent = event.absent.filter(n => n !== nick);
-  }
-
-  await saveEvents(guildId, events);
+  await saveEventChanges(guildId, events);
 
   await interaction.editReply({
-    content: added.length
-      ? `${added.join(", ")} added to **${event.name}**`
-      : `No new participants were added (all already present).`
+    content: updatedItems.length
+      ? `${updatedItems.join(", ")} updated for **${event.name}**`
+      : `No changes were made for **${event.name}**.`
   });
 }
 
-/* ======================================================
-   🔹 REMOVE PARTICIPANT (BUTTON → MODAL)
-====================================================== */
-export async function handleRemoveParticipant(interaction: ButtonInteraction, eventId: string) {
-  const modal = new ModalBuilder()
-    .setCustomId(`event_remove_modal_${eventId}`)
-    .setTitle("Remove Participant");
-
-  const input = new TextInputBuilder()
-    .setCustomId("user_input")
-    .setLabel("Enter game nickname")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
-  await interaction.showModal(modal);
+export async function handleAddParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
+  await updateParticipants(interaction, eventId, (event, nicknames) => {
+    const added: string[] = [];
+    for (const nick of nicknames) {
+      if (!event.participants.includes(nick)) {
+        event.participants.push(nick);
+        added.push(nick);
+      }
+      event.absent = event.absent.filter(n => n !== nick);
+    }
+    return added;
+  });
 }
 
-/* ======================================================
-   🔹 REMOVE PARTICIPANT (MODAL SUBMIT)
-====================================================== */
 export async function handleRemoveParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guildId = interaction.guildId!;
-  const input = interaction.fields.getTextInputValue("user_input");
-
-  const events = await getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find(e => e.id === eventId);
-  if (!event) {
-    await interaction.editReply({ content: "Event not found." });
-    return;
-  }
-
-  if (!event.participants.includes(input)) {
-    await interaction.editReply({ content: `${input} is not a participant in **${event.name}**` });
-    return;
-  }
-
-  event.participants = event.participants.filter(nick => nick !== input);
-  event.absent = (event.absent || []).filter(n => n !== input);
-
-  await saveEvents(guildId, events);
-
-  await interaction.editReply({ content: `${input} removed from **${event.name}**` });
+  await updateParticipants(interaction, eventId, (event, nicknames) => {
+    const removed: string[] = [];
+    for (const nick of nicknames) {
+      if (event.participants.includes(nick)) {
+        event.participants = event.participants.filter(n => n !== nick);
+        event.absent = event.absent.filter(n => n !== nick);
+        removed.push(nick);
+      }
+    }
+    return removed;
+  });
 }
 
-/* ======================================================
-   🔹 ABSENT PARTICIPANT (BUTTON → MODAL)
-====================================================== */
-export async function handleAbsentParticipant(interaction: ButtonInteraction, eventId: string) {
-  const modal = new ModalBuilder()
-    .setCustomId(`event_absent_modal_${eventId}`)
-    .setTitle("Mark Absent");
-
-  const input = new TextInputBuilder()
-    .setCustomId("user_input")
-    .setLabel("Enter game nickname")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
-  await interaction.showModal(modal);
-}
-
-/* ======================================================
-   🔹 ABSENT PARTICIPANT (MODAL SUBMIT)
-====================================================== */
 export async function handleAbsentParticipantSubmit(interaction: ModalSubmitInteraction, eventId: string) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guildId = interaction.guildId!;
-  const input = interaction.fields.getTextInputValue("user_input");
-
-  const events = await getEvents(guildId) as EventObjectWithAbsent[];
-  const event = events.find(e => e.id === eventId);
-  if (!event) {
-    await interaction.editReply({ content: "Event not found." });
-    return;
-  }
-
-  event.absent = event.absent || [];
-
-  if (!event.participants.includes(input)) {
-    await interaction.editReply({ content: `${input} is not a participant in **${event.name}**, cannot mark absent.` });
-    return;
-  }
-
-  event.participants = event.participants.filter(nick => nick !== input);
-  if (!event.absent.includes(input)) event.absent.push(input);
-
-  await saveEvents(guildId, events);
-
-  await interaction.editReply({ content: `${input} marked as absent for **${event.name}**` });
+  await updateParticipants(interaction, eventId, (event, nicknames) => {
+    const marked: string[] = [];
+    for (const nick of nicknames) {
+      if (!event.participants.includes(nick)) {
+        // cannot mark absent if not a participant
+        continue;
+      }
+      event.participants = event.participants.filter(n => n !== nick);
+      if (!event.absent.includes(nick)) event.absent.push(nick);
+      marked.push(nick);
+    }
+    return marked;
+  });
 }
