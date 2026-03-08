@@ -10,26 +10,38 @@ import { formatEventUTC } from "../../utils/timeUtils";
  * - otherwise -> all events in TXT file(s)
  */
 export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
-  if (!interaction.isButton()) return;
-  const guildId = interaction.guildId!;
+  if (!interaction.guild || !interaction.guildId) return;
+
+  const guildId = interaction.guildId;
   const allEvents: EventObject[] = await getEvents(guildId);
   const config = await getConfig(guildId);
 
-  if (!config.downloadChannelId) {
-    await interaction.reply({ content: "Download channel is not set.", ephemeral: true });
+  // 🔹 Bezpieczne sprawdzenie configu
+  if (!config || !config.downloadChannelId || config.downloadChannelId.trim() === "") {
+    await interaction.reply({
+      content: "❌ Download channel is not set in event settings.",
+      ephemeral: true
+    });
     return;
   }
 
-  const channel = interaction.guild!.channels.cache.get(config.downloadChannelId) as TextChannel | undefined;
-  if (!channel || !channel.isTextBased()) {
-    await interaction.reply({ content: "Download channel not found or not text-based.", ephemeral: true });
+  const channel = interaction.guild.channels.cache.get(config.downloadChannelId);
+
+  if (!channel || !(channel instanceof TextChannel)) {
+    await interaction.reply({
+      content: "❌ Download channel not found or is not a text channel.",
+      ephemeral: true
+    });
     return;
   }
 
   // 🔹 Single event download
   if (singleEventId) {
     const event = allEvents.find(e => e.id === singleEventId);
-    if (!event) return interaction.reply({ content: "Event not found.", ephemeral: true });
+    if (!event) {
+      await interaction.reply({ content: "Event not found.", ephemeral: true });
+      return;
+    }
 
     const statusLabel =
       event.status === "PAST" ? "[PAST]" :
@@ -41,24 +53,28 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     const dateStr = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     const messageContent = [
-      `**Event:** ${event.name}`,
-      `**Status:** ${statusLabel}`,
-      `**Date:** ${dateStr}`,
-      `**Participants:**\n${participants}`,
-      `**Absent:**\n${absent}`
+      `Event: ${event.name}`,
+      `Status: ${statusLabel}`,
+      `Date: ${dateStr}`,
+      `Participants:\n${participants}`,
+      `Absent:\n${absent}`
     ].join("\n\n");
 
-    const file = new AttachmentBuilder(Buffer.from(messageContent, "utf-8"), { name: `${event.id}.txt` });
+    const file = new AttachmentBuilder(
+      Buffer.from(messageContent, "utf-8"),
+      { name: `${event.id}.txt` }
+    );
 
     await channel.send({
-      content: `${messageContent}\n\nTXT file attached.`,
+      content: `Participant list for **${event.name}**`,
       files: [file]
     });
 
     await interaction.reply({
-      content: `Participant file for event **${event.name}** sent to <#${config.downloadChannelId}>.`,
+      content: `✅ Participant file sent to <#${config.downloadChannelId}>.`,
       ephemeral: true
     });
+
     return;
   }
 
@@ -89,13 +105,20 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     ].join("\n\n");
   });
 
-  const filePath = `all_events_${Date.now()}.txt`;
-  const file = new AttachmentBuilder(Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"), { name: filePath });
+  const fileName = `all_events_${Date.now()}.txt`;
+
+  const file = new AttachmentBuilder(
+    Buffer.from(finalMessage.join("\n\n====================\n\n"), "utf-8"),
+    { name: fileName }
+  );
 
   await channel.send({
-    content: `All participant lists sent as TXT file.`,
+    content: "All participant lists",
     files: [file]
   });
 
-  await interaction.editReply({ content: `Participant lists sent to <#${config.downloadChannelId}>.`, components: [] });
+  await interaction.editReply({
+    content: `✅ Participant lists sent to <#${config.downloadChannelId}>.`,
+    components: []
+  });
 }
