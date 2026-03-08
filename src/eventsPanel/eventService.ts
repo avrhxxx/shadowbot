@@ -58,8 +58,8 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
         year: obj.year ? toNumber(obj.year) : new Date().getUTCFullYear(),
         reminderBefore: obj.reminderBefore ? toNumber(obj.reminderBefore) : undefined,
         status: obj.status as "ACTIVE" | "PAST" | "CANCELED",
-        participants: safeJSONParse(obj.participants, []),
-        absent: safeJSONParse(obj.absent, []),
+        participants: safeJSONParse<string[]>(obj.participants, []),
+        absent: safeJSONParse<string[]>(obj.absent, []),
         createdAt: toNumber(obj.createdAt),
         reminderSent: toBool(obj.reminderSent),
         started: toBool(obj.started),
@@ -88,7 +88,7 @@ export async function updateEventCell(eventId: string, columnName: string, value
   const colIndex = headers.indexOf(columnName);
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0]?.toString().trim() === eventId.toString().trim());
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
@@ -97,7 +97,7 @@ export async function updateEventCell(eventId: string, columnName: string, value
 export async function deleteEventRow(eventId: string) {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
-  const rowIndex = rows.findIndex((r: any[]) => r[0]?.toString().trim() === eventId.toString().trim());
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) return;
   await GS.deleteEventRow(rowIndex + 1);
 }
@@ -105,25 +105,17 @@ export async function deleteEventRow(eventId: string) {
 // -----------------------------
 // PARTICIPANT OPERATIONS
 // -----------------------------
-export async function addParticipants(eventId: string, nicknames: string[]) {
+export async function addParticipants(eventId: string, nicknames: string[]): Promise<string[]> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-
-  console.log("ROWS (first 5):", rows.slice(0, 5));
-  console.log("Looking for eventId:", eventId);
-
-  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
-  console.log("Found rowIndex:", rowIndex);
+  const rowIndex = rows.findIndex(r => r[0] === eventId);
   if (rowIndex === -1) throw new Error("Event not found");
 
   const participantsCol = headers.indexOf("participants");
   const absentCol = headers.indexOf("absent");
 
-  let participants = safeJSONParse(rows[rowIndex][participantsCol], []);
-  let absent = safeJSONParse(rows[rowIndex][absentCol], []);
-
-  console.log("Current participants:", participants);
-  console.log("Current absent:", absent);
+  const participants = safeJSONParse<string[]>(rows[rowIndex][participantsCol], []);
+  const absent = safeJSONParse<string[]>(rows[rowIndex][absentCol], []);
 
   for (const nick of nicknames) {
     if (!participants.includes(nick)) participants.push(nick);
@@ -134,54 +126,38 @@ export async function addParticipants(eventId: string, nicknames: string[]) {
   await updateEventCell(eventId, "participants", JSON.stringify(participants));
   await updateEventCell(eventId, "absent", JSON.stringify(newAbsent));
 
-  console.log("Updated participants:", participants);
-  console.log("Updated absent:", newAbsent);
-
   return participants;
 }
 
-export async function removeParticipants(eventId: string, nicknames: string[]) {
+export async function removeParticipants(eventId: string, nicknames: string[]): Promise<string[]> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-
-  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
+  const rowIndex = rows.findIndex(r => r[0] === eventId);
   if (rowIndex === -1) throw new Error("Event not found");
 
   const participantsCol = headers.indexOf("participants");
   const absentCol = headers.indexOf("absent");
 
-  let participants = safeJSONParse(rows[rowIndex][participantsCol], []);
-  let absent = safeJSONParse(rows[rowIndex][absentCol], []);
+  const participants = safeJSONParse<string[]>(rows[rowIndex][participantsCol], []);
+  const absent = safeJSONParse<string[]>(rows[rowIndex][absentCol], []);
 
-  console.log("Remove participants input:", nicknames);
-  console.log("Current participants:", participants);
-  console.log("Current absent:", absent);
-
-  const newParticipants = participants.filter(n => !nicknames.includes(n));
-  const newAbsent = absent.filter(n => !nicknames.includes(n));
+  const newParticipants = participants.filter((n: string) => !nicknames.includes(n));
+  const newAbsent = absent.filter((n: string) => !nicknames.includes(n));
 
   await updateEventCell(eventId, "participants", JSON.stringify(newParticipants));
   await updateEventCell(eventId, "absent", JSON.stringify(newAbsent));
 
-  console.log("Updated participants:", newParticipants);
-  console.log("Updated absent:", newAbsent);
-
   return newParticipants;
 }
 
-export async function markAbsent(eventId: string, nicknames: string[]) {
+export async function markAbsent(eventId: string, nicknames: string[]): Promise<string[]> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0];
-
-  const rowIndex = rows.findIndex(r => r[0]?.toString().trim() === eventId.toString().trim());
+  const rowIndex = rows.findIndex(r => r[0] === eventId);
   if (rowIndex === -1) throw new Error("Event not found");
 
-  let participants = safeJSONParse(rows[rowIndex][headers.indexOf("participants")], []);
-  let absent = safeJSONParse(rows[rowIndex][headers.indexOf("absent")], []);
-
-  console.log("Mark absent input:", nicknames);
-  console.log("Current participants:", participants);
-  console.log("Current absent:", absent);
+  let participants = safeJSONParse<string[]>(rows[rowIndex][headers.indexOf("participants")], []);
+  let absent = safeJSONParse<string[]>(rows[rowIndex][headers.indexOf("absent")], []);
 
   for (const nick of nicknames) {
     if (!participants.includes(nick)) continue;
@@ -191,9 +167,6 @@ export async function markAbsent(eventId: string, nicknames: string[]) {
 
   await updateEventCell(eventId, "participants", JSON.stringify(participants));
   await updateEventCell(eventId, "absent", JSON.stringify(absent));
-
-  console.log("Updated participants:", participants);
-  console.log("Updated absent:", absent);
 
   return absent;
 }
@@ -248,7 +221,7 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
 export async function getConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
   if (!rows.length) return {};
-  let headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   const dataRows = rows.slice(1);
 
   const guildIndex = headers.indexOf("guildId");
@@ -264,7 +237,7 @@ export async function getConfig(guildId: string): Promise<EventConfig> {
 
 export async function setConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readConfigSheet();
-  let headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   const dataRows = rows.slice(1);
 
   if (!headers.includes(key)) {
