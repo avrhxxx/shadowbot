@@ -36,7 +36,7 @@ function toNumber(value: any, fallback = 0) { return value != null ? Number(valu
 function toBool(value: any) { return value === true || value === "true"; }
 
 // -----------------------------
-// EVENTS SHEET HELPERS (minimal overwrite)
+// EVENTS SHEET HELPERS
 // -----------------------------
 async function loadEvents(guildId: string): Promise<EventObject[]> {
   const rows = await GS.readEventsSheet();
@@ -91,21 +91,16 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
     copy.started = e.started ? "true" : "false";
 
     if (rowMap[e.id]) {
-      // Nadpisz istniejący wiersz minimalnie
       const existingRow = rowMap[e.id];
       const newRow = headers.map((h, i) => copy[h] ?? existingRow[i] ?? "");
-      rowMap[e.id] = newRow; // aktualizacja mapy
+      rowMap[e.id] = newRow;
     } else {
-      // Nowy wiersz
       const newRow = headers.map(h => copy[h] ?? "");
       rowMap[e.id] = newRow;
     }
   }
 
-  // Pozostałe wiersze z innych guildów
   const otherRows = dataRows.filter(r => r[guildIndex] !== guildId);
-
-  // Finalny zapis minimalny
   await GS.writeEventsSheet([headers, ...otherRows, ...Object.values(rowMap)]);
 }
 
@@ -148,7 +143,7 @@ export async function deleteEvent(guildId: string, eventId: string) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS (minimal overwrite)
+// CONFIG SHEET HELPERS (update po linijce)
 // -----------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
@@ -180,21 +175,22 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  // Znajdź wiersz dla tego guildId
+  // Znajdź wiersz dla guildId
   let row = dataRows.find(r => r[guildIndex] === guildId);
+  let rowIndex: number;
 
   if (!row) {
-    // nowy wiersz
+    // nowy wiersz na końcu arkusza
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
+    rowIndex = dataRows.length; // +1 wiersza nagłówka w Sheets
+  } else {
+    rowIndex = dataRows.indexOf(row) + 1; // +1 dla nagłówka
   }
 
-  // Nadpisanie tylko jednej kolumny, reszta zostaje
-  row[keyIndex] = value;
-
-  // finalny zapis: nagłówki + wszystkie wiersze
-  await GS.writeConfigSheet([headers, ...dataRows]);
+  // Nadpisanie tylko jednej komórki w arkuszu
+  await GS.updateConfigCell(rowIndex, keyIndex + 1, value); // kolumny w Sheets są 1-indexed
 }
 
 // -----------------------------
