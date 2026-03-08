@@ -145,11 +145,23 @@ export async function getEventById(guildId: string, eventId: string): Promise<Ev
   return events.find(e => e.id === eventId) || null;
 }
 
+// -----------------------------
+// 🔹 CANCEL EVENT
+// -----------------------------
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
-  const event = await getEventById(guildId, eventId);
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id === eventId);
   if (!event) return null;
+
+  // 1️⃣ Zmień status w obiekcie
   event.status = "CANCELED";
+
+  // 2️⃣ Zaktualizuj tylko pojedynczą komórkę statusu w arkuszu
   await updateEventCell(event.id, "status", "CANCELED");
+
+  // 3️⃣ Zapisz całą listę eventów, żeby snapshot w arkuszu był spójny
+  await saveEvents(guildId, events);
+
   return event;
 }
 
@@ -166,7 +178,6 @@ export async function getConfig(guildId: string): Promise<EventConfig> {
   let headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   let dataRows: any[][] = rows.slice(1);
 
-  // dodaj brakujące nagłówki
   if (headers.length === 0) headers = ["guildId","notificationChannel","downloadChannel"];
 
   const guildIndex = headers.indexOf("guildId");
@@ -185,7 +196,6 @@ export async function setConfig(guildId: string, key: string, value: any) {
   let headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   let dataRows: any[][] = rows.slice(1);
 
-  // jeśli nagłówki nie zawierają klucza, dodaj na końcu
   if (!headers.includes(key)) {
     headers.push(key);
     dataRows = dataRows.map((r: any[]) => { while(r.length < headers.length) r.push(""); return r; });
@@ -194,7 +204,6 @@ export async function setConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  // znajdź wiersz dla gildii
   let row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   let rowIndex: number;
 
@@ -202,16 +211,16 @@ export async function setConfig(guildId: string, key: string, value: any) {
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
-    rowIndex = dataRows.length; // wiersz w Sheets (1-indexed, +1 dla nagłówka)
+    rowIndex = dataRows.length;
   } else {
-    rowIndex = dataRows.indexOf(row) + 1; // +1 bo nagłówek w wierszu 1
+    rowIndex = dataRows.indexOf(row) + 1;
   }
 
-  // zapisz nagłówki jeśli puste
+  // Zapisz nagłówki i całą tabelę
   await GS.writeConfigSheet([headers, ...dataRows]);
 
-  // aktualizacja pojedynczej komórki
-  await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value); // +1 dla A1 notation
+  // Aktualizacja pojedynczej komórki
+  await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value);
 }
 
 // -----------------------------
