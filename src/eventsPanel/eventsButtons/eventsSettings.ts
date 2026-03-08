@@ -50,11 +50,29 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
   }
 
   try {
+    // Pobierz aktualną konfigurację
+    const config = await getConfig(guildId);
+
+    // Jeżeli kanał jest już ustawiony w serwisie, tylko wyświetl komunikat
+    if (config[key] === channelId) {
+      await interaction.reply({
+        content: `${key === "notificationChannel" ? "Notification" : "Download"} channel is already set to <#${channelId}>.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    // Wyślij do serwisu nowy kanał – serwis zajmuje się zapisem i nadpisywaniem w arkuszu
     await setConfig(guildId, key, channelId);
-    await interaction.reply({ content: `${key === "notificationChannel" ? "Notification" : "Download"} channel set to <#${channelId}>.`, ephemeral: true });
+
+    await interaction.reply({
+      content: `${key === "notificationChannel" ? "Notification" : "Download"} channel set to <#${channelId}>.`,
+      ephemeral: true
+    });
+
   } catch (err) {
-    console.error("Error saving channel:", err);
-    await interaction.reply({ content: "Failed to save channel. Please try again later.", ephemeral: true });
+    console.error("Error setting channel:", err);
+    await interaction.reply({ content: "Failed to set channel. Please try again later.", ephemeral: true });
   }
 }
 
