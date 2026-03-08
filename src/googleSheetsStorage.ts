@@ -48,16 +48,6 @@ export async function writeEventsSheet(values: any[][]) {
   await writeSheet(EVENTS_TAB, values);
 }
 
-// **NOWOŚĆ: aktualizacja jednej komórki w arkuszu eventu**
-export async function updateEventCell(row: number, col: number, value: any) {
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: `${EVENTS_TAB}!R${row}C${col}`, // R1C1 notation
-    valueInputOption: "RAW",
-    requestBody: { values: [[value]] },
-  });
-}
-
 // --------------------------
 // CONFIG STORAGE
 // --------------------------
@@ -69,12 +59,47 @@ export async function writeConfigSheet(values: any[][]) {
   await writeSheet(EVENTS_CONFIG_TAB, values);
 }
 
-// **NOWOŚĆ: aktualizacja jednej komórki w config**
+// --------------------------
+// UPDATE / DELETE CELLS
+// --------------------------
+
+// Aktualizacja pojedynczej komórki w zakładce config
 export async function updateConfigCell(row: number, col: number, value: any) {
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${EVENTS_CONFIG_TAB}!R${row}C${col}`,
+    range: `${EVENTS_CONFIG_TAB}!${col}${row}`,
     valueInputOption: "RAW",
     requestBody: { values: [[value]] },
+  });
+}
+
+// Aktualizacja pojedynczej komórki w zakładce events
+export async function updateEventCell(row: number, col: number, value: any) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${EVENTS_TAB}!${col}${row}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+// Usunięcie całego wiersza w zakładce events
+export async function deleteEventRow(row: number) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: 0, // jeśli masz tylko jedną zakładkę events, SheetId=0. W innym wypadku trzeba pobrać sheetId przez API.
+              dimension: "ROWS",
+              startIndex: row - 1, // 0-indexed
+              endIndex: row,
+            },
+          },
+        },
+      ],
+    },
   });
 }
