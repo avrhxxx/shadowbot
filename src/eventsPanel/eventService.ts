@@ -180,20 +180,29 @@ async function saveConfig(guildId: string, key: string, value: any) {
   }
 
   const guildIndex = headers.indexOf("guildId");
-  let row = dataRows.find(r => r[guildIndex] === guildId);
+  const keyIndex = headers.indexOf(key);
 
+  // mapa wierszy po guildId
+  const rowMap: Record<string, any[]> = {};
+  dataRows.forEach(r => { if (r[guildIndex]) rowMap[r[guildIndex]] = r; });
+
+  let row = rowMap[guildId];
   if (!row) {
     // nowy wiersz
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
-    row[headers.indexOf(key)] = value;
-    dataRows.push(row);
+    row[keyIndex] = value;
+    rowMap[guildId] = row;
   } else {
-    // nadpisanie tylko jednej komórki
-    row[headers.indexOf(key)] = value;
+    // nadpisanie tylko jeśli wartość się zmieniła
+    if (row[keyIndex] !== value) {
+      row[keyIndex] = value;
+    }
   }
 
-  await GS.writeConfigSheet([headers, ...dataRows]);
+  // przygotowanie finalnego arkusza
+  const otherRows = Object.values(rowMap).filter(r => r[guildIndex] !== guildId);
+  await GS.writeConfigSheet([headers, ...otherRows, ...rowMap[guildId]]);
 }
 
 // -----------------------------
