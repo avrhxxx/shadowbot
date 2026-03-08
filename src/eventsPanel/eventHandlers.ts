@@ -52,7 +52,7 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promi
   [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminder(i),
   [IDS.BUTTONS.SHOW_ALL]: async (i) => await EB.handleShowAllEvents(i),
   [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => await EB.handleShowAllLists(i),
-  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownloadAll(i),
+  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownload(i), // ✅ wszystkie eventy
   [IDS.BUTTONS.COMPARE_ALL]: async (i) => await EB.handleCompareAll(i),
 };
 
@@ -90,7 +90,6 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
     if (interaction.isButton()) {
       const id = interaction.customId;
 
-      // Stałe przyciski
       const handler = BUTTON_HANDLERS[id];
       if (handler) return await handler(interaction);
 
@@ -100,16 +99,16 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleCancelConfirm(interaction, eventId);
       }
 
-      // Przycisk notify_create (Yes / No)
+      // Notify create (Yes/No)
       if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
         return await EB.handleNotificationResponse(interaction);
       }
 
-      // Przycisk next_year (Yes / No)
+      // Next year (Yes/No)
       if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
       if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
-      // Dynamiczne przyciski uczestników
+      // Dynamic participant buttons
       if (id.startsWith("event_add_"))
         return await EB.handleAddParticipant(interaction, parseEventId(id));
 
@@ -132,9 +131,6 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
-    // ----------------------------
-    // Select menu
-    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
@@ -143,9 +139,6 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
         return await EB.handleCompareSelect(interaction);
     }
 
-    // ----------------------------
-    // Modal submit
-    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
