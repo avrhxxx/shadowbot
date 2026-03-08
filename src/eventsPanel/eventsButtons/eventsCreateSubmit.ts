@@ -8,6 +8,7 @@ import {
     ButtonInteraction,
     BaseInteraction
 } from "discord.js";
+import { v4 as uuidv4 } from "uuid";
 
 import { getEvents, saveEvents, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
@@ -17,6 +18,7 @@ import { sendEventCreatedNotification } from "./eventsReminder";
 // TEMP DATA TYPE
 // -----------------------------------------------------------
 export type TempEventData = {
+    id: string; // unikalne ID już w tempData
     name: string;
     day: number;
     month: number;
@@ -26,9 +28,11 @@ export type TempEventData = {
     year?: number;
     reminderBefore?: number;
     notifyOnCreate?: boolean;
-    eventId?: string;
 };
 
+// -----------------------------------------------------------
+// TEMP STORE
+// -----------------------------------------------------------
 export const tempEventStore = new Map<string, TempEventData>();
 
 // -----------------------------------------------------------
@@ -94,9 +98,10 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         : getEventDateUTC(day, month, hour, minute);
 
     const tempKey = `${interaction.user.id}-temp`;
+    const tempId = `E-${uuidv4()}`; // wstępne ID dla tempData
 
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
+        tempEventStore.set(tempKey, { id: tempId, name, day, month, hour, minute, guildId });
         await safeReply(interaction, {
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
             components: [
@@ -112,6 +117,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // zapis tymczasowy + reminderBefore stałe 60 minut
     tempEventStore.set(tempKey, {
+        id: tempId,
         name,
         day,
         month,
@@ -119,7 +125,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute,
         guildId,
         year: year ?? eventDateUTC.getUTCFullYear(),
-        reminderBefore: 60 // <-- stały reminder przed eventem
+        reminderBefore: 60
     });
 
     await showCreateNotificationConfirm(interaction, tempKey);
@@ -132,12 +138,19 @@ export async function showCreateNotificationConfirm(
     interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempKey: string
 ) {
+    const tempData = tempEventStore.get(tempKey);
+    if (!tempData) return;
+
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(`notify_create_yes-${tempKey}`).setLabel("Yes").setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`notify_create_no-${tempKey}`).setLabel("No").setStyle(ButtonStyle.Danger)
     );
 
-    await safeReply(interaction, { content: "Do you want to send a notification about creating this event?", components: [row], ephemeral: true });
+    await safeReply(interaction, {
+        content: "Do you want to send a notification about creating this event?",
+        components: [row],
+        ephemeral: true
+    });
 }
 
 // -----------------------------------------------------------
@@ -152,7 +165,7 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
 
     const events: EventObject[] = await getEvents(tempData.guildId);
     const newEvent: EventObject = {
-        id: tempData.eventId || `${Date.now()}`,
+        id: tempData.id, // użycie wstępnego ID
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -183,7 +196,7 @@ export async function finalizeEvent(interaction: ButtonInteraction | StringSelec
 // HANDLE NOTIFICATION RESPONSE
 // -----------------------------------------------------------
 export async function handleNotificationResponse(interaction: ButtonInteraction) {
-    const [action, tempKey] = interaction.customId.split("-"); // notify_create_yes / no
+    const [action, tempKey] = interaction.customId.split("-");
     const tempData = tempEventStore.get(tempKey);
     if (!tempData) {
         await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
