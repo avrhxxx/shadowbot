@@ -38,11 +38,20 @@ export const handleCompareButton = async (
   const guild = interaction.guild as Guild;
   const events = await getEvents(interaction.guildId!);
   const current = events.find(e => e.id === eventId);
-  if (!current) return await interaction.reply({ content: "Event not found.", ephemeral: true });
-  if (current.status !== "PAST") return await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
+  if (!current) {
+    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    return;
+  }
+  if (current.status !== "PAST") {
+    await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
+    return;
+  }
 
   const pastEvents = events.filter(e => e.status === "PAST" && e.id !== eventId).sort((a, b) => b.createdAt - a.createdAt);
-  if (!pastEvents.length) return await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
+  if (!pastEvents.length) {
+    await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
+    return;
+  }
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`compare_select_${eventId}`)
@@ -168,8 +177,8 @@ export const handleCompareAllDownload = async (
   }
 
   const chunks = txtText.match(/[\s\S]{1,1900}/g) || [];
-  for (let i = 0; i < chunks.length; i++) {
-    await sendComparisonFile(channel, `compare_all_part_${i + 1}.txt`, chunks[i]);
+  for (const [i, chunk] of chunks.entries()) {
+    await sendComparisonFile(channel, `compare_all_part_${i + 1}.txt`, chunk);
   }
 
   await interaction.editReply({ content: `Comparison for all events sent to <#${channelId}>`, components: [] });
