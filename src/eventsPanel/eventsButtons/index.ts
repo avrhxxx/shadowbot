@@ -1,5 +1,3 @@
-// src/eventsPanel/eventsButtons/index.ts
-
 // -----------------------------
 // EVENTS CREATE
 // -----------------------------
