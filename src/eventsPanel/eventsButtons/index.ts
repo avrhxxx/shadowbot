@@ -6,8 +6,8 @@ export {
   handleCreateSubmit,
   tempEventStore,
   showCreateNotificationConfirm,
-  handleNotificationResponse,   // <-- nowy eksport
-  finalizeNextYearEvent         // <-- nowy eksport
+  handleNotificationResponse,
+  finalizeNextYearEvent
 } from "./eventsCreateSubmit";
 
 // -----------------------------
@@ -54,7 +54,7 @@ export {
 // -----------------------------
 // EVENTS SHOW ALL
 // -----------------------------
-export { handleShowAllEvents, handleShowAllLists } from "./eventsShowAll";
+export { handleShowAllEvents, handleShowAllLists, handleDownloadAll, handleCompareAll } from "./eventsShowAll";
 
 // -----------------------------
 // EVENTS PARTICIPANTS
