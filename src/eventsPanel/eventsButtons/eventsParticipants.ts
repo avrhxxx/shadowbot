@@ -62,7 +62,7 @@ async function updateParticipants(
 
   const updatedItems = updater(event, input);
 
-  // 🔹 Aktualizacja pojedynczych komórek
+  // 🔹 Aktualizacja pojedynczych komórek w arkuszu
   await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
   await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
 
