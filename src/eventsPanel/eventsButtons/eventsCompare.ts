@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCompare.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -14,9 +13,6 @@ import {
 import { EventObject, getEvents, getConfig } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
-// ==========================
-// HELPERS
-// ==========================
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
@@ -31,9 +27,6 @@ async function sendComparisonFile(channel: TextChannel, name: string, content: s
   await channel.send({ content: `📥 ${name}`, files: [file] });
 }
 
-// ==========================
-// SINGLE COMPARE
-// ==========================
 export async function handleCompareButton(interaction: ButtonInteraction, eventId: string) {
   const guild = interaction.guild as Guild;
   const events = await getEvents(interaction.guildId!);
@@ -105,9 +98,6 @@ export async function handleCompareDownload(interaction: ButtonInteraction) {
   await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 }
 
-// ==========================
-// COMPARE ALL
-// ==========================
 export async function handleCompareAll(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
   const events = await getEvents(interaction.guildId!);
@@ -146,9 +136,6 @@ export async function handleCompareAllDownload(interaction: ButtonInteraction) {
   await interaction.editReply({ content: `Comparison for all events sent to <#${channelId}>`, components: [] });
 }
 
-// ==========================
-// LOGIC
-// ==========================
 function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guild) {
   const participantsA = new Set(eventA.participants);
   const participantsB = new Set(eventB.participants);
