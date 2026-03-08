@@ -94,7 +94,7 @@ async function saveEventsSheet(guildId: string, events: EventObject[]) {
       // Nadpisz istniejący wiersz minimalnie
       const existingRow = rowMap[e.id];
       const newRow = headers.map((h, i) => copy[h] ?? existingRow[i] ?? "");
-      rowMap[e.id] = newRow;
+      rowMap[e.id] = newRow; // aktualizacja mapy
     } else {
       // Nowy wiersz
       const newRow = headers.map(h => copy[h] ?? "");
@@ -148,7 +148,7 @@ export async function deleteEvent(guildId: string, eventId: string) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS (minimal overwrite + poprawka)
+// CONFIG SHEET HELPERS (minimal overwrite)
 // -----------------------------
 async function loadConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
@@ -180,28 +180,21 @@ async function saveConfig(guildId: string, key: string, value: any) {
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
 
-  // mapa wierszy po guildId
-  const rowMap: Record<string, any[]> = {};
-  dataRows.forEach(r => { if (r[guildIndex]) rowMap[r[guildIndex]] = r; });
+  // Znajdź wiersz dla tego guildId
+  let row = dataRows.find(r => r[guildIndex] === guildId);
 
-  let row = rowMap[guildId];
   if (!row) {
     // nowy wiersz
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
-    row[keyIndex] = value;
-    rowMap[guildId] = row;
-  } else {
-    // nadpisanie tylko jeśli wartość się zmieniła
-    if (row[keyIndex] !== value) {
-      row[keyIndex] = value;
-    }
+    dataRows.push(row);
   }
 
-  // przygotowanie finalnego arkusza
-  const otherRows = Object.values(rowMap).filter(r => r[guildIndex] !== guildId);
-  const finalRows = [headers, ...otherRows, rowMap[guildId]]; // rowMap[guildId] w tablicy
-  await GS.writeConfigSheet(finalRows);
+  // Nadpisanie tylko jednej kolumny, reszta zostaje
+  row[keyIndex] = value;
+
+  // finalny zapis: nagłówki + wszystkie wiersze
+  await GS.writeConfigSheet([headers, ...dataRows]);
 }
 
 // -----------------------------
