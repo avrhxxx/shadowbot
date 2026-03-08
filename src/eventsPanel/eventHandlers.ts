@@ -18,6 +18,8 @@ export const IDS = {
     SETTINGS: "event_settings",
     HELP: "event_help",
     MANUAL_REMINDER: "event_manual_reminder",
+    SHOW_ALL: "show_all_events",       // ✅ dodany
+    SHOW_ALL_LISTS: "show_all_lists",  // ✅ dodany
   },
   SELECTS: {
     MANUAL_REMINDER: "manual_reminder_select",
@@ -45,6 +47,8 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction) => Promise<void>> =
   [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
   [IDS.BUTTONS.HELP]: EB.handleHelp,
   [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
+  [IDS.BUTTONS.SHOW_ALL]: EB.handleShowAllEvents,      // ✅ powiązany handler
+  [IDS.BUTTONS.SHOW_ALL_LISTS]: EB.handleShowAllLists, // ✅ powiązany handler
 };
 
 // ----------------------------
