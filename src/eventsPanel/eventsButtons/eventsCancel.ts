@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCancel.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -29,11 +28,13 @@ export async function handleCancel(interaction: ButtonInteraction) {
     return;
   }
 
+  const uniqueActiveEvents = Array.from(new Map(activeEvents.map(e => [e.id, e])).values()); // ✅ unikalne ID
+
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId("event_cancel_select")
     .setPlaceholder("Select an event to cancel")
     .addOptions(
-      activeEvents.map(e => ({
+      uniqueActiveEvents.map(e => ({
         label: e.name,
         description: formatEventUTC(e.day, e.month, e.hour, e.minute, e.year),
         value: e.id
