@@ -80,69 +80,82 @@ function handleModal(interaction: ModalSubmitInteraction) {
 // Główny handler interakcji
 // ----------------------------
 export async function handleEventInteraction(interaction: Interaction) {
+  try {
+    if (interaction.isButton()) {
+      const id = interaction.customId;
 
-  if (interaction.isButton()) {
-    const id = interaction.customId;
+      // ----------------------------
+      // Stałe przyciski
+      // ----------------------------
+      const handler = BUTTON_HANDLERS[id];
+      if (handler) return handler(interaction);
 
-    // ----------------------------
-    // Stałe przyciski
-    // ----------------------------
-    const handler = BUTTON_HANDLERS[id];
-    if (handler) return handler(interaction);
+      // ----------------------------
+      // Dynamiczne confirm dla cancel
+      // ----------------------------
+      if (id.startsWith("event_cancel_confirm_")) {
+        const eventId = id.replace("event_cancel_confirm_", "");
+        return EB.handleCancelConfirm(interaction, eventId);
+      }
 
-    // ----------------------------
-    // Przycisk notify_create (Yes / No)
-    // ----------------------------
-    if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
-      return EB.handleNotificationResponse(interaction);
+      // ----------------------------
+      // Przycisk notify_create (Yes / No)
+      // ----------------------------
+      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
+        return EB.handleNotificationResponse(interaction);
+      }
+
+      // ----------------------------
+      // Przycisk next_year (Yes / No)
+      // ----------------------------
+      if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction);
+      if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
+
+      // ----------------------------
+      // dynamiczne przyciski uczestników
+      // ----------------------------
+      if (id.startsWith("event_add_"))
+        return EB.handleAddParticipant(interaction, parseEventId(id));
+
+      if (id.startsWith("event_remove_"))
+        return EB.handleRemoveParticipant(interaction, parseEventId(id));
+
+      if (id.startsWith("event_absent_"))
+        return EB.handleAbsentParticipant(interaction, parseEventId(id));
+
+      if (id.startsWith("event_show_list_"))
+        return EB.handleShowList(interaction, parseEventId(id));
+
+      if (id.startsWith("event_download_single_"))
+        return EB.handleDownload(interaction, parseEventId(id));
+
+      if (id.startsWith("event_compare_"))
+        return EB.handleCompareButton(interaction, parseEventId(id));
+
+      if (id.startsWith("event_clear_"))
+        return EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
     // ----------------------------
-    // Przycisk next_year (Yes / No)
+    // Select menu
     // ----------------------------
-    if (id.startsWith("next_year_yes")) return EB.finalizeNextYearEvent(interaction);
-    if (id.startsWith("next_year_no")) return EB.handleCancelAbort(interaction);
+    if (interaction.isStringSelectMenu()) {
+      const handler = SELECT_HANDLERS[interaction.customId];
+      if (handler) return handler(interaction);
+
+      if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX))
+        return EB.handleCompareSelect(interaction);
+    }
 
     // ----------------------------
-    // dynamiczne przyciski uczestników
+    // Modal submit
     // ----------------------------
-    if (id.startsWith("event_add_"))
-      return EB.handleAddParticipant(interaction, parseEventId(id));
-
-    if (id.startsWith("event_remove_"))
-      return EB.handleRemoveParticipant(interaction, parseEventId(id));
-
-    if (id.startsWith("event_absent_"))
-      return EB.handleAbsentParticipant(interaction, parseEventId(id));
-
-    if (id.startsWith("event_show_list_"))
-      return EB.handleShowList(interaction, parseEventId(id));
-
-    if (id.startsWith("event_download_single_"))
-      return EB.handleDownload(interaction, parseEventId(id));
-
-    if (id.startsWith("event_compare_"))
-      return EB.handleCompareButton(interaction, parseEventId(id));
-
-    if (id.startsWith("event_clear_"))
-      return EB.handleClearEventButton(interaction, parseEventId(id));
-  }
-
-  // ----------------------------
-  // Select menu
-  // ----------------------------
-  if (interaction.isStringSelectMenu()) {
-    const handler = SELECT_HANDLERS[interaction.customId];
-    if (handler) return handler(interaction);
-
-    if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX))
-      return EB.handleCompareSelect(interaction);
-  }
-
-  // ----------------------------
-  // Modal submit
-  // ----------------------------
-  if (interaction.isModalSubmit()) {
-    return handleModal(interaction);
+    if (interaction.isModalSubmit()) {
+      return handleModal(interaction);
+    }
+  } catch (error) {
+    console.error("Error handling event interaction:", error);
+    if (interaction.isRepliable())
+      await interaction.reply({ content: "❌ An error occurred while processing this interaction.", ephemeral: true });
   }
 }
