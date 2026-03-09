@@ -90,10 +90,10 @@ async function sendEventNotification(
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
   const embed = new EmbedBuilder()
-    .setTitle(title)
+    .setTitle(`${title}: ${event.name}`)
     .setDescription(
+      `**Game Time:** ${formatEventUTCObj(event)}\n` +
       `${label} <t:${unixTime}:R>\n\n` +
-      `**Game Time:** ${formatEventUTCObj(event)}\n\n` +
       `_Click the countdown to see the event time in your local timezone_`
     )
     .setColor(color);
