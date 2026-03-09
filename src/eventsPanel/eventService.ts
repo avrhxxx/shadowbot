@@ -5,7 +5,7 @@ export interface EventObject {
   id: string;
   guildId: string;
   name: string;
-  eventType: string; // nowa właściwość
+  eventType: string;
   day: number;
   month: number;
   hour: number;
@@ -18,7 +18,7 @@ export interface EventObject {
   createdAt: number;
   reminderSent: boolean;
   started: boolean;
-  lastBirthdayYear?: number; // aby birthday wysyłał raz w roku
+  lastBirthdayYear?: number;
 }
 
 export interface EventConfig {
@@ -28,10 +28,8 @@ export interface EventConfig {
 }
 
 // -----------------------------
-// CACHE
+// HELPERS
 // -----------------------------
-let eventsCache: EventObject[] = [];
-
 function safeJSONParse<T>(value: any, fallback: T): T {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
 }
@@ -39,14 +37,14 @@ function toNumber(value: any, fallback = 0) { return value != null ? Number(valu
 function toBool(value: any) { return value === true || value === "true"; }
 
 // -----------------------------
-// LOAD EVENTS (do cache)
+// LOAD EVENTS
 // -----------------------------
 export async function loadEvents(guildId: string): Promise<EventObject[]> {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return [];
   const headers: string[] = rows[0];
 
-  const events = rows.slice(1)
+  return rows.slice(1)
     .map((row: any[]) => {
       const obj: Record<string, any> = {};
       headers.forEach((h: string, i: number) => obj[h] = row[i] ?? null);
@@ -71,17 +69,14 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
       } as EventObject;
     })
     .filter(e => e.guildId === guildId);
-
-  eventsCache = events;
-  return events;
 }
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  return eventsCache.filter(e => e.guildId === guildId);
+  return loadEvents(guildId);
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await getEvents(guildId);
+  const events = await loadEvents(guildId);
   return events.find(e => e.id === eventId) || null;
 }
 
@@ -100,10 +95,6 @@ export async function updateEventCell(eventId: string, columnName: string, value
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
-
-  // Update cache
-  const event = eventsCache.find(e => e.id === eventId);
-  if (event) (event as any)[columnName] = value;
 }
 
 export async function deleteEventRow(eventId: string) {
@@ -112,8 +103,6 @@ export async function deleteEventRow(eventId: string) {
   const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) return;
   await GS.deleteEventRow(rowIndex + 1);
-
-  eventsCache = eventsCache.filter(e => e.id !== eventId);
 }
 
 // -----------------------------
@@ -204,8 +193,6 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
   });
 
   await GS.writeEventsSheet([headers, ...rows.slice(1), newRow]);
-  eventsCache.push(data);
-
   return data;
 }
 
