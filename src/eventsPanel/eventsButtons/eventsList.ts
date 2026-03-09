@@ -30,6 +30,12 @@ function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year ?? new Date().getUTCFullYear());
 }
 
+// Formatuje nazwę kategorii, np. Arcadian_Conquest → Arcadian Conquest
+function formatCategoryLabel(label: string) {
+  return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Tworzy embed i przyciski dla pojedynczego eventu
 function createEventEmbedAndRows(e: EventObject) {
   const embed = new EmbedBuilder()
     .setTitle(e.name)
@@ -56,19 +62,77 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// LIST HANDLER
+// CATEGORY CLICK
 // -----------------------------
-export async function handleList(interaction: ButtonInteraction) {
+export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
+  if (category) {
+    // jeśli kliknięto konkretną kategorię, pokaz listę eventów
+    return await handleListByCategory(interaction, category);
+  }
+
+  // jeśli brak kategorii – pokaz przyciski kategorii
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
-  if (!events?.length) {
+  if (!events.length) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i];
+  const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
+
+  // Tworzymy rzędy po maks. 5 przycisków
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+  categories.forEach((cat, idx) => {
+    currentRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`event_category_${cat}`)
+        .setLabel(formatCategoryLabel(cat))
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    if ((idx + 1) % 5 === 0) {
+      rows.push(currentRow);
+      currentRow = new ActionRowBuilder<ButtonBuilder>();
+    }
+  });
+
+  if (currentRow.components.length > 0) {
+    rows.push(currentRow);
+  }
+
+  await interaction.reply({
+    content: "Select a category to view events:",
+    components: rows,
+    ephemeral: true
+  });
+}
+
+// -----------------------------
+// LIST BY CATEGORY
+// -----------------------------
+export async function handleListByCategory(interaction: ButtonInteraction, category?: string) {
+  const guildId = interaction.guildId!;
+  const events = await getEvents(guildId);
+
+  if (!events.length) {
+    await interaction.reply({ content: "No events found.", ephemeral: true });
+    return;
+  }
+
+  const filteredEvents = category
+    ? events.filter(e => e.eventType === category)
+    : events;
+
+  if (!filteredEvents.length) {
+    await interaction.reply({ content: `No events found for category "${category}".`, ephemeral: true });
+    return;
+  }
+
+  for (let i = 0; i < filteredEvents.length; i++) {
+    const e = filteredEvents[i];
     const { embed, rows } = createEventEmbedAndRows(e);
     const payload = { embeds: [embed], components: rows, ephemeral: true };
 
@@ -83,7 +147,7 @@ export async function handleList(interaction: ButtonInteraction) {
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id.toString() === eventId.toString());
+  const event = events.find(e => e.id === eventId.toString());
 
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });

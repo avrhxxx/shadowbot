@@ -42,26 +42,16 @@ async function checkEvents(guild: Guild) {
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
+    // Upcoming reminder
     if (!event.reminderSent && now >= reminderTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        "⏰ Upcoming Event",
-        `Event starts on ${formatEventUTCObj(event)}`,
-        "Orange" as ColorResolvable
-      );
+      await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
       event.reminderSent = true;
       changed = true;
     }
 
+    // Event started
     if (!event.started && now >= eventTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        "✅ Event Started",
-        `The event scheduled for ${formatEventUTCObj(event)} has just started!`,
-        "Blue" as ColorResolvable
-      );
+      await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
       event.started = true;
       event.status = "PAST";
       changed = true;
@@ -79,38 +69,39 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  const reminderText = event.reminderBefore !== undefined
-    ? `\nReminder set for ${event.reminderBefore} minutes before event start.`
-    : "\nReminder set for 60 minutes before event start.";
-
-  await sendEventNotification(
-    channel,
-    event,
-    `🎉 Event Created: ${event.name}`,
-    `Event scheduled for ${formatEventUTCObj(event)}${reminderText}`,
-    "Green" as ColorResolvable
-  );
+  await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
 }
 
 export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
-  await sendEventNotification(
-    channel,
-    event,
-    `⏰ Upcoming Event: ${event.name}`,
-    `Event starts on ${formatEventUTCObj(event)}`,
-    "Orange" as ColorResolvable
-  );
+  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
 }
 
+// ======================================================
+// SEND EVENT NOTIFICATION (UNIFIED SCHEME)
+// ======================================================
 async function sendEventNotification(
   channel: TextChannel,
   event: EventObject,
   title: string,
-  description: string,
+  type: "created" | "upcoming" | "started",
   color: ColorResolvable = "White"
 ) {
+  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
+  const unixTime = Math.floor(eventDate.getTime() / 1000);
+
+  // Description dla embedu
+  let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
+  if (type === "created") {
+    description += `Event scheduled <t:${unixTime}:R>`;
+  } else if (type === "upcoming") {
+    description += `Event starts <t:${unixTime}:R>`;
+  } else if (type === "started") {
+    description += `Event started <t:${unixTime}:R>`;
+  }
+  description += `\n\n_Click the countdown to see the event time in your local timezone_`;
+
   const embed = new EmbedBuilder()
-    .setTitle(title)
+    .setTitle(`${title}: ${event.name}`)
     .setDescription(description)
     .setColor(color);
 
