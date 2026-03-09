@@ -46,69 +46,48 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
     const typeConfig = EVENT_TYPES.find(t => t.value === typeValue);
     if (!typeConfig) return;
 
-    if (typeValue === "birthdays") {
-        await showBirthdayModal(interaction);
-    } else {
-        await showStandardModal(interaction, typeValue);
-    }
-}
-
-// ----------------------------
-// Birthday modal
-// ----------------------------
-async function showBirthdayModal(interaction: StringSelectMenuInteraction) {
-    const modal = new ModalBuilder()
-        .setCustomId("event_create_modal_birthdays")
-        .setTitle("Create Birthday Event");
-
-    const nickInput = new TextInputBuilder()
-        .setCustomId("event_name")
-        .setLabel("Birthday Person's Nick")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Enter nickname only")
-        .setRequired(true);
-
-    const dateInput = new TextInputBuilder()
-        .setCustomId("event_datetime")
-        .setLabel("Date (DD/MM, UTC)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("DD/MM")
-        .setRequired(true);
-
-    modal.addComponents(
-        new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(dateInput)
-    );
-
-    await interaction.showModal(modal);
-}
-
-// ----------------------------
-// Standard modal (Custom + predefined events)
-// ----------------------------
-async function showStandardModal(interaction: StringSelectMenuInteraction, typeValue: string) {
     const modal = new ModalBuilder()
         .setCustomId(`event_create_modal_${typeValue}`)
         .setTitle("Create Event");
 
-    // Data & Time (UTC) – zawsze wymagane
-    const datetimeInput = new TextInputBuilder()
-        .setCustomId("event_datetime")
-        .setLabel("Date & Time (UTC)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("See pinned message in this channel for formats")
-        .setRequired(true);
+    if (typeValue === "birthdays") {
+        // Nick osoby
+        const nickInput = new TextInputBuilder()
+            .setCustomId("event_name")
+            .setLabel("Enter the in-game nickname of the birthday person")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Enter nickname only")
+            .setRequired(true);
 
-    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
+        // Data (DD/MM)
+        const dateInput = new TextInputBuilder()
+            .setCustomId("event_datetime")
+            .setLabel("Birthday Date (DD/MM)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("DD/MM")
+            .setRequired(true);
 
-    // Nazwa + rok – tylko dla Custom
-    if (typeValue === "custom") {
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(dateInput)
+        );
+    } else if (typeValue === "custom") {
+        // Name
         const nameInput = new TextInputBuilder()
             .setCustomId("event_name")
             .setLabel("Event Name")
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
+        // Date & Time (UTC)
+        const datetimeInput = new TextInputBuilder()
+            .setCustomId("event_datetime")
+            .setLabel("Date & Time (UTC)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("DD/MM HH:MM")
+            .setRequired(true);
+
+        // Year (optional)
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
             .setLabel("Year (optional)")
@@ -118,8 +97,19 @@ async function showStandardModal(interaction: StringSelectMenuInteraction, typeV
 
         modal.addComponents(
             new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
             new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
         );
+    } else {
+        // Standard events – only date & time
+        const datetimeInput = new TextInputBuilder()
+            .setCustomId("event_datetime")
+            .setLabel("Date & Time (UTC)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("DD/MM HH:MM")
+            .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
     }
 
     await interaction.showModal(modal);
