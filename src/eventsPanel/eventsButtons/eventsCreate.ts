@@ -71,37 +71,39 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
             new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
             new ActionRowBuilder<TextInputBuilder>().addComponents(dateInput)
         );
-    } else {
-        // Data & Time (UTC) – zawsze wymagane
-        const datetimeInput = new TextInputBuilder()
-            .setCustomId("event_datetime")
-            .setLabel("Date & Time (UTC)")
+
+        await interaction.showModal(modal);
+        return; // ważne, żeby nie wykonywał reszty
+    }
+
+    // Standardowy modal dla innych typów
+    const datetimeInput = new TextInputBuilder()
+        .setCustomId("event_datetime")
+        .setLabel("Date & Time (UTC)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("See pinned message in this channel for formats")
+        .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
+
+    if (typeValue === "custom") {
+        const nameInput = new TextInputBuilder()
+            .setCustomId("event_name")
+            .setLabel("Event Name")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("See pinned message in this channel for formats")
             .setRequired(true);
 
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
+        const yearInput = new TextInputBuilder()
+            .setCustomId("event_year")
+            .setLabel("Year (optional)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Leave empty for current year")
+            .setRequired(false);
 
-        // Nazwa – tylko dla Custom
-        if (typeValue === "custom") {
-            const nameInput = new TextInputBuilder()
-                .setCustomId("event_name")
-                .setLabel("Event Name")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const yearInput = new TextInputBuilder()
-                .setCustomId("event_year")
-                .setLabel("Year (optional)")
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder("Leave empty for current year")
-                .setRequired(false);
-
-            modal.addComponents(
-                new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
-            );
-        }
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
+        );
     }
 
     await interaction.showModal(modal);
