@@ -56,7 +56,7 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// LIST HANDLER
+// LIST HANDLER (kategorie)
 // -----------------------------
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -67,9 +67,41 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i];
-    const { embed, rows } = createEventEmbedAndRows(e);
+  // Wyciągamy unikalne kategorie
+  const categories = Array.from(new Set(events.map(e => e.category || "Uncategorized")));
+
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  categories.forEach((cat, idx) => {
+    const rowIndex = Math.floor(idx / 5); // max 5 przycisków w jednym row
+    if (!rows[rowIndex]) rows[rowIndex] = new ActionRowBuilder<ButtonBuilder>();
+
+    rows[rowIndex].addComponents(
+      new ButtonBuilder()
+        .setCustomId(`event_category_${cat}`)
+        .setLabel(cat)
+        .setStyle(ButtonStyle.Primary)
+    );
+  });
+
+  await interaction.reply({ content: "Select a category:", components: rows, ephemeral: true });
+}
+
+// -----------------------------
+// OBSŁUGA WYBORU KATEGORII
+// -----------------------------
+export async function handleCategoryClick(interaction: ButtonInteraction, category: string) {
+  const guildId = interaction.guildId!;
+  const events = await getEvents(guildId);
+
+  const filteredEvents = events.filter(e => (e.category || "Uncategorized") === category);
+
+  if (!filteredEvents.length) {
+    await interaction.reply({ content: `No events found in category ${category}.`, ephemeral: true });
+    return;
+  }
+
+  for (let i = 0; i < filteredEvents.length; i++) {
+    const { embed, rows } = createEventEmbedAndRows(filteredEvents[i]);
     const payload = { embeds: [embed], components: rows, ephemeral: true };
 
     if (i === 0) await interaction.reply(payload);
