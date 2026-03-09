@@ -6,8 +6,7 @@ import {
     TextInputStyle, 
     ActionRowBuilder, 
     StringSelectMenuInteraction, 
-    StringSelectMenuBuilder, 
-    ComponentType 
+    StringSelectMenuBuilder 
 } from "discord.js";
 
 const EVENT_TYPES = [
@@ -70,13 +69,15 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setPlaceholder("See pinned message in this channel for formats")
         .setRequired(true);
 
+    // Dodajemy najpierw datetime
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
 
+    // Dodajemy Event Name dla birthdays i custom
     if (typeValue === "birthdays" || typeValue === "custom") {
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
     }
 
-    // Pole: Year (only birthdays required, custom optional)
+    // Pole: Year
     if (typeValue === "birthdays" || typeValue === "custom") {
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
