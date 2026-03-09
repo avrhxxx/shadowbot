@@ -14,6 +14,7 @@ const EVENT_TYPES = [
     { label: "City Contest", value: "city_contest", prefillName: "City Contest" },
     { label: "Reservoir Raid", value: "reservoir_raid", prefillName: "Reservoir Raid" },
     { label: "Ghoulion Pursuit", value: "ghoulion_pursuit", prefillName: "Ghoulion Pursuit" },
+    { label: "KvK", value: "kvk", prefillName: "KvK" }, // nowy event
     { label: "Birthdays", value: "birthdays" },
     { label: "Custom", value: "custom" }
 ];
@@ -49,20 +50,20 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
     const modal = new ModalBuilder().setTitle("Create Event");
 
     if (typeValue === "birthdays") {
-        modal.setCustomId("event_create_modal_birthdays"); // unikalny ID dla birthday
+        modal.setCustomId("event_create_modal_birthdays");
 
         const nickInput = new TextInputBuilder()
             .setCustomId("event_name")
             .setLabel("Enter the birthday player's nickname")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Nickname")
+            .setPlaceholder("See info above panel for available formats")
             .setRequired(true);
 
         const dateInput = new TextInputBuilder()
             .setCustomId("event_datetime")
             .setLabel("Date (Day/Month, UTC)")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("DD/MM")
+            .setPlaceholder("See info above panel for available formats")
             .setRequired(true);
 
         modal.addComponents(
@@ -71,7 +72,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         );
 
     } else if (typeValue === "custom") {
-        modal.setCustomId("event_create_modal_custom"); // unikalny ID dla custom
+        modal.setCustomId("event_create_modal_custom");
 
         const nameInput = new TextInputBuilder()
             .setCustomId("event_name")
@@ -83,7 +84,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
             .setCustomId("event_datetime")
             .setLabel("Date & Time (UTC)")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("DD/MM HH:mm")
+            .setPlaceholder("See info above panel for available formats")
             .setRequired(true);
 
         const yearInput = new TextInputBuilder()
@@ -100,14 +101,15 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         );
 
     } else {
-        // standard events
-        modal.setCustomId(`event_create_modal_standard_${typeValue}`);
+        // standard events + KvK
+        const customId = typeValue === "kvk" ? "event_create_modal_standard_kvk" : `event_create_modal_standard_${typeValue}`;
+        modal.setCustomId(customId);
 
         const datetimeInput = new TextInputBuilder()
             .setCustomId("event_datetime")
             .setLabel("Date & Time (UTC)")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("DD/MM HH:mm")
+            .setPlaceholder("See info above panel for available formats")
             .setRequired(true);
 
         modal.addComponents(
