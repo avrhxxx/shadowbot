@@ -7,6 +7,8 @@ import {
     ActionRowBuilder 
 } from "discord.js";
 
+import { getConfig } from "../eventService"; // 🔹 zmieniony import
+
 export async function handleCreate(interaction: ButtonInteraction) {
     // ✅ tylko dla przycisku
     if (!interaction.isButton()) return;
@@ -38,7 +40,7 @@ export async function handleCreate(interaction: ButtonInteraction) {
         .setPlaceholder("Leave empty to auto-calculate the year")
         .setRequired(false);
 
-    // Dodanie pól do modala
+    // Wszystkie pola dodajemy do modala
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
