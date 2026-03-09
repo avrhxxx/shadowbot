@@ -30,6 +30,12 @@ function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year ?? new Date().getUTCFullYear());
 }
 
+// Formatuje nazwę kategorii, np. Arcadian_Conquest → Arcadian Conquest
+function formatCategoryLabel(label: string) {
+  return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Tworzy embed i przyciski dla pojedynczego eventu
 function createEventEmbedAndRows(e: EventObject) {
   const embed = new EmbedBuilder()
     .setTitle(e.name)
@@ -75,19 +81,31 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
 
   const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
 
-  const row = new ActionRowBuilder<ButtonBuilder>();
-  for (const cat of categories) {
-    row.addComponents(
+  // Tworzymy rzędy po maks. 5 przycisków
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+  categories.forEach((cat, idx) => {
+    currentRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`event_category_${cat}`)
-        .setLabel(cat.charAt(0).toUpperCase() + cat.slice(1))
+        .setLabel(formatCategoryLabel(cat))
         .setStyle(ButtonStyle.Primary)
     );
+
+    if ((idx + 1) % 5 === 0) {
+      rows.push(currentRow);
+      currentRow = new ActionRowBuilder<ButtonBuilder>();
+    }
+  });
+
+  if (currentRow.components.length > 0) {
+    rows.push(currentRow);
   }
 
   await interaction.reply({
     content: "Select a category to view events:",
-    components: [row],
+    components: rows,
     ephemeral: true
   });
 }
