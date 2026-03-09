@@ -86,7 +86,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         arcadian_conquest: "Arcadian Conquest",
         city_contest: "City Contest",
         reservoir_raid: "Reservoir Raid",
-        ghoulion_pursuit: "Ghoulion Pursuit"
+        ghoulion_pursuit: "Ghoulion Pursuit",
+        kvk: "KvK"
     };
     if (prefillMap[eventType]) name = prefillMap[eventType];
 
@@ -95,7 +96,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     if (eventType === "birthdays") {
         const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
         if (!dateMatch) {
-            await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date format. See panel above for correct format.", ephemeral: true });
             return;
         }
 
@@ -110,7 +111,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     } else {
         const parsed = parseEventDateTime(datetimeRaw);
         if (!parsed && eventType !== "custom") {
-            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date/time format. See panel above for correct format.", ephemeral: true });
             return;
         }
         day = parsed?.day ?? 1;
@@ -160,7 +161,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // Pokazujemy przycisk powiadomień tylko dla innych eventów niż Birthday
     if (eventType !== "birthdays") {
-        await showCreateNotificationConfirm(interaction, tempId);
+        // rzutowanie do any, żeby TS nie krzyczał
+        await showCreateNotificationConfirm(interaction as any, tempId);
     } else {
         await finalizeEvent(interaction, tempId);
     }
@@ -170,7 +172,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
