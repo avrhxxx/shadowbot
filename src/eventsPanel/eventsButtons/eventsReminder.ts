@@ -48,7 +48,7 @@ async function checkEvents(guild: Guild) {
         channel,
         event,
         `⏰ Upcoming Event: ${event.name}`,
-        `Event starts <t:${Math.floor(eventTime / 1000)}:R>`,
+        `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}\nStarts <t:${Math.floor(eventTime / 1000)}:R>`,
         "Orange" as ColorResolvable
       );
       event.reminderSent = true;
@@ -61,7 +61,7 @@ async function checkEvents(guild: Guild) {
         channel,
         event,
         `✅ Event Started: ${event.name}`,
-        `Event started <t:${Math.floor(eventTime / 1000)}:R>`,
+        `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}\nStarted <t:${Math.floor(eventTime / 1000)}:R>`,
         "Blue" as ColorResolvable
       );
       event.started = true;
@@ -81,28 +81,12 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  const reminderText = event.reminderBefore !== undefined
-    ? `\nReminder set for ${event.reminderBefore} minutes before event start.`
-    : "\nReminder set for 60 minutes before event start.";
-
   await sendEventNotification(
     channel,
     event,
     `🎉 Event Created: ${event.name}`,
-    `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}${reminderText}`,
+    `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}`,
     "Green" as ColorResolvable
-  );
-}
-
-export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
-  const eventUnix = Math.floor(getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime() / 1000);
-
-  await sendEventNotification(
-    channel,
-    event,
-    `⏰ Upcoming Event: ${event.name}`,
-    `Event starts <t:${eventUnix}:R>`,
-    "Orange" as ColorResolvable
   );
 }
 
