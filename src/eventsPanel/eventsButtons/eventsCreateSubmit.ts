@@ -106,8 +106,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         year = new Date().getUTCFullYear();
 
         // Nazwa eventu z nicku gracza + postfix
-        name = `${name.trim()}'s birthday! 🎉`;
-
+        name = `${name}'s birthday! 🎉`;
     } else {
         const parsed = parseEventDateTime(datetimeRaw);
         if (!parsed && eventType !== "custom") {
@@ -129,8 +128,9 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
+    // Sprawdzenie, czy data przeszła
     if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType });
+        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType, notifyOnCreate: false });
         await safeReply(interaction, {
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
             components: [
@@ -153,15 +153,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute,
         guildId,
         year: year ?? eventDateUTC.getUTCFullYear(),
-        reminderBefore: eventType === "birthdays" ? 0 : 60, // birthday nie wysyła reminder przy tworzeniu
-        eventType
+        reminderBefore: eventType === "birthdays" ? 0 : 60,
+        eventType,
+        notifyOnCreate: eventType === "birthdays" ? false : undefined
     });
 
-    // Pokazujemy przycisk powiadomienia tylko dla innych eventów niż Birthday
+    // Pokazujemy przycisk powiadomień tylko dla innych eventów niż Birthday
     if (eventType !== "birthdays") {
         await showCreateNotificationConfirm(interaction, tempId);
     } else {
-        // Dla Birthday od razu finalize, bez powiadomienia
         await finalizeEvent(interaction, tempId);
     }
 }
@@ -170,7 +170,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ModalSubmitInteraction, // <-- tylko modal
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
@@ -192,7 +192,7 @@ export async function showCreateNotificationConfirm(
 // FINALIZE EVENT
 // -----------------------------------------------------------
 export async function finalizeEvent(
-    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
@@ -223,7 +223,6 @@ export async function finalizeEvent(
     await createEvent(newEvent);
     tempEventStore.delete(tempId);
 
-    // Send notification tylko jeśli ustawione i nie Birthday
     if (interaction.guild && tempData.notifyOnCreate) {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
