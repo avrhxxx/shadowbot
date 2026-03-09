@@ -56,7 +56,7 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// LIST HANDLER – wybór kategorii
+// LIST HANDLER (kategorie)
 // -----------------------------
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -67,39 +67,41 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  const categories = Array.from(new Set(events.map(e => e.category || "Uncategorized")));
+  // ✅ zbierz unikalne kategorie (eventType)
+  const categories = Array.from(new Set(events.map(e => e.eventType ?? "Uncategorized")));
+
+  // wyświetl przyciski kategorii
+  const categoryButtons = categories.map(cat =>
+    new ButtonBuilder().setCustomId(`event_list_category_${cat}`).setLabel(cat).setStyle(ButtonStyle.Primary)
+  );
+
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < categoryButtons.length; i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(categoryButtons.slice(i, i + 5)));
+  }
 
-  categories.forEach((cat, idx) => {
-    const rowIndex = Math.floor(idx / 5); // max 5 przycisków na row
-    if (!rows[rowIndex]) rows[rowIndex] = new ActionRowBuilder<ButtonBuilder>();
-
-    rows[rowIndex].addComponents(
-      new ButtonBuilder()
-        .setCustomId(`event_category_${cat}`)
-        .setLabel(cat)
-        .setStyle(ButtonStyle.Primary)
-    );
+  await interaction.reply({
+    content: "Select a category:",
+    components: rows,
+    ephemeral: true
   });
-
-  await interaction.reply({ content: "Select a category:", components: rows, ephemeral: true });
 }
 
 // -----------------------------
-// CATEGORY CLICK HANDLER
+// LISTA PO KATEGORII
 // -----------------------------
-export async function handleCategoryClick(interaction: ButtonInteraction, category: string) {
+export async function handleListByCategory(interaction: ButtonInteraction, category: string) {
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
+  const events = await getEvents(guildId).then(evts => evts.filter(e => (e.eventType ?? "Uncategorized") === category));
 
-  const filteredEvents = events.filter(e => (e.category || "Uncategorized") === category);
-  if (!filteredEvents.length) {
-    await interaction.reply({ content: `No events found in category ${category}.`, ephemeral: true });
+  if (!events.length) {
+    await interaction.reply({ content: `No events found in category "${category}".`, ephemeral: true });
     return;
   }
 
-  for (let i = 0; i < filteredEvents.length; i++) {
-    const { embed, rows } = createEventEmbedAndRows(filteredEvents[i]);
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    const { embed, rows } = createEventEmbedAndRows(e);
     const payload = { embeds: [embed], components: rows, ephemeral: true };
 
     if (i === 0) await interaction.reply(payload);
