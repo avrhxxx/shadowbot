@@ -79,7 +79,14 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     let name = interaction.fields.getTextInputValue("event_name");
     const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
-    const yearRaw = interaction.fields.getTextInputValue("event_year");
+
+    // bezpieczne pobranie pola "event_year" – może nie istnieć w standardowych eventach
+    let yearRaw: string | undefined;
+    try {
+        yearRaw = interaction.fields.getTextInputValue("event_year");
+    } catch {
+        yearRaw = undefined;
+    }
 
     // prefille dla standardowych typów
     const prefillMap: Record<string,string> = {
@@ -139,7 +146,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         eventType
     });
 
-    // pokaż pytanie o powiadomienie przed finalizacją
+    // pokaż pytanie o powiadomienie przed finalizacją – dla wszystkich typów
     await showCreateNotificationConfirm(interaction, tempId);
 }
 
