@@ -74,12 +74,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         modal.setCustomId("event_create_modal_birthdays");
 
         const nickInput = createTextInput("event_name", "Enter Player Nickname", "Enter player nickname");
-        const dateInput = new TextInputBuilder()
-            .setCustomId("event_datetime")
-            .setLabel("Date (Day, Month, UTC)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("DD/MM")
-            .setRequired(true);
+        const dateInput = createDateInput("event_datetime", "Date (Day, Month, UTC)");
 
         modal.addComponents(
             new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
