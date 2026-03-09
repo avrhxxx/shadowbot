@@ -1,7 +1,7 @@
 // -----------------------------
 // EVENTS CREATE
 // -----------------------------
-export { handleCreate } from "./eventsCreate";
+export { handleCreate, handleTypeSelect } from "./eventsCreate";
 export {
   handleCreateSubmit,
   tempEventStore,
