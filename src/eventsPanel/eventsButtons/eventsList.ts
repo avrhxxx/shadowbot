@@ -40,12 +40,17 @@ function formatCategoryLabel(label: string) {
 function createEventEmbedAndRows(e: EventObject) {
   const title = e.eventType === "birthdays" ? `🎉 ${e.name}'s Birthday` : e.name;
 
-  // Kategorie, które mają tylko Clear Event Data
-  const clearOnly = ["birthdays", "arcadian_conquest", "city_contest", "ghoulion_pursuit"];
+  // Kategorie z tylko "Clear Event Data" button
+  const clearOnly = ["birthdays", "arcadian_conquest", "city_contest", "ghoulion_pursuit", "kvk"];
+  // Kategorie z pełnymi przyciskami
   const hasFullButtons = ["custom", "reservoir_raid"];
 
-  // Embed description – dla clearOnly tylko status i datę
-  let description = `Status: ${e.status}\nDate: ${formatEventUTCObj(e)}`;
+  // Obliczamy countdown unix timestamp
+  const eventDate = new Date(Date.UTC(e.year ?? new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
+  const unixTime = Math.floor(eventDate.getTime() / 1000);
+
+  // Embed description
+  let description = `Status: ${e.status}\nDate: ${formatEventUTCObj(e)} <t:${unixTime}:R>`;
   if (hasFullButtons.includes(e.eventType)) {
     description += `\nParticipants: ${e.participants.length}` + (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "");
   }
@@ -152,7 +157,7 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId.toString());
+  const event = events.find(e => e.id.toString() === eventId.toString());
 
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -162,13 +167,15 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const participants = event.participants.map(cleanNickname);
   const absent = event.absent?.map(cleanNickname) || [];
 
-  // Tylko dla kategorii z pełnymi przyciskami pokazujemy participants
   const showParticipants = ["custom", "reservoir_raid"].includes(event.eventType);
+
+  const eventDate = new Date(Date.UTC(event.year ?? new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
+  const unixTime = Math.floor(eventDate.getTime() / 1000);
 
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.eventType === "birthdays" ? `🎉 ${event.name}'s Birthday` : event.name}`)
     .setDescription(
-      `Date: ${formatEventUTCObj(event)}\nStatus: ${event.status}` +
+      `Date: ${formatEventUTCObj(event)} <t:${unixTime}:R>\nStatus: ${event.status}` +
       (showParticipants ? `\n\nParticipants (${participants.length}):\n${participants.join("\n")}` : "") +
       (showParticipants && absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
     )
