@@ -105,7 +105,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute = 0;
         year = new Date().getUTCFullYear();
 
-        // Nazwa eventu z nicku gracza + postfix
+        // Nazwa eventu = nick z modala + postfix
         name = `${name.trim()}'s birthday! 🎉`;
 
     } else {
@@ -123,7 +123,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     }
 
     const tempId = `E-${uuidv4()}`;
-
     const nowUTC = new Date();
     const eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
@@ -153,15 +152,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute,
         guildId,
         year: year ?? eventDateUTC.getUTCFullYear(),
-        reminderBefore: eventType === "birthdays" ? 0 : 60, // birthday nie wysyła reminder przy tworzeniu
+        reminderBefore: eventType === "birthdays" ? 0 : 60,
         eventType
     });
 
-    // Pokazujemy przycisk powiadomienia tylko dla innych eventów niż Birthday
+    // Pokaż przycisk powiadomienia tylko dla innych eventów niż Birthday
     if (eventType !== "birthdays") {
         await showCreateNotificationConfirm(interaction, tempId);
     } else {
-        // Dla Birthday od razu finalize, bez powiadomienia
+        // Birthday od razu finalize, bez powiadomienia
         await finalizeEvent(interaction, tempId);
     }
 }
@@ -223,7 +222,8 @@ export async function finalizeEvent(
     await createEvent(newEvent);
     tempEventStore.delete(tempId);
 
-    if (interaction.guild && tempData.notifyOnCreate) {
+    // Wyślij powiadomienie tylko jeśli nie birthday i zaznaczono notify
+    if (interaction.guild && tempData.notifyOnCreate && tempData.eventType !== "birthdays") {
         await sendEventCreatedNotification(newEvent, interaction.guild);
     }
 
@@ -261,7 +261,6 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     }
 
     tempData.year = new Date().getUTCFullYear() + 1;
-    // pokazujemy przycisk tylko jeśli to nie birthday
     if (tempData.eventType !== "birthdays") {
         await showCreateNotificationConfirm(interaction, tempId);
     } else {
