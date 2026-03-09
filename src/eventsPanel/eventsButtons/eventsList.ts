@@ -30,24 +30,42 @@ function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year ?? new Date().getUTCFullYear());
 }
 
-// Formatuje nazwę kategorii, np. Arcadian_Conquest → Arcadian Conquest
 function formatCategoryLabel(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Tworzy embed i przyciski dla pojedynczego eventu
+// -----------------------------
+// CREATE EMBED & ROWS
+// -----------------------------
 function createEventEmbedAndRows(e: EventObject) {
-  // jeśli birthday – dostosowana nazwa
   const title = e.eventType === "birthdays" ? `🎉 ${e.name}'s Birthday` : e.name;
+
+  // Kategorie, które mają tylko Clear Event Data
+  const clearOnly = ["birthdays", "arcadian_conquest", "city_contest", "ghoulion_pursuit"];
+  const hasFullButtons = ["custom", "reservoir_raid"];
+
+  // Embed description – dla clearOnly tylko status i datę
+  let description = `Status: ${e.status}\nDate: ${formatEventUTCObj(e)}`;
+  if (hasFullButtons.includes(e.eventType)) {
+    description += `\nParticipants: ${e.participants.length}` + (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "");
+  }
 
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(
-      `Status: ${e.status}\nUTC Date: ${formatEventUTCObj(e)}\nParticipants: ${e.participants.length}` +
-      (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
-    )
+    .setDescription(description)
     .setColor(STATUS_COLORS[e.status] ?? 0xffffff);
 
+  const clearButton = new ButtonBuilder()
+    .setCustomId(`event_clear_${e.id}`)
+    .setLabel("Clear Event Data")
+    .setStyle(ButtonStyle.Danger);
+
+  if (clearOnly.includes(e.eventType)) {
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(clearButton);
+    return { embed, rows: [row] };
+  }
+
+  // Reservoir / Custom – pełne przyciski
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`event_add_${e.id}`).setLabel("Add Participant").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`event_remove_${e.id}`).setLabel("Remove Participant").setStyle(ButtonStyle.Danger),
@@ -58,7 +76,7 @@ function createEventEmbedAndRows(e: EventObject) {
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
+    clearButton
   );
 
   return { embed, rows: [row1, row2] };
@@ -68,12 +86,8 @@ function createEventEmbedAndRows(e: EventObject) {
 // CATEGORY CLICK
 // -----------------------------
 export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
-  if (category) {
-    // jeśli kliknięto konkretną kategorię, pokaz listę eventów
-    return await handleListByCategory(interaction, category);
-  }
+  if (category) return await handleListByCategory(interaction, category);
 
-  // jeśli brak kategorii – pokaz przyciski kategorii
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
@@ -83,8 +97,6 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
   }
 
   const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
-
-  // Tworzymy rzędy po maks. 5 przycisków
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   let currentRow = new ActionRowBuilder<ButtonBuilder>();
 
@@ -95,22 +107,15 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
         .setLabel(formatCategoryLabel(cat))
         .setStyle(ButtonStyle.Primary)
     );
-
     if ((idx + 1) % 5 === 0) {
       rows.push(currentRow);
       currentRow = new ActionRowBuilder<ButtonBuilder>();
     }
   });
 
-  if (currentRow.components.length > 0) {
-    rows.push(currentRow);
-  }
+  if (currentRow.components.length > 0) rows.push(currentRow);
 
-  await interaction.reply({
-    content: "Select a category to view events:",
-    components: rows,
-    ephemeral: true
-  });
+  await interaction.reply({ content: "Select a category to view events:", components: rows, ephemeral: true });
 }
 
 // -----------------------------
@@ -125,9 +130,7 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
     return;
   }
 
-  const filteredEvents = category
-    ? events.filter(e => e.eventType === category)
-    : events;
+  const filteredEvents = category ? events.filter(e => e.eventType === category) : events;
 
   if (!filteredEvents.length) {
     await interaction.reply({ content: `No events found for category "${category}".`, ephemeral: true });
@@ -138,7 +141,6 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
     const e = filteredEvents[i];
     const { embed, rows } = createEventEmbedAndRows(e);
     const payload = { embeds: [embed], components: rows, ephemeral: true };
-
     if (i === 0) await interaction.reply(payload);
     else await interaction.followUp(payload);
   }
@@ -160,11 +162,15 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const participants = event.participants.map(cleanNickname);
   const absent = event.absent?.map(cleanNickname) || [];
 
+  // Tylko dla kategorii z pełnymi przyciskami pokazujemy participants
+  const showParticipants = ["custom", "reservoir_raid"].includes(event.eventType);
+
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.eventType === "birthdays" ? `🎉 ${event.name}'s Birthday` : event.name}`)
     .setDescription(
-      `UTC Date: ${formatEventUTCObj(event)}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
-      (absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
+      `Date: ${formatEventUTCObj(event)}\nStatus: ${event.status}` +
+      (showParticipants ? `\n\nParticipants (${participants.length}):\n${participants.join("\n")}` : "") +
+      (showParticipants && absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
     )
     .setColor(STATUS_COLORS[event.status] ?? 0xffffff);
 
