@@ -50,7 +50,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setCustomId(`event_create_modal_${typeValue}`)
         .setTitle("Create Event");
 
-    // Pole: Event Name
+    // Pole: Event Name – dla wszystkich typów
     const nameInput = new TextInputBuilder()
         .setCustomId("event_name")
         .setLabel("Event Name")
@@ -69,15 +69,13 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setPlaceholder("See pinned message in this channel for formats")
         .setRequired(true);
 
-    // Dodajemy najpierw datetime
-    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
+    // Dodajemy datetime i nameInput do modalu zawsze
+    modal.addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput)
+    );
 
-    // Dodajemy Event Name dla birthdays i custom
-    if (typeValue === "birthdays" || typeValue === "custom") {
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
-    }
-
-    // Pole: Year
+    // Pole: Year – tylko dla birthdays i custom
     if (typeValue === "birthdays" || typeValue === "custom") {
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
