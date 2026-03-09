@@ -6,7 +6,7 @@ import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders, sendBirthdayNotification } from "./eventsPanel/eventsButtons/eventsReminder";
-import { tempEventStore, TempEventData } from "./eventsPanel/eventsButtons/eventsCreateSubmit";
+import { EventObject } from "./eventsPanel/eventService";
 
 const client = new Client({
   intents: [
@@ -24,36 +24,50 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
+  // -----------------------------
+  // Init modules
+  // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
 
+  // -----------------------------
+  // Event reminders
+  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
 
-    // 🔹 Test Birthday – wyślij powiadomienie po 1 minucie
-    const testTempId = `E-test-birthday`;
-    const testEvent: TempEventData = {
-      id: testTempId,
-      name: "TestPlayer",
-      day: new Date().getUTCDate(),
-      month: new Date().getUTCMonth() + 1,
-      hour: new Date().getUTCHours(),
-      minute: (new Date().getUTCMinutes() + 1) % 60, // minuta później
-      guildId: guild.id,
-      eventType: "birthdays"
-    };
+    // -----------------------------
+    // Test birthday – przyjdzie po 1 minucie
+    // -----------------------------
+    const channel = guild.channels.cache.find(c => c.isTextBased()) as TextChannel;
+    if (channel) {
+      const now = new Date();
+      const testEvent: EventObject = {
+        id: "test-bday",
+        guildId: guild.id,
+        name: "TestPlayer",
+        day: now.getUTCDate(),
+        month: now.getUTCMonth() + 1,
+        hour: now.getUTCHours(),
+        minute: (now.getUTCMinutes() + 1) % 60, // za minutę
+        year: now.getUTCFullYear(),
+        status: "ACTIVE",
+        participants: [],
+        absent: [],
+        createdAt: Date.now(),
+        reminderSent: false,
+        started: false,
+        reminderBefore: 0,
+        eventType: "birthdays"
+      };
 
-    tempEventStore.set(testTempId, testEvent);
-
-    // Poczekaj minutę i wyślij powiadomienie
-    setTimeout(async () => {
-      const channel = guild.channels.cache.find(c => c.isTextBased()) as TextChannel | undefined;
-      if (!channel) return;
-      await sendBirthdayNotification(channel, testEvent);
-      console.log(`Test birthday notification sent for ${testEvent.name} in ${guild.name}`);
-    }, 60_000);
+      setTimeout(() => sendBirthdayNotification(channel, testEvent), 60_000);
+    }
   }
 
+  // -----------------------------
+  // Interaction handler
+  // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     await handleEventInteraction(interaction);
   });
