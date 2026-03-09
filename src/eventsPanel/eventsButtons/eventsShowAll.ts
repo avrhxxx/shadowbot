@@ -3,11 +3,15 @@ import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedB
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
+// Status emojis
 const STATUS_EMOJIS: Record<string, string> = {
   ACTIVE: "🟢",
   PAST: "⚪",
   CANCELED: "🔴"
 };
+
+// Kategorie, dla których przyciski Compare / Download / Show All Lists są aktywne
+const EVENT_TYPES_WITH_PARTICIPANTS = ["custom", "reservoir_raid"];
 
 function createButtonRow(...buttons: ButtonBuilder[]) {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
@@ -30,29 +34,34 @@ function createEventListText(events: any[]) {
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
-  // 🔹 filtrujemy birthdays
-  const events = (await getEvents(interaction.guildId!))
-    .filter(e => e.eventType !== "birthdays");
+  // 🔹 pobieramy wszystkie eventy poza birthdays
+  const events = (await getEvents(interaction.guildId!)).filter(e => e.eventType !== "birthdays");
 
   if (!events.length) {
     return interaction.editReply({ content: "No events found." });
   }
 
+  // 🔹 przyciski Compare / Download / Show All Lists tylko dla Custom i Reservoir
+  const participantEvents = events.filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
+
   const row = createButtonRow(
     new ButtonBuilder()
       .setCustomId("compare_all_events")
       .setLabel("Compare All")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(participantEvents.length === 0), // blokujemy jeśli brak odpowiednich eventów
 
     new ButtonBuilder()
       .setCustomId("download_all_events")
       .setLabel("Download All")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(participantEvents.length === 0),
 
     new ButtonBuilder()
       .setCustomId("show_all_lists")
       .setLabel("Show All Lists")
       .setStyle(ButtonStyle.Success)
+      .setDisabled(participantEvents.length === 0)
   );
 
   const listText = createEventListText(events);
@@ -64,17 +73,17 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
 }
 
 // ==========================
-// SHOW ALL PARTICIPANT LISTS
+// SHOW ALL PARTICIPANT LISTS (Custom & Reservoir only)
 // ==========================
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
-  // 🔹 filtrujemy birthdays
+  // 🔹 pobieramy tylko Custom i Reservoir eventy
   const events = (await getEvents(interaction.guildId!))
-    .filter(e => e.eventType !== "birthdays");
+    .filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
 
   if (!events.length) {
-    return interaction.editReply({ content: "No events found." });
+    return interaction.editReply({ content: "No participant lists available for Custom/Reservoir events." });
   }
 
   const fullText = events
