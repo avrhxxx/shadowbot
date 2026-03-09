@@ -17,9 +17,6 @@ const EVENT_TYPES = [
     { label: "Custom", value: "custom" }
 ];
 
-// ----------------------------
-// Step 1: show type select
-// ----------------------------
 export async function handleCreate(interaction: ButtonInteraction) {
     if (!interaction.isButton()) return;
 
@@ -35,9 +32,6 @@ export async function handleCreate(interaction: ButtonInteraction) {
     });
 }
 
-// ----------------------------
-// Step 2: show modal based on type
-// ----------------------------
 export async function handleTypeSelect(interaction: StringSelectMenuInteraction) {
     if (!interaction.isStringSelectMenu()) return;
 
@@ -49,19 +43,20 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setCustomId(`event_create_modal_${typeValue}`)
         .setTitle("Create Event");
 
-    // Pole: Event Name
+    // Nazwa
     const nameInput = new TextInputBuilder()
         .setCustomId("event_name")
         .setLabel("Event Name")
         .setStyle(TextInputStyle.Short)
-        // Wymagane tylko dla Birthday i Custom
         .setRequired(typeValue === "birthdays" || typeValue === "custom");
 
+    // Jeśli standardowy → wypełniona i zablokowana
     if (typeConfig.prefillName) {
         nameInput.setValue(typeConfig.prefillName);
+        nameInput.setDisabled(true);
     }
 
-    // Pole: Date & Time (UTC) – wymagane dla wszystkich
+    // Data & Time (UTC)
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -74,13 +69,13 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput)
     );
 
-    // Pole: Year – tylko dla Birthday i Custom
+    // Rok – tylko Birthday / Custom
     if (typeValue === "birthdays" || typeValue === "custom") {
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
             .setLabel("Year")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Optional, leave empty to use current year")
+            .setPlaceholder("Optional, leave empty for current year")
             .setRequired(false);
 
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput));
