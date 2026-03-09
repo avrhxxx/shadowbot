@@ -14,7 +14,8 @@ import { formatEventUTC } from "../../utils/timeUtils";
    HELPERS
 ====================================================== */
 function createEventSelectMenu(events: EventObject[], customId: string, placeholder: string) {
-  const uniqueEvents = Array.from(new Map(events.map(e => [e.id, e])).values()); // ✅ unikalne ID
+  const uniqueEvents = Array.from(new Map(events.map(e => [e.id, e])).values());
+
   const options = uniqueEvents.map(ev =>
     new StringSelectMenuOptionBuilder()
       .setLabel(ev.name)
@@ -36,10 +37,17 @@ function createEventSelectMenu(events: EventObject[], customId: string, placehol
 export async function handleManualReminder(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const upcomingEvents = events.filter(e => e.status !== "PAST");
+
+  // ❗ filtr: usuwamy birthday events
+  const upcomingEvents = events.filter(
+    e => e.status !== "PAST" && e.eventType !== "birthdays"
+  );
 
   if (!upcomingEvents.length) {
-    await interaction.reply({ content: "No upcoming events to remind.", ephemeral: true });
+    await interaction.reply({
+      content: "No upcoming events available for manual reminder.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -62,32 +70,49 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
 export async function handleManualReminderSelect(interaction: StringSelectMenuInteraction) {
   const guildId = interaction.guildId!;
   const selectedEventId = interaction.values[0];
+
   if (!selectedEventId) {
-    await interaction.reply({ content: "No event selected.", ephemeral: true });
+    await interaction.reply({
+      content: "No event selected.",
+      ephemeral: true
+    });
     return;
   }
 
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === selectedEventId);
+
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.reply({
+      content: "Event not found.",
+      ephemeral: true
+    });
     return;
   }
 
   const config = await getConfig(guildId);
   const channelId = config.notificationChannel;
+
   if (!channelId) {
-    await interaction.reply({ content: "Notification channel not set.", ephemeral: true });
+    await interaction.reply({
+      content: "Notification channel not set.",
+      ephemeral: true
+    });
     return;
   }
 
   const rawChannel = interaction.guild?.channels.cache.get(channelId);
+
   if (!rawChannel || !rawChannel.isTextBased()) {
-    await interaction.reply({ content: "Notification channel invalid.", ephemeral: true });
+    await interaction.reply({
+      content: "Notification channel invalid.",
+      ephemeral: true
+    });
     return;
   }
 
   const channel = rawChannel as TextChannel;
+
   await sendReminderMessage(channel, event);
 
   await interaction.update({
