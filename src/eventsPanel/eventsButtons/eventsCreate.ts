@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreate.ts
 import { 
     ButtonInteraction, 
     ModalBuilder, 
@@ -50,18 +49,19 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setCustomId(`event_create_modal_${typeValue}`)
         .setTitle("Create Event");
 
-    // Pole: Event Name – dla wszystkich typów
+    // Pole: Event Name
     const nameInput = new TextInputBuilder()
         .setCustomId("event_name")
         .setLabel("Event Name")
         .setStyle(TextInputStyle.Short)
+        // Wymagane tylko dla Birthday i Custom
         .setRequired(typeValue === "birthdays" || typeValue === "custom");
 
     if (typeConfig.prefillName) {
         nameInput.setValue(typeConfig.prefillName);
     }
 
-    // Pole: Date & Time
+    // Pole: Date & Time (UTC) – wymagane dla wszystkich
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -69,20 +69,19 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setPlaceholder("See pinned message in this channel for formats")
         .setRequired(true);
 
-    // Dodajemy datetime i nameInput do modalu zawsze
     modal.addComponents(
         new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
         new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput)
     );
 
-    // Pole: Year – tylko dla birthdays i custom
+    // Pole: Year – tylko dla Birthday i Custom
     if (typeValue === "birthdays" || typeValue === "custom") {
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
             .setLabel("Year")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder(typeValue === "birthdays" ? "Required" : "Optional")
-            .setRequired(typeValue === "birthdays");
+            .setPlaceholder("Optional, leave empty to use current year")
+            .setRequired(false);
 
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput));
     }
