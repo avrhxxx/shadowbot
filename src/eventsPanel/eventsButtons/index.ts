@@ -1,3 +1,5 @@
+// src/eventsPanel/eventsButtons/index.ts
+
 // -----------------------------
 // EVENTS CREATE
 // -----------------------------
@@ -13,7 +15,7 @@ export {
 // -----------------------------
 // EVENTS LIST
 // -----------------------------
-export { handleList, handleShowList } from "./eventsList";
+export { handleList, handleShowList, handleCategoryClick } from "./eventsList";
 
 // -----------------------------
 // EVENTS CANCEL
