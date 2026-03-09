@@ -100,13 +100,15 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       }
 
       // Notify create
-      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
+      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no"))
         return await EB.handleNotificationResponse(interaction);
-      }
 
       // Next year
-      if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
-      if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
+      if (id.startsWith("next_year_yes"))
+        return await EB.finalizeNextYearEvent(interaction);
+
+      if (id.startsWith("next_year_no"))
+        return await EB.handleCancelAbort(interaction);
 
       // Participants
       if (id.startsWith("event_add_"))
@@ -134,7 +136,16 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id === "compare_all_download")
         return await EB.handleCompareAllDownload(interaction);
 
-      // Clear event
+      // ----------------------------
+      // CLEAR EVENT
+      // ----------------------------
+
+      if (id.startsWith("event_clear_confirm_"))
+        return await EB.handleClearEventConfirm(interaction);
+
+      if (id.startsWith("event_clear_abort_"))
+        return await EB.handleClearEventAbort(interaction);
+
       if (id.startsWith("event_clear_"))
         return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
@@ -158,6 +169,7 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
     }
   } catch (error) {
     console.error("Error handling event interaction:", error);
+
     if (interaction.isRepliable())
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
