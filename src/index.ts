@@ -1,12 +1,11 @@
 // 🔹 Import Google Sheets klienta jako pierwszy
 import "./googleSheetsClient";
 
-import { Client, GatewayIntentBits, Partials, Interaction, TextChannel } from "discord.js";
+import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
-import { initEventReminders, sendBirthdayNotification } from "./eventsPanel/eventsButtons/eventsReminder";
-import { EventObject } from "./eventsPanel/eventService";
+import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
 
 const client = new Client({
   intents: [
@@ -31,38 +30,10 @@ client.once("ready", async () => {
   initModeratorPanel(client);
 
   // -----------------------------
-  // Event reminders
+  // Init event reminders
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
-
-    // -----------------------------
-    // Test birthday – przyjdzie po 1 minucie
-    // -----------------------------
-    const channel = guild.channels.cache.find(c => c.isTextBased()) as TextChannel;
-    if (channel) {
-      const now = new Date();
-      const testEvent: EventObject = {
-        id: "test-bday",
-        guildId: guild.id,
-        name: "TestPlayer",
-        day: now.getUTCDate(),
-        month: now.getUTCMonth() + 1,
-        hour: now.getUTCHours(),
-        minute: (now.getUTCMinutes() + 1) % 60, // za minutę
-        year: now.getUTCFullYear(),
-        status: "ACTIVE",
-        participants: [],
-        absent: [],
-        createdAt: Date.now(),
-        reminderSent: false,
-        started: false,
-        reminderBefore: 0,
-        eventType: "birthdays"
-      };
-
-      setTimeout(() => sendBirthdayNotification(channel, testEvent), 60_000);
-    }
   }
 
   // -----------------------------
