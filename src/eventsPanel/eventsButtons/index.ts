@@ -15,7 +15,7 @@ export {
 // -----------------------------
 // EVENTS LIST
 // -----------------------------
-export { handleList, handleShowList, handleCategoryClick } from "./eventsList";
+export { handleCategoryClick, handleListByCategory, handleShowList } from "./eventsList";
 
 // -----------------------------
 // EVENTS CANCEL
