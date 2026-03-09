@@ -30,6 +30,7 @@ export const IDS = {
     SETTINGS_DOWNLOAD: "event_settings_download",
     CANCEL_SELECT: "event_cancel_select",
     COMPARE_SELECT_PREFIX: "compare_select_",
+    CREATE_TYPE_SELECT: "event_type_select", // nowy select menu dla typów eventów
   },
   MODALS: {
     CREATE: "event_create_modal",
@@ -64,6 +65,7 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await EB.handleSettingsSelect(i),
   [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => await EB.handleSettingsSelect(i),
   [IDS.SELECTS.CANCEL_SELECT]: async (i) => await EB.handleCancelSelect(i),
+  [IDS.SELECTS.CREATE_TYPE_SELECT]: async (i) => await EB.handleTypeSelect(i), // nowy handler typu eventu
 };
 
 // ----------------------------
@@ -72,14 +74,19 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
 async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
   const { customId } = interaction;
 
-  if (customId === IDS.MODALS.CREATE)
+  // Obsługa modali create z typem eventu
+  if (customId === IDS.MODALS.CREATE || customId.startsWith(`${IDS.MODALS.CREATE}_`)) {
     await EB.handleCreateSubmit(interaction);
-  else if (customId.startsWith(IDS.MODALS.ADD_PREFIX))
+  }
+  else if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
     await EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
-  else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX))
+  }
+  else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
     await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
-  else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX))
+  }
+  else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
     await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
+  }
 }
 
 // ----------------------------
@@ -100,54 +107,35 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       }
 
       // Notify create
-      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no"))
+      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
         return await EB.handleNotificationResponse(interaction);
+      }
 
       // Next year
-      if (id.startsWith("next_year_yes"))
-        return await EB.finalizeNextYearEvent(interaction);
-
-      if (id.startsWith("next_year_no"))
-        return await EB.handleCancelAbort(interaction);
+      if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
+      if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
 
       // Participants
-      if (id.startsWith("event_add_"))
-        return await EB.handleAddParticipant(interaction, parseEventId(id));
-
-      if (id.startsWith("event_remove_"))
-        return await EB.handleRemoveParticipant(interaction, parseEventId(id));
-
-      if (id.startsWith("event_absent_"))
-        return await EB.handleAbsentParticipant(interaction, parseEventId(id));
+      if (id.startsWith("event_add_")) return await EB.handleAddParticipant(interaction, parseEventId(id));
+      if (id.startsWith("event_remove_")) return await EB.handleRemoveParticipant(interaction, parseEventId(id));
+      if (id.startsWith("event_absent_")) return await EB.handleAbsentParticipant(interaction, parseEventId(id));
 
       // Event list
-      if (id.startsWith("event_show_list_"))
-        return await EB.handleShowList(interaction, parseEventId(id));
+      if (id.startsWith("event_show_list_")) return await EB.handleShowList(interaction, parseEventId(id));
 
       // Download single
-      if (id.startsWith("event_download_single_"))
-        return await EB.handleDownload(interaction, parseEventId(id));
+      if (id.startsWith("event_download_single_")) return await EB.handleDownload(interaction, parseEventId(id));
 
       // Compare events
-      if (id.startsWith("event_compare_"))
-        return await EB.handleCompareButton(interaction, parseEventId(id));
+      if (id.startsWith("event_compare_")) return await EB.handleCompareButton(interaction, parseEventId(id));
 
       // Compare All Download
-      if (id === "compare_all_download")
-        return await EB.handleCompareAllDownload(interaction);
+      if (id === "compare_all_download") return await EB.handleCompareAllDownload(interaction);
 
-      // ----------------------------
-      // CLEAR EVENT
-      // ----------------------------
-
-      if (id.startsWith("event_clear_confirm_"))
-        return await EB.handleClearEventConfirm(interaction);
-
-      if (id.startsWith("event_clear_abort_"))
-        return await EB.handleClearEventAbort(interaction);
-
-      if (id.startsWith("event_clear_"))
-        return await EB.handleClearEventButton(interaction, parseEventId(id));
+      // Clear event
+      if (id.startsWith("event_clear_confirm_")) return await EB.handleClearEventConfirm(interaction);
+      if (id.startsWith("event_clear_abort_")) return await EB.handleClearEventAbort(interaction);
+      if (id.startsWith("event_clear_")) return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
     // ----------------------------
@@ -157,8 +145,10 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
 
-      if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX))
+      // Compare select
+      if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
+      }
     }
 
     // ----------------------------
@@ -170,10 +160,11 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
   } catch (error) {
     console.error("Error handling event interaction:", error);
 
-    if (interaction.isRepliable())
+    if (interaction.isRepliable()) {
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
         ephemeral: true
       });
+    }
   }
 }
