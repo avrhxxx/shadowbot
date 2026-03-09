@@ -56,51 +56,60 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// LIST HANDLER (kategorie)
+// SHOW CATEGORIES
 // -----------------------------
-export async function handleList(interaction: ButtonInteraction) {
+export async function handleCategoryClick(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
-  if (!events?.length) {
+  if (!events.length) {
     await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
-  // ✅ zbierz unikalne kategorie (eventType)
-  const categories = Array.from(new Set(events.map(e => e.eventType ?? "Uncategorized")));
+  // zbieramy unikalne kategorie
+  const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
 
-  // wyświetl przyciski kategorii
-  const categoryButtons = categories.map(cat =>
-    new ButtonBuilder().setCustomId(`event_list_category_${cat}`).setLabel(cat).setStyle(ButtonStyle.Primary)
-  );
-
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < categoryButtons.length; i += 5) {
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(categoryButtons.slice(i, i + 5)));
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  for (const category of categories) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`category_${category}`)
+        .setLabel(category.charAt(0).toUpperCase() + category.slice(1))
+        .setStyle(ButtonStyle.Primary)
+    );
   }
 
   await interaction.reply({
-    content: "Select a category:",
-    components: rows,
+    content: "Select a category to view events:",
+    components: [row],
     ephemeral: true
   });
 }
 
 // -----------------------------
-// LISTA PO KATEGORII
+// LIST BY CATEGORY
 // -----------------------------
-export async function handleListByCategory(interaction: ButtonInteraction, category: string) {
+export async function handleListByCategory(interaction: ButtonInteraction, category?: string) {
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId).then(evts => evts.filter(e => (e.eventType ?? "Uncategorized") === category));
+  const events = await getEvents(guildId);
 
   if (!events.length) {
-    await interaction.reply({ content: `No events found in category "${category}".`, ephemeral: true });
+    await interaction.reply({ content: "No events found.", ephemeral: true });
     return;
   }
 
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i];
+  const filteredEvents = category
+    ? events.filter(e => e.eventType === category)
+    : events;
+
+  if (!filteredEvents.length) {
+    await interaction.reply({ content: `No events found for category "${category}".`, ephemeral: true });
+    return;
+  }
+
+  for (let i = 0; i < filteredEvents.length; i++) {
+    const e = filteredEvents[i];
     const { embed, rows } = createEventEmbedAndRows(e);
     const payload = { embeds: [embed], components: rows, ephemeral: true };
 
@@ -115,7 +124,7 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id.toString() === eventId.toString());
+  const event = events.find(e => e.id === eventId.toString());
 
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
