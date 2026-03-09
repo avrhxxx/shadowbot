@@ -1,150 +1,270 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
-import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
+import {
+    ModalSubmitInteraction,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    StringSelectMenuInteraction,
+    ButtonInteraction
+} from "discord.js";
+import { v4 as uuidv4 } from "uuid";
+
+import { createEvent, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { sendEventCreatedNotification } from "./eventsReminder";
 
-const CHECK_INTERVAL = 60_000; // 60s
-const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
+// -----------------------------------------------------------
+// TEMP DATA TYPE
+// -----------------------------------------------------------
+export type TempEventData = {
+    id: string;
+    name: string;
+    day: number;
+    month: number;
+    hour: number;
+    minute: number;
+    guildId: string;
+    year?: number;
+    reminderBefore?: number;
+    notifyOnCreate?: boolean;
+    eventType: string;
+};
 
-// ======================================================
-// INIT / STOP REMINDERS
-// ======================================================
-export async function initEventReminders(guild: Guild) {
-  if (intervalHandles.has(guild.id)) return;
+// -----------------------------------------------------------
+// TEMP STORE
+// -----------------------------------------------------------
+export const tempEventStore = new Map<string, TempEventData>();
 
-  const handle = setInterval(() => checkEvents(guild).catch(console.error), CHECK_INTERVAL);
-  intervalHandles.set(guild.id, handle);
+// -----------------------------------------------------------
+// HELPERS
+// -----------------------------------------------------------
+function parseEventDateTime(input: string) {
+    const cleaned = input.trim();
+    const match = cleaned.match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
+    if (!match) return null;
+
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const hour = parseInt(match[3], 10);
+    const minute = match[4] ? parseInt(match[4], 10) : 0;
+
+    if (hour > 23 || minute > 59) return null;
+    return { day, month, hour, minute };
 }
 
-export function stopEventReminders(guildId: string) {
-  const handle = intervalHandles.get(guildId);
-  if (handle) {
-    clearInterval(handle);
-    intervalHandles.delete(guildId);
-  }
-}
+async function safeReply(interaction: any, payload: any) {
+    if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+    if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
 
-// ======================================================
-// CHECK EVENTS
-// ======================================================
-async function checkEvents(guild: Guild) {
-  const events = await getEvents(guild.id);
-  const now = new Date();
-  let changed = false;
-
-  const config = await getConfig(guild.id);
-  const channel = getTextChannel(guild, config?.notificationChannel);
-  if (!channel) return;
-
-  for (const event of events) {
-    if (event.status !== "ACTIVE") continue;
-
-    // ----------------------
-    // Birthday special case
-    // ----------------------
-    if (event.eventType === "birthdays") {
-      if (
-        event.day === now.getUTCDate() &&
-        event.month === now.getUTCMonth() + 1 &&
-        (event.lastBirthdayYear ?? 0) < now.getUTCFullYear()
-      ) {
-        await sendBirthdayNotification(channel, event);
-        event.lastBirthdayYear = now.getUTCFullYear();
-        changed = true;
-      }
-      continue;
+    if (payload.ephemeral) {
+        payload.flags = 64;
+        delete payload.ephemeral;
     }
 
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
-    const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
+    return interaction.reply(payload);
+}
 
-    // Upcoming reminder
-    if (!event.reminderSent && now.getTime() >= reminderTime) {
-      await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
-      event.reminderSent = true;
-      changed = true;
+// -----------------------------------------------------------
+// HANDLE CREATE SUBMIT
+// -----------------------------------------------------------
+export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
+    const guildId = interaction.guildId!;
+    const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
+    const rawType = typeMatch ? typeMatch[1] : "custom";
+    const eventType = rawType.startsWith("standard_") ? rawType.replace(/^standard_/, "") : rawType;
+
+    let name = "";
+    let datetimeRaw = "";
+    let yearRaw: string | undefined;
+
+    try { name = interaction.fields.getTextInputValue("event_name"); } catch {}
+    try { datetimeRaw = interaction.fields.getTextInputValue("event_datetime"); } catch {}
+    try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
+
+    // Prefill dla standardowych typów
+    const prefillMap: Record<string,string> = {
+        arcadian_conquest: "Arcadian Conquest",
+        city_contest: "City Contest",
+        reservoir_raid: "Reservoir Raid",
+        ghoulion_pursuit: "Ghoulion Pursuit"
+    };
+    if (prefillMap[eventType]) name = prefillMap[eventType];
+
+    let day: number, month: number, hour = 0, minute = 0, year: number | undefined;
+
+    if (eventType === "birthdays") {
+        const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+        if (!dateMatch) {
+            await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
+            return;
+        }
+
+        day = parseInt(dateMatch[1], 10);
+        month = parseInt(dateMatch[2], 10);
+        hour = 0;
+        minute = 0;
+        year = new Date().getUTCFullYear();
+
+        // Nazwa eventu z nicku gracza + postfix
+        name = `${name.trim()}'s birthday! 🎉`;
+
+    } else {
+        const parsed = parseEventDateTime(datetimeRaw);
+        if (!parsed && eventType !== "custom") {
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+            return;
+        }
+        day = parsed?.day ?? 1;
+        month = parsed?.month ?? 1;
+        hour = parsed?.hour ?? 0;
+        minute = parsed?.minute ?? 0;
+        const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
+        year = Number.isNaN(yearParsed) ? undefined : yearParsed;
     }
 
-    // Event started
-    if (!event.started && now.getTime() >= eventTime) {
-      await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
-      event.started = true;
-      event.status = "PAST";
-      changed = true;
+    const tempId = `E-${uuidv4()}`;
+
+    const nowUTC = new Date();
+    const eventDateUTC = year
+        ? new Date(Date.UTC(year, month - 1, day, hour, minute))
+        : getEventDateUTC(day, month, hour, minute);
+
+    if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
+        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType });
+        await safeReply(interaction, {
+            content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
+            components: [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`next_year_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`next_year_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+                )
+            ],
+            ephemeral: true
+        });
+        return;
     }
-  }
 
-  if (changed) await saveEvents(guild.id, events);
+    tempEventStore.set(tempId, {
+        id: tempId,
+        name,
+        day,
+        month,
+        hour,
+        minute,
+        guildId,
+        year: year ?? eventDateUTC.getUTCFullYear(),
+        reminderBefore: eventType === "birthdays" ? 0 : 60, // birthday nie wysyła reminder przy tworzeniu
+        eventType
+    });
+
+    // Pokazujemy przycisk powiadomienia tylko dla innych eventów niż Birthday
+    if (eventType !== "birthdays") {
+        await showCreateNotificationConfirm(interaction, tempId);
+    } else {
+        // Dla Birthday od razu finalize, bez powiadomienia
+        await finalizeEvent(interaction, tempId);
+    }
 }
 
-// ======================================================
-// SEND BIRTHDAY NOTIFICATION (SPECIAL)
-// ======================================================
-async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
-  const embed = new EmbedBuilder()
-    .setTitle("🎂 Birthday Celebration!")
-    .setDescription(`Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`)
-    .setColor(0xffc107);
-
-  await channel.send({ content: "@everyone", embeds: [embed] });
-}
-
-// ======================================================
-// SEND REMINDERS / CREATED
-// ======================================================
-export async function sendEventCreatedNotification(event: EventObject, guild: Guild) {
-  const config = await getConfig(guild.id);
-  const channel = getTextChannel(guild, config?.notificationChannel);
-  if (!channel) return;
-
-  await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
-}
-
-export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
-  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
-}
-
-// ======================================================
-// SEND EVENT NOTIFICATION (UNIFIED SCHEME)
-// ======================================================
-async function sendEventNotification(
-  channel: TextChannel,
-  event: EventObject,
-  title: string,
-  type: "created" | "upcoming" | "started",
-  color: ColorResolvable = "White"
+// -----------------------------------------------------------
+// SHOW CREATE NOTIFICATION CONFIRM
+// -----------------------------------------------------------
+export async function showCreateNotificationConfirm(
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+    tempId: string
 ) {
-  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
-  const unixTime = Math.floor(eventDate.getTime() / 1000);
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) return;
 
-  // Description dla embedu
-  let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
-  if (type === "created") {
-    description += `Event scheduled <t:${unixTime}:R>`;
-  } else if (type === "upcoming") {
-    description += `Event starts <t:${unixTime}:R>`;
-  } else if (type === "started") {
-    description += `Event started <t:${unixTime}:R>`;
-  }
-  description += `\n\n_Click the countdown to see the event time in your local timezone_`;
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`notify_create_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`notify_create_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+    );
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${title}: ${event.name}`)
-    .setDescription(description)
-    .setColor(color);
-
-  await channel.send({ content: "@everyone", embeds: [embed] });
+    await safeReply(interaction, {
+        content: "Do you want to send a notification about creating this event?",
+        components: [row],
+        ephemeral: true
+    });
 }
 
-// ======================================================
-// UTILS
-// ======================================================
-function getTextChannel(guild: Guild, channelId?: string) {
-  if (!channelId) return null;
-  const ch = guild.channels.cache.get(channelId);
-  return ch && ch.isTextBased() ? (ch as TextChannel) : null;
+// -----------------------------------------------------------
+// FINALIZE EVENT
+// -----------------------------------------------------------
+export async function finalizeEvent(
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    tempId: string
+) {
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+        return;
+    }
+
+    const newEvent: EventObject = {
+        id: tempData.id,
+        guildId: tempData.guildId,
+        name: tempData.name,
+        day: tempData.day,
+        month: tempData.month,
+        hour: tempData.hour,
+        minute: tempData.minute,
+        year: tempData.year ?? new Date().getUTCFullYear(),
+        status: "ACTIVE",
+        participants: [],
+        absent: [],
+        createdAt: Date.now(),
+        reminderSent: false,
+        started: false,
+        reminderBefore: tempData.reminderBefore ?? 60,
+        eventType: tempData.eventType
+    };
+
+    await createEvent(newEvent);
+    tempEventStore.delete(tempId);
+
+    if (interaction.guild && tempData.notifyOnCreate) {
+        await sendEventCreatedNotification(newEvent, interaction.guild);
+    }
+
+    await safeReply(interaction, {
+        content: `Event **${newEvent.name}** scheduled successfully.`,
+        components: [],
+        ephemeral: true
+    });
 }
 
-function formatEventUTCObj(event: EventObject) {
-  return formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
+// -----------------------------------------------------------
+// HANDLE NOTIFICATION RESPONSE
+// -----------------------------------------------------------
+export async function handleNotificationResponse(interaction: ButtonInteraction) {
+    const [, tempId] = interaction.customId.split(/-(.+)/);
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+        return;
+    }
+
+    tempData.notifyOnCreate = interaction.customId.startsWith("notify_create_yes");
+    await finalizeEvent(interaction, tempId);
+}
+
+// -----------------------------------------------------------
+// FINALIZE NEXT YEAR EVENT
+// -----------------------------------------------------------
+export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+    const [, tempId] = interaction.customId.split(/-(.+)/);
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+        return;
+    }
+
+    tempData.year = new Date().getUTCFullYear() + 1;
+    // pokazujemy przycisk tylko jeśli to nie birthday
+    if (tempData.eventType !== "birthdays") {
+        await showCreateNotificationConfirm(interaction, tempId);
+    } else {
+        await finalizeEvent(interaction, tempId);
+    }
 }
