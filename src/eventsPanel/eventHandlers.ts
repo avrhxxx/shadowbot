@@ -74,17 +74,13 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
 async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
   const { customId } = interaction;
 
-  // Obsługa modali create z typem eventu
   if (customId === IDS.MODALS.CREATE || customId.startsWith(`${IDS.MODALS.CREATE}_`)) {
     await EB.handleCreateSubmit(interaction);
-  }
-  else if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
+  } else if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
     await EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
-  }
-  else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
+  } else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
     await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
-  }
-  else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
+  } else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
     await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
   }
 }
@@ -123,6 +119,12 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       // Event list
       if (id.startsWith("event_show_list_")) return await EB.handleShowList(interaction, parseEventId(id));
 
+      // CATEGORY CLICK
+      if (id.startsWith("event_category_")) {
+        const category = id.replace("event_category_", "");
+        return await EB.handleCategoryClick(interaction, category);
+      }
+
       // Download single
       if (id.startsWith("event_download_single_")) return await EB.handleDownload(interaction, parseEventId(id));
 
@@ -138,22 +140,15 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id.startsWith("event_clear_")) return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
-    // ----------------------------
-    // Select menus
-    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
 
-      // Compare select
       if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
       }
     }
 
-    // ----------------------------
-    // Modal submit
-    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
