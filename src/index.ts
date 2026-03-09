@@ -31,26 +31,25 @@ client.once("ready", async () => {
     initEventReminders(guild);
 
     // -----------------------------
-    // TEST: Wstrzykujemy Birthday w 5 minut
+    // TEST: Wstrzykujemy Birthday natychmiast
     // -----------------------------
     const now = new Date();
-    const fiveMinutesLater = new Date(now.getTime() + 5 * 60_000);
 
     const tempId = `E-test-${Date.now()}`;
     const tempBirthday: TempEventData = {
       id: tempId,
       guildId: guild.id,
       name: "TestPlayer",           // nick z gry jubilanta
-      day: fiveMinutesLater.getUTCDate(),
-      month: fiveMinutesLater.getUTCMonth() + 1,
-      hour: fiveMinutesLater.getUTCHours(),
-      minute: fiveMinutesLater.getUTCMinutes(),
+      day: now.getUTCDate(),
+      month: now.getUTCMonth() + 1,
+      hour: now.getUTCHours(),
+      minute: now.getUTCMinutes(),
       eventType: "birthdays",
-      reminderBefore: 0,            // wysyła od razu
+      reminderBefore: 0,            // przypomnienie od razu
     };
 
     tempEventStore.set(tempId, tempBirthday);
-    console.log(`Injected test birthday for guild ${guild.id}, event in 5 minutes`);
+    console.log(`Injected immediate test birthday for guild ${guild.id}`);
   }
 
   client.on("interactionCreate", async (interaction: Interaction) => {
