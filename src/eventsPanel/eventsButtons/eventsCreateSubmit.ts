@@ -77,16 +77,13 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
     const eventType = typeMatch ? typeMatch[1] : "custom";
 
-    let name = interaction.fields.getTextInputValue("event_name");
-    const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
-
-    // bezpieczne pobranie pola "event_year" – może nie istnieć w standardowych eventach
+    // bezpieczne pobranie pól modalowych
+    let name = "";
+    try { name = interaction.fields.getTextInputValue("event_name"); } catch {}
+    let datetimeRaw = "";
+    try { datetimeRaw = interaction.fields.getTextInputValue("event_datetime"); } catch {}
     let yearRaw: string | undefined;
-    try {
-        yearRaw = interaction.fields.getTextInputValue("event_year");
-    } catch {
-        yearRaw = undefined;
-    }
+    try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
 
     // prefille dla standardowych typów
     const prefillMap: Record<string,string> = {
@@ -188,20 +185,20 @@ export async function finalizeEvent(
     const newEvent: EventObject = {
         id: tempData.id,
         guildId: tempData.guildId,
-        name: tempData.name,
+        name: tempData.name || "Unnamed Event",
         day: tempData.day,
         month: tempData.month,
         hour: tempData.hour,
         minute: tempData.minute,
-        year: tempData.year!,
+        year: tempData.year ?? new Date().getUTCFullYear(),
         status: "ACTIVE",
         participants: [],
         absent: [],
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        reminderBefore: tempData.reminderBefore,
-        eventType: tempData.eventType
+        reminderBefore: tempData.reminderBefore ?? 60,
+        eventType: tempData.eventType || "custom"
     };
 
     await createEvent(newEvent);
