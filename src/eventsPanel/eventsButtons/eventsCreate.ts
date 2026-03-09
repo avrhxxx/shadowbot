@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreate.ts
 import { 
     ButtonInteraction, 
     ModalBuilder, 
@@ -17,6 +18,9 @@ const EVENT_TYPES = [
     { label: "Custom", value: "custom" }
 ];
 
+// ----------------------------
+// Step 1: show type select
+// ----------------------------
 export async function handleCreate(interaction: ButtonInteraction) {
     if (!interaction.isButton()) return;
 
@@ -32,6 +36,9 @@ export async function handleCreate(interaction: ButtonInteraction) {
     });
 }
 
+// ----------------------------
+// Step 2: show modal based on type
+// ----------------------------
 export async function handleTypeSelect(interaction: StringSelectMenuInteraction) {
     if (!interaction.isStringSelectMenu()) return;
 
@@ -43,20 +50,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setCustomId(`event_create_modal_${typeValue}`)
         .setTitle("Create Event");
 
-    // Nazwa
-    const nameInput = new TextInputBuilder()
-        .setCustomId("event_name")
-        .setLabel("Event Name")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(typeValue === "birthdays" || typeValue === "custom");
-
-    // Jeśli standardowy → wypełniona i zablokowana
-    if (typeConfig.prefillName) {
-        nameInput.setValue(typeConfig.prefillName);
-        nameInput.setDisabled(true);
-    }
-
-    // Data & Time (UTC)
+    // Data & Time (UTC) – zawsze wymagane
     const datetimeInput = new TextInputBuilder()
         .setCustomId("event_datetime")
         .setLabel("Date & Time (UTC)")
@@ -64,18 +58,24 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         .setPlaceholder("See pinned message in this channel for formats")
         .setRequired(true);
 
-    modal.addComponents(
-        new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput)
-    );
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
 
-    // Rok – tylko Birthday / Custom
+    // Nazwa – tylko dla Birthday / Custom
     if (typeValue === "birthdays" || typeValue === "custom") {
+        const nameInput = new TextInputBuilder()
+            .setCustomId("event_name")
+            .setLabel("Event Name")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
+
+        // Rok – opcjonalny
         const yearInput = new TextInputBuilder()
             .setCustomId("event_year")
-            .setLabel("Year")
+            .setLabel("Year (optional)")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Optional, leave empty for current year")
+            .setPlaceholder("Leave empty for current year")
             .setRequired(false);
 
         modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput));
