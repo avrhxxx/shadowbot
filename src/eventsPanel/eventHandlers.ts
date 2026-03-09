@@ -45,7 +45,10 @@ export const IDS = {
 // ----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
   [IDS.BUTTONS.CREATE]: async (i) => await EB.handleCreate(i),
-  [IDS.BUTTONS.LIST]: async (i) => await EB.handleList(i),
+
+  // teraz wywołujemy kategorię zamiast od razu listy
+  [IDS.BUTTONS.LIST]: async (i) => await EB.handleCategoryClick(i),
+
   [IDS.BUTTONS.CANCEL]: async (i) => await EB.handleCancel(i),
   [IDS.BUTTONS.CANCEL_ABORT]: async (i) => await EB.handleCancelAbort(i),
   [IDS.BUTTONS.SETTINGS]: async (i) => await EB.handleSettings(i),
@@ -65,7 +68,7 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await EB.handleSettingsSelect(i),
   [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => await EB.handleSettingsSelect(i),
   [IDS.SELECTS.CANCEL_SELECT]: async (i) => await EB.handleCancelSelect(i),
-  [IDS.SELECTS.CREATE_TYPE_SELECT]: async (i) => await EB.handleTypeSelect(i), // nowy handler typu eventu
+  [IDS.SELECTS.CREATE_TYPE_SELECT]: async (i) => await EB.handleTypeSelect(i),
 };
 
 // ----------------------------
@@ -116,7 +119,7 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id.startsWith("event_remove_")) return await EB.handleRemoveParticipant(interaction, parseEventId(id));
       if (id.startsWith("event_absent_")) return await EB.handleAbsentParticipant(interaction, parseEventId(id));
 
-      // Event list
+      // Event list dla pojedynczego eventu
       if (id.startsWith("event_show_list_")) return await EB.handleShowList(interaction, parseEventId(id));
 
       // CATEGORY CLICK
@@ -140,15 +143,22 @@ export async function handleEventInteraction(interaction: Interaction<CacheType>
       if (id.startsWith("event_clear_")) return await EB.handleClearEventButton(interaction, parseEventId(id));
     }
 
+    // ----------------------------
+    // Select menus
+    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
 
+      // Compare select
       if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
       }
     }
 
+    // ----------------------------
+    // Modal submit
+    // ----------------------------
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction);
     }
