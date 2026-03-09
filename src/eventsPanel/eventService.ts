@@ -107,8 +107,8 @@ export async function deleteEventRow(eventId: string) {
 // -----------------------------
 // PARTICIPANT OPERATIONS
 // -----------------------------
-export async function addParticipants(eventId: string, nicknames: string[]) {
-  const event = await getEventById("", eventId);
+export async function addParticipants(guildId: string, eventId: string, nicknames: string[]) {
+  const event = await getEventById(guildId, eventId);
   if (!event) throw new Error("Event not found");
 
   for (const nick of nicknames) {
@@ -122,8 +122,8 @@ export async function addParticipants(eventId: string, nicknames: string[]) {
   return event.participants;
 }
 
-export async function removeParticipants(eventId: string, nicknames: string[]) {
-  const event = await getEventById("", eventId);
+export async function removeParticipants(guildId: string, eventId: string, nicknames: string[]) {
+  const event = await getEventById(guildId, eventId);
   if (!event) throw new Error("Event not found");
 
   event.participants = event.participants.filter(n => !nicknames.includes(n));
@@ -135,8 +135,8 @@ export async function removeParticipants(eventId: string, nicknames: string[]) {
   return event.participants;
 }
 
-export async function markAbsent(eventId: string, nicknames: string[]) {
-  const event = await getEventById("", eventId);
+export async function markAbsent(guildId: string, eventId: string, nicknames: string[]) {
+  const event = await getEventById(guildId, eventId);
   if (!event) throw new Error("Event not found");
 
   for (const nick of nicknames) {
@@ -173,7 +173,15 @@ export async function deleteEvent(eventId: string) {
 
 export async function createEvent(data: EventObject): Promise<EventObject> {
   const rows = await GS.readEventsSheet();
-  const headers = rows[0];
+  const headers = rows[0] ?? [
+    "id","guildId","name","eventType","day","month","hour","minute","year",
+    "participants","absent","status","createdAt","reminderSent","started","reminderBefore"
+  ];
+
+  // dopisanie brakujących kolumn, jeśli ich nie ma
+  ["eventType","participants","absent"].forEach(col => {
+    if (!headers.includes(col)) headers.push(col);
+  });
 
   const newRow = headers.map(h => {
     if (h === "participants") return JSON.stringify(data.participants || []);
