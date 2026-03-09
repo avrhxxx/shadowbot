@@ -106,7 +106,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute = 0;
         year = new Date().getUTCFullYear();
 
-        // Nazwa eventu z nicku gracza + postfix
         name = `${name}'s birthday! 🎉`;
 
     } else {
@@ -130,7 +129,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
-    // Sprawdzenie, czy data przeszła
     if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
         tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType, notifyOnCreate: false });
         await safeReply(interaction, {
@@ -162,21 +160,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // Pokazujemy przycisk powiadomień
     if (eventType !== "birthdays") {
-        if (interaction instanceof ModalSubmitInteraction) {
-            const tempData = tempEventStore.get(tempId);
-            if (!tempData) return;
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId(`notify_create_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`notify_create_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
-            );
-            await safeReply(interaction, {
-                content: "Do you want to send a notification about creating this event?",
-                components: [row],
-                ephemeral: true
-            });
-        } else {
-            await showCreateNotificationConfirm(interaction, tempId);
-        }
+        await showCreateNotificationConfirm(interaction, tempId);
     } else {
         await finalizeEvent(interaction, tempId);
     }
@@ -186,7 +170,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
@@ -208,7 +192,7 @@ export async function showCreateNotificationConfirm(
 // FINALIZE EVENT
 // -----------------------------------------------------------
 export async function finalizeEvent(
-    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
@@ -268,7 +252,7 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
 // -----------------------------------------------------------
 // FINALIZE NEXT YEAR EVENT
 // -----------------------------------------------------------
-export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+export async function finalizeNextYearEvent(interaction: ButtonInteraction | ModalSubmitInteraction) {
     const [, tempId] = interaction.customId.split(/-(.+)/);
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
