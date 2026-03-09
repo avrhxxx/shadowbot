@@ -42,24 +42,26 @@ async function checkEvents(guild: Guild) {
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
+    // Upcoming reminder
     if (!event.reminderSent && now >= reminderTime) {
       await sendEventNotification(
         channel,
         event,
         "⏰ Upcoming Event",
-        `Event starts on ${formatEventUTCObj(event)}`,
+        `Event starts in <t:${Math.floor(eventTime / 1000)}:R>`,
         "Orange" as ColorResolvable
       );
       event.reminderSent = true;
       changed = true;
     }
 
+    // Event started
     if (!event.started && now >= eventTime) {
       await sendEventNotification(
         channel,
         event,
         "✅ Event Started",
-        `The event scheduled for ${formatEventUTCObj(event)} has just started!`,
+        `Event started <t:${Math.floor(eventTime / 1000)}:R>`,
         "Blue" as ColorResolvable
       );
       event.started = true;
@@ -87,7 +89,7 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
     channel,
     event,
     `🎉 Event Created: ${event.name}`,
-    `Event scheduled for ${formatEventUTCObj(event)}${reminderText}`,
+    `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}${reminderText}`,
     "Green" as ColorResolvable
   );
 }
@@ -97,7 +99,7 @@ export async function sendReminderMessage(channel: TextChannel, event: EventObje
     channel,
     event,
     `⏰ Upcoming Event: ${event.name}`,
-    `Event starts on ${formatEventUTCObj(event)}`,
+    `Event starts in <t:${Math.floor(getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime() / 1000)}:R>`,
     "Orange" as ColorResolvable
   );
 }
@@ -114,23 +116,11 @@ async function sendEventNotification(
 ) {
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
 
-  // Unix timestamp w sekundach
-  const eventTimestamp = Math.floor(eventDate.getTime() / 1000);
-
-  // Local Time – tylko godzina:minuta
-  const localTime = eventDate.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(
       `${description}\n\n` +
-      `**Game Time (UTC):** ${formatEventUTCObj(event)}\n` +
-      `**Local Time:** ${localTime}\n` +
-      `**Starts:** <t:${eventTimestamp}:R>`
+      `**Game Time:** ${formatEventUTCObj(event)}`
     )
     .setColor(color);
 
