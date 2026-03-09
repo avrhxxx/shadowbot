@@ -53,13 +53,6 @@ function parseEventDateTime(input: string) {
     return { day, month, hour, minute };
 }
 
-function canReply(interaction: BaseInteraction): interaction is
-    | ModalSubmitInteraction
-    | ButtonInteraction
-    | StringSelectMenuInteraction {
-    return "reply" in interaction;
-}
-
 async function safeReply(interaction: any, payload: any) {
     if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
     if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
@@ -77,8 +70,12 @@ async function safeReply(interaction: any, payload: any) {
 // -----------------------------------------------------------
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
-    const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
-    const eventType = typeMatch ? typeMatch[1] : "custom";
+    // WYciągamy tylko typ eventu po ostatnim "_" dla standard, birthday, custom
+    let typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
+    let rawType = typeMatch ? typeMatch[1] : "custom";
+
+    // Usuń prefix "standard_" jeśli jest
+    const eventType = rawType.startsWith("standard_") ? rawType.replace(/^standard_/, "") : rawType;
 
     let name = "";
     let datetimeRaw = "";
@@ -112,21 +109,20 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         year = new Date().getUTCFullYear();
     } else {
         const parsed = parseEventDateTime(datetimeRaw);
-        if (!parsed || (!name && ["birthdays","custom"].includes(eventType))) {
-            await safeReply(interaction, { content: "Invalid date/time format or missing name.", ephemeral: true });
+        if (!parsed && eventType !== "custom") {
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
             return;
         }
-        day = parsed.day;
-        month = parsed.month;
-        hour = parsed.hour;
-        minute = parsed.minute;
+        day = parsed?.day ?? 1;
+        month = parsed?.month ?? 1;
+        hour = parsed?.hour ?? 0;
+        minute = parsed?.minute ?? 0;
         const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
         year = Number.isNaN(yearParsed) ? undefined : yearParsed;
     }
 
     const tempId = `E-${uuidv4()}`;
 
-    // data w przeszłości – tylko Birthday i Custom bez roku
     const nowUTC = new Date();
     const eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
