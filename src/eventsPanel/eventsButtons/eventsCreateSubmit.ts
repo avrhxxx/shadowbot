@@ -1,3 +1,4 @@
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import {
     ModalSubmitInteraction,
     ActionRowBuilder,
@@ -84,7 +85,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     let yearRaw: string | undefined;
     try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
 
-    // prefille dla standardowych typów
+    // prefille dla standardowych typów – nadpisujemy nazwę
     const prefillMap: Record<string,string> = {
         arcadian_conquest: "Arcadian Conquest",
         city_contest: "City Contest",
@@ -191,8 +192,8 @@ export async function finalizeEvent(
         minute: tempData.minute,
         year: tempData.year ?? new Date().getUTCFullYear(),
         status: "ACTIVE",
-        participants: [], // zawsze inicjalizowane
-        absent: [],       // zawsze inicjalizowane
+        participants: [],
+        absent: [],
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
