@@ -102,6 +102,9 @@ export async function sendReminderMessage(channel: TextChannel, event: EventObje
   );
 }
 
+// ======================================================
+// SEND EVENT NOTIFICATION
+// ======================================================
 async function sendEventNotification(
   channel: TextChannel,
   event: EventObject,
@@ -109,9 +112,26 @@ async function sendEventNotification(
   description: string,
   color: ColorResolvable = "White"
 ) {
+  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
+
+  // Unix timestamp w sekundach
+  const eventTimestamp = Math.floor(eventDate.getTime() / 1000);
+
+  // Local Time – tylko godzina:minuta
+  const localTime = eventDate.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(description)
+    .setDescription(
+      `${description}\n\n` +
+      `**Game Time (UTC):** ${formatEventUTCObj(event)}\n` +
+      `**Local Time:** ${localTime}\n` +
+      `**Starts:** <t:${eventTimestamp}:R>`
+    )
     .setColor(color);
 
   await channel.send({ content: "@everyone", embeds: [embed] });
