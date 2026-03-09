@@ -2,7 +2,13 @@
 // EVENTS CREATE
 // -----------------------------
 export { handleCreate, handleTypeSelect } from "./eventsCreate";
-export { handleCreateSubmit, tempEventStore, showCreateNotificationConfirm } from "./eventsCreateSubmit";
+export {
+  handleCreateSubmit,
+  tempEventStore,
+  showCreateNotificationConfirm,
+  handleNotificationResponse,
+  finalizeNextYearEvent
+} from "./eventsCreateSubmit";
 
 // -----------------------------
 // EVENTS LIST
@@ -12,7 +18,12 @@ export { handleCategoryClick, handleListByCategory, handleShowList } from "./eve
 // -----------------------------
 // EVENTS CANCEL
 // -----------------------------
-export { handleCancel, handleCancelSelect, handleCancelConfirm, handleCancelAbort } from "./eventsCancel";
+export {
+  handleCancel,
+  handleCancelSelect,
+  handleCancelConfirm,
+  handleCancelAbort
+} from "./eventsCancel";
 
 // -----------------------------
 // EVENTS DOWNLOAD
@@ -32,7 +43,13 @@ export { handleHelp } from "./eventsHelp";
 // -----------------------------
 // EVENTS COMPARE
 // -----------------------------
-export { handleCompareButton, handleCompareSelect, handleCompareDownload, handleCompareAll, handleCompareAllDownload } from "./eventsCompare";
+export {
+  handleCompareButton,
+  handleCompareSelect,
+  handleCompareDownload,
+  handleCompareAll,
+  handleCompareAllDownload
+} from "./eventsCompare";
 
 // -----------------------------
 // EVENTS SHOW ALL
@@ -42,12 +59,24 @@ export { handleShowAllEvents, handleShowAllLists } from "./eventsShowAll";
 // -----------------------------
 // EVENTS PARTICIPANTS
 // -----------------------------
-export { handleAddParticipant, handleRemoveParticipant, handleAbsentParticipant, handleAddParticipantSubmit, handleRemoveParticipantSubmit, handleAbsentParticipantSubmit } from "./eventsParticipants";
+export {
+  handleAddParticipant,
+  handleRemoveParticipant,
+  handleAbsentParticipant,
+  handleAddParticipantSubmit,
+  handleRemoveParticipantSubmit,
+  handleAbsentParticipantSubmit
+} from "./eventsParticipants";
 
 // -----------------------------
 // EVENTS REMINDER
 // -----------------------------
-export { sendReminderMessage, sendEventCreatedNotification, initEventReminders, stopEventReminders } from "./eventsReminder";
+export {
+  sendReminderMessage,
+  sendEventCreatedNotification,
+  initEventReminders,
+  stopEventReminders
+} from "./eventsReminder";
 
 // -----------------------------
 // EVENTS CLEAR
