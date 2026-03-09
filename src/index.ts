@@ -1,11 +1,11 @@
 // 🔹 Import Google Sheets klienta jako pierwszy
 import "./googleSheetsClient";
 
-import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
+import { Client, GatewayIntentBits, Partials, Interaction, TextChannel } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
-import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
+import { initEventReminders, sendBirthdayNotification } from "./eventsPanel/eventsButtons/eventsReminder";
 import { tempEventStore, TempEventData } from "./eventsPanel/eventsButtons/eventsCreateSubmit";
 
 const client = new Client({
@@ -30,26 +30,28 @@ client.once("ready", async () => {
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
 
-    // -----------------------------
-    // TEST: Wstrzykujemy Birthday natychmiast
-    // -----------------------------
-    const now = new Date();
-
-    const tempId = `E-test-${Date.now()}`;
-    const tempBirthday: TempEventData = {
-      id: tempId,
+    // 🔹 Test Birthday – wyślij powiadomienie po 1 minucie
+    const testTempId = `E-test-birthday`;
+    const testEvent: TempEventData = {
+      id: testTempId,
+      name: "TestPlayer",
+      day: new Date().getUTCDate(),
+      month: new Date().getUTCMonth() + 1,
+      hour: new Date().getUTCHours(),
+      minute: (new Date().getUTCMinutes() + 1) % 60, // minuta później
       guildId: guild.id,
-      name: "TestPlayer",           // nick z gry jubilanta
-      day: now.getUTCDate(),
-      month: now.getUTCMonth() + 1,
-      hour: now.getUTCHours(),
-      minute: now.getUTCMinutes(),
-      eventType: "birthdays",
-      reminderBefore: 0,            // przypomnienie od razu
+      eventType: "birthdays"
     };
 
-    tempEventStore.set(tempId, tempBirthday);
-    console.log(`Injected immediate test birthday for guild ${guild.id}`);
+    tempEventStore.set(testTempId, testEvent);
+
+    // Poczekaj minutę i wyślij powiadomienie
+    setTimeout(async () => {
+      const channel = guild.channels.cache.find(c => c.isTextBased()) as TextChannel | undefined;
+      if (!channel) return;
+      await sendBirthdayNotification(channel, testEvent);
+      console.log(`Test birthday notification sent for ${testEvent.name} in ${guild.name}`);
+    }, 60_000);
   }
 
   client.on("interactionCreate", async (interaction: Interaction) => {
