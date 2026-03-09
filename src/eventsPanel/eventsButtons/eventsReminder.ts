@@ -1,4 +1,3 @@
-
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
 import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
@@ -121,11 +120,11 @@ async function sendEventNotification(
 // ======================================================
 async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
   const embed = new EmbedBuilder()
-    .setTitle("🎉 Birthday Alert!")
+    .setTitle("🎂 Birthday Celebration!")
     .setDescription(`Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`)
     .setColor(0xffc107);
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 // ======================================================
