@@ -49,10 +49,10 @@ function createEventEmbedAndRows(e: EventObject) {
   const eventDate = new Date(Date.UTC(e.year ?? new Date().getUTCFullYear(), e.month - 1, e.day, e.hour, e.minute));
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  // Embed description
-  let description = `Status: ${e.status}\nDate: ${formatEventUTCObj(e)} <t:${unixTime}:R>`;
+  // Embed description: data + starts in / started
+  let description = `Date: ${formatEventUTCObj(e)}\nStarts: <t:${unixTime}:R>`;
   if (hasFullButtons.includes(e.eventType)) {
-    description += `\nParticipants: ${e.participants.length}` + (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "");
+    description += `\n\nParticipants: ${e.participants.length}` + (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "");
   }
 
   const embed = new EmbedBuilder()
@@ -175,7 +175,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.eventType === "birthdays" ? `🎉 ${event.name}'s Birthday` : event.name}`)
     .setDescription(
-      `Date: ${formatEventUTCObj(event)} <t:${unixTime}:R>\nStatus: ${event.status}` +
+      `Date: ${formatEventUTCObj(event)}\nStarts: <t:${unixTime}:R>` +
       (showParticipants ? `\n\nParticipants (${participants.length}):\n${participants.join("\n")}` : "") +
       (showParticipants && absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
     )
