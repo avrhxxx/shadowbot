@@ -37,8 +37,11 @@ function formatCategoryLabel(label: string) {
 
 // Tworzy embed i przyciski dla pojedynczego eventu
 function createEventEmbedAndRows(e: EventObject) {
+  // jeśli birthday – dostosowana nazwa
+  const title = e.eventType === "birthdays" ? `🎉 ${e.name}'s Birthday` : e.name;
+
   const embed = new EmbedBuilder()
-    .setTitle(e.name)
+    .setTitle(title)
     .setDescription(
       `Status: ${e.status}\nUTC Date: ${formatEventUTCObj(e)}\nParticipants: ${e.participants.length}` +
       (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
@@ -158,7 +161,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const absent = event.absent?.map(cleanNickname) || [];
 
   const embed = new EmbedBuilder()
-    .setTitle(`List for ${event.name}`)
+    .setTitle(`List for ${event.eventType === "birthdays" ? `🎉 ${event.name}'s Birthday` : event.name}`)
     .setDescription(
       `UTC Date: ${formatEventUTCObj(event)}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
       (absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
