@@ -56,7 +56,7 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// LIST HANDLER (kategorie)
+// LIST HANDLER – wybór kategorii
 // -----------------------------
 export async function handleList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -67,12 +67,11 @@ export async function handleList(interaction: ButtonInteraction) {
     return;
   }
 
-  // Wyciągamy unikalne kategorie
   const categories = Array.from(new Set(events.map(e => e.category || "Uncategorized")));
-
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
   categories.forEach((cat, idx) => {
-    const rowIndex = Math.floor(idx / 5); // max 5 przycisków w jednym row
+    const rowIndex = Math.floor(idx / 5); // max 5 przycisków na row
     if (!rows[rowIndex]) rows[rowIndex] = new ActionRowBuilder<ButtonBuilder>();
 
     rows[rowIndex].addComponents(
@@ -87,14 +86,13 @@ export async function handleList(interaction: ButtonInteraction) {
 }
 
 // -----------------------------
-// OBSŁUGA WYBORU KATEGORII
+// CATEGORY CLICK HANDLER
 // -----------------------------
 export async function handleCategoryClick(interaction: ButtonInteraction, category: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
   const filteredEvents = events.filter(e => (e.category || "Uncategorized") === category);
-
   if (!filteredEvents.length) {
     await interaction.reply({ content: `No events found in category ${category}.`, ephemeral: true });
     return;
