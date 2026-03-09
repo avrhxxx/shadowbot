@@ -96,7 +96,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     if (eventType === "birthdays") {
         const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
         if (!dateMatch) {
-            await safeReply(interaction, { content: "Invalid date format. Info about formats is in the message above the panel.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
             return;
         }
 
@@ -108,10 +108,11 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
         // Nazwa eventu z nicku gracza + postfix
         name = `${name}'s birthday! 🎉`;
+
     } else {
         const parsed = parseEventDateTime(datetimeRaw);
         if (!parsed && eventType !== "custom") {
-            await safeReply(interaction, { content: "Invalid date/time format. Info about formats is in the message above the panel.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
             return;
         }
         day = parsed?.day ?? 1;
@@ -159,9 +160,23 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         notifyOnCreate: eventType === "birthdays" ? false : undefined
     });
 
-    // Pokazujemy przycisk powiadomień tylko dla innych eventów niż Birthday
+    // Pokazujemy przycisk powiadomień
     if (eventType !== "birthdays") {
-        await showCreateNotificationConfirm(interaction, tempId);
+        if (interaction instanceof ModalSubmitInteraction) {
+            const tempData = tempEventStore.get(tempId);
+            if (!tempData) return;
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId(`notify_create_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`notify_create_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+            );
+            await safeReply(interaction, {
+                content: "Do you want to send a notification about creating this event?",
+                components: [row],
+                ephemeral: true
+            });
+        } else {
+            await showCreateNotificationConfirm(interaction, tempId);
+        }
     } else {
         await finalizeEvent(interaction, tempId);
     }
@@ -171,7 +186,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
