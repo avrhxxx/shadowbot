@@ -29,7 +29,7 @@ export function stopEventReminders(guildId: string) {
 // ======================================================
 async function checkEvents(guild: Guild) {
   const events = await getEvents(guild.id);
-  const now = Date.now();
+  const now = new Date();
   let changed = false;
 
   const config = await getConfig(guild.id);
@@ -39,18 +39,35 @@ async function checkEvents(guild: Guild) {
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
+    // ----------------------
+    // Birthday special case
+    // ----------------------
+    if (event.eventType === "birthdays") {
+      // jeśli dzisiaj są urodziny i nie wysłano przypomnienia
+      if (
+        event.day === now.getUTCDate() &&
+        event.month === now.getUTCMonth() + 1 &&
+        !event.reminderSent
+      ) {
+        await sendBirthdayNotification(channel, event);
+        event.reminderSent = true;
+        changed = true;
+      }
+      continue; // skip standard reminders
+    }
+
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
     // Upcoming reminder
-    if (!event.reminderSent && now >= reminderTime) {
+    if (!event.reminderSent && Date.now() >= reminderTime) {
       await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
       event.reminderSent = true;
       changed = true;
     }
 
     // Event started
-    if (!event.started && now >= eventTime) {
+    if (!event.started && Date.now() >= eventTime) {
       await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
       event.started = true;
       event.status = "PAST";
@@ -72,12 +89,8 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
 }
 
-export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
-  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
-}
-
 // ======================================================
-// SEND EVENT NOTIFICATION (UNIFIED SCHEME)
+// SEND EVENT NOTIFICATION (STANDARD)
 // ======================================================
 async function sendEventNotification(
   channel: TextChannel,
@@ -89,15 +102,11 @@ async function sendEventNotification(
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  // Description dla embedu
   let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
-  if (type === "created") {
-    description += `Event scheduled <t:${unixTime}:R>`;
-  } else if (type === "upcoming") {
-    description += `Event starts <t:${unixTime}:R>`;
-  } else if (type === "started") {
-    description += `Event started <t:${unixTime}:R>`;
-  }
+  if (type === "created") description += `Event scheduled <t:${unixTime}:R>`;
+  else if (type === "upcoming") description += `Event starts <t:${unixTime}:R>`;
+  else if (type === "started") description += `Event started <t:${unixTime}:R>`;
+
   description += `\n\n_Click the countdown to see the event time in your local timezone_`;
 
   const embed = new EmbedBuilder()
@@ -106,6 +115,18 @@ async function sendEventNotification(
     .setColor(color);
 
   await channel.send({ content: "@everyone", embeds: [embed] });
+}
+
+// ======================================================
+// SEND BIRTHDAY NOTIFICATION (SPECIAL)
+// ======================================================
+async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
+  const embed = new EmbedBuilder()
+    .setTitle("🎉 Birthday Alert!")
+    .setDescription(`Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`)
+    .setColor(0xffc107);
+
+  await channel.send({ embeds: [embed] });
 }
 
 // ======================================================
