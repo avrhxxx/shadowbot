@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import { v4 as uuidv4 } from "uuid";
 
-import { getEvents, createEvent, EventObject } from "../eventService";
+import { createEvent, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
@@ -18,7 +18,7 @@ import { sendEventCreatedNotification } from "./eventsReminder";
 // TEMP DATA TYPE
 // -----------------------------------------------------------
 export type TempEventData = {
-    id: string; // unikalne ID eventu
+    id: string;
     name: string;
     day: number;
     month: number;
@@ -28,7 +28,7 @@ export type TempEventData = {
     year?: number;
     reminderBefore?: number;
     notifyOnCreate?: boolean;
-    eventType: string; // nowy typ eventu
+    eventType: string;
 };
 
 // -----------------------------------------------------------
@@ -57,18 +57,13 @@ function canReply(interaction: BaseInteraction): interaction is
     return "reply" in interaction;
 }
 
-// -----------------------------------------------------------
-// SAFE REPLY
-// -----------------------------------------------------------
 async function safeReply(interaction: any, payload: any) {
     if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
     if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
-
     if (payload.ephemeral) {
         payload.flags = 64;
         delete payload.ephemeral;
     }
-
     return interaction.reply(payload);
 }
 
@@ -77,7 +72,7 @@ async function safeReply(interaction: any, payload: any) {
 // -----------------------------------------------------------
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
-    
+
     // odczyt typu eventu z customId
     const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
     const eventType = typeMatch ? typeMatch[1] : "custom";
@@ -85,6 +80,15 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     let name = interaction.fields.getTextInputValue("event_name");
     const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
     const yearRaw = interaction.fields.getTextInputValue("event_year");
+
+    // prefille dla standardowych typów
+    const prefillMap: Record<string,string> = {
+        arcadian_conquest: "Arcadian Conquest",
+        city_contest: "City Contest",
+        reservoir_raid: "Reservoir Raid",
+        ghoulion_pursuit: "Ghoulion Pursuit"
+    };
+    if (prefillMap[eventType]) name = prefillMap[eventType];
 
     const parsed = parseEventDateTime(datetimeRaw);
     if (!parsed || (!name && ["birthdays","custom"].includes(eventType))) {
@@ -97,17 +101,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const { day, month, hour, minute } = parsed;
     const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
-
-    // prefille dla standardowych eventów
-    if (["arcadian_conquest","city_contest","reservoir_raid","ghoulion_pursuit"].includes(eventType)) {
-        const prefillMap: Record<string,string> = {
-            arcadian_conquest: "Arcadian Conquest",
-            city_contest: "City Contest",
-            reservoir_raid: "Reservoir Raid",
-            ghoulion_pursuit: "Ghoulion Pursuit"
-        };
-        name = prefillMap[eventType];
-    }
 
     const nowUTC = new Date();
     const eventDateUTC = year
@@ -146,6 +139,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         eventType
     });
 
+    // pokaż pytanie o powiadomienie przed finalizacją
     await showCreateNotificationConfirm(interaction, tempId);
 }
 
