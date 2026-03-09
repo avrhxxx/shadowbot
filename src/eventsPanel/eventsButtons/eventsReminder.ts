@@ -47,8 +47,8 @@ async function checkEvents(guild: Guild) {
       await sendEventNotification(
         channel,
         event,
-        "⏰ Upcoming Event",
-        `Event starts in <t:${Math.floor(eventTime / 1000)}:R>`,
+        `⏰ Upcoming Event: ${event.name}`,
+        `Event starts <t:${Math.floor(eventTime / 1000)}:R>`,
         "Orange" as ColorResolvable
       );
       event.reminderSent = true;
@@ -60,7 +60,7 @@ async function checkEvents(guild: Guild) {
       await sendEventNotification(
         channel,
         event,
-        "✅ Event Started",
+        `✅ Event Started: ${event.name}`,
         `Event started <t:${Math.floor(eventTime / 1000)}:R>`,
         "Blue" as ColorResolvable
       );
@@ -95,11 +95,13 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
 }
 
 export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
+  const eventUnix = Math.floor(getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime() / 1000);
+
   await sendEventNotification(
     channel,
     event,
     `⏰ Upcoming Event: ${event.name}`,
-    `Event starts in <t:${Math.floor(getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime() / 1000)}:R>`,
+    `Event starts <t:${eventUnix}:R>`,
     "Orange" as ColorResolvable
   );
 }
@@ -114,14 +116,9 @@ async function sendEventNotification(
   description: string,
   color: ColorResolvable = "White"
 ) {
-  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
-
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(
-      `${description}\n\n` +
-      `**Game Time:** ${formatEventUTCObj(event)}`
-    )
+    .setDescription(description)
     .setColor(color);
 
   await channel.send({ content: "@everyone", embeds: [embed] });
