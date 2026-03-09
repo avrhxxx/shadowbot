@@ -96,7 +96,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     if (eventType === "birthdays") {
         const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
         if (!dateMatch) {
-            await safeReply(interaction, { content: "Invalid date format. See panel above for correct format.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date format. Info about formats is in the message above the panel.", ephemeral: true });
             return;
         }
 
@@ -111,7 +111,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     } else {
         const parsed = parseEventDateTime(datetimeRaw);
         if (!parsed && eventType !== "custom") {
-            await safeReply(interaction, { content: "Invalid date/time format. See panel above for correct format.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date/time format. Info about formats is in the message above the panel.", ephemeral: true });
             return;
         }
         day = parsed?.day ?? 1;
@@ -161,8 +161,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     // Pokazujemy przycisk powiadomień tylko dla innych eventów niż Birthday
     if (eventType !== "birthdays") {
-        // rzutowanie do any, żeby TS nie krzyczał
-        await showCreateNotificationConfirm(interaction as any, tempId);
+        await showCreateNotificationConfirm(interaction, tempId);
     } else {
         await finalizeEvent(interaction, tempId);
     }
@@ -172,7 +171,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 // SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
-    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
