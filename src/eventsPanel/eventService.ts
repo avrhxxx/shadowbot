@@ -1,4 +1,3 @@
-// src/eventsPanel/eventService.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
@@ -19,6 +18,7 @@ export interface EventObject {
   createdAt: number;
   reminderSent: boolean;
   started: boolean;
+  lastBirthdayYear?: number; // aby birthday wysyłał raz w roku
 }
 
 export interface EventConfig {
@@ -28,8 +28,10 @@ export interface EventConfig {
 }
 
 // -----------------------------
-// HELPERS
+// CACHE
 // -----------------------------
+let eventsCache: EventObject[] = [];
+
 function safeJSONParse<T>(value: any, fallback: T): T {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
 }
@@ -37,21 +39,21 @@ function toNumber(value: any, fallback = 0) { return value != null ? Number(valu
 function toBool(value: any) { return value === true || value === "true"; }
 
 // -----------------------------
-// LOAD EVENTS
+// LOAD EVENTS (do cache)
 // -----------------------------
 export async function loadEvents(guildId: string): Promise<EventObject[]> {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return [];
   const headers: string[] = rows[0];
 
-  return rows.slice(1)
+  const events = rows.slice(1)
     .map((row: any[]) => {
       const obj: Record<string, any> = {};
       headers.forEach((h: string, i: number) => obj[h] = row[i] ?? null);
       return {
         id: obj.id,
         guildId: obj.guildId,
-        eventType: obj.eventType ?? "custom", // domyślny typ
+        eventType: obj.eventType ?? "custom",
         name: obj.name,
         day: toNumber(obj.day),
         month: toNumber(obj.month),
@@ -65,13 +67,17 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
         createdAt: toNumber(obj.createdAt),
         reminderSent: toBool(obj.reminderSent),
         started: toBool(obj.started),
+        lastBirthdayYear: toNumber(obj.lastBirthdayYear ?? 0)
       } as EventObject;
     })
     .filter(e => e.guildId === guildId);
+
+  eventsCache = events;
+  return events;
 }
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  return await loadEvents(guildId);
+  return eventsCache.filter(e => e.guildId === guildId);
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
@@ -94,6 +100,10 @@ export async function updateEventCell(eventId: string, columnName: string, value
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
+
+  // Update cache
+  const event = eventsCache.find(e => e.id === eventId);
+  if (event) (event as any)[columnName] = value;
 }
 
 export async function deleteEventRow(eventId: string) {
@@ -102,6 +112,8 @@ export async function deleteEventRow(eventId: string) {
   const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
   if (rowIndex === -1) return;
   await GS.deleteEventRow(rowIndex + 1);
+
+  eventsCache = eventsCache.filter(e => e.id !== eventId);
 }
 
 // -----------------------------
@@ -175,11 +187,10 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0] ?? [
     "id","guildId","name","eventType","day","month","hour","minute","year",
-    "participants","absent","status","createdAt","reminderSent","started","reminderBefore"
+    "participants","absent","status","createdAt","reminderSent","started","reminderBefore","lastBirthdayYear"
   ];
 
-  // dopisanie brakujących kolumn, jeśli ich nie ma
-  ["eventType","participants","absent"].forEach(col => {
+  ["eventType","participants","absent","lastBirthdayYear"].forEach(col => {
     if (!headers.includes(col)) headers.push(col);
   });
 
@@ -188,10 +199,12 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
     if (h === "absent") return JSON.stringify(data.absent || []);
     if (h === "reminderSent") return data.reminderSent ? "true" : "false";
     if (h === "started") return data.started ? "true" : "false";
+    if (h === "lastBirthdayYear") return data.lastBirthdayYear ?? 0;
     return (data as any)[h] ?? "";
   });
 
   await GS.writeEventsSheet([headers, ...rows.slice(1), newRow]);
+  eventsCache.push(data);
 
   return data;
 }
@@ -206,6 +219,9 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
     await updateEventCell(event.id, "status", event.status);
     await updateEventCell(event.id, "reminderSent", event.reminderSent ? "true" : "false");
     await updateEventCell(event.id, "started", event.started ? "true" : "false");
+    if (event.eventType === "birthdays") {
+      await updateEventCell(event.id, "lastBirthdayYear", event.lastBirthdayYear ?? 0);
+    }
   }
 }
 
@@ -253,9 +269,6 @@ export async function setConfig(guildId: string, key: string, value: any) {
   await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value);
 }
 
-// -----------------------------
-// CONFIG SHORTCUTS
-// -----------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   await setConfig(guildId, "notificationChannel", channelId);
 }
