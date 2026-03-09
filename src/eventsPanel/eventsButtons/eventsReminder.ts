@@ -1,4 +1,4 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
+
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
 import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
@@ -43,7 +43,6 @@ async function checkEvents(guild: Guild) {
     // Birthday special case
     // ----------------------
     if (event.eventType === "birthdays") {
-      // jeśli dzisiaj są urodziny i nie wysłano przypomnienia
       if (
         event.day === now.getUTCDate() &&
         event.month === now.getUTCMonth() + 1 &&
@@ -102,7 +101,7 @@ async function sendEventNotification(
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
+  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
   if (type === "created") description += `Event scheduled <t:${unixTime}:R>`;
   else if (type === "upcoming") description += `Event starts <t:${unixTime}:R>`;
   else if (type === "started") description += `Event started <t:${unixTime}:R>`;
@@ -130,14 +129,17 @@ async function sendBirthdayNotification(channel: TextChannel, event: EventObject
 }
 
 // ======================================================
+// EXPORTED FOR MANUAL REMINDERS
+// ======================================================
+export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
+  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
+}
+
+// ======================================================
 // UTILS
 // ======================================================
 function getTextChannel(guild: Guild, channelId?: string) {
   if (!channelId) return null;
   const ch = guild.channels.cache.get(channelId);
   return ch && ch.isTextBased() ? (ch as TextChannel) : null;
-}
-
-function formatEventUTCObj(event: EventObject) {
-  return formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 }
