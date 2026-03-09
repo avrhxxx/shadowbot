@@ -28,6 +28,7 @@ export type TempEventData = {
     year?: number;
     reminderBefore?: number;
     notifyOnCreate?: boolean;
+    eventType: string; // nowy typ eventu
 };
 
 // -----------------------------------------------------------
@@ -57,14 +58,14 @@ function canReply(interaction: BaseInteraction): interaction is
 }
 
 // -----------------------------------------------------------
-// SAFE REPLY (obsługa flags zamiast przestarzałego ephemeral)
+// SAFE REPLY
 // -----------------------------------------------------------
 async function safeReply(interaction: any, payload: any) {
     if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
     if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
 
     if (payload.ephemeral) {
-        payload.flags = 64; // Discord API: EPHEMERAL
+        payload.flags = 64;
         delete payload.ephemeral;
     }
 
@@ -76,14 +77,19 @@ async function safeReply(interaction: any, payload: any) {
 // -----------------------------------------------------------
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
-    const name = interaction.fields.getTextInputValue("event_name");
+    
+    // odczyt typu eventu z customId
+    const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
+    const eventType = typeMatch ? typeMatch[1] : "custom";
+
+    let name = interaction.fields.getTextInputValue("event_name");
     const datetimeRaw = interaction.fields.getTextInputValue("event_datetime");
     const yearRaw = interaction.fields.getTextInputValue("event_year");
 
     const parsed = parseEventDateTime(datetimeRaw);
-    if (!name || !parsed) {
+    if (!parsed || (!name && ["birthdays","custom"].includes(eventType))) {
         if (canReply(interaction)) {
-            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+            await safeReply(interaction, { content: "Invalid date/time format or missing name.", ephemeral: true });
         }
         return;
     }
@@ -92,18 +98,29 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
     const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
 
+    // prefille dla standardowych eventów
+    if (["arcadian_conquest","city_contest","reservoir_raid","ghoulion_pursuit"].includes(eventType)) {
+        const prefillMap: Record<string,string> = {
+            arcadian_conquest: "Arcadian Conquest",
+            city_contest: "City Contest",
+            reservoir_raid: "Reservoir Raid",
+            ghoulion_pursuit: "Ghoulion Pursuit"
+        };
+        name = prefillMap[eventType];
+    }
+
     const nowUTC = new Date();
-    let eventDateUTC = year
+    const eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
-    const tempId = `E-${uuidv4()}`; // unikalne ID dla tego eventu
+    const tempId = `E-${uuidv4()}`;
 
-    // przypadek daty w przeszłości
+    // data w przeszłości
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId });
+        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType });
         await safeReply(interaction, {
-            content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
+            content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
             components: [
                 new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder().setCustomId(`next_year_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
@@ -125,7 +142,8 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute,
         guildId,
         year: year ?? eventDateUTC.getUTCFullYear(),
-        reminderBefore: 60
+        reminderBefore: 60,
+        eventType
     });
 
     await showCreateNotificationConfirm(interaction, tempId);
@@ -181,10 +199,10 @@ export async function finalizeEvent(
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        reminderBefore: tempData.reminderBefore
+        reminderBefore: tempData.reminderBefore,
+        eventType: tempData.eventType
     };
 
-    // 🔹 zapis do arkusza po wierszu (nowy serwis)
     await createEvent(newEvent);
     tempEventStore.delete(tempId);
 
