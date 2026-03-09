@@ -3,16 +3,44 @@ import { ButtonInteraction, EmbedBuilder } from "discord.js";
 
 export async function handleHelp(interaction: ButtonInteraction) {
   const embed = new EmbedBuilder()
-    .setTitle("Event Panel Help")
+    .setTitle("Event Panel Guide")
     .setDescription(`
-Create Event – creates a new event  
-Events List – displays events grouped by category; shows detailed participant information for each event individually  
-Cancel Event – cancels an event  
-Manual Reminder – sends a manual reminder for participants  
-Show All – displays all events together in a single view; allows downloading all participant lists at once and comparing events  
-Settings – configure the download channel and notification channel  
-Help – shows this description
-  `);
+Hey! 👋 Quick guide to our Event Panel – super easy once you get the hang of it!
+
+🎮 **Main Buttons**
+• **Create Event** – start a new event with a simple form  
+• **Events List** – see events by category, check participants & absentees  
+• **Cancel Event** – pause an event (doesn’t delete it)  
+• **Manual Reminder** – send a reminder to participants anytime via select menu  
+• **Show All** – view all events together (excludes birthdays), compare & download all lists  
+• **Settings** – configure notifications & download channels  
+• **Guide** – this guide 😎
+
+⚡ **Inside Event Buttons** *(Custom & Reservoir events only)*
+• **Add Participant** – add participant(s)  
+• **Remove Participant** – remove a single participant  
+• **Mark Absent** – mark someone absent  
+• **Show List** – see participants & absentees for this event  
+• **Download** – get participant info for this event  
+• **Compare** – compare this event with another one (Custom & Reservoir past events only)  
+• **Clear Event Data** – wipes all data for this event ⚠️
+
+📝 **Event Creation Flow**
+• **Birthday** – enter player name + date  
+• **Custom** – enter event name, date, optional year  
+• **Other Events** – pick a date; name is preset  
+Auto reminders are set 1 hour before the event ⏰
+
+💡 **Tips**
+• Only participants can be marked absent; to undo, re-add them to the participant list  
+• When adding participants, multiple names can be added at once using commas  
+• Dates must follow the formats shown above the panel  
+
+⚠️ **Heads up**  
+Bot is still in beta! If something acts up, or you have ideas, just give me a shout – we’ll sort it out.  
+
+- Arek 😌
+`);
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
