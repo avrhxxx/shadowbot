@@ -1,8 +1,8 @@
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
-import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { getEvents, saveEvents, EventObject, getConfig } from "../eventService";
+import { formatEventUTC } from "../../utils/timeUtils";
 
-const CHECK_INTERVAL = 30_000;
+const CHECK_INTERVAL = 60_000; // 60s
 const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 
 // ======================================================
@@ -45,74 +45,17 @@ async function checkEvents(guild: Guild) {
       if (
         event.day === now.getUTCDate() &&
         event.month === now.getUTCMonth() + 1 &&
-        !event.reminderSent
+        (event.lastBirthdayYear ?? 0) < now.getUTCFullYear()
       ) {
         await sendBirthdayNotification(channel, event);
-        event.reminderSent = true;
+        event.lastBirthdayYear = now.getUTCFullYear();
         changed = true;
       }
-      continue; // skip standard reminders
-    }
-
-    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
-    const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
-
-    // Upcoming reminder
-    if (!event.reminderSent && Date.now() >= reminderTime) {
-      await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
-      event.reminderSent = true;
-      changed = true;
-    }
-
-    // Event started
-    if (!event.started && Date.now() >= eventTime) {
-      await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
-      event.started = true;
-      event.status = "PAST";
-      changed = true;
+      continue;
     }
   }
 
   if (changed) await saveEvents(guild.id, events);
-}
-
-// ======================================================
-// NOTIFICATIONS HELPERS
-// ======================================================
-export async function sendEventCreatedNotification(event: EventObject, guild: Guild) {
-  const config = await getConfig(guild.id);
-  const channel = getTextChannel(guild, config?.notificationChannel);
-  if (!channel) return;
-
-  await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
-}
-
-// ======================================================
-// SEND EVENT NOTIFICATION (STANDARD)
-// ======================================================
-async function sendEventNotification(
-  channel: TextChannel,
-  event: EventObject,
-  title: string,
-  type: "created" | "upcoming" | "started",
-  color: ColorResolvable = "White"
-) {
-  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
-  const unixTime = Math.floor(eventDate.getTime() / 1000);
-
-  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
-  if (type === "created") description += `Event scheduled <t:${unixTime}:R>`;
-  else if (type === "upcoming") description += `Event starts <t:${unixTime}:R>`;
-  else if (type === "started") description += `Event started <t:${unixTime}:R>`;
-
-  description += `\n\n_Click the countdown to see the event time in your local timezone_`;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`${title}: ${event.name}`)
-    .setDescription(description)
-    .setColor(color);
-
-  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 // ======================================================
@@ -128,10 +71,15 @@ async function sendBirthdayNotification(channel: TextChannel, event: EventObject
 }
 
 // ======================================================
-// EXPORTED FOR MANUAL REMINDERS
+// SEND REMINDER MANUALLY (STANDARD EVENTS)
 // ======================================================
 export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
-  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
+  const embed = new EmbedBuilder()
+    .setTitle(`⏰ Upcoming Event: ${event.name}`)
+    .setDescription(`Date: ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}`)
+    .setColor("Orange");
+
+  await channel.send({ content: "@everyone", embeds: [embed] });
 }
 
 // ======================================================
