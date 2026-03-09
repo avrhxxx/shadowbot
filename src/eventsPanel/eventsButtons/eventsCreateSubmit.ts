@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import {
     ModalSubmitInteraction,
     ActionRowBuilder,
@@ -73,11 +72,11 @@ async function safeReply(interaction: any, payload: any) {
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
 
-    // odczyt typu eventu z customId
+    // Typ eventu z customId
     const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
     const eventType = typeMatch ? typeMatch[1] : "custom";
 
-    // bezpieczne pobranie pól modalowych
+    // Pobranie danych z modala
     let name = "";
     try { name = interaction.fields.getTextInputValue("event_name"); } catch {}
     let datetimeRaw = "";
@@ -85,7 +84,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     let yearRaw: string | undefined;
     try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
 
-    // prefille dla standardowych typów
+    // Prefille dla standardowych eventów
     const prefillMap: Record<string,string> = {
         arcadian_conquest: "Arcadian Conquest",
         city_contest: "City Contest",
@@ -107,14 +106,22 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
 
     const nowUTC = new Date();
-    const eventDateUTC = year
-        ? new Date(Date.UTC(year, month - 1, day, hour, minute))
-        : getEventDateUTC(day, month, hour, minute);
+
+    // Wyliczenie daty eventu
+    let eventDateUTC: Date;
+    if (eventType === "birthdays" || eventType === "custom") {
+        eventDateUTC = year
+            ? new Date(Date.UTC(year, month - 1, day, hour, minute))
+            : getEventDateUTC(day, month, hour, minute);
+    } else {
+        // standardowe eventy → bieżący rok
+        eventDateUTC = new Date(Date.UTC(new Date().getUTCFullYear(), month - 1, day, hour, minute));
+    }
 
     const tempId = `E-${uuidv4()}`;
 
-    // data w przeszłości
-    if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
+    // Przeszła data → tylko dla birthday/custom
+    if ((eventType === "birthdays" || eventType === "custom") && eventDateUTC.getTime() < nowUTC.getTime() && !year) {
         tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType });
         await safeReply(interaction, {
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
@@ -129,7 +136,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         return;
     }
 
-    // zapis tymczasowy + reminderBefore 60 minut
+    // Zapis tymczasowy
     tempEventStore.set(tempId, {
         id: tempId,
         name,
@@ -143,7 +150,7 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         eventType
     });
 
-    // pokaż pytanie o powiadomienie przed finalizacją – dla wszystkich typów
+    // Pytanie o powiadomienie
     await showCreateNotificationConfirm(interaction, tempId);
 }
 
