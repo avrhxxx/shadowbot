@@ -14,10 +14,31 @@ const EVENT_TYPES = [
     { label: "City Contest", value: "city_contest", prefillName: "City Contest" },
     { label: "Reservoir Raid", value: "reservoir_raid", prefillName: "Reservoir Raid" },
     { label: "Ghoulion Pursuit", value: "ghoulion_pursuit", prefillName: "Ghoulion Pursuit" },
-    { label: "KvK", value: "kvk", prefillName: "KvK" }, // nowy event
+    { label: "KvK", value: "kvk", prefillName: "KvK" },
     { label: "Birthdays", value: "birthdays" },
     { label: "Custom", value: "custom" }
 ];
+
+// ----------------------------
+// HELPERS TO CREATE INPUTS
+// ----------------------------
+function createDateInput(customId: string, labelText: string) {
+    return new TextInputBuilder()
+        .setCustomId(customId)
+        .setLabel(labelText)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Available formats are in the message above the panel")
+        .setRequired(true);
+}
+
+function createTextInput(customId: string, labelText: string, placeholder: string, required = true) {
+    return new TextInputBuilder()
+        .setCustomId(customId)
+        .setLabel(labelText)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(placeholder)
+        .setRequired(required);
+}
 
 // ----------------------------
 // Step 1: show type select
@@ -52,18 +73,12 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
     if (typeValue === "birthdays") {
         modal.setCustomId("event_create_modal_birthdays");
 
-        const nickInput = new TextInputBuilder()
-            .setCustomId("event_name")
-            .setLabel("Enter the birthday player's nickname")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("See info above panel for available formats")
-            .setRequired(true);
-
+        const nickInput = createTextInput("event_name", "Enter Player Nickname", "Enter player nickname");
         const dateInput = new TextInputBuilder()
             .setCustomId("event_datetime")
-            .setLabel("Date (Day/Month, UTC)")
+            .setLabel("Date (Day, Month, UTC)")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("See info above panel for available formats")
+            .setPlaceholder("DD/MM")
             .setRequired(true);
 
         modal.addComponents(
@@ -74,25 +89,9 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
     } else if (typeValue === "custom") {
         modal.setCustomId("event_create_modal_custom");
 
-        const nameInput = new TextInputBuilder()
-            .setCustomId("event_name")
-            .setLabel("Event Name")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-        const datetimeInput = new TextInputBuilder()
-            .setCustomId("event_datetime")
-            .setLabel("Date & Time (UTC)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("See info above panel for available formats")
-            .setRequired(true);
-
-        const yearInput = new TextInputBuilder()
-            .setCustomId("event_year")
-            .setLabel("Year (optional)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Leave empty for current year")
-            .setRequired(false);
+        const nameInput = createTextInput("event_name", "Event Name", "Enter event name");
+        const datetimeInput = createDateInput("event_datetime", "Date & Time (Day, Month, Hour, Minute, UTC)");
+        const yearInput = createTextInput("event_year", "Year (optional)", "Leave empty for current year", false);
 
         modal.addComponents(
             new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
@@ -105,12 +104,7 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
         const customId = typeValue === "kvk" ? "event_create_modal_standard_kvk" : `event_create_modal_standard_${typeValue}`;
         modal.setCustomId(customId);
 
-        const datetimeInput = new TextInputBuilder()
-            .setCustomId("event_datetime")
-            .setLabel("Date & Time (UTC)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("See info above panel for available formats")
-            .setRequired(true);
+        const datetimeInput = createDateInput("event_datetime", "Date & Time (Day, Month, Hour, Minute, UTC)");
 
         modal.addComponents(
             new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput)
