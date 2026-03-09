@@ -44,26 +44,14 @@ async function checkEvents(guild: Guild) {
 
     // Upcoming reminder
     if (!event.reminderSent && now >= reminderTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        `⏰ Upcoming Event: ${event.name}`,
-        `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}\nStarts <t:${Math.floor(eventTime / 1000)}:R>`,
-        "Orange" as ColorResolvable
-      );
+      await sendEventNotification(channel, event, "⏰ Upcoming Event", "Event starts", "Orange");
       event.reminderSent = true;
       changed = true;
     }
 
     // Event started
     if (!event.started && now >= eventTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        `✅ Event Started: ${event.name}`,
-        `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}\nStarted <t:${Math.floor(eventTime / 1000)}:R>`,
-        "Blue" as ColorResolvable
-      );
+      await sendEventNotification(channel, event, "✅ Event Started", "Event started", "Blue");
       event.started = true;
       event.status = "PAST";
       changed = true;
@@ -81,28 +69,33 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  await sendEventNotification(
-    channel,
-    event,
-    `🎉 Event Created: ${event.name}`,
-    `Event scheduled for **Game Time:** ${formatEventUTCObj(event)}`,
-    "Green" as ColorResolvable
-  );
+  await sendEventNotification(channel, event, `🎉 Event Created: ${event.name}`, "Event scheduled", "Green");
+}
+
+export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
+  await sendEventNotification(channel, event, `⏰ Upcoming Event: ${event.name}`, "Event starts", "Orange");
 }
 
 // ======================================================
-// SEND EVENT NOTIFICATION
+// SEND EVENT NOTIFICATION (SPÓJNY SCHEMAT)
 // ======================================================
 async function sendEventNotification(
   channel: TextChannel,
   event: EventObject,
   title: string,
-  description: string,
+  label: string,
   color: ColorResolvable = "White"
 ) {
+  const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
+  const unixTime = Math.floor(eventDate.getTime() / 1000);
+
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(description)
+    .setDescription(
+      `${label} <t:${unixTime}:R>\n\n` +
+      `**Game Time:** ${formatEventUTCObj(event)}\n\n` +
+      `_Click the countdown to see the event time in your local timezone_`
+    )
     .setColor(color);
 
   await channel.send({ content: "@everyone", embeds: [embed] });
