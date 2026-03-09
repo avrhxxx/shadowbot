@@ -8,7 +8,7 @@ import {
   ButtonStyle,
   EmbedBuilder
 } from "discord.js";
-import { EventObject, getEvents, saveEvents } from "../eventService";
+import { cancelEvent, getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
 /* ======================================================
@@ -29,11 +29,13 @@ export async function handleCancel(interaction: ButtonInteraction) {
     return;
   }
 
+  const uniqueActiveEvents = Array.from(new Map(activeEvents.map(e => [e.id, e])).values());
+
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId("event_cancel_select")
     .setPlaceholder("Select an event to cancel")
     .addOptions(
-      activeEvents.map(e => ({
+      uniqueActiveEvents.map(e => ({
         label: e.name,
         description: formatEventUTC(e.day, e.month, e.hour, e.minute, e.year),
         value: e.id
@@ -53,6 +55,8 @@ export async function handleCancel(interaction: ButtonInteraction) {
    🔹 STEP 2 – SELECT → CONFIRMATION
 ====================================================== */
 export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
+  await interaction.deferUpdate();
+
   const guildId = interaction.guildId!;
   const eventId = interaction.values[0];
 
@@ -60,7 +64,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
-    await interaction.reply({
+    await interaction.followUp({
       content: "Event not found.",
       ephemeral: true
     });
@@ -87,7 +91,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
 
-  await interaction.update({
+  await interaction.editReply({
     content: "",
     embeds: [embed],
     components: [row]
@@ -98,24 +102,22 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
    🔹 STEP 3 – CONFIRM BUTTON
 ====================================================== */
 export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
+  await interaction.deferUpdate();
+
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = await cancelEvent(guildId, eventId); // ✅ użycie cancelEvent aktualizuje arkusz
 
   if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
+    await interaction.followUp({ content: "Event not found.", ephemeral: true });
     return;
   }
-
-  event.status = "CANCELED";
-  await saveEvents(guildId, events);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Canceled")
     .setDescription(`**${event.name}** has been canceled.`)
     .setColor("Red");
 
-  await interaction.update({ content: "", embeds: [embed], components: [] });
+  await interaction.editReply({ content: "", embeds: [embed], components: [] });
 }
 
 /* ======================================================

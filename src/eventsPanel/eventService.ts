@@ -1,6 +1,6 @@
 // src/eventsPanel/eventService.ts
-import * as EventStorage from "./googleSheetsStorage";
-import { EmbedBuilder, TextChannel, Guild } from "discord.js";
+import { Guild, TextChannel, EmbedBuilder } from "discord.js";
+import * as GS from "../googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -10,220 +10,246 @@ export interface EventObject {
   month: number;
   hour: number;
   minute: number;
-  year?: number;           // dodane dla Next Year
-  reminderBefore?: number; // OPTIONAL
+  year: number;
+  reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
-  absent?: string[];
+  absent: string[];
   createdAt: number;
-
-  // nowe pola dla reminderów
-  reminderSent?: boolean;
-  started?: boolean;
+  reminderSent: boolean;
+  started: boolean;
 }
 
-/* =========================
-   EVENT CRUD / HELPERS
-========================= */
-export async function createEvent(data: {
-  guildId: string;
-  name: string;
-  day: number;
-  month: number;
-  hour: number;
-  minute: number;
-  year?: number;
-  reminderBefore?: number;
-}): Promise<EventObject> {
-  const events = await EventStorage.getEvents(data.guildId);
+export interface EventConfig {
+  notificationChannel?: string;
+  downloadChannel?: string;
+  [key: string]: any;
+}
 
-  const newEvent: EventObject = {
-    id: `${Date.now()}`,
-    ...data,
-    status: "ACTIVE",
-    participants: [],
-    absent: [],
-    createdAt: Date.now(),
-    reminderSent: false,
-    started: false
-  };
+// -----------------------------
+// HELPERS
+// -----------------------------
+function safeJSONParse<T>(value: any, fallback: T): T {
+  try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
+}
+function toNumber(value: any, fallback = 0) { return value != null ? Number(value) : fallback; }
+function toBool(value: any) { return value === true || value === "true"; }
 
-  events.push(newEvent);
-  await EventStorage.saveEvents(data.guildId, events);
-  return newEvent;
+// -----------------------------
+// LOAD EVENTS
+// -----------------------------
+export async function loadEvents(guildId: string): Promise<EventObject[]> {
+  const rows: any[][] = await GS.readEventsSheet();
+  if (!rows.length) return [];
+  const headers: string[] = rows[0];
+
+  return rows.slice(1)
+    .map((row: any[]) => {
+      const obj: Record<string, any> = {};
+      headers.forEach((h: string, i: number) => obj[h] = row[i] ?? null);
+      return {
+        id: obj.id,
+        guildId: obj.guildId,
+        name: obj.name,
+        day: toNumber(obj.day),
+        month: toNumber(obj.month),
+        hour: toNumber(obj.hour),
+        minute: toNumber(obj.minute),
+        year: obj.year ? toNumber(obj.year) : new Date().getUTCFullYear(),
+        reminderBefore: obj.reminderBefore ? toNumber(obj.reminderBefore) : undefined,
+        status: obj.status as "ACTIVE" | "PAST" | "CANCELED",
+        participants: safeJSONParse(obj.participants, []),
+        absent: safeJSONParse(obj.absent, []),
+        createdAt: toNumber(obj.createdAt),
+        reminderSent: toBool(obj.reminderSent),
+        started: toBool(obj.started),
+      } as EventObject;
+    })
+    .filter(e => e.guildId === guildId);
 }
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  return await EventStorage.getEvents(guildId);
-}
-
-export async function saveEvents(guildId: string, events: EventObject[]) {
-  await EventStorage.saveEvents(guildId, events);
-}
-
-export async function getActiveEvents(guildId: string): Promise<EventObject[]> {
-  const events = await EventStorage.getEvents(guildId);
-  return events.filter(e => e.status === "ACTIVE");
-}
-
-export async function getPastEvents(guildId: string): Promise<EventObject[]> {
-  const events = await EventStorage.getEvents(guildId);
-  return events.filter(e => e.status === "PAST");
+  return await loadEvents(guildId);
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await EventStorage.getEvents(guildId);
+  const events = await getEvents(guildId);
   return events.find(e => e.id === eventId) || null;
 }
 
+// -----------------------------
+// UPDATE / DELETE CELLS
+// -----------------------------
+export async function updateEventCell(eventId: string, columnName: string, value: any) {
+  const rows: any[][] = await GS.readEventsSheet();
+  if (!rows.length) return;
+
+  const headers: string[] = rows[0];
+  const colIndex = headers.indexOf(columnName);
+  if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
+
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+  if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
+
+  await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
+}
+
+export async function deleteEventRow(eventId: string) {
+  const rows: any[][] = await GS.readEventsSheet();
+  if (!rows.length) return;
+  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+  if (rowIndex === -1) return;
+  await GS.deleteEventRow(rowIndex + 1);
+}
+
+// -----------------------------
+// PARTICIPANT OPERATIONS
+// -----------------------------
+export async function addParticipants(eventId: string, nicknames: string[]) {
+  const event = await getEventById("", eventId);
+  if (!event) throw new Error("Event not found");
+
+  for (const nick of nicknames) {
+    if (!event.participants.includes(nick)) event.participants.push(nick);
+    event.absent = event.absent.filter(n => n !== nick);
+  }
+
+  await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
+  await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
+
+  return event.participants;
+}
+
+export async function removeParticipants(eventId: string, nicknames: string[]) {
+  const event = await getEventById("", eventId);
+  if (!event) throw new Error("Event not found");
+
+  event.participants = event.participants.filter(n => !nicknames.includes(n));
+  event.absent = event.absent.filter(n => !nicknames.includes(n));
+
+  await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
+  await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
+
+  return event.participants;
+}
+
+export async function markAbsent(eventId: string, nicknames: string[]) {
+  const event = await getEventById("", eventId);
+  if (!event) throw new Error("Event not found");
+
+  for (const nick of nicknames) {
+    if (!event.participants.includes(nick)) continue;
+    event.participants = event.participants.filter(n => n !== nick);
+    if (!event.absent.includes(nick)) event.absent.push(nick);
+  }
+
+  await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
+  await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
+
+  return event.absent;
+}
+
+// -----------------------------
+// EVENT STATUS
+// -----------------------------
 export async function cancelEvent(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await EventStorage.getEvents(guildId);
-  const event = events.find(e => e.id === eventId);
+  const event = await getEventById(guildId, eventId);
   if (!event) return null;
 
   event.status = "CANCELED";
-  await EventStorage.saveEvents(guildId, events);
+  await updateEventCell(eventId, "status", "CANCELED");
+
   return event;
 }
 
-/* =========================
-   CONFIG HELPERS
-========================= */
+// -----------------------------
+// DELETE / CREATE EVENT
+// -----------------------------
+export async function deleteEvent(eventId: string) {
+  await deleteEventRow(eventId);
+}
+
+export async function createEvent(data: EventObject): Promise<EventObject> {
+  const rows = await GS.readEventsSheet();
+  const headers = rows[0];
+
+  const newRow = headers.map(h => {
+    if (h === "participants") return JSON.stringify(data.participants || []);
+    if (h === "absent") return JSON.stringify(data.absent || []);
+    if (h === "reminderSent") return data.reminderSent ? "true" : "false";
+    if (h === "started") return data.started ? "true" : "false";
+    return (data as any)[h] ?? "";
+  });
+
+  await GS.writeEventsSheet([headers, ...rows.slice(1), newRow]);
+
+  return data;
+}
+
+// -----------------------------
+// SAVE EVENTS (FOR REMINDERS, PARTICIPANTS ETC.)
+// -----------------------------
+export async function saveEvents(guildId: string, events: EventObject[]) {
+  for (const event of events) {
+    await updateEventCell(event.id, "participants", JSON.stringify(event.participants));
+    await updateEventCell(event.id, "absent", JSON.stringify(event.absent));
+    await updateEventCell(event.id, "status", event.status);
+    await updateEventCell(event.id, "reminderSent", event.reminderSent ? "true" : "false");
+    await updateEventCell(event.id, "started", event.started ? "true" : "false");
+  }
+}
+
+// -----------------------------
+// CONFIG SHEET HELPERS
+// -----------------------------
+export async function getConfig(guildId: string): Promise<EventConfig> {
+  const rows = await GS.readConfigSheet();
+  if (!rows.length) return {};
+  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const dataRows = rows.slice(1);
+  const guildIndex = headers.indexOf("guildId");
+  if (guildIndex === -1) return {};
+  const row = dataRows.find(r => r[guildIndex] === guildId);
+  if (!row) return {};
+  const config: EventConfig = {};
+  headers.forEach((h, i) => config[h] = row[i] ?? null);
+  return config;
+}
+
+export async function setConfig(guildId: string, key: string, value: any) {
+  const rows = await GS.readConfigSheet();
+  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const dataRows = rows.slice(1);
+
+  if (!headers.includes(key)) {
+    headers.push(key);
+    for (const r of dataRows) while(r.length < headers.length) r.push("");
+  }
+
+  const guildIndex = headers.indexOf("guildId");
+  const keyIndex = headers.indexOf(key);
+  let row = dataRows.find(r => r[guildIndex] === guildId);
+  let rowIndex: number;
+  if (!row) {
+    row = new Array(headers.length).fill("");
+    row[guildIndex] = guildId;
+    dataRows.push(row);
+    rowIndex = dataRows.length;
+  } else {
+    rowIndex = dataRows.indexOf(row) + 1;
+  }
+
+  await GS.writeConfigSheet([headers, ...dataRows]);
+  await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value);
+}
+
+// -----------------------------
+// CONFIG SHORTCUTS
+// -----------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
-  const config = await EventStorage.getConfig(guildId);
-  config.notificationChannelId = channelId;
-  await EventStorage.saveConfig(guildId, config);
+  await setConfig(guildId, "notificationChannel", channelId);
 }
 
 export async function setDownloadChannel(guildId: string, channelId: string) {
-  const config = await EventStorage.getConfig(guildId);
-  config.downloadChannelId = channelId;
-  await EventStorage.saveConfig(guildId, config);
-}
-
-export async function getDownloadChannel(guildId: string): Promise<string | undefined> {
-  const config = await EventStorage.getConfig(guildId);
-  return config.downloadChannelId;
-}
-
-// 🔹 Dodane do kompatybilności
-export async function getConfig(guildId: string) {
-  return await EventStorage.getConfig(guildId);
-}
-
-export async function saveConfig(guildId: string, config: any) {
-  await EventStorage.saveConfig(guildId, config);
-}
-
-/* =========================
-   MANUAL REMINDERS
-========================= */
-export async function sendManualReminders(guild: any) {
-  const guildId = guild.id;
-  const events = await getActiveEvents(guildId);
-  const config = await EventStorage.getConfig(guildId);
-
-  if (!config.notificationChannelId) return;
-
-  const channel = guild.channels.cache.get(config.notificationChannelId) as TextChannel;
-  if (!channel || !channel.isTextBased()) return;
-
-  for (const event of events) {
-    const embed = new EmbedBuilder()
-      .setTitle(`Reminder: ${event.name}`)
-      .setDescription(
-        `Event starts on ${event.day}/${event.month}${event.year ? `/${event.year}` : ""} at ${event.hour}:${event.minute}`
-      );
-
-    await channel.send({ embeds: [embed] });
-  }
-}
-
-/* =========================
-   EMBED GENERATORS
-========================= */
-export function generateEventListEmbed(events: EventObject[]) {
-  return new EmbedBuilder()
-    .setTitle("Event List")
-    .setDescription(
-      events.length === 0
-        ? "No events found."
-        : events.map(e => `• ${e.name} (${e.status})`).join("\n")
-    );
-}
-
-export function generateEventListEmbedDetailed(events: EventObject[]) {
-  return events.map(e =>
-    new EmbedBuilder()
-      .setTitle(e.name)
-      .setDescription(
-        `Status: ${e.status}\nParticipants: ${e.participants.length}${e.absent?.length ? `\nAbsent: ${e.absent.length}` : ""}`
-      )
-      .setColor(
-        e.status === "ACTIVE" ? 0x00ff00 : e.status === "PAST" ? 0x808080 : 0xff0000
-      )
-  );
-}
-
-/* =========================
-   FRAGMENTATION HELPERS
-========================= */
-export function chunkEventEmbedDescription(description: string, maxChars = 6000): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < description.length) {
-    chunks.push(description.slice(start, start + maxChars));
-    start += maxChars;
-  }
-  return chunks;
-}
-
-export function chunkTextFile(content: string, maxChars = 1900000): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < content.length) {
-    chunks.push(content.slice(start, start + maxChars));
-    start += maxChars;
-  }
-  return chunks;
-}
-
-/* =========================
-   BUILD REPORT FRAGMENTS
-========================= */
-export function buildReportFragments(events: EventObject[], guild: Guild) {
-  const participantsSet = new Set<string>();
-  events.forEach(ev => {
-    ev.participants.forEach(p => participantsSet.add(p));
-    (ev.absent || []).forEach(a => participantsSet.add(a));
-  });
-
-  const participants = [...participantsSet];
-  let embedText = '';
-  let txtText = '';
-
-  participants.forEach(memberId => {
-    const name = guild.members.cache.get(memberId)?.displayName || memberId;
-    let attended = 0;
-    let block: string[] = [];
-
-    events.forEach(ev => {
-      let status = '-';
-      if (ev.participants.includes(memberId)) status = '✓';
-      else if (ev.absent?.includes(memberId)) status = '✗';
-      if (status === '✓') attended++;
-      block.push(`${ev.name}  ${status}`);
-    });
-
-    const percent = Math.round((attended / events.length) * 100);
-    const line = `${name}\n${block.join('\n')}\nAttendance: ${attended}/${events.length} (${percent}%)\n\n----------------------\n\n`;
-
-    embedText += line;
-    txtText += line;
-  });
-
-  const embedChunks = chunkEventEmbedDescription(embedText);
-  const txtChunks = chunkTextFile(txtText);
-
-  return { embedChunks, txtChunks };
+  await setConfig(guildId, "downloadChannel", channelId);
 }

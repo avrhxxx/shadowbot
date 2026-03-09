@@ -1,19 +1,24 @@
 // src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
-import { 
-    ModalSubmitInteraction, 
-    ActionRowBuilder, 
-    StringSelectMenuBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    StringSelectMenuInteraction, 
-    ButtonInteraction, 
-    BaseInteraction 
+import {
+    ModalSubmitInteraction,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    StringSelectMenuInteraction,
+    ButtonInteraction,
+    BaseInteraction
 } from "discord.js";
-import { getEvents, saveEvents, EventObject } from "../eventService"; // 🔹 zmienione importy
+import { v4 as uuidv4 } from "uuid";
+
+import { getEvents, createEvent, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
 
+// -----------------------------------------------------------
+// TEMP DATA TYPE
+// -----------------------------------------------------------
 export type TempEventData = {
+    id: string; // unikalne ID eventu
     name: string;
     day: number;
     month: number;
@@ -21,10 +26,18 @@ export type TempEventData = {
     minute: number;
     guildId: string;
     year?: number;
+    reminderBefore?: number;
+    notifyOnCreate?: boolean;
 };
 
+// -----------------------------------------------------------
+// TEMP STORE
+// -----------------------------------------------------------
 export const tempEventStore = new Map<string, TempEventData>();
 
+// -----------------------------------------------------------
+// HELPERS
+// -----------------------------------------------------------
 function parseEventDateTime(input: string) {
     const match = input.trim().match(/^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/);
     if (!match) return null;
@@ -37,12 +50,30 @@ function parseEventDateTime(input: string) {
 }
 
 function canReply(interaction: BaseInteraction): interaction is
-  | ModalSubmitInteraction
-  | ButtonInteraction
-  | StringSelectMenuInteraction {
-    return 'reply' in interaction && typeof interaction.reply === 'function';
+    | ModalSubmitInteraction
+    | ButtonInteraction
+    | StringSelectMenuInteraction {
+    return "reply" in interaction;
 }
 
+// -----------------------------------------------------------
+// SAFE REPLY (obsługa flags zamiast przestarzałego ephemeral)
+// -----------------------------------------------------------
+async function safeReply(interaction: any, payload: any) {
+    if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+    if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
+
+    if (payload.ephemeral) {
+        payload.flags = 64; // Discord API: EPHEMERAL
+        delete payload.ephemeral;
+    }
+
+    return interaction.reply(payload);
+}
+
+// -----------------------------------------------------------
+// HANDLE CREATE SUBMIT
+// -----------------------------------------------------------
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
     const name = interaction.fields.getTextInputValue("event_name");
@@ -51,107 +82,92 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 
     const parsed = parseEventDateTime(datetimeRaw);
     if (!name || !parsed) {
-        if (canReply(interaction)) await interaction.reply({ content: "Invalid date/time format.", ephemeral: true });
+        if (canReply(interaction)) {
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+        }
         return;
     }
 
     const { day, month, hour, minute } = parsed;
-    const year = yearRaw ? parseInt(yearRaw, 10) : undefined;
+    const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
+    const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
+
     const nowUTC = new Date();
     let eventDateUTC = year
         ? new Date(Date.UTC(year, month - 1, day, hour, minute))
         : getEventDateUTC(day, month, hour, minute);
 
-    const tempKey = `${interaction.user.id}-temp`;
+    const tempId = `E-${uuidv4()}`; // unikalne ID dla tego eventu
 
+    // przypadek daty w przeszłości
     if (!year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId });
-        if (canReply(interaction)) {
-            await interaction.reply({
-                content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
-                components: [
-                    new ActionRowBuilder<ButtonBuilder>().addComponents(
-                        new ButtonBuilder().setCustomId("next_year_yes").setLabel("Yes").setStyle(ButtonStyle.Success),
-                        new ButtonBuilder().setCustomId("next_year_no").setLabel("No").setStyle(ButtonStyle.Danger)
-                    )
-                ],
-                ephemeral: true
-            });
-        }
+        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId });
+        await safeReply(interaction, {
+            content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Do you want to schedule it for next year?`,
+            components: [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId(`next_year_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`next_year_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+                )
+            ],
+            ephemeral: true
+        });
         return;
     }
 
-    tempEventStore.set(tempKey, { name, day, month, hour, minute, guildId, year: year ?? eventDateUTC.getUTCFullYear() });
-    await showReminderSelect(interaction, tempKey);
+    // zapis tymczasowy + reminderBefore 60 minut
+    tempEventStore.set(tempId, {
+        id: tempId,
+        name,
+        day,
+        month,
+        hour,
+        minute,
+        guildId,
+        year: year ?? eventDateUTC.getUTCFullYear(),
+        reminderBefore: 60
+    });
+
+    await showCreateNotificationConfirm(interaction, tempId);
 }
 
-export async function showReminderSelect(
-    interaction: ModalSubmitInteraction | ButtonInteraction | StringSelectMenuInteraction, 
-    tempKey: string
+// -----------------------------------------------------------
+// SHOW CREATE NOTIFICATION CONFIRM
+// -----------------------------------------------------------
+export async function showCreateNotificationConfirm(
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+    tempId: string
 ) {
-    const tempData = tempEventStore.get(tempKey);
-    if (!tempData) {
-        if (canReply(interaction)) await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
-        return;
-    }
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) return;
 
-    const options = [
-        { label: "No reminder", value: "0" },
-        { label: "5 min before", value: "5" },
-        { label: "10 min before", value: "10" },
-        { label: "15 min before", value: "15" },
-        { label: "20 min before", value: "20" },
-        { label: "25 min before", value: "25" },
-        { label: "30 min before", value: "30" },
-        { label: "35 min before", value: "35" },
-        { label: "40 min before", value: "40" },
-        { label: "45 min before", value: "45" },
-        { label: "50 min before", value: "50" },
-        { label: "55 min before", value: "55" },
-        { label: "1h before", value: "60" },
-        { label: "1h5m before", value: "65" },
-        { label: "1h10m before", value: "70" },
-        { label: "1h15m before", value: "75" },
-        { label: "1h30m before", value: "90" },
-        { label: "2h before", value: "120" },
-        { label: "3h before", value: "180" },
-        { label: "4h before", value: "240" },
-        { label: "5h before", value: "300" },
-        { label: "6h before", value: "360" },
-        { label: "12h before", value: "720" },
-        { label: "18h before", value: "1080" },
-        { label: "24h before", value: "1440" }
-    ];
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`notify_create_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`notify_create_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+    );
 
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`reminder_select_${tempKey}`)
-        .setPlaceholder("Set reminder before event (optional)")
-        .addOptions(options);
-
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-
-    if ('update' in interaction && typeof interaction.update === 'function') {
-        await interaction.update({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row] });
-    } else if (canReply(interaction)) {
-        await interaction.reply({ content: `Event "${tempData.name}" created. Please select a reminder time:`, components: [row], ephemeral: true });
-    }
+    await safeReply(interaction, {
+        content: "Do you want to send a notification about creating this event?",
+        components: [row],
+        ephemeral: true
+    });
 }
 
-export async function finalizeEventWithReminder(interaction: StringSelectMenuInteraction) {
-    const tempKey = interaction.customId.replace("reminder_select_", "");
-    const tempData = tempEventStore.get(tempKey);
+// -----------------------------------------------------------
+// FINALIZE EVENT
+// -----------------------------------------------------------
+export async function finalizeEvent(
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    tempId: string
+) {
+    const tempData = tempEventStore.get(tempId);
     if (!tempData) {
-        if ('update' in interaction && typeof interaction.update === 'function') await interaction.update({ content: "Temporary event data not found.", components: [] });
-        else if (canReply(interaction)) await interaction.reply({ content: "Temporary event data not found.", ephemeral: true });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
-    const reminderValue = parseInt(interaction.values[0], 10);
-    const reminderBefore = reminderValue > 0 ? reminderValue : undefined;
-
-    const events: EventObject[] = await getEvents(tempData.guildId);
     const newEvent: EventObject = {
-        id: `${Date.now()}`,
+        id: tempData.id,
         guildId: tempData.guildId,
         name: tempData.name,
         day: tempData.day,
@@ -161,30 +177,54 @@ export async function finalizeEventWithReminder(interaction: StringSelectMenuInt
         year: tempData.year!,
         status: "ACTIVE",
         participants: [],
+        absent: [],
         createdAt: Date.now(),
         reminderSent: false,
         started: false,
-        ...(reminderBefore !== undefined && { reminderBefore })
+        reminderBefore: tempData.reminderBefore
     };
 
-    await saveEvents(tempData.guildId, [...events, newEvent]);
-    tempEventStore.delete(tempKey);
+    // 🔹 zapis do arkusza po wierszu (nowy serwis)
+    await createEvent(newEvent);
+    tempEventStore.delete(tempId);
 
-    if (interaction.guild) await sendEventCreatedNotification(newEvent, interaction.guild);
+    if (interaction.guild && tempData.notifyOnCreate) {
+        await sendEventCreatedNotification(newEvent, interaction.guild);
+    }
 
-    if (interaction.replied || interaction.deferred) await interaction.editReply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [] });
-    else if (canReply(interaction)) await interaction.reply({ content: `Event "${newEvent.name}" scheduled successfully.`, components: [], ephemeral: true });
+    await safeReply(interaction, {
+        content: `Event **${newEvent.name}** scheduled successfully.`,
+        components: [],
+        ephemeral: true
+    });
 }
 
-export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
-    const tempKey = `${interaction.user.id}-temp`;
-    const tempData = tempEventStore.get(tempKey);
+// -----------------------------------------------------------
+// HANDLE NOTIFICATION RESPONSE
+// -----------------------------------------------------------
+export async function handleNotificationResponse(interaction: ButtonInteraction) {
+    const [, tempId] = interaction.customId.split(/-(.+)/);
+    const tempData = tempEventStore.get(tempId);
     if (!tempData) {
-        if (interaction.replied || interaction.deferred) await interaction.editReply({ content: "Temporary event data not found. Please try again.", components: [] });
-        else if (canReply(interaction)) await interaction.reply({ content: "Temporary event data not found. Please try again.", ephemeral: true });
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+        return;
+    }
+
+    tempData.notifyOnCreate = interaction.customId.startsWith("notify_create_yes");
+    await finalizeEvent(interaction, tempId);
+}
+
+// -----------------------------------------------------------
+// FINALIZE NEXT YEAR EVENT
+// -----------------------------------------------------------
+export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+    const [, tempId] = interaction.customId.split(/-(.+)/);
+    const tempData = tempEventStore.get(tempId);
+    if (!tempData) {
+        await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
         return;
     }
 
     tempData.year = new Date().getUTCFullYear() + 1;
-    await showReminderSelect(interaction, tempKey);
+    await showCreateNotificationConfirm(interaction, tempId);
 }

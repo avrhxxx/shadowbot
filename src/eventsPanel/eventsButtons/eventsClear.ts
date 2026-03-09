@@ -1,35 +1,63 @@
-import { ButtonInteraction, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
-import { getEvents, saveEvents } from "../eventService";
+// src/eventsPanel/eventsButtons/eventsClear.ts
+import {
+  ButtonInteraction,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  EmbedBuilder
+} from "discord.js";
 
-// osobny store tylko dla clear event
-const clearEventStore = new Map<string, string>();
+import { getEvents, deleteEvent as serviceDeleteEvent, EventObject } from "../eventService";
+import { parseEventId } from "./utils";
 
+// ======================================================
+// HELPERS
+// ======================================================
+async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id.toString() === eventId.toString());
+  return event || null;
+}
+
+// ======================================================
+// HANDLE CLEAR BUTTON
+// ======================================================
 export async function handleClearEventButton(
   interaction: ButtonInteraction,
-  eventId: string,
-  eventName: string
+  eventId: string
 ) {
+  const guildId = interaction.guildId!;
 
-  clearEventStore.set(interaction.user.id, eventId);
+  const event = await getEventById(guildId, eventId);
+
+  if (!event) {
+    await interaction.reply({
+      content: "Event not found.",
+      ephemeral: true
+    });
+    return;
+  }
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`event_clear_confirm_${eventId}`)
+      .setLabel("Confirm")
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId(`event_clear_abort_${eventId}`)
+      .setLabel("Abort")
+      .setStyle(ButtonStyle.Secondary)
+  );
 
   const embed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Clear Event Data")
     .setDescription(
-      `Are you sure you want to **clear all data** for event **${eventName}**?\n\n` +
-      `This will permanently delete **all participants, absences, and other event data**.\nThis action **cannot be undone**.`
+      `Are you sure you want to **clear all data** for event **${event.name}**?\n\n` +
+      `This will permanently delete **all participants, absences, and other event data**.\n` +
+      `This action **cannot be undone**.`
     )
     .setColor("Red");
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("event_clear_confirm")
-      .setLabel("Confirm")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId("event_clear_abort")
-      .setLabel("Abort")
-      .setStyle(ButtonStyle.Secondary)
-  );
 
   await interaction.reply({
     embeds: [embed],
@@ -38,55 +66,40 @@ export async function handleClearEventButton(
   });
 }
 
+// ======================================================
+// HANDLE CONFIRM CLEAR
+// ======================================================
 export async function handleClearEventConfirm(interaction: ButtonInteraction) {
+  await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
-  const eventId = clearEventStore.get(interaction.user.id);
+  const eventId = parseEventId(interaction.customId);
 
-  if (!eventId) {
-    await interaction.reply({
-      content: "Temporary event info not found. Please try again.",
-      ephemeral: true
+  const event = await getEventById(guildId, eventId);
+
+  if (!event) {
+    await interaction.editReply({
+      content: "Event not found."
     });
     return;
   }
 
-  let events = await getEvents(guildId);
-
-  const index = events.findIndex(e => e.id.toString() === eventId.toString());
-
-  if (index === -1) {
-    await interaction.reply({
-      content: "Event not found.",
-      ephemeral: true
-    });
-    clearEventStore.delete(interaction.user.id);
-    return;
-  }
-
-  const eventName = events[index].name;
-
-  events.splice(index, 1);
-
-  await saveEvents(guildId, events);
-
-  clearEventStore.delete(interaction.user.id);
+  await serviceDeleteEvent(eventId);
 
   const embed = new EmbedBuilder()
     .setTitle("Event Cleared")
-    .setDescription(`✅ All data for **${eventName}** has been permanently cleared.`)
+    .setDescription(`✅ All data for **${event.name}** has been permanently cleared.`)
     .setColor("Red");
 
-  await interaction.reply({
-    embeds: [embed],
-    ephemeral: true
+  await interaction.editReply({
+    embeds: [embed]
   });
 }
 
+// ======================================================
+// HANDLE ABORT CLEAR
+// ======================================================
 export async function handleClearEventAbort(interaction: ButtonInteraction) {
-
-  clearEventStore.delete(interaction.user.id);
-
   await interaction.reply({
     content: "Clear action aborted.",
     ephemeral: true
