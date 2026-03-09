@@ -56,9 +56,15 @@ function createEventEmbedAndRows(e: EventObject) {
 }
 
 // -----------------------------
-// SHOW CATEGORIES
+// CATEGORY CLICK
 // -----------------------------
-export async function handleCategoryClick(interaction: ButtonInteraction) {
+export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
+  if (category) {
+    // jeśli kliknięto konkretną kategorię, pokaz listę eventów
+    return await handleListByCategory(interaction, category);
+  }
+
+  // jeśli brak kategorii – pokaz przyciski kategorii
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
@@ -67,15 +73,14 @@ export async function handleCategoryClick(interaction: ButtonInteraction) {
     return;
   }
 
-  // zbieramy unikalne kategorie
   const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
 
   const row = new ActionRowBuilder<ButtonBuilder>();
-  for (const category of categories) {
+  for (const cat of categories) {
     row.addComponents(
       new ButtonBuilder()
-        .setCustomId(`category_${category}`)
-        .setLabel(category.charAt(0).toUpperCase() + category.slice(1))
+        .setCustomId(`event_category_${cat}`)
+        .setLabel(cat.charAt(0).toUpperCase() + cat.slice(1))
         .setStyle(ButtonStyle.Primary)
     );
   }
