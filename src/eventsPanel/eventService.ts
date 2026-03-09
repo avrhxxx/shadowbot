@@ -6,6 +6,7 @@ export interface EventObject {
   id: string;
   guildId: string;
   name: string;
+  eventType: string; // nowa właściwość
   day: number;
   month: number;
   hour: number;
@@ -50,6 +51,7 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
       return {
         id: obj.id,
         guildId: obj.guildId,
+        eventType: obj.eventType ?? "custom", // domyślny typ
         name: obj.name,
         day: toNumber(obj.day),
         month: toNumber(obj.month),
