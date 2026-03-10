@@ -57,18 +57,18 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
   const guildId = interaction.guildId!;
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
 
-  // -----------------------------
-  // 1️⃣ Sprawdź, czy nick już istnieje w aktualnej liście
+  // 1️⃣ Sprawdź, czy nick już istnieje
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    await interaction.reply({
+    await interaction.followUp({
       content: `❌ Player **${nick}** is already on the absence list.`,
-      ephemeral: true
     });
     return;
   }
@@ -95,7 +95,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toDate = parseDate(toRaw);
 
   if (!fromDate || !toDate) {
-    await interaction.reply({ content: "Invalid date format.", ephemeral: true });
+    await interaction.followUp({ content: "Invalid date format." });
     return;
   }
 
@@ -110,13 +110,12 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       notified: false
     });
 
-    await interaction.reply({
+    await interaction.followUp({
       content: `✅ Absence for **${nick}** added: ${fromDate.day}.${fromDate.month} → ${toDate.day}.${toDate.month}`,
-      ephemeral: true
     });
 
   } catch (err) {
     console.error("Error saving absence:", err);
-    await interaction.reply({ content: "❌ Failed to save absence.", ephemeral: true });
+    await interaction.followUp({ content: "❌ Failed to save absence." });
   }
 }
