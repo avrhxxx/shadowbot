@@ -9,16 +9,6 @@ export function renderAbsencePanel(): MessageCreateOptions {
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("absence_add")
-      .setLabel("Add Absence")
-      .setStyle(ButtonStyle.Success),
-
-    new ButtonBuilder()
-      .setCustomId("absence_remove")
-      .setLabel("Remove Absence")
-      .setStyle(ButtonStyle.Danger),
-
-    new ButtonBuilder()
       .setCustomId("absence_show_list")
       .setLabel("Show Absences")
       .setStyle(ButtonStyle.Primary)
@@ -28,6 +18,11 @@ export function renderAbsencePanel(): MessageCreateOptions {
     new ButtonBuilder()
       .setCustomId("absence_settings")
       .setLabel("Settings")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId("absence_help")
+      .setLabel("Help")
       .setStyle(ButtonStyle.Secondary)
   );
 
