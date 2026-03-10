@@ -1,6 +1,6 @@
 // src/absencePanel/absenceButtons/absenceSettings.ts
 import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
-import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
+import { setNotificationChannel, getConfig } from "../absenceService";
 
 // -----------------------------
 // HANDLER SETTINGS BUTTON
@@ -8,12 +8,17 @@ import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton() || !interaction.guild) return;
 
+  // defer, żeby Discord nie pokazał błędu
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.deferReply({ ephemeral: true }).catch(() => null);
+  }
+
   const textChannels = interaction.guild.channels.cache
     .filter(c => c.isTextBased())
     .map(c => ({ label: c.name, value: c.id }));
 
   if (!textChannels.length) {
-    await interaction.reply({ content: "No text channels available.", ephemeral: true });
+    await interaction.editReply({ content: "No text channels available.", components: [] });
     return;
   }
 
@@ -22,10 +27,9 @@ export async function handleSettings(interaction: Interaction) {
     .setPlaceholder("Select notification channel")
     .addOptions(textChannels);
 
-  await interaction.reply({
+  await interaction.editReply({
     content: "Select a channel for Absence notifications:",
     components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect)],
-    ephemeral: true
   });
 }
 
@@ -43,7 +47,7 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
 
   try {
     // Pobierz aktualną konfigurację
-    const config = await getAbsenceConfig(guildId);
+    const config = await getConfig(guildId);
 
     if (config.notificationChannel === channelId) {
       await interaction.reply({
