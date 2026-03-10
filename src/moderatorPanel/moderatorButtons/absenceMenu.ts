@@ -1,5 +1,5 @@
 import { Interaction } from "discord.js";
-import { renderAbsencePanel } from "./absencePanel";
+import { renderAbsencePanel } from "../../absencePanel/absencePanel";
 
 export async function handleAbsenceMenu(interaction: Interaction) {
   if (!interaction.isButton()) return;
