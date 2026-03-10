@@ -5,7 +5,7 @@ export async function handleTranslateMenu(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
   await interaction.reply({
-    content: "Translate Menu – TODO",
+    content: "Not implemented yet",
     ephemeral: true
   });
 }
