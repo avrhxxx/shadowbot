@@ -10,7 +10,6 @@ import {
   Message
 } from "discord.js";
 
-import { renderEventPanel } from "../eventsPanel/eventPanel";
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
 import { handleEventMenu } from "./moderatorButtons/eventMenu";
 import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
@@ -45,8 +44,7 @@ function renderDateFormatsEmbed(): EmbedBuilder {
       { name: "Tip", value: "No need for magic wands — just type it straight! ✨" },
       { name: "Last Update", value: `<t:${unixTimestamp}:F>` }
     )
-    .setColor("Blue")
-    .setFooter({ text: "" });
+    .setColor("Blue");
 }
 
 // --- helper do renderu hubu / root panel ---
@@ -88,9 +86,7 @@ export async function initModeratorPanel(client: Client) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
         type: 0,
-        permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
-        ]
+        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
       });
     }
 
@@ -103,9 +99,7 @@ export async function initModeratorPanel(client: Client) {
       updatesChannel = await guild.channels.create({
         name: "bot-updates",
         type: 0,
-        permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
-        ]
+        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
       });
       await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
     }
@@ -113,7 +107,7 @@ export async function initModeratorPanel(client: Client) {
     // --- Fetch wiadomości z moderator-panel ---
     const messages = await modChannel.messages.fetch({ limit: 50 });
 
-    // --- Embed z datami ---
+    // --- Embed z datami (rollback jeśli skasowane) ---
     let dateEmbedMessage: Message | undefined = messages.find(
       (m) => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
     );
@@ -125,9 +119,10 @@ export async function initModeratorPanel(client: Client) {
       embedUpdated = true;
     } else {
       dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
+      embedUpdated = true;
     }
 
-    // --- Root hub ---
+    // --- Root hub (rollback jeśli skasowane) ---
     let hubMessage: Message | undefined = messages.find(
       (m) => m.content === "📌 **Moderator Panel**"
     );
@@ -138,35 +133,40 @@ export async function initModeratorPanel(client: Client) {
       await hubMessage.edit({ components: [hubRow] });
       hubUpdated = true;
     } else {
-      hubMessage = await modChannel.send({
-        content: "📌 **Moderator Panel**",
-        components: [hubRow]
-      });
+      hubMessage = await modChannel.send({ content: "📌 **Moderator Panel**", components: [hubRow] });
+      hubUpdated = true;
     }
 
     // --- Pobierz aktualną wersję bota z Google Sheets ---
-    let currentInfo = await getModeratorPanelInfo();
-    let currentVersion = currentInfo?.version ?? 0;
-    let newVersion = currentVersion;
+    const currentInfo = await getModeratorPanelInfo();
+    let currentVersion = currentInfo?.version || "1.0.0";
 
-    // --- Jeśli cokolwiek odświeżone, zwiększ wersję i wyślij powiadomienie ---
-    if (embedUpdated || hubUpdated) {
-      newVersion = Number(currentVersion) + 1;
-      const unixTimestamp = Math.floor(Date.now() / 1000);
-      await updatesChannel.send({
-        content: `Moderator Panel has been refreshed! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
-      });
+    // --- Zwiększ patch ---
+    function incrementPatch(version: string) {
+      const parts = version.split(".").map(Number);
+      parts[2] = (parts[2] || 0) + 1;
+      return parts.join(".");
     }
 
-    // --- Zapis info do Google Sheets (ID kanałów, wiadomości, wersja, timestamp) ---
-    await saveModeratorPanelInfo(
-      modChannel.id,
-      dateEmbedMessage.id,
-      hubMessage.id,
-      updatesChannel.id,
-      newVersion,
-      Math.floor(Date.now() / 1000)
-    );
+    let newVersion = currentVersion;
+
+    if (embedUpdated || hubUpdated) {
+      newVersion = incrementPatch(currentVersion);
+      const unixTimestamp = Math.floor(Date.now() / 1000);
+      await updatesChannel.send({
+        content: `Bot Updated! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
+      });
+
+      // --- Zapis info do Google Sheets ---
+      await saveModeratorPanelInfo(
+        modChannel.id,
+        dateEmbedMessage.id,
+        hubMessage.id,
+        updatesChannel.id,
+        Math.floor(Date.now() / 1000),
+        newVersion
+      );
+    }
   }
 
   // --- Globalny listener na przyciski ---
@@ -174,21 +174,11 @@ export async function initModeratorPanel(client: Client) {
     if (!interaction.isButton()) return;
 
     switch (interaction.customId) {
-      case "moderator_event_menu":
-        await handleEventMenu(interaction);
-        break;
-      case "moderator_points_menu":
-        await handlePointsMenu(interaction);
-        break;
-      case "moderator_translate_menu":
-        await handleTranslateMenu(interaction);
-        break;
-      case "moderator_absence_menu":
-        await handleAbsenceMenu(interaction);
-        break;
-      case "moderator_help":
-        await handleModeratorHelp(interaction);
-        break;
+      case "moderator_event_menu": await handleEventMenu(interaction); break;
+      case "moderator_points_menu": await handlePointsMenu(interaction); break;
+      case "moderator_translate_menu": await handleTranslateMenu(interaction); break;
+      case "moderator_absence_menu": await handleAbsenceMenu(interaction); break;
+      case "moderator_help": await handleModeratorHelp(interaction); break;
     }
   });
 }
