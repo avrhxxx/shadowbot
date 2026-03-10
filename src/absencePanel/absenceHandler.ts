@@ -1,3 +1,4 @@
+// src/absencePanel/absenceHandler.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -33,7 +34,7 @@ export const IDS = {
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
   [IDS.BUTTONS.ADD]: async (i) => await AB.handleAddAbsence(i),
   [IDS.BUTTONS.REMOVE]: async (i) => await AB.handleRemoveAbsence(i),
-  [IDS.BUTTONS.SHOW_LIST]: async (i) => await AB.handleShowAbsences(i),
+  [IDS.BUTTONS.SHOW_LIST]: async (i) => await AB.handleAbsenceList(i),
   [IDS.BUTTONS.SETTINGS]: async (i) => await AB.handleSettings(i),
 };
 
@@ -71,7 +72,6 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
       const handler = SELECT_HANDLERS[interaction.customId];
       if (!handler) return;
 
-      // defer tylko jeśli funkcja nie wysyła od razu reply
       return await handler(interaction);
     }
 
