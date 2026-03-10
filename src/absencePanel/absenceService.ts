@@ -73,7 +73,7 @@ export async function getAbsenceByPlayer(
 // CREATE / SAVE ABSENCE
 // -----------------------------
 export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
-  // ✅ 1. Sprawdź, czy taki nick już istnieje
+  // ✅ Sprawdzenie unikalnego nicku
   const existing = await getAbsenceByPlayer(data.guildId, data.player);
   if (existing) {
     throw new Error(`Player ${data.player} is already on the absence list.`);
@@ -81,8 +81,6 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
 
   const rows = await GS.readAbsenceSheet();
   const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
-
-  // Dodaj kolumnę notified jeśli jej brakuje
   if (!headers.includes("notified")) headers.push("notified");
 
   const newRow = headers.map(h => {
@@ -116,50 +114,29 @@ export async function setAbsence(
 }
 
 // -----------------------------
-// UPDATE / DELETE
+// DELETE / REMOVE
 // -----------------------------
-export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
-  const rows: any[][] = await GS.readAbsenceSheet();
-  if (!rows.length) return;
-
-  const headers = rows[0];
-  const colIndex = headers.indexOf(columnName);
-  if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
-
-  const idIndex = headers.indexOf("id");
-  const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
-  if (rowIndex === -1) throw new Error(`Absence ID ${absenceId} not found`);
-
-  await GS.updateAbsenceCell(rowIndex + 1, colIndex + 1, value);
+export async function deleteAbsenceRowByIndex(rowIndex: number) {
+  await GS.deleteAbsenceRow(rowIndex);
 }
 
-export async function deleteAbsenceRow(absenceId: string) {
-  const rows: any[][] = await GS.readAbsenceSheet();
-  if (!rows.length) return;
-
-  const headers = rows[0];
-  const idIndex = headers.indexOf("id");
-  if (idIndex === -1) throw new Error("Column 'id' not found");
-
-  const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
-  if (rowIndex === -1) return;
-
-  await GS.deleteAbsenceRow(rowIndex + 1);
-}
-
-// -----------------------------
-// REMOVE ABSENCE BY PLAYER
-// -----------------------------
+// ✅ Remove by nick
 export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-  // 1️⃣ Pobierz listę absencji
-  const absences = await loadAbsences(guildId);
+  const rows: any[][] = await GS.readAbsenceSheet();
+  if (!rows.length) return false;
 
-  // 2️⃣ Znajdź rekord po nicku
-  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
-  if (!target) return false;
+  const headers = rows[0];
+  const idIndex = headers.indexOf("id");
+  const playerIndex = headers.indexOf("player");
+  if (playerIndex === -1) throw new Error("Column 'player' not found");
 
-  // 3️⃣ Usuń rekord po ID
-  await deleteAbsenceRow(target.id);
+  // Znajdź wiersz po nicku
+  const rowIndex = rows.findIndex(r => 
+    r[playerIndex]?.toLowerCase() === player.toLowerCase() && r[headers.indexOf("guildId")] === guildId
+  );
+  if (rowIndex === -1) return false;
+
+  await deleteAbsenceRowByIndex(rowIndex + 1); // +1 bo arkusz 1-indexed
   return true;
 }
 
