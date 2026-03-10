@@ -36,11 +36,6 @@ function createDateInput(customId: string, label: string) {
 export async function handleAddAbsence(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
-  // defer, żeby Discord nie pokazał błędu
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.deferReply({ ephemeral: true }).catch(() => null);
-  }
-
   const modal = new ModalBuilder()
     .setTitle("Add Absence")
     .setCustomId("absence_add_modal");
@@ -71,7 +66,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     const cleaned = input.replace(/[^\d]/g, "");
     let day: number, month: number;
 
-    if (/^\d{4}$/.test(cleaned)) { // e.g. 0903 → 9 March
+    if (/^\d{4}$/.test(cleaned)) {
       day = parseInt(cleaned.slice(0, 2), 10);
       month = parseInt(cleaned.slice(2), 10);
     } else {
@@ -89,7 +84,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toDate = parseDate(toRaw);
 
   if (!fromDate || !toDate) {
-    await interaction.reply({ content: "Invalid date format. Use allowed formats.", ephemeral: true });
+    await interaction.reply({ content: "Invalid date format.", ephemeral: true });
     return;
   }
 
@@ -105,12 +100,12 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     });
 
     await interaction.reply({
-      content: `✅ Absence for **${nick}** added: from ${fromDate.day}/${fromDate.month} to ${toDate.day}/${toDate.month}`,
+      content: `✅ Absence for **${nick}** added: ${fromDate.day}.${fromDate.month} → ${toDate.day}.${toDate.month}`,
       ephemeral: true
     });
 
   } catch (err) {
     console.error("Error saving absence:", err);
-    await interaction.reply({ content: "❌ Failed to save absence. Try again later.", ephemeral: true });
+    await interaction.reply({ content: "❌ Failed to save absence.", ephemeral: true });
   }
 }
