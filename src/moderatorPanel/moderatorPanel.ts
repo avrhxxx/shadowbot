@@ -18,7 +18,8 @@ import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 import {
   saveModeratorPanelInfo,
-  updateModeratorPanelColumn
+  updateModeratorPanelColumn,
+  getModeratorPanelInfo
 } from "../googleSheetsStorage";
 
 // ---- helper do embedu z formatami dat i stopką ----
@@ -42,10 +43,10 @@ function renderDateFormatsEmbed(): EmbedBuilder {
       },
       { name: "📆 Year only", value: "YYYY → 2026" },
       { name: "Tip", value: "No need for magic wands — just type it straight! ✨" },
-      { name: "Last Update", value: `<t:${unixTimestamp}:F>` } // <-- pod tipami
+      { name: "Last Update", value: `<t:${unixTimestamp}:F>` } // pod tipami
     )
     .setColor("Blue")
-    .setFooter({ text: "" }); // footer pusty
+    .setFooter({ text: "" });
 }
 
 // --- helper do renderu hubu / root panel ---
@@ -143,22 +144,29 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- Zapis info do Google Sheets ---
+    // --- Pobierz aktualną wersję bota z Google Sheets ---
+    let currentInfo = await getModeratorPanelInfo();
+    let currentVersion = currentInfo?.version ?? 0;
+    let newVersion = currentVersion;
+
+    // --- Jeśli cokolwiek odświeżone, zwiększ wersję i wyślij powiadomienie ---
+    if (embedUpdated || hubUpdated) {
+      newVersion = Number(currentVersion) + 1;
+      const unixTimestamp = Math.floor(Date.now() / 1000);
+      await updatesChannel.send({
+        content: `Moderator Panel has been refreshed! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
+      });
+    }
+
+    // --- Zapis info do Google Sheets (ID kanałów, wiadomości, nowa wersja, timestamp) ---
     await saveModeratorPanelInfo(
       modChannel.id,
       dateEmbedMessage.id,
       hubMessage.id,
       updatesChannel.id,
+      newVersion,
       Math.floor(Date.now() / 1000)
     );
-
-    // --- Jeśli cokolwiek odświeżone, wyślij powiadomienie do bot-updates ---
-    if (embedUpdated || hubUpdated) {
-      const unixTimestamp = Math.floor(Date.now() / 1000);
-      await updatesChannel.send({
-        content: `Moderator Panel has been refreshed: <t:${unixTimestamp}:F>`
-      });
-    }
   }
 
   // --- Globalny listener na przyciski ---
