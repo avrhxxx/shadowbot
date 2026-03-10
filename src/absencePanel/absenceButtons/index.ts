@@ -1,6 +1,4 @@
-// src/absencePanel/absenceButtons/index.ts
-
 export { handleAddAbsence, handleAddAbsenceSubmit } from "./absenceAdd";
 export { handleRemoveAbsence, handleRemoveAbsenceSubmit } from "./absenceRemove";
-export { handleShowAbsences } from "./absenceShowList";
+export { handleAbsenceList } from "./absenceList"; // <- zmiana
 export { handleSettings, handleSettingsSelect } from "./absenceSettings";
