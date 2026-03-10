@@ -100,6 +100,31 @@ export async function updateEventCell(eventId: string, columnName: string, value
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
 }
 
+// -----------------------------
+// REMINDER-SPECIFIC UPDATE
+// -----------------------------
+export async function checkAndSetReminder(eventId: string, reminderValue: boolean): Promise<boolean> {
+  const rows: any[][] = await GS.readEventsSheet();
+  if (!rows.length) return false;
+
+  const headers: string[] = rows[0];
+  const reminderIndex = headers.indexOf("reminderSent");
+  if (reminderIndex === -1) throw new Error("Column 'reminderSent' not found");
+
+  const idIndex = headers.indexOf("id");
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+
+  const rowIndex = rows.findIndex((r: any[]) => r[idIndex] === eventId);
+  if (rowIndex === -1) return false;
+
+  const currentValue = rows[rowIndex][reminderIndex] === "true";
+  if (!currentValue && reminderValue) {
+    await GS.updateEventCell(rowIndex + 1, reminderIndex + 1, "true");
+  }
+
+  return !currentValue; // true jeśli reminder jeszcze nie był wysłany
+}
+
 export async function deleteEventRow(eventId: string) {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
