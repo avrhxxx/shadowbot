@@ -1,23 +1,23 @@
-// src/absencePanel/absenceButtons/absenceSettings.ts
-import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
-import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
+import {
+  Interaction,
+  StringSelectMenuBuilder,
+  ActionRowBuilder,
+  StringSelectMenuInteraction,
+} from "discord.js";
+import { setNotificationChannel, getConfig } from "../absenceService";
 
 // -----------------------------
-// HANDLER SETTINGS BUTTON
+// HANDLE SETTINGS BUTTON
 // -----------------------------
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton() || !interaction.guild) return;
-
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.deferReply({ ephemeral: true }).catch(() => null);
-  }
 
   const textChannels = interaction.guild.channels.cache
     .filter(c => c.isTextBased())
     .map(c => ({ label: c.name, value: c.id }));
 
   if (!textChannels.length) {
-    await interaction.editReply({ content: "No text channels available.", components: [] });
+    await interaction.reply({ content: "No text channels available.", ephemeral: true });
     return;
   }
 
@@ -26,14 +26,15 @@ export async function handleSettings(interaction: Interaction) {
     .setPlaceholder("Select notification channel")
     .addOptions(textChannels);
 
-  await interaction.editReply({
+  await interaction.reply({
     content: "Select a channel for Absence notifications:",
     components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect)],
+    ephemeral: true,
   });
 }
 
 // -----------------------------
-// HANDLER SELECT MENU
+// HANDLE SELECT MENU
 // -----------------------------
 export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
   const guildId = interaction.guildId;
@@ -45,12 +46,12 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
   const channelId = interaction.values[0];
 
   try {
-    const config = await getAbsenceConfig(guildId);
+    const config = await getConfig(guildId);
 
     if (config.notificationChannel === channelId) {
       await interaction.reply({
         content: `Notification channel is already set to <#${channelId}>.`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -59,7 +60,7 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
 
     await interaction.reply({
       content: `Notification channel set to <#${channelId}>.`,
-      ephemeral: true
+      ephemeral: true,
     });
   } catch (err) {
     console.error("Error setting absence notification channel:", err);
