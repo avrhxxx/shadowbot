@@ -9,8 +9,8 @@ export function renderAbsencePanel(): MessageCreateOptions {
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("absence_show_list")
-      .setLabel("Show Absences")
+      .setCustomId("absence_list")  // nowy plik i handler
+      .setLabel("Absences List")    // widoczne dla użytkownika
       .setStyle(ButtonStyle.Primary)
   );
 
