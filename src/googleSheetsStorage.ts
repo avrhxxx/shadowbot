@@ -121,7 +121,6 @@ export async function readModeratorConfig(): Promise<any[][]> {
   return await readSheet(MODERATOR_CONFIG_TAB);
 }
 
-// Zapis danych panelu do wiersza 2 (rollback / info)
 export async function saveModeratorPanelInfo(
   modChannelId: string,
   dateEmbedId: string,
@@ -139,22 +138,6 @@ export async function saveModeratorPanelInfo(
   });
 }
 
-// --------------------------
-// HELPERS
-// --------------------------
-function toA1(col: number, row: number): string {
-  let result = "";
-  while (col > 0) {
-    const rem = (col - 1) % 26;
-    result = String.fromCharCode(65 + rem) + result;
-    col = Math.floor((col - 1) / 26);
-  }
-  return result + row;
-}
-
-// --------------------------
-// UPDATE / DELETE CELLS
-// --------------------------
 export async function updateModeratorConfigCell(row: number, col: number, value: any) {
   const range = `${MODERATOR_CONFIG_TAB}!${toA1(col, row)}`;
   await sheets.spreadsheets.values.update({
@@ -165,7 +148,6 @@ export async function updateModeratorConfigCell(row: number, col: number, value:
   });
 }
 
-// Odczyt danych panelu
 export async function getModeratorPanelInfo(): Promise<{
   modChannelId: string;
   dateEmbedId: string;
@@ -201,4 +183,89 @@ export async function updateModeratorPanelColumn(
     version: 6,
   };
   await updateModeratorConfigCell(2, colMap[col], value);
+}
+
+// --------------------------
+// ABSENCE STORAGE
+// --------------------------
+export async function readAbsenceSheet(): Promise<any[][]> {
+  return await readSheet(ABSENCE_TAB);
+}
+
+export async function writeAbsenceSheet(values: any[][]) {
+  await writeSheet(ABSENCE_TAB, values);
+}
+
+export async function readAbsenceConfigSheet(): Promise<any[][]> {
+  return await readSheet(ABSENCE_CONFIG_TAB);
+}
+
+export async function writeAbsenceConfigSheet(values: any[][]) {
+  await writeSheet(ABSENCE_CONFIG_TAB, values);
+}
+
+export async function updateAbsenceCell(row: number, col: number, value: any) {
+  const range = `${ABSENCE_TAB}!${toA1(col, row)}`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+export async function updateAbsenceConfigCell(row: number, col: number, value: any) {
+  const range = `${ABSENCE_CONFIG_TAB}!${toA1(col, row)}`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+export async function deleteAbsenceRow(row: number) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: 0,
+              dimension: "ROWS",
+              startIndex: row - 1,
+              endIndex: row,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
+export async function ensureAbsenceConfigHeaders() {
+  const rows = await readSheet(ABSENCE_CONFIG_TAB);
+  if (!rows || rows.length === 0 || rows[0].length === 0) {
+    const headers = [["guildId", "notificationChannel", "otherSetting1", "otherSetting2"]];
+    await writeSheet(`${ABSENCE_CONFIG_TAB}!A1:D1`, headers);
+  }
+}
+
+export async function readAbsenceConfig(): Promise<any[][]> {
+  await ensureAbsenceConfigHeaders();
+  return await readSheet(ABSENCE_CONFIG_TAB);
+}
+
+// --------------------------
+// HELPERS
+// --------------------------
+function toA1(col: number, row: number): string {
+  let result = "";
+  while (col > 0) {
+    const rem = (col - 1) % 26;
+    result = String.fromCharCode(65 + rem) + result;
+    col = Math.floor((col - 1) / 26);
+  }
+  return result + row;
 }
