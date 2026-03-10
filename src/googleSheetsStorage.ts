@@ -1,10 +1,19 @@
-// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
-const EVENTS_TAB = "events";
-const EVENTS_CONFIG_TAB = "events_config";
 
+// --------------------------
+// TABS
+// --------------------------
+const MODERATOR_CONFIG_TAB = "moderator_config";        // wcześniej moderator_config_tab
+const EVENTS_TAB = "events";                             // wcześniej events_tab
+const EVENTS_CONFIG_TAB = "events_config";               // wcześniej events_config_tab
+const ABSENCE_TAB = "absence";                           // wcześniej absence_tab
+const ABSENCE_CONFIG_TAB = "absence_config";            // wcześniej absence_config_tab
+
+// --------------------------
+// VALIDACJA ENV
+// --------------------------
 if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
 if (!process.env.GOOGLE_SERVICE_ACCOUNT) throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
 
