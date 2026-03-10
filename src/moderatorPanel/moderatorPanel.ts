@@ -10,14 +10,14 @@ import {
   Message
 } from "discord.js";
 
-import { renderEventPanel } from "../eventsPanel/eventPanel"; // EventPanel renderer
+import { renderEventPanel } from "../eventsPanel/eventPanel";
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
 import { handleEventMenu } from "./moderatorButtons/eventMenu";
-import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
-import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
-import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu"; // placeholder
+import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
+import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
+import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 
-// ---- wersja panelu (można inkrementować przy zmianach) ----
+// ---- wersja panelu ----
 const PANEL_VERSION = "1.0.0";
 
 // --- helper do embedu z formatami dat i stopką ---
@@ -48,14 +48,38 @@ function renderDateFormatsEmbed(): EmbedBuilder {
     });
 }
 
+// --- helper do renderu hubu / root panel ---
+function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("moderator_event_menu")
+      .setLabel("Event Menu")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId("moderator_points_menu")
+      .setLabel("Points Menu")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("moderator_translate_menu")
+      .setLabel("Translate Menu")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("moderator_absence_menu")
+      .setLabel("Absence Menu")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("moderator_help")
+      .setLabel("Help")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
     let modChannel = guild.channels.cache.find(
-      (c) =>
-        c.type === 0 && // GUILD_TEXT
-        c.name === "moderator-panel"
+      (c) => c.type === 0 && c.name === "moderator-panel"
     ) as TextChannel;
 
     if (!modChannel) {
@@ -77,20 +101,26 @@ export async function initModeratorPanel(client: Client) {
     const dateEmbed = renderDateFormatsEmbed();
 
     if (dateEmbedMessage) {
-      // --- Edytujemy istniejący embed ---
       await dateEmbedMessage.edit({ embeds: [dateEmbed] });
     } else {
-      // --- Wysyłamy nowy embed, jeśli go nie ma ---
       dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
     }
 
     // --- Render root hub w tym kanale ---
-    await renderModeratorHub(modChannel);
+    let hubMessage: Message | undefined = messages.find(
+      (m) => m.content === "📌 **Moderator Panel**"
+    );
 
-    // Tutaj możesz zapisać do Google Sheets:
-    // - ID kanału: modChannel.id
-    // - ID wiadomości z embedem: dateEmbedMessage.id
-    // Możesz użyć helperów typu updateConfigCell
+    const row = renderModeratorHubRow();
+
+    if (hubMessage) {
+      await hubMessage.edit({ components: [row] });
+    } else {
+      hubMessage = await modChannel.send({ content: "📌 **Moderator Panel**", components: [row] });
+    }
+
+    // --- TODO: tutaj możesz zapisać do Google Sheets:
+    // modChannel.id, dateEmbedMessage.id, hubMessage.id
   }
 
   // Globalny listener na przyciski ModeratorPanel
@@ -114,37 +144,5 @@ export async function initModeratorPanel(client: Client) {
         await handleModeratorHelp(interaction);
         break;
     }
-  });
-}
-
-// Funkcja renderująca root panel / hub w kanale moderator-panel
-export async function renderModeratorHub(channel: TextChannel) {
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("moderator_event_menu")
-      .setLabel("Event Menu")
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId("moderator_points_menu")
-      .setLabel("Points Menu")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("moderator_translate_menu")
-      .setLabel("Translate Menu")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("moderator_absence_menu")
-      .setLabel("Absence Menu")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("moderator_help")
-      .setLabel("Help")
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  // --- Można też sprawdzić istniejącą wiadomość z hubem i edytować ją ---
-  await channel.send({
-    content: "📌 **Moderator Panel**",
-    components: [row]
   });
 }
