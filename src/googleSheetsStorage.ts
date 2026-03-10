@@ -1,3 +1,4 @@
+// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -5,11 +6,11 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 // --------------------------
 // TABS
 // --------------------------
-const MODERATOR_CONFIG_TAB = "moderator_config";        // wcześniej moderator_config_tab
-const EVENTS_TAB = "events";                             // wcześniej events_tab
-const EVENTS_CONFIG_TAB = "events_config";               // wcześniej events_config_tab
-const ABSENCE_TAB = "absence";                           // wcześniej absence_tab
-const ABSENCE_CONFIG_TAB = "absence_config";            // wcześniej absence_config_tab
+const MODERATOR_CONFIG_TAB = "moderator_config";
+const EVENTS_TAB = "events";
+const EVENTS_CONFIG_TAB = "events_config";
+const ABSENCE_TAB = "absence";
+const ABSENCE_CONFIG_TAB = "absence_config";
 
 // --------------------------
 // VALIDACJA ENV
@@ -69,6 +70,17 @@ export async function writeConfigSheet(values: any[][]) {
 }
 
 // --------------------------
+// MODERATOR CONFIG STORAGE
+// --------------------------
+export async function readModeratorConfig(): Promise<any[][]> {
+  return await readSheet(MODERATOR_CONFIG_TAB);
+}
+
+export async function writeModeratorConfig(values: any[][]) {
+  await writeSheet(MODERATOR_CONFIG_TAB, values);
+}
+
+// --------------------------
 // HELPERS
 // --------------------------
 function toA1(col: number, row: number): string {
@@ -122,4 +134,57 @@ export async function deleteEventRow(row: number) {
       ],
     },
   });
+}
+
+// --------------------------
+// MODERATOR PANEL HELPERS
+// --------------------------
+
+// Aktualizacja pojedynczej komórki w moderator_config
+export async function updateModeratorConfigCell(row: number, col: number, value: any) {
+  const range = `${MODERATOR_CONFIG_TAB}!${toA1(col, row)}`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+// Zapis informacji panelu: channelId, messageId, version, unix timestamp
+export async function saveModeratorPanelInfo(channelId: string, messageId: string, version: string) {
+  const unixTimestamp = Math.floor(Date.now() / 1000);
+  const values = [[channelId, messageId, version, unixTimestamp]];
+  await writeModeratorConfig(values);
+}
+
+// Odczyt danych panelu
+export async function getModeratorPanelInfo(): Promise<{
+  channelId: string;
+  messageId: string;
+  version: string;
+  lastUpdated: number;
+} | null> {
+  const rows = await readModeratorConfig();
+  if (!rows || rows.length === 0) return null;
+
+  const [channelId, messageId, version, lastUpdated] = rows[0];
+  return {
+    channelId,
+    messageId,
+    version,
+    lastUpdated: Number(lastUpdated)
+  };
+}
+
+// Aktualizacja pojedynczej kolumny panelu
+export async function updateModeratorPanelColumn(col: "channelId" | "messageId" | "version" | "lastUpdated", value: string | number) {
+  const colMap: Record<typeof col, number> = {
+    channelId: 1,
+    messageId: 2,
+    version: 3,
+    lastUpdated: 4
+  };
+
+  await updateModeratorConfigCell(1, colMap[col], value);
 }
