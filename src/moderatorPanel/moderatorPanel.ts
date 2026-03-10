@@ -16,8 +16,9 @@ import { handleEventMenu } from "./moderatorButtons/eventMenu";
 import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
 import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
+import { saveModeratorPanelInfo } from "../googleSheetsStorage";
 
-// ---- wersja panelu ----
+// ---- wersja panelu (do wersjonowania przy zmianach) ----
 const PANEL_VERSION = "1.0.0";
 
 // --- helper do embedu z formatami dat i stopką ---
@@ -25,7 +26,10 @@ function renderDateFormatsEmbed(): EmbedBuilder {
   const unixTimestamp = Math.floor(Date.now() / 1000);
   return new EmbedBuilder()
     .setTitle("📅 Accepted Date & Time Formats")
-    .setDescription("Please enter dates and times in one of the following formats:")
+    .setDescription(
+      "Please enter dates and times in one of the following formats:\n\n" +
+      `**Last updated:** <t:${unixTimestamp}:F>`
+    )
     .addFields(
       {
         name: "🕰 Date + Time",
@@ -43,9 +47,7 @@ function renderDateFormatsEmbed(): EmbedBuilder {
       { name: "Tip", value: "No need for magic wands — just type it straight! ✨" }
     )
     .setColor("Blue")
-    .setFooter({
-      text: `Last updated: <t:${unixTimestamp}:F> | Version: ${PANEL_VERSION}`
-    });
+    .setFooter({ text: `Version: ${PANEL_VERSION}` });
 }
 
 // --- helper do renderu hubu / root panel ---
@@ -74,10 +76,14 @@ function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
   );
 }
 
+// ======================================================
+// INIT PANEL
+// ======================================================
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
+    // --- znajdź lub utwórz kanał moderator-panel ---
     let modChannel = guild.channels.cache.find(
       (c) => c.type === 0 && c.name === "moderator-panel"
     ) as TextChannel;
@@ -92,8 +98,10 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- Fetch wiadomości z kanału, aby sprawdzić, czy embed już istnieje ---
+    // --- pobierz ostatnie wiadomości, żeby znaleźć embed i hub ---
     const messages = await modChannel.messages.fetch({ limit: 50 });
+
+    // 1️⃣ Embed z formatami dat
     let dateEmbedMessage: Message | undefined = messages.find((m) =>
       m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
     );
@@ -106,7 +114,7 @@ export async function initModeratorPanel(client: Client) {
       dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
     }
 
-    // --- Render root hub w tym kanale ---
+    // 2️⃣ Root hub (panel z przyciskami)
     let hubMessage: Message | undefined = messages.find(
       (m) => m.content === "📌 **Moderator Panel**"
     );
@@ -119,11 +127,13 @@ export async function initModeratorPanel(client: Client) {
       hubMessage = await modChannel.send({ content: "📌 **Moderator Panel**", components: [row] });
     }
 
-    // --- TODO: tutaj możesz zapisać do Google Sheets:
-    // modChannel.id, dateEmbedMessage.id, hubMessage.id
+    // --- Zapis do Google Sheets ---
+    await saveModeratorPanelInfo(modChannel.id, dateEmbedMessage.id, PANEL_VERSION);
   }
 
+  // ======================================================
   // Globalny listener na przyciski ModeratorPanel
+  // ======================================================
   client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
 
