@@ -1,3 +1,4 @@
+// src/absencePanel/absenceHandler.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -50,13 +51,8 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
 async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
   const { customId } = interaction;
 
-  if (customId === IDS.MODALS.ADD) {
-    return await AB.handleAddAbsenceSubmit(interaction);
-  }
-
-  if (customId === IDS.MODALS.REMOVE) {
-    return await AB.handleRemoveAbsenceSubmit(interaction);
-  }
+  if (customId === IDS.MODALS.ADD) return await AB.handleAddAbsenceSubmit(interaction);
+  if (customId === IDS.MODALS.REMOVE) return await AB.handleRemoveAbsenceSubmit(interaction);
 }
 
 // ----------------------------
@@ -64,43 +60,21 @@ async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
 // ----------------------------
 export async function handleAbsenceInteraction(interaction: Interaction<CacheType>) {
   try {
-    // ----------------------------
-    // Buttons
-    // ----------------------------
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
       if (!handler) return;
-
-      // defer reply, jeśli funkcja nie od razu wysyła odpowiedź
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => null);
-      }
-
+      // **nie deferReply**, bo funkcja sama wysyła modal/reply
       return await handler(interaction);
     }
 
-    // ----------------------------
-    // Select menus
-    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (!handler) return;
-
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => null);
-      }
-
+      // **deferReply tylko jeśli funkcja nie wysyła od razu reply**
       return await handler(interaction);
     }
 
-    // ----------------------------
-    // Modal submit
-    // ----------------------------
     if (interaction.isModalSubmit()) {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => null);
-      }
-
       return await handleModal(interaction);
     }
 
@@ -110,7 +84,7 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     if (interaction.isRepliable()) {
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
-        ephemeral: true
+        ephemeral: true,
       });
     }
   }
