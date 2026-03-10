@@ -1,5 +1,4 @@
 // src/absencePanel/absenceService.ts
-import { TextChannel } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
 export interface AbsenceObject {
@@ -20,9 +19,6 @@ export interface AbsenceConfig {
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeJSONParse<T>(value: any, fallback: T): T {
-  try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
-}
 function toNumber(value: any, fallback = 0) { return value != null ? Number(value) : fallback; }
 function toBool(value: any) { return value === true || value === "true"; }
 
@@ -30,14 +26,14 @@ function toBool(value: any) { return value === true || value === "true"; }
 // LOAD ABSENCES
 // -----------------------------
 export async function loadAbsences(guildId: string): Promise<AbsenceObject[]> {
-  const rows: any[][] = await GS.readSheet("absence");
+  const rows = await GS.readAbsenceSheet();
   if (!rows.length) return [];
-  const headers: string[] = rows[0] as string[];
+  const headers = rows[0] as string[];
 
   return rows.slice(1)
-    .map((row: any[]) => {
+    .map(row => {
       const obj: Record<string, any> = {};
-      headers.forEach((h: string, i: number) => obj[h] = row[i] ?? null);
+      headers.forEach((h, i) => obj[h] = row[i] ?? null);
       return {
         id: obj.id,
         guildId: obj.guildId,
@@ -51,11 +47,11 @@ export async function loadAbsences(guildId: string): Promise<AbsenceObject[]> {
     .filter(a => a.guildId === guildId);
 }
 
-export async function getAbsences(guildId: string): Promise<AbsenceObject[]> {
+export async function getAbsences(guildId: string) {
   return loadAbsences(guildId);
 }
 
-export async function getAbsenceByPlayer(guildId: string, player: string): Promise<AbsenceObject | null> {
+export async function getAbsenceByPlayer(guildId: string, player: string) {
   const absences = await loadAbsences(guildId);
   return absences.find(a => a.player === player) || null;
 }
@@ -64,35 +60,35 @@ export async function getAbsenceByPlayer(guildId: string, player: string): Promi
 // UPDATE / DELETE CELLS
 // -----------------------------
 export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
-  const rows: any[][] = await GS.readSheet("absence");
+  const rows = await GS.readAbsenceSheet();
   if (!rows.length) return;
 
-  const headers: string[] = rows[0] as string[];
+  const headers = rows[0] as string[];
   const colIndex = headers.indexOf(columnName);
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === absenceId);
+  const rowIndex = rows.findIndex(r => r[0] === absenceId);
   if (rowIndex === -1) throw new Error(`Absence ID ${absenceId} not found`);
 
-  await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
+  await GS.updateAbsenceCell(rowIndex + 1, colIndex + 1, value);
 }
 
 export async function deleteAbsenceRow(absenceId: string) {
-  const rows: any[][] = await GS.readSheet("absence");
+  const rows = await GS.readAbsenceSheet();
   if (!rows.length) return;
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === absenceId);
+  const rowIndex = rows.findIndex(r => r[0] === absenceId);
   if (rowIndex === -1) return;
 
-  await GS.deleteEventRow(rowIndex + 1);
+  await GS.deleteAbsenceRow(rowIndex + 1);
 }
 
 // -----------------------------
 // CREATE / SAVE ABSENCE
 // -----------------------------
-export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
-  const rows: any[][] = await GS.readSheet("absence");
-  const headers: string[] = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
+export async function createAbsence(data: AbsenceObject) {
+  const rows = await GS.readAbsenceSheet();
+  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
 
   if (!headers.includes("notified")) headers.push("notified");
 
@@ -102,7 +98,7 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
     return (data as any)[h] ?? "";
   });
 
-  await GS.writeSheet("absence", [headers, ...rows.slice(1), newRow]);
+  await GS.writeAbsenceSheet([headers, ...rows.slice(1), newRow]);
   return data;
 }
 
@@ -117,12 +113,12 @@ export async function saveAbsences(guildId: string, absences: AbsenceObject[]) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS
+// CONFIG
 // -----------------------------
 export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> {
-  const rows: any[][] = await GS.readSheet("absence_config");
+  const rows = await GS.readAbsenceConfigSheet();
   if (!rows.length) return {};
-  const headers: string[] = rows[0];
+  const headers = rows[0] as string[];
   const dataRows = rows.slice(1);
 
   const guildIndex = headers.indexOf("guildId");
@@ -132,16 +128,17 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
   if (!row) return {};
 
   const config: AbsenceConfig = {};
-  headers.forEach((h: string, i: number) => config[h] = row[i] ?? null);
+  headers.forEach((h, i) => config[h] = row[i] ?? null);
   return config;
 }
 
 export async function setAbsenceNotificationChannel(guildId: string, channelId: string) {
-  const rows: any[][] = await GS.readSheet("absence_config");
-  const headers: string[] = rows[0] ?? ["guildId","notificationChannel"];
+  const rows = await GS.readAbsenceConfigSheet();
+  const headers = rows[0] ?? ["guildId","notificationChannel"];
   const dataRows = rows.slice(1);
 
   if (!headers.includes("notificationChannel")) headers.push("notificationChannel");
+
   const guildIndex = headers.indexOf("guildId");
   const colIndex = headers.indexOf("notificationChannel");
 
@@ -152,6 +149,6 @@ export async function setAbsenceNotificationChannel(guildId: string, channelId: 
     dataRows.push(row);
   }
 
-  await GS.writeSheet("absence_config", [headers, ...dataRows]);
-  await GS.updateConfigCell(dataRows.indexOf(row) + 1, colIndex + 1, channelId);
+  await GS.writeAbsenceConfigSheet([headers, ...dataRows]);
+  await GS.updateAbsenceConfigCell(dataRows.indexOf(row) + 1, colIndex + 1, channelId);
 }
