@@ -10,10 +10,11 @@ import {
 } from "discord.js";
 
 import { renderEventPanel } from "../eventsPanel/eventPanel"; // EventPanel renderer
-// import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
-// import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
 import { handleEventMenu } from "./moderatorButtons/eventMenu";
+import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
+import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
+import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu"; // placeholder
 
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
@@ -78,28 +79,19 @@ export async function initModeratorPanel(client: Client) {
 
     switch (interaction.customId) {
       case "moderator_event_menu":
-        await handleEventMenu(interaction);
+        await handleEventMenu(interaction); // zostaje nienaruszony
         break;
 
       case "moderator_points_menu":
-        await interaction.reply({
-          content: "Points Menu – not implemented yet.",
-          ephemeral: true
-        });
+        await handlePointsMenu(interaction);
         break;
 
       case "moderator_translate_menu":
-        await interaction.reply({
-          content: "Translate Menu – not implemented yet.",
-          ephemeral: true
-        });
+        await handleTranslateMenu(interaction);
         break;
 
       case "moderator_absence_menu":
-        await interaction.reply({
-          content: "Absence Menu – not implemented yet.",
-          ephemeral: true
-        });
+        await handleAbsenceMenu(interaction);
         break;
 
       case "moderator_help":
