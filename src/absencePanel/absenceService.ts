@@ -19,10 +19,6 @@ export interface AbsenceConfig {
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeJSONParse<T>(value: any, fallback: T): T {
-  try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
-}
-
 function toNumber(value: any, fallback = 0) {
   return value != null ? Number(value) : fallback;
 }
@@ -64,16 +60,20 @@ export async function getAbsences(guildId: string): Promise<AbsenceObject[]> {
 
 export async function getAbsenceByPlayer(guildId: string, player: string): Promise<AbsenceObject | null> {
   const absences = await loadAbsences(guildId);
-  return absences.find(a => a.player === player) || null;
+  return absences.find(a => a.player.toLowerCase() === player.toLowerCase()) || null;
 }
 
 // -----------------------------
 // CREATE / SAVE ABSENCE
 // -----------------------------
 export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
-
   const rows = await GS.readAbsenceSheet();
   const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
+
+  // -----------------------------
+  // Walidacja unikalnego nicku w tym samym guildzie
+  const exists = rows.slice(1).some(r => r[headers.indexOf("guildId")] === data.guildId && r[headers.indexOf("player")].toLowerCase() === data.player.toLowerCase());
+  if (exists) throw new Error(`Player ${data.player} already has an absence.`);
 
   ["notified"].forEach(col => {
     if (!headers.includes(col)) headers.push(col);
@@ -86,7 +86,6 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
   });
 
   await GS.writeAbsenceSheet([headers, ...rows.slice(1), newRow]);
-
   return data;
 }
 
@@ -111,14 +110,6 @@ export async function setAbsence(
 }
 
 // -----------------------------
-// CHECK IF NICK EXISTS (OPTIONAL)
-// -----------------------------
-export async function isNickOnList(guildId: string, player: string): Promise<boolean> {
-  const absences = await loadAbsences(guildId);
-  return absences.some(a => a.player.toLowerCase() === player.toLowerCase());
-}
-
-// -----------------------------
 // UPDATE / DELETE
 // -----------------------------
 export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
@@ -127,7 +118,6 @@ export async function updateAbsenceCell(absenceId: string, columnName: string, v
 
   const headers: string[] = rows[0];
   const colIndex = headers.indexOf(columnName);
-
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
   const rowIndex = rows.findIndex((r: any[]) => r[headers.indexOf("id")] === absenceId);
@@ -152,25 +142,17 @@ export async function deleteAbsenceRow(absenceId: string) {
 }
 
 // -----------------------------
-// REMOVE ABSENCE BY PLAYER (POPRAWIONE)
+// REMOVE ABSENCE BY PLAYER (poprawione)
 // -----------------------------
 export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-  const rows: any[][] = await GS.readAbsenceSheet();
-  if (!rows.length) return false;
+  const absences = await loadAbsences(guildId);
 
-  const headers = rows[0];
-  const guildIndex = headers.indexOf("guildId");
-  const playerIndex = headers.indexOf("player");
-  if (guildIndex === -1 || playerIndex === -1) throw new Error("Required column not found");
+  // Szukamy gracza po nicku w danym guildzie
+  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
+  if (!target) return false;
 
-  // Szukamy wiersza po guildId + player
-  const rowIndex = rows.findIndex(
-    r => r[guildIndex] === guildId && r[playerIndex].toLowerCase() === player.toLowerCase()
-  );
-
-  if (rowIndex === -1) return false;
-
-  await GS.deleteAbsenceRow(rowIndex + 1);
+  // Usuwamy po ID
+  await deleteAbsenceRow(target.id);
   return true;
 }
 
@@ -183,7 +165,6 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
 
   const headers = rows[0];
   const dataRows = rows.slice(1);
-
   const guildIndex = headers.indexOf("guildId");
   if (guildIndex === -1) return {};
 
@@ -192,7 +173,6 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
 
   const config: AbsenceConfig = {};
   headers.forEach((h, i) => config[h] = row[i] ?? null);
-
   return config;
 }
 
@@ -203,9 +183,7 @@ export async function setConfig(guildId: string, key: string, value: any) {
 
   if (!headers.includes(key)) {
     headers.push(key);
-    for (const r of dataRows) {
-      while(r.length < headers.length) r.push("");
-    }
+    for (const r of dataRows) while(r.length < headers.length) r.push("");
   }
 
   const guildIndex = headers.indexOf("guildId");
