@@ -1,10 +1,10 @@
-import {
-  ButtonInteraction,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder,
-  ModalSubmitInteraction,
+import { 
+  ButtonInteraction, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  ActionRowBuilder, 
+  ModalSubmitInteraction 
 } from "discord.js";
 import { createAbsence } from "../absenceService";
 
@@ -86,13 +86,14 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       startDate: `${fromDate.day}/${fromDate.month}`,
       endDate: `${toDate.day}/${toDate.month}`,
       createdAt: Date.now(),
-      notified: false,
+      notified: false
     });
 
     await interaction.reply({
       content: `✅ Absence for **${nick}** added: from ${fromDate.day}/${fromDate.month} to ${toDate.day}/${toDate.month}`,
-      ephemeral: true,
+      ephemeral: true
     });
+
   } catch (err) {
     console.error("Error saving absence:", err);
     await interaction.reply({ content: "❌ Failed to save absence. Try again later.", ephemeral: true });
