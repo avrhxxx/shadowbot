@@ -16,7 +16,7 @@ export const IDS = {
   BUTTONS: {
     ADD: "absence_add",
     REMOVE: "absence_remove",
-    SHOW_LIST: "absence_show_list",
+    SHOW_LIST: "absence_list", // <- dopasowane do nowego przycisku
     SETTINGS: "absence_settings",
   },
   SELECTS: {
