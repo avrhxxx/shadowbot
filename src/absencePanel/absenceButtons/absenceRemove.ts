@@ -42,10 +42,11 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
   try {
-
+    // Wywołanie serwisu, który usuwa gracza tylko jeśli jest w bazie
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
+      // Gracz nie był na liście → nie można usunąć
       await interaction.reply({
         content: `❌ No absence found for **${nick}**.`,
         ephemeral: true
@@ -53,19 +54,18 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
       return;
     }
 
+    // Sukces – gracz został usunięty z listy i bazy
     await interaction.reply({
       content: `✅ Absence for **${nick}** removed.`,
       ephemeral: true
     });
 
   } catch (err) {
-
     console.error("Error removing absence:", err);
 
     await interaction.reply({
       content: "❌ Failed to remove absence.",
       ephemeral: true
     });
-
   }
 }
