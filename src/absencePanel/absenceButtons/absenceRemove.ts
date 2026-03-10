@@ -8,13 +8,12 @@ import {
   ActionRowBuilder
 } from "discord.js";
 
-import { removeAbsence } from "../absenceService";
+import { getAbsences, removeAbsence } from "../absenceService";
 
 // ----------------------------
 // SHOW REMOVE MODAL
 // ----------------------------
 export async function handleRemoveAbsence(interaction: ButtonInteraction) {
-
   const modal = new ModalBuilder()
     .setTitle("Remove Absence")
     .setCustomId("absence_remove_modal");
@@ -37,35 +36,61 @@ export async function handleRemoveAbsence(interaction: ButtonInteraction) {
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteraction) {
-
   const guildId = interaction.guildId!;
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
   try {
-    // Wywołanie serwisu, który usuwa gracza tylko jeśli jest w bazie
-    const removed = await removeAbsence(guildId, nick);
+    // -----------------------------
+    // 1️⃣ Pobierz aktualną listę z serwisu
+    const absences = await getAbsences(guildId);
+    console.log("Current absences:", absences.map(a => ({ id: a.id, player: a.player })));
 
-    if (!removed) {
-      // Gracz nie był na liście → nie można usunąć
+    // -----------------------------
+    // 2️⃣ Sprawdź, czy wpisany nick istnieje
+    const target = absences.find(a => a.player.toLowerCase() === nick.toLowerCase());
+
+    if (!target) {
       await interaction.reply({
-        content: `❌ No absence found for **${nick}**.`,
+        content: `❌ No absence found for **${nick}** in the current list.`,
         ephemeral: true
       });
       return;
     }
 
-    // Sukces – gracz został usunięty z listy i bazy
+    console.log("Removing absence ID:", target.id, "Player:", target.player);
+
+    // -----------------------------
+    // 3️⃣ Usuń przez serwis
+    const removed = await removeAbsence(guildId, nick);
+
+    if (!removed) {
+      await interaction.reply({
+        content: `❌ Failed to remove absence for **${nick}**.`,
+        ephemeral: true
+      });
+      return;
+    }
+
     await interaction.reply({
-      content: `✅ Absence for **${nick}** removed.`,
+      content: `✅ Absence for **${nick}** removed from the list and database.`,
       ephemeral: true
     });
 
   } catch (err) {
     console.error("Error removing absence:", err);
 
-    await interaction.reply({
-      content: "❌ Failed to remove absence.",
-      ephemeral: true
-    });
+    if (interaction.isRepliable()) {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "❌ An error occurred while trying to remove absence.",
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ An error occurred while trying to remove absence.",
+          ephemeral: true
+        });
+      }
+    }
   }
 }
