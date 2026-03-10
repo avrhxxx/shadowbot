@@ -76,18 +76,19 @@ export async function readModeratorConfig(): Promise<any[][]> {
   return await readSheet(MODERATOR_CONFIG_TAB);
 }
 
-// Zapis danych panelu do wiersza 2
+// Zapis danych panelu do wiersza 2 (bez logiki wersji)
 export async function saveModeratorPanelInfo(
   modChannelId: string,
   dateEmbedId: string,
   hubMessageId: string,
   updateChannelId: string,
-  lastUpdated: number
+  lastUpdated: number,
+  version?: string
 ) {
-  const values = [[modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated]];
+  const values = [[modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated, version || "1.0.0"]];
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${MODERATOR_CONFIG_TAB}!A2:E2`,
+    range: `${MODERATOR_CONFIG_TAB}!A2:F2`,
     valueInputOption: "RAW",
     requestBody: { values },
   });
@@ -152,8 +153,6 @@ export async function deleteEventRow(row: number) {
 // --------------------------
 // MODERATOR PANEL HELPERS
 // --------------------------
-
-// Aktualizacja pojedynczej komórki w moderator_config (wiersz 2)
 export async function updateModeratorConfigCell(row: number, col: number, value: any) {
   const range = `${MODERATOR_CONFIG_TAB}!${toA1(col, row)}`;
   await sheets.spreadsheets.values.update({
@@ -164,30 +163,30 @@ export async function updateModeratorConfigCell(row: number, col: number, value:
   });
 }
 
-// Odczyt danych panelu
 export async function getModeratorPanelInfo(): Promise<{
   modChannelId: string;
   dateEmbedId: string;
   hubMessageId: string;
   updateChannelId: string;
   lastUpdated: number;
+  version?: string;
 } | null> {
   const rows = await readModeratorConfig();
   if (!rows || rows.length < 2) return null;
 
-  const [modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated] = rows[1];
+  const [modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated, version] = rows[1];
   return {
     modChannelId,
     dateEmbedId,
     hubMessageId,
     updateChannelId,
-    lastUpdated: Number(lastUpdated)
+    lastUpdated: Number(lastUpdated),
+    version: version || "1.0.0"
   };
 }
 
-// Aktualizacja pojedynczej kolumny panelu w wierszu 2
 export async function updateModeratorPanelColumn(
-  col: "modChannelId" | "dateEmbedId" | "hubMessageId" | "updateChannelId" | "lastUpdated",
+  col: "modChannelId" | "dateEmbedId" | "hubMessageId" | "updateChannelId" | "lastUpdated" | "version",
   value: string | number
 ) {
   const colMap: Record<typeof col, number> = {
@@ -195,7 +194,8 @@ export async function updateModeratorPanelColumn(
     dateEmbedId: 2,
     hubMessageId: 3,
     updateChannelId: 4,
-    lastUpdated: 5
+    lastUpdated: 5,
+    version: 6
   };
   await updateModeratorConfigCell(2, colMap[col], value);
 }
