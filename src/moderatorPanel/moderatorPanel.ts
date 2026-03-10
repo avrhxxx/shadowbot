@@ -43,7 +43,7 @@ function renderDateFormatsEmbed(): EmbedBuilder {
       },
       { name: "📆 Year only", value: "YYYY → 2026" },
       { name: "Tip", value: "No need for magic wands — just type it straight! ✨" },
-      { name: "Last Update", value: `<t:${unixTimestamp}:F>` } // pod tipami
+      { name: "Last Update", value: `<t:${unixTimestamp}:F>` }
     )
     .setColor("Blue")
     .setFooter({ text: "" });
@@ -158,7 +158,7 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- Zapis info do Google Sheets (ID kanałów, wiadomości, nowa wersja, timestamp) ---
+    // --- Zapis info do Google Sheets (ID kanałów, wiadomości, wersja, timestamp) ---
     await saveModeratorPanelInfo(
       modChannel.id,
       dateEmbedMessage.id,
