@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceRemove.ts
 import {
   ButtonInteraction,
   ModalSubmitInteraction,
