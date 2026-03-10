@@ -40,13 +40,7 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
   try {
-    // -----------------------------
-    // 1️⃣ Pobierz aktualną listę z serwisu
     const absences = await getAbsences(guildId);
-    console.log("Current absences:", absences.map(a => ({ id: a.id, player: a.player })));
-
-    // -----------------------------
-    // 2️⃣ Sprawdź, czy wpisany nick istnieje
     const target = absences.find(a => a.player.toLowerCase() === nick.toLowerCase());
 
     if (!target) {
@@ -57,10 +51,6 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
       return;
     }
 
-    console.log("Removing absence ID:", target.id, "Player:", target.player);
-
-    // -----------------------------
-    // 3️⃣ Usuń przez serwis
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
