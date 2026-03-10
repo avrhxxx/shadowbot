@@ -4,16 +4,28 @@ import { getAbsences, AbsenceObject } from "../absenceService";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
 // -----------------------------
-// Formatowanie daty DD.MM.YYYY
+// Formatowanie daty: DD.MM.YYYY → DD.MM.YYYY back
 // -----------------------------
 function formatAbsenceDate(absence: AbsenceObject): string {
-  const todayYear = new Date().getFullYear();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
   const [fromDay, fromMonth] = absence.startDate.split("/").map(Number);
   const [toDay, toMonth] = absence.endDate.split("/").map(Number);
 
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${pad(fromDay)}.${pad(fromMonth)}.${todayYear} → ${pad(toDay)}.${pad(toMonth)}.${todayYear}`;
+  // Obliczamy datę końcową
+  let toYear = currentYear;
+  const toDateCandidate = new Date(currentYear, toMonth - 1, toDay);
+  if (toDateCandidate < today) {
+    // jeśli data już minęła w tym roku, ustaw rok na następny
+    toYear += 1;
+  }
+
+  const toDate = getEventDateUTC(toDay, toMonth, 0, 0, toYear);
+  const toUnix = Math.floor(toDate.getTime() / 1000);
+
+  return `${pad(fromDay)}.${pad(fromMonth)}.${currentYear} → ${pad(toDay)}.${pad(toMonth)}.${toYear} back: <t:${toUnix}:R>`;
 }
 
 // -----------------------------
