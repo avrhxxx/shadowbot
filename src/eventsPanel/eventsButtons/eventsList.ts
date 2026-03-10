@@ -20,6 +20,11 @@ const STATUS_COLORS: Record<string, number> = {
 };
 
 // -----------------------------
+// EVENT TYPES
+// -----------------------------
+const PARTICIPANT_EVENTS = ["reservoir_raid", "custom"];
+
+// -----------------------------
 // HELPERS
 // -----------------------------
 function cleanNickname(nick: string) {
@@ -36,7 +41,6 @@ function formatEventUTCObj(e: EventObject) {
   );
 }
 
-// Formatuje nazwę kategorii, np. arcadian_conquest → Arcadian Conquest
 function formatCategoryLabel(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -44,52 +48,93 @@ function formatCategoryLabel(label: string) {
 // -----------------------------
 // CREATE EVENT EMBED + BUTTONS
 // -----------------------------
-function createEventEmbedAndRows(e: EventObject) {
-  const embed = new EmbedBuilder()
-    .setTitle(e.name)
-    .setDescription(
-      `Status: ${e.status}\nUTC Date: ${formatEventUTCObj(e)}\nParticipants: ${e.participants.length}` +
-      (e.absent?.length ? `\nAbsent: ${e.absent.length}` : "")
-    )
-    .setColor(STATUS_COLORS[e.status] ?? 0xffffff);
+function createEventEmbedAndRows(event: EventObject) {
 
+  const showParticipants = PARTICIPANT_EVENTS.includes(event.eventType);
+
+  const eventDate = new Date(
+    Date.UTC(
+      event.year ?? new Date().getUTCFullYear(),
+      event.month - 1,
+      event.day,
+      event.hour,
+      event.minute
+    )
+  );
+
+  const unix = Math.floor(eventDate.getTime() / 1000);
+
+  let description =
+`Status: ${event.status}
+Date: ${formatEventUTCObj(event)}
+Starts: <t:${unix}:R>`;
+
+  if (showParticipants) {
+    description += `
+
+Participants: ${event.participants.length}`;
+
+    if (event.absent?.length) {
+      description += `\nAbsent: ${event.absent.length}`;
+    }
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(event.name)
+    .setDescription(description)
+    .setColor(STATUS_COLORS[event.status] ?? 0xffffff);
+
+  const clearButton = new ButtonBuilder()
+    .setCustomId(`event_clear_${event.id}`)
+    .setLabel("Clear Event Data")
+    .setStyle(ButtonStyle.Danger);
+
+  // EVENTS WITHOUT PARTICIPANTS
+  if (!showParticipants) {
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(clearButton);
+
+    return { embed, rows: [row] };
+  }
+
+  // FULL EVENT BUTTONS
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+
     new ButtonBuilder()
-      .setCustomId(`event_add_${e.id}`)
+      .setCustomId(`event_add_${event.id}`)
       .setLabel("Add Participant")
       .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId(`event_remove_${e.id}`)
+      .setCustomId(`event_remove_${event.id}`)
       .setLabel("Remove Participant")
       .setStyle(ButtonStyle.Danger),
 
     new ButtonBuilder()
-      .setCustomId(`event_absent_${e.id}`)
+      .setCustomId(`event_absent_${event.id}`)
       .setLabel("Mark Absent")
       .setStyle(ButtonStyle.Secondary),
 
     new ButtonBuilder()
-      .setCustomId(`event_show_list_${e.id}`)
+      .setCustomId(`event_show_list_${event.id}`)
       .setLabel("Show List")
       .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
-      .setCustomId(`event_download_single_${e.id}`)
+      .setCustomId(`event_download_single_${event.id}`)
       .setLabel("Download")
       .setStyle(ButtonStyle.Primary)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+
     new ButtonBuilder()
-      .setCustomId(`event_compare_${e.id}`)
+      .setCustomId(`event_compare_${event.id}`)
       .setLabel("Compare")
       .setStyle(ButtonStyle.Secondary),
 
-    new ButtonBuilder()
-      .setCustomId(`event_clear_${e.id}`)
-      .setLabel("Clear Event Data")
-      .setStyle(ButtonStyle.Danger)
+    clearButton
   );
 
   return { embed, rows: [row1, row2] };
@@ -99,9 +144,8 @@ function createEventEmbedAndRows(e: EventObject) {
 // CATEGORY CLICK
 // -----------------------------
 export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
-  if (category) {
-    return await handleListByCategory(interaction, category);
-  }
+
+  if (category) return await handleListByCategory(interaction, category);
 
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
@@ -117,6 +161,7 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
   let currentRow = new ActionRowBuilder<ButtonBuilder>();
 
   categories.forEach((cat, idx) => {
+
     currentRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`event_category_${cat}`)
@@ -130,9 +175,7 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
     }
   });
 
-  if (currentRow.components.length > 0) {
-    rows.push(currentRow);
-  }
+  if (currentRow.components.length > 0) rows.push(currentRow);
 
   await interaction.reply({
     content: "Select a category to view events:",
@@ -145,6 +188,7 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
 // LIST BY CATEGORY
 // -----------------------------
 export async function handleListByCategory(interaction: ButtonInteraction, category?: string) {
+
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
@@ -166,14 +210,11 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
   }
 
   for (let i = 0; i < filteredEvents.length; i++) {
-    const e = filteredEvents[i];
-    const { embed, rows } = createEventEmbedAndRows(e);
 
-    const payload = {
-      embeds: [embed],
-      components: rows,
-      ephemeral: true
-    };
+    const event = filteredEvents[i];
+    const { embed, rows } = createEventEmbedAndRows(event);
+
+    const payload = { embeds: [embed], components: rows, ephemeral: true };
 
     if (i === 0) await interaction.reply(payload);
     else await interaction.followUp(payload);
@@ -181,11 +222,13 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 }
 
 // -----------------------------
-// SHOW LIST HANDLER
+// SHOW LIST
 // -----------------------------
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
+
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
+
   const event = events.find(e => e.id.toString() === eventId);
 
   if (!event) {
@@ -199,8 +242,14 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
   const embed = new EmbedBuilder()
     .setTitle(`List for ${event.name}`)
     .setDescription(
-      `UTC Date: ${formatEventUTCObj(event)}\nStatus: ${event.status}\n\nParticipants (${participants.length}):\n${participants.join("\n")}` +
-      (absent.length ? `\n\nAbsent (${absent.length}):\n${absent.join("\n")}` : "")
+      `Date: ${formatEventUTCObj(event)}
+
+Participants (${participants.length}):
+${participants.join("\n")}` +
+      (absent.length ? `
+
+Absent (${absent.length}):
+${absent.join("\n")}` : "")
     )
     .setColor(STATUS_COLORS[event.status] ?? 0xffffff);
 
@@ -208,9 +257,10 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 }
 
 // -----------------------------
-// UPDATE EMBED HANDLER
+// UPDATE EMBED
 // -----------------------------
 export async function updateEventEmbed(message: Message, eventId: string) {
+
   const guildId = message.guildId;
   if (!guildId) return;
 
@@ -220,5 +270,6 @@ export async function updateEventEmbed(message: Message, eventId: string) {
   if (!event) return;
 
   const { embed, rows } = createEventEmbedAndRows(event);
+
   await message.edit({ embeds: [embed], components: rows });
 }
