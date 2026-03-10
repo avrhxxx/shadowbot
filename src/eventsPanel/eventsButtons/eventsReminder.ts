@@ -1,5 +1,5 @@
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEventById, updateEventCell, getConfig, EventObject } from "../eventService";
+import { getEventById, updateEventCell, getEvents, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 const CHECK_INTERVAL = 60_000; // 60s
@@ -10,7 +10,6 @@ const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 // ======================================================
 export async function initEventReminders(guild: Guild) {
   if (intervalHandles.has(guild.id)) return;
-
   const handle = setInterval(() => checkEvents(guild).catch(console.error), CHECK_INTERVAL);
   intervalHandles.set(guild.id, handle);
 }
@@ -32,15 +31,12 @@ async function checkEvents(guild: Guild) {
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  // Pobieramy wszystkie aktywne eventy z serwisu
   const events = await getEvents(guild.id);
 
   for (const event of events) {
     if (!event || event.status !== "ACTIVE") continue;
 
-    // ----------------------
     // Birthday special case
-    // ----------------------
     if (event.eventType === "birthdays") {
       const thisYear = now.getUTCFullYear();
       if (
@@ -58,18 +54,12 @@ async function checkEvents(guild: Guild) {
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
-    // ----------------------
-    // Upcoming reminder
-    // ----------------------
     if (!event.reminderSent && now.getTime() >= reminderTime) {
       await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
       event.reminderSent = true;
       await updateEventCell(event.id, "reminderSent", "true");
     }
 
-    // ----------------------
-    // Event started
-    // ----------------------
     if (!event.started && now.getTime() >= eventTime) {
       await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
       event.started = true;
@@ -81,7 +71,7 @@ async function checkEvents(guild: Guild) {
 }
 
 // ======================================================
-// SEND BIRTHDAY NOTIFICATION (SPECIAL)
+// SEND BIRTHDAY NOTIFICATION
 // ======================================================
 async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
   const embed = new EmbedBuilder()
@@ -99,7 +89,6 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   const config = await getConfig(guild.id);
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
-
   await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
 }
 
@@ -120,14 +109,10 @@ async function sendEventNotification(
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
-  if (type === "created") {
-    description += `Event scheduled <t:${unixTime}:R>`;
-  } else if (type === "upcoming") {
-    description += `Event starts <t:${unixTime}:R>`;
-  } else if (type === "started") {
-    description += `Event started <t:${unixTime}:R>`;
-  }
+  let description = `**Game Time:** ${formatEventUTC(event)}\n`;
+  if (type === "created") description += `Event scheduled <t:${unixTime}:R>`;
+  else if (type === "upcoming") description += `Event starts <t:${unixTime}:R>`;
+  else if (type === "started") description += `Event started <t:${unixTime}:R>`;
   description += `\n\n_Click the countdown to see the event time in your local timezone_`;
 
   const embed = new EmbedBuilder()
@@ -146,8 +131,3 @@ function getTextChannel(guild: Guild, channelId?: string) {
   const ch = guild.channels.cache.get(channelId);
   return ch && ch.isTextBased() ? (ch as TextChannel) : null;
 }
-
-// ======================================================
-// EXPORTS
-// ======================================================
-export { sendEventCreatedNotification, sendReminderMessage, initEventReminders, stopEventReminders };
