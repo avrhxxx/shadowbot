@@ -1,141 +1,115 @@
 // src/absencePanel/absenceNotification.ts
-import { TextChannel, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, Message } from "discord.js";
-import { getAbsences, removeAbsence } from "../absencePanel/absenceService";
-import { setNotificationChannel, getAbsenceConfig } from "../absencePanel/absenceService";
-import cron from "node-cron";
+import { Client, TextChannel, EmbedBuilder } from "discord.js";
+import { getAbsences, AbsenceObject, getAbsenceConfig, setConfig } from "../absencePanel/absenceService";
 
-// -----------------------------
-// SETTINGS
-// -----------------------------
-const NOTIFICATION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24h
-let pinnedMessageCache: Record<string, string> = {}; // guildId -> messageId
+const AUTO_CLEAN_INTERVAL_MIN = 15;
 
-// -----------------------------
-// UTILS
-// -----------------------------
-function formatAbsence(absence: any) {
-  return `${absence.player}: ${absence.startDate} → ${absence.endDate}`;
+interface NotificationState {
+  channelId?: string;
+  embedId?: string;
 }
 
-function createEmbed(absences: any[]) {
-  const embed = new EmbedBuilder()
-    .setTitle("📌 Current Absences")
-    .setColor(0x1E90FF)
-    .setTimestamp(Date.now())
-    .setDescription(absences.length === 0 ? "✅ No absences recorded." :
-      absences.map(a => formatAbsence(a)).join("\n")
-    );
-  return embed;
-}
+export class AbsenceNotifier {
+  private client: Client;
+  private guildId: string;
+  private state: NotificationState = {};
 
-// -----------------------------
-// GET OR CREATE EMBED
-// -----------------------------
-async function getPinnedEmbed(channel: TextChannel): Promise<Message> {
-  const config = await getAbsenceConfig(channel.guildId!);
-  let messageId = config.absenceEmbedMessageId || pinnedMessageCache[channel.guildId!];
-  let message: Message | undefined;
+  constructor(client: Client, guildId: string) {
+    this.client = client;
+    this.guildId = guildId;
+    this.init();
+  }
 
-  if (messageId) {
+  private async init() {
+    const config = await getAbsenceConfig(this.guildId);
+    this.state.channelId = config.notificationChannel ?? undefined;
+    this.state.embedId = config.absenceEmbedId ?? undefined;
+
+    this.startAutoClean();
+  }
+
+  /** Wyślij powiadomienie o dodaniu absencji */
+  public async notifyAdd(absence: AbsenceObject) {
+    if (!this.state.channelId) return;
+    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("📌 New Absence Added")
+      .setColor(0x1E90FF)
+      .setDescription(`Player **${absence.player}** will be absent from **${absence.startDate}** to **${absence.endDate}**.`)
+      .setTimestamp(new Date());
+
+    await channel.send({ embeds: [embed] });
+    await this.updateAbsenceListEmbed();
+  }
+
+  /** Wyślij powiadomienie o usunięciu absencji */
+  public async notifyRemove(absence: AbsenceObject, reason: string = "manual") {
+    if (!this.state.channelId) return;
+    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+      .setTitle("✅ Absence Removed")
+      .setColor(0x32CD32)
+      .setDescription(`Player **${absence.player}** absence removed (${reason}).`)
+      .setTimestamp(new Date());
+
+    await channel.send({ embeds: [embed] });
+    await this.updateAbsenceListEmbed();
+  }
+
+  /** Utwórz / zaktualizuj embed listy absencji */
+  private async updateAbsenceListEmbed() {
+    if (!this.state.channelId) return;
+    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
+    if (!channel) return;
+
+    const absences = await getAbsences(this.guildId);
+    const embed = new EmbedBuilder()
+      .setTitle("📋 Current Absences")
+      .setColor(0x1E90FF)
+      .setTimestamp(new Date());
+
+    if (absences.length === 0) {
+      embed.setDescription("✅ No absences recorded.");
+    } else {
+      for (const absence of absences) {
+        embed.addFields({
+          name: absence.player,
+          value: `${absence.startDate} → ${absence.endDate}`,
+          inline: false,
+        });
+      }
+    }
+
     try {
-      message = await channel.messages.fetch(messageId);
-    } catch { message = undefined; }
+      if (this.state.embedId) {
+        const msg = await channel.messages.fetch(this.state.embedId);
+        await msg.edit({ embeds: [embed] });
+      } else {
+        const msg = await channel.send({ embeds: [embed] });
+        this.state.embedId = msg.id;
+        await setConfig(this.guildId, "absenceEmbedId", msg.id);
+      }
+    } catch (err) {
+      console.error("Error updating absence embed:", err);
+    }
   }
 
-  if (!message) {
-    // send new embed and pin it
-    const absences = await getAbsences(channel.guildId!);
-    message = await channel.send({ embeds: [createEmbed(absences)] });
-    await message.pin().catch(() => {});
-    pinnedMessageCache[channel.guildId!] = message.id;
-    await setNotificationChannel(channel.guildId!, message.id); // zapis ID do config
-  }
-
-  return message;
-}
-
-// -----------------------------
-// UPDATE EMBED
-// -----------------------------
-export async function updateAbsenceEmbed(channel: TextChannel) {
-  const message = await getPinnedEmbed(channel);
-  const absences = await getAbsences(channel.guildId!);
-
-  await message.edit({ embeds: [createEmbed(absences)] });
-}
-
-// -----------------------------
-// SEND NOTIFICATION
-// -----------------------------
-export async function sendAbsenceNotification(channel: TextChannel, player: string, startDate: string, endDate: string) {
-  const content = `📢 Player **${player}** will be absent from **${startDate} → ${endDate}**`;
-  const msg = await channel.send({ content });
-
-  // automatyczne usuwanie po 24h
-  setTimeout(async () => {
-    try { await msg.delete(); } catch {}
-  }, NOTIFICATION_EXPIRY_MS);
-}
-
-// -----------------------------
-// MANUAL ADD/REMOVE HANDLERS
-// -----------------------------
-export async function handleAddAbsenceNotification(channel: TextChannel, player: string, startDate: string, endDate: string) {
-  await updateAbsenceEmbed(channel);
-  await sendAbsenceNotification(channel, player, startDate, endDate);
-}
-
-export async function handleRemoveAbsenceNotification(channel: TextChannel, player: string) {
-  const content = `🗑️ Player **${player}** absence has been removed`;
-  await channel.send({ content });
-  await updateAbsenceEmbed(channel);
-}
-
-// -----------------------------
-// CRON: AUTO CLEANER
-// -----------------------------
-export function startAbsenceCron() {
-  // sprawdzamy co godzinę
-  cron.schedule("0 * * * *", async () => {
-    const allConfigs = await getAllGuildConfigs(); // funkcja, która zwraca wszystkie guildId i notificationChannel
-    for (const config of allConfigs) {
-      const channelId = config.notificationChannel;
-      const guildId = config.guildId;
-      if (!channelId) continue;
-
-      const channel = await globalClient.channels.fetch(channelId) as TextChannel;
-      if (!channel) continue;
-
-      const absences = await getAbsences(guildId);
+  /** Automatyczne czyszczenie przeterminowanych absencji */
+  private startAutoClean() {
+    setInterval(async () => {
+      const absences = await getAbsences(this.guildId);
       const now = new Date();
       for (const absence of absences) {
-        const [fromDay, fromMonth] = absence.startDate.split("/").map(Number);
         const [toDay, toMonth] = absence.endDate.split("/").map(Number);
-        const toDate = new Date(now.getFullYear(), toMonth - 1, toDay);
+        const toDate = new Date(now.getFullYear(), toMonth - 1, toDay, 23, 59, 59);
         if (toDate < now) {
-          await removeAbsence(guildId, absence.player);
-          await sendAbsenceNotification(channel, absence.player, absence.startDate, absence.endDate);
+          await this.notifyRemove(absence, "auto-clean");
         }
       }
-
-      await updateAbsenceEmbed(channel);
-    }
-  });
-}
-
-// -----------------------------
-// MOCK: GET ALL CONFIGS
-// -----------------------------
-async function getAllGuildConfigs(): Promise<{ guildId: string, notificationChannel: string }[]> {
-  // powinno zwracać wszystkie guildy i ustawiony channel z absencji
-  // TODO: zamienić na prawdziwy serwis
-  return []; 
-}
-
-// -----------------------------
-// GLOBAL CLIENT
-// -----------------------------
-let globalClient: any;
-export function setGlobalClient(client: any) {
-  globalClient = client;
+    }, AUTO_CLEAN_INTERVAL_MIN * 60 * 1000);
+  }
 }
