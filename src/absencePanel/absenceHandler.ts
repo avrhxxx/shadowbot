@@ -1,4 +1,3 @@
-// src/absencePanel/absenceHandler.ts
 import {
   Interaction,
   ButtonInteraction,
@@ -32,17 +31,17 @@ export const IDS = {
 // Button handlers
 // ----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
-  [IDS.BUTTONS.ADD]: async (i) => await AB.handleAddAbsence(i),
-  [IDS.BUTTONS.REMOVE]: async (i) => await AB.handleRemoveAbsence(i),
-  [IDS.BUTTONS.SHOW_LIST]: async (i) => await AB.handleShowAbsences(i),
-  [IDS.BUTTONS.SETTINGS]: async (i) => await AB.handleSettings(i),
+  [IDS.BUTTONS.ADD]: AB.handleAddAbsence,
+  [IDS.BUTTONS.REMOVE]: AB.handleRemoveAbsence,
+  [IDS.BUTTONS.SHOW_LIST]: AB.handleShowAbsences,
+  [IDS.BUTTONS.SETTINGS]: AB.handleSettings,
 };
 
 // ----------------------------
 // Select handlers
 // ----------------------------
 const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await AB.handleSettingsSelect(i),
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: AB.handleSettingsSelect,
 };
 
 // ----------------------------
@@ -63,14 +62,12 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
       if (!handler) return;
-      // **nie deferReply**, bo funkcja sama wysyła modal/reply
-      return await handler(interaction);
+      return await handler(interaction); // funkcja sama wywoła modal/reply
     }
 
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (!handler) return;
-      // **deferReply tylko jeśli funkcja nie wysyła od razu reply**
       return await handler(interaction);
     }
 
