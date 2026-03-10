@@ -192,7 +192,7 @@ export async function initModeratorPanel(client: Client) {
       newVersionNum = currentVersionNum + 1;
       const unixTimestamp = Math.floor(Date.now() / 1000);
       await updatesChannel.send({
-        content: `Shadow bot has been updated! Bot version: v${formatVersion(newVersionNum)}\n<t:${unixTimestamp}:F>`
+        content: `Shadow Bot has been updated! Bot version: v${formatVersion(newVersionNum)}\n<t:${unixTimestamp}:F>`
       });
       await updateModeratorPanelColumn("version", formatVersion(newVersionNum));
       await updateModeratorPanelColumn("lastUpdated", unixTimestamp);
