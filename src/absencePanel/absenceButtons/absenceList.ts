@@ -1,6 +1,7 @@
 // src/absencePanel/absenceButtons/absenceList.ts
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { getAbsences, AbsenceObject } from "../absenceService";
+import { getEventDateUTC } from "../../utils/timeUtils";
 
 // -----------------------------
 // HELPER: status based on today
@@ -16,6 +17,19 @@ function getStatusDot(absence: AbsenceObject): string {
   if (today < fromDate) return "🔴"; // upcoming
   if (today > toDate) return "🟢"; // ended
   return "🟡"; // ongoing
+}
+
+// -----------------------------
+// HELPER: formatted date
+// -----------------------------
+function formatAbsenceDate(absence: AbsenceObject): string {
+  const todayYear = new Date().getFullYear();
+  const [fromDay, fromMonth] = absence.startDate.split("/").map(Number);
+  const [toDay, toMonth] = absence.endDate.split("/").map(Number);
+
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+  return `${pad(fromDay)}.${pad(fromMonth)}.${todayYear} → ${pad(toDay)}.${pad(toMonth)}.${todayYear}`;
 }
 
 // -----------------------------
@@ -42,7 +56,7 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
       const dot = getStatusDot(absence);
       embed.addFields({
         name: `${dot} ${absence.player}`,
-        value: `${absence.startDate} ➜ ${absence.endDate}`,
+        value: formatAbsenceDate(absence),
         inline: true
       });
     }
