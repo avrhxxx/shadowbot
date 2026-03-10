@@ -7,7 +7,8 @@ import {
   ButtonStyle,
   Interaction,
   EmbedBuilder,
-  Message
+  Message,
+  Guild
 } from "discord.js";
 
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
@@ -20,7 +21,7 @@ import {
   updateModeratorPanelColumn,
   getModeratorPanelInfo,
   readModeratorConfig,
-  writeSheet
+  ensureModeratorConfigHeaders
 } from "../googleSheetsStorage";
 
 // ---- helper do embedu z formatami dat ----
@@ -104,23 +105,19 @@ async function syncModeratorPanel(modChannel: TextChannel, messages: Map<string,
   }
 }
 
-// --- Funkcja do rollbacku w interwale ---
-async function intervalModeratorPanelCheck(client: Client) {
-  for (const guild of client.guilds.cache.values()) {
-    const modChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "moderator-panel") as TextChannel;
-    if (!modChannel) continue;
+// --- Usuwanie ID z Google Sheets, jeśli kanał nie istnieje ---
+async function cleanupDeletedChannels(guild: Guild, modChannelId: string, updateChannelId: string) {
+  const modChannel = guild.channels.cache.get(modChannelId);
+  const updatesChannel = guild.channels.cache.get(updateChannelId);
 
-    const fetchedMessages = await modChannel.messages.fetch({ limit: 50 });
-    const messagesMap = new Map<string, Message>();
+  if (!modChannel) {
+    await updateModeratorPanelColumn("modChannelId", "");
+    await updateModeratorPanelColumn("dateEmbedId", "");
+    await updateModeratorPanelColumn("hubMessageId", "");
+  }
 
-    const dateEmbedMsg = fetchedMessages.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
-    const hubMsg = fetchedMessages.find(m => m.content === "📌 **Moderator Panel**");
-
-    if (dateEmbedMsg) messagesMap.set("dateEmbed", dateEmbedMsg);
-    if (hubMsg) messagesMap.set("hubMessage", hubMsg);
-
-    // Wysyłamy rollback brakujących wiadomości bez wersjonowania
-    await syncModeratorPanel(modChannel, messagesMap);
+  if (!updatesChannel) {
+    await updateModeratorPanelColumn("updateChannelId", "");
   }
 }
 
@@ -131,16 +128,26 @@ export async function initModeratorPanel(client: Client) {
   for (const guild of client.guilds.cache.values()) {
     // --- Szukamy kanału moderator-panel ---
     let modChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "moderator-panel") as TextChannel;
+    let updatesChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "bot-updates") as TextChannel;
+
+    // --- Tworzymy nagłówki w Google Sheets jeśli nie istnieją ---
+    await ensureModeratorConfigHeaders();
+    const panelInfo = await getModeratorPanelInfo();
+
+    // --- Sprawdzenie czy kanały istnieją, jeśli nie usuń ID ---
+    if (panelInfo) {
+      await cleanupDeletedChannels(guild, panelInfo.modChannelId, panelInfo.updateChannelId);
+    }
+
     if (!modChannel) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
         type: 0,
         permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
       });
+      await updateModeratorPanelColumn("modChannelId", modChannel.id);
     }
 
-    // --- Szukamy kanału bot-updates ---
-    let updatesChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "bot-updates") as TextChannel;
     if (!updatesChannel) {
       updatesChannel = await guild.channels.create({
         name: "bot-updates",
@@ -150,27 +157,17 @@ export async function initModeratorPanel(client: Client) {
       await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
     }
 
-    // --- Tworzymy nagłówki w Google Sheets jeśli nie istnieją ---
-    const headers = ["modChannelId","dateEmbedId","hubMessageId","updateChannelId","lastUpdated","version"];
-    const rows = await readModeratorConfig();
-    if (!rows || rows.length === 0) {
-      await writeSheet("moderator_config", [headers, ["", "", "", "", 0, "1.0.0"]]);
-    }
-
     // --- Fetch wiadomości z moderator-panel ---
     const fetchedMessages = await modChannel.messages.fetch({ limit: 50 });
     const messagesMap = new Map<string, Message>();
-
     const dateEmbedMsg = fetchedMessages.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
     const hubMsg = fetchedMessages.find(m => m.content === "📌 **Moderator Panel**");
-
     if (dateEmbedMsg) messagesMap.set("dateEmbed", dateEmbedMsg);
     if (hubMsg) messagesMap.set("hubMessage", hubMsg);
 
     let embedUpdated = false;
     let hubUpdated = false;
 
-    // --- Aktualizacja istniejących wiadomości ---
     if (dateEmbedMsg) {
       await dateEmbedMsg.edit({ embeds: [renderDateFormatsEmbed()] });
       embedUpdated = true;
@@ -191,7 +188,6 @@ export async function initModeratorPanel(client: Client) {
       : 100; // 1.0.0
     let newVersionNum = currentVersionNum;
 
-    // --- Jeśli faktyczna edycja, zwiększamy wersję i wysyłamy update ---
     if (embedUpdated || hubUpdated) {
       newVersionNum = currentVersionNum + 1;
       const unixTimestamp = Math.floor(Date.now() / 1000);
@@ -201,6 +197,22 @@ export async function initModeratorPanel(client: Client) {
       await updateModeratorPanelColumn("version", formatVersion(newVersionNum));
       await updateModeratorPanelColumn("lastUpdated", unixTimestamp);
     }
+
+    // --- Interwał automatycznego sprawdzania rollbacku co minutę ---
+    setInterval(async () => {
+      const fetched = await modChannel.messages.fetch({ limit: 50 });
+      const map = new Map<string, Message>();
+      const dateMsg = fetched.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
+      const hub = fetched.find(m => m.content === "📌 **Moderator Panel**");
+      if (dateMsg) map.set("dateEmbed", dateMsg);
+      if (hub) map.set("hubMessage", hub);
+      await syncModeratorPanel(modChannel, map);
+
+      // --- Sprawdzenie czy kanały nadal istnieją ---
+      if (panelInfo) {
+        await cleanupDeletedChannels(guild, panelInfo.modChannelId, panelInfo.updateChannelId);
+      }
+    }, 60_000);
   }
 
   // --- Globalny listener przycisków ---
@@ -215,13 +227,4 @@ export async function initModeratorPanel(client: Client) {
       case "moderator_help": await handleModeratorHelp(interaction); break;
     }
   });
-
-  // --- Interwał co minutę na rollback brakujących wiadomości ---
-  setInterval(async () => {
-    try {
-      await intervalModeratorPanelCheck(client);
-    } catch (err) {
-      console.error("Moderator panel rollback check failed:", err);
-    }
-  }, 60 * 1000); // co 1 minutę
 }
