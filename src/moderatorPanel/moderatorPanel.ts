@@ -1,4 +1,3 @@
-// src/moderatorPanel/moderatorPanel.ts
 import {
   Client,
   TextChannel,
@@ -21,7 +20,7 @@ import {
   getModeratorPanelInfo
 } from "../googleSheetsStorage";
 
-// ---- helper do embedu z formatami dat i stopką ----
+// ---- helper do embedu z formatami dat ----
 function renderDateFormatsEmbed(): EmbedBuilder {
   const unixTimestamp = Math.floor(Date.now() / 1000);
   return new EmbedBuilder()
@@ -86,7 +85,9 @@ export async function initModeratorPanel(client: Client) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
         type: 0,
-        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
+        ]
       });
     }
 
@@ -99,7 +100,9 @@ export async function initModeratorPanel(client: Client) {
       updatesChannel = await guild.channels.create({
         name: "bot-updates",
         type: 0,
-        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
+        ]
       });
       await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
     }
@@ -107,7 +110,7 @@ export async function initModeratorPanel(client: Client) {
     // --- Fetch wiadomości z moderator-panel ---
     const messages = await modChannel.messages.fetch({ limit: 50 });
 
-    // --- Embed z datami (rollback jeśli skasowane) ---
+    // --- Embed z datami ---
     let dateEmbedMessage: Message | undefined = messages.find(
       (m) => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
     );
@@ -115,14 +118,16 @@ export async function initModeratorPanel(client: Client) {
     const dateEmbed = renderDateFormatsEmbed();
     let embedUpdated = false;
     if (dateEmbedMessage) {
+      // jeśli istnieje, aktualizacja → wersja + powiadomienie
       await dateEmbedMessage.edit({ embeds: [dateEmbed] });
       embedUpdated = true;
     } else {
+      // rollback / odtworzenie embedu → zapis ID bez wersjonowania
       dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
-      embedUpdated = true;
+      await updateModeratorPanelColumn("dateEmbedId", dateEmbedMessage.id);
     }
 
-    // --- Root hub (rollback jeśli skasowane) ---
+    // --- Root hub ---
     let hubMessage: Message | undefined = messages.find(
       (m) => m.content === "📌 **Moderator Panel**"
     );
@@ -133,39 +138,29 @@ export async function initModeratorPanel(client: Client) {
       await hubMessage.edit({ components: [hubRow] });
       hubUpdated = true;
     } else {
-      hubMessage = await modChannel.send({ content: "📌 **Moderator Panel**", components: [hubRow] });
-      hubUpdated = true;
+      // rollback / odtworzenie hubu → zapis ID bez wersjonowania
+      hubMessage = await modChannel.send({
+        content: "📌 **Moderator Panel**",
+        components: [hubRow]
+      });
+      await updateModeratorPanelColumn("hubMessageId", hubMessage.id);
     }
 
     // --- Pobierz aktualną wersję bota z Google Sheets ---
-    const currentInfo = await getModeratorPanelInfo();
-    let currentVersion = currentInfo?.version || "1.0.0";
-
-    // --- Zwiększ patch ---
-    function incrementPatch(version: string) {
-      const parts = version.split(".").map(Number);
-      parts[2] = (parts[2] || 0) + 1;
-      return parts.join(".");
-    }
-
+    let currentInfo = await getModeratorPanelInfo();
+    let currentVersion = currentInfo?.lastUpdated ?? 0;
     let newVersion = currentVersion;
 
+    // --- Jeśli coś faktycznie edytowane, zwiększ wersję i wysyłamy update ---
     if (embedUpdated || hubUpdated) {
-      newVersion = incrementPatch(currentVersion);
+      newVersion = Number(currentVersion) + 1;
       const unixTimestamp = Math.floor(Date.now() / 1000);
       await updatesChannel.send({
-        content: `Bot Updated! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
+        content: `Moderator Panel has been refreshed! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
       });
 
-      // --- Zapis info do Google Sheets ---
-      await saveModeratorPanelInfo(
-        modChannel.id,
-        dateEmbedMessage.id,
-        hubMessage.id,
-        updatesChannel.id,
-        Math.floor(Date.now() / 1000),
-        newVersion
-      );
+      // zapis nowej wersji w Google Sheets
+      await updateModeratorPanelColumn("lastUpdated", newVersion);
     }
   }
 
@@ -174,11 +169,21 @@ export async function initModeratorPanel(client: Client) {
     if (!interaction.isButton()) return;
 
     switch (interaction.customId) {
-      case "moderator_event_menu": await handleEventMenu(interaction); break;
-      case "moderator_points_menu": await handlePointsMenu(interaction); break;
-      case "moderator_translate_menu": await handleTranslateMenu(interaction); break;
-      case "moderator_absence_menu": await handleAbsenceMenu(interaction); break;
-      case "moderator_help": await handleModeratorHelp(interaction); break;
+      case "moderator_event_menu":
+        await handleEventMenu(interaction);
+        break;
+      case "moderator_points_menu":
+        await handlePointsMenu(interaction);
+        break;
+      case "moderator_translate_menu":
+        await handleTranslateMenu(interaction);
+        break;
+      case "moderator_absence_menu":
+        await handleAbsenceMenu(interaction);
+        break;
+      case "moderator_help":
+        await handleModeratorHelp(interaction);
+        break;
     }
   });
 }
