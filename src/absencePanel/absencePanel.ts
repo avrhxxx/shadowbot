@@ -1,20 +1,16 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } from "discord.js";
 
 /**
- * Renderuje Absence Panel
- * Rząd 1: operacje główne
- * Rząd 2: ustawienia i help
+ * Renderuje Absence Panel – jeden rząd dla wszystkich przycisków
  */
 export function renderAbsencePanel(): MessageCreateOptions {
 
-  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("absence_list")  // nowy plik i handler
       .setLabel("Absences List")    // widoczne dla użytkownika
-      .setStyle(ButtonStyle.Primary)
-  );
+      .setStyle(ButtonStyle.Primary),
 
-  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("absence_settings")
       .setLabel("Settings")
@@ -28,6 +24,6 @@ export function renderAbsencePanel(): MessageCreateOptions {
 
   return {
     content: "📌 **Absence Panel**",
-    components: [row1, row2]
+    components: [row]
   };
 }
