@@ -64,13 +64,19 @@ async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
 // ----------------------------
 export async function handleAbsenceInteraction(interaction: Interaction<CacheType>) {
   try {
-
     // ----------------------------
     // Buttons
     // ----------------------------
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
-      if (handler) return await handler(interaction);
+      if (!handler) return;
+
+      // defer reply, jeśli funkcja nie od razu wysyła odpowiedź
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+      }
+
+      return await handler(interaction);
     }
 
     // ----------------------------
@@ -78,13 +84,23 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
-      if (handler) return await handler(interaction);
+      if (!handler) return;
+
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+      }
+
+      return await handler(interaction);
     }
 
     // ----------------------------
     // Modal submit
     // ----------------------------
     if (interaction.isModalSubmit()) {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => null);
+      }
+
       return await handleModal(interaction);
     }
 
