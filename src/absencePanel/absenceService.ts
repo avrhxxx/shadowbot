@@ -111,10 +111,17 @@ export async function setAbsence(
 }
 
 // -----------------------------
+// CHECK IF NICK EXISTS (OPTIONAL)
+// -----------------------------
+export async function isNickOnList(guildId: string, player: string): Promise<boolean> {
+  const absences = await loadAbsences(guildId);
+  return absences.some(a => a.player.toLowerCase() === player.toLowerCase());
+}
+
+// -----------------------------
 // UPDATE / DELETE
 // -----------------------------
 export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
-
   const rows: any[][] = await GS.readAbsenceSheet();
   if (!rows.length) return;
 
@@ -129,13 +136,13 @@ export async function updateAbsenceCell(absenceId: string, columnName: string, v
   await GS.updateAbsenceCell(rowIndex + 1, colIndex + 1, value);
 }
 
-// DELETE ABSENCE BY ID (poprawione)
+// DELETE ABSENCE BY ID
 export async function deleteAbsenceRow(absenceId: string) {
   const rows: any[][] = await GS.readAbsenceSheet();
   if (!rows.length) return;
 
   const headers = rows[0];
-  const idIndex = headers.indexOf("id"); // <- kolumna id
+  const idIndex = headers.indexOf("id");
   if (idIndex === -1) throw new Error("Column 'id' not found");
 
   const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
@@ -145,17 +152,25 @@ export async function deleteAbsenceRow(absenceId: string) {
 }
 
 // -----------------------------
-// REMOVE ABSENCE BY PLAYER
+// REMOVE ABSENCE BY PLAYER (POPRAWIONE)
 // -----------------------------
 export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-  const absences = await loadAbsences(guildId);
+  const rows: any[][] = await GS.readAbsenceSheet();
+  if (!rows.length) return false;
 
-  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
+  const headers = rows[0];
+  const guildIndex = headers.indexOf("guildId");
+  const playerIndex = headers.indexOf("player");
+  if (guildIndex === -1 || playerIndex === -1) throw new Error("Required column not found");
 
-  if (!target) return false;
+  // Szukamy wiersza po guildId + player
+  const rowIndex = rows.findIndex(
+    r => r[guildIndex] === guildId && r[playerIndex].toLowerCase() === player.toLowerCase()
+  );
 
-  await deleteAbsenceRow(target.id);
+  if (rowIndex === -1) return false;
 
+  await GS.deleteAbsenceRow(rowIndex + 1);
   return true;
 }
 
@@ -163,7 +178,6 @@ export async function removeAbsence(guildId: string, player: string): Promise<bo
 // CONFIG
 // -----------------------------
 export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> {
-
   const rows = await GS.readAbsenceConfigSheet();
   if (!rows.length) return {};
 
@@ -183,7 +197,6 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
 }
 
 export async function setConfig(guildId: string, key: string, value: any) {
-
   const rows = await GS.readAbsenceConfigSheet();
   const headers = rows[0] ?? ["guildId","notificationChannel"];
   const dataRows = rows.slice(1);
