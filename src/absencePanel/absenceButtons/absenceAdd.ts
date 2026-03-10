@@ -1,109 +1,64 @@
-// src/absencePanel/absenceButtons/absenceAdd.ts
-import {
-  ButtonInteraction,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder,
-  ModalSubmitInteraction
-} from "discord.js";
-import { createAbsence } from "../absenceService";
+import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
+import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
 
-// ----------------------------
-// HELPERS TO CREATE INPUTS
-// ----------------------------
-function createTextInput(customId: string, label: string, placeholder: string) {
-  return new TextInputBuilder()
-    .setCustomId(customId)
-    .setLabel(label)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder(placeholder)
-    .setRequired(true);
-}
+// -----------------------------
+// HANDLER SETTINGS BUTTON
+// -----------------------------
+export async function handleSettings(interaction: Interaction) {
+  if (!interaction.isButton() || !interaction.guild) return;
 
-function createDateInput(customId: string, label: string) {
-  return new TextInputBuilder()
-    .setCustomId(customId)
-    .setLabel(label)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Available formats are in the message above the panel")
-    .setRequired(true);
-}
+  const textChannels = interaction.guild.channels.cache
+    .filter(c => c.isTextBased())
+    .map(c => ({ label: c.name, value: c.id }));
 
-// ----------------------------
-// SHOW MODAL
-// ----------------------------
-export async function handleAddAbsence(interaction: ButtonInteraction) {
-  if (!interaction.isButton()) return;
-
-  const modal = new ModalBuilder()
-    .setTitle("Add Absence")
-    .setCustomId("absence_add_modal");
-
-  const nickInput = createTextInput("player_nick", "Player Link / Nickname", "Enter player link or nickname");
-  const fromInput = createDateInput("absence_from", "From Date");
-  const toInput = createDateInput("absence_to", "To Date");
-
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(fromInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(toInput)
-  );
-
-  await interaction.showModal(modal);
-}
-
-// ----------------------------
-// PARSE DATE
-// ----------------------------
-function parseDate(input: string) {
-  const cleaned = input.trim();
-  // Akceptujemy: DD/MM, DD.MM, DD-MM, DDMM
-  const match = cleaned.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-  if (!match) return null;
-
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-
-  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-  return { day, month };
-}
-
-// ----------------------------
-// HANDLE MODAL SUBMIT
-// ----------------------------
-export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
-  const guildId = interaction.guildId!;
-  const nick = interaction.fields.getTextInputValue("player_nick").trim();
-  const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
-  const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
-
-  const fromDate = parseDate(fromRaw);
-  const toDate = parseDate(toRaw);
-
-  if (!fromDate || !toDate) {
-    await interaction.reply({ content: "Invalid date format. Use valid formats above the panel.", ephemeral: true });
+  if (!textChannels.length) {
+    await interaction.reply({ content: "No text channels available.", ephemeral: true });
     return;
   }
 
+  const channelSelect = new StringSelectMenuBuilder()
+    .setCustomId("absence_settings_notification")
+    .setPlaceholder("Select notification channel")
+    .addOptions(textChannels);
+
+  await interaction.reply({
+    content: "Select a channel for Absence notifications:",
+    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect)],
+    ephemeral: true
+  });
+}
+
+// -----------------------------
+// HANDLER SELECT MENU
+// -----------------------------
+export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
+  const guildId = interaction.guildId;
+  if (!guildId || !interaction.values.length) {
+    await interaction.reply({ content: "No channel selected.", ephemeral: true });
+    return;
+  }
+
+  const channelId = interaction.values[0];
+
   try {
-    await createAbsence({
-      id: `${guildId}-${nick}-${Date.now()}`,
-      guildId,
-      player: nick,
-      startDate: `${fromDate.day}/${fromDate.month}`,
-      endDate: `${toDate.day}/${toDate.month}`,
-      createdAt: Date.now(),
-      notified: false
-    });
+    const config = await getAbsenceConfig(guildId);
+
+    if (config.notificationChannel === channelId) {
+      await interaction.reply({
+        content: `Notification channel is already set to <#${channelId}>.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    await setNotificationChannel(guildId, channelId);
 
     await interaction.reply({
-      content: `✅ Absence for **${nick}** added: from ${fromDate.day}/${fromDate.month} to ${toDate.day}/${toDate.month}`,
+      content: `Notification channel set to <#${channelId}>.`,
       ephemeral: true
     });
-
   } catch (err) {
-    console.error("Error saving absence:", err);
-    await interaction.reply({ content: "❌ Failed to save absence. Try again later.", ephemeral: true });
+    console.error("Error setting absence notification channel:", err);
+    await interaction.reply({ content: "Failed to set channel. Try again later.", ephemeral: true });
   }
 }
