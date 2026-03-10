@@ -91,7 +91,10 @@ export async function updateEventCell(eventId: string, columnName: string, value
   const colIndex = headers.indexOf(columnName);
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+  const idIndex = headers.indexOf("id");
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+
+  const rowIndex = rows.findIndex((r: any[]) => r[idIndex] === eventId);
   if (rowIndex === -1) throw new Error(`Event ID ${eventId} not found`);
 
   await GS.updateEventCell(rowIndex + 1, colIndex + 1, value);
@@ -100,8 +103,14 @@ export async function updateEventCell(eventId: string, columnName: string, value
 export async function deleteEventRow(eventId: string) {
   const rows: any[][] = await GS.readEventsSheet();
   if (!rows.length) return;
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === eventId);
+
+  const headers: string[] = rows[0];
+  const idIndex = headers.indexOf("id");
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+
+  const rowIndex = rows.findIndex((r: any[]) => r[idIndex] === eventId);
   if (rowIndex === -1) return;
+
   await GS.deleteEventRow(rowIndex + 1);
 }
 
