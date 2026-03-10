@@ -1,6 +1,6 @@
 // src/absencePanel/absenceButtons/absenceSettings.ts
 import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
-import { setAbsenceNotificationChannel, getAbsenceConfig } from "../absenceService";
+import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
 
 // -----------------------------
 // HANDLER SETTINGS BUTTON
@@ -54,7 +54,7 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
     }
 
     // Zapisz nowy kanał w serwisie
-    await setAbsenceNotificationChannel(guildId, channelId);
+    await setNotificationChannel(guildId, channelId);
 
     await interaction.reply({
       content: `Notification channel set to <#${channelId}>.`,
