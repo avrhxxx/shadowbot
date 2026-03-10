@@ -1,3 +1,4 @@
+// src/moderatorPanel/moderatorPanel.ts
 import {
   Client,
   TextChannel,
@@ -17,7 +18,9 @@ import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 import {
   saveModeratorPanelInfo,
   updateModeratorPanelColumn,
-  getModeratorPanelInfo
+  getModeratorPanelInfo,
+  readModeratorConfig,
+  writeSheet
 } from "../googleSheetsStorage";
 
 // ---- helper do embedu z formatami dat ----
@@ -72,118 +75,153 @@ function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
   );
 }
 
+// --- pomocnicza funkcja do formatowania wersji numerowej ---
+function formatVersion(num: number): string {
+  const major = Math.floor(num / 100);
+  const minor = Math.floor((num % 100) / 10);
+  const patch = num % 10;
+  return `${major}.${minor}.${patch}`;
+}
+
+// --- Funkcja do automatycznego rollbacku panelu ---
+async function syncModeratorPanel(modChannel: TextChannel, messages: Map<string, Message>) {
+  const dateEmbedMessage = messages.get("dateEmbed");
+  const hubMessage = messages.get("hubMessage");
+
+  // Embed daty
+  if (!dateEmbedMessage) {
+    const newEmbedMsg = await modChannel.send({ embeds: [renderDateFormatsEmbed()] });
+    await updateModeratorPanelColumn("dateEmbedId", newEmbedMsg.id);
+  }
+
+  // Hub
+  if (!hubMessage) {
+    const newHubMsg = await modChannel.send({
+      content: "📌 **Moderator Panel**",
+      components: [renderModeratorHubRow()]
+    });
+    await updateModeratorPanelColumn("hubMessageId", newHubMsg.id);
+  }
+}
+
+// --- Funkcja do rollbacku w interwale ---
+async function intervalModeratorPanelCheck(client: Client) {
+  for (const guild of client.guilds.cache.values()) {
+    const modChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "moderator-panel") as TextChannel;
+    if (!modChannel) continue;
+
+    const fetchedMessages = await modChannel.messages.fetch({ limit: 50 });
+    const messagesMap = new Map<string, Message>();
+
+    const dateEmbedMsg = fetchedMessages.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
+    const hubMsg = fetchedMessages.find(m => m.content === "📌 **Moderator Panel**");
+
+    if (dateEmbedMsg) messagesMap.set("dateEmbed", dateEmbedMsg);
+    if (hubMsg) messagesMap.set("hubMessage", hubMsg);
+
+    // Wysyłamy rollback brakujących wiadomości bez wersjonowania
+    await syncModeratorPanel(modChannel, messagesMap);
+  }
+}
+
+// --- Inicjalizacja panelu moderatora ---
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
     // --- Szukamy kanału moderator-panel ---
-    let modChannel = guild.channels.cache.find(
-      (c) => c.type === 0 && c.name === "moderator-panel"
-    ) as TextChannel;
-
+    let modChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "moderator-panel") as TextChannel;
     if (!modChannel) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
         type: 0,
-        permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
-        ]
+        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
       });
     }
 
     // --- Szukamy kanału bot-updates ---
-    let updatesChannel = guild.channels.cache.find(
-      (c) => c.type === 0 && c.name === "bot-updates"
-    ) as TextChannel;
-
+    let updatesChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "bot-updates") as TextChannel;
     if (!updatesChannel) {
       updatesChannel = await guild.channels.create({
         name: "bot-updates",
         type: 0,
-        permissionOverwrites: [
-          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
-        ]
+        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
       });
       await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
     }
 
-    // --- Fetch wiadomości z moderator-panel ---
-    const messages = await modChannel.messages.fetch({ limit: 50 });
-
-    // --- Embed z datami ---
-    let dateEmbedMessage: Message | undefined = messages.find(
-      (m) => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
-    );
-
-    const dateEmbed = renderDateFormatsEmbed();
-    let embedUpdated = false;
-    if (dateEmbedMessage) {
-      // jeśli istnieje, aktualizacja → wersja + powiadomienie
-      await dateEmbedMessage.edit({ embeds: [dateEmbed] });
-      embedUpdated = true;
-    } else {
-      // rollback / odtworzenie embedu → zapis ID bez wersjonowania
-      dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
-      await updateModeratorPanelColumn("dateEmbedId", dateEmbedMessage.id);
+    // --- Tworzymy nagłówki w Google Sheets jeśli nie istnieją ---
+    const headers = ["modChannelId","dateEmbedId","hubMessageId","updateChannelId","lastUpdated","version"];
+    const rows = await readModeratorConfig();
+    if (!rows || rows.length === 0) {
+      await writeSheet("moderator_config", [headers, ["", "", "", "", 0, "1.0.0"]]);
     }
 
-    // --- Root hub ---
-    let hubMessage: Message | undefined = messages.find(
-      (m) => m.content === "📌 **Moderator Panel**"
-    );
-    const hubRow = renderModeratorHubRow();
+    // --- Fetch wiadomości z moderator-panel ---
+    const fetchedMessages = await modChannel.messages.fetch({ limit: 50 });
+    const messagesMap = new Map<string, Message>();
+
+    const dateEmbedMsg = fetchedMessages.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
+    const hubMsg = fetchedMessages.find(m => m.content === "📌 **Moderator Panel**");
+
+    if (dateEmbedMsg) messagesMap.set("dateEmbed", dateEmbedMsg);
+    if (hubMsg) messagesMap.set("hubMessage", hubMsg);
+
+    let embedUpdated = false;
     let hubUpdated = false;
 
-    if (hubMessage) {
-      await hubMessage.edit({ components: [hubRow] });
-      hubUpdated = true;
-    } else {
-      // rollback / odtworzenie hubu → zapis ID bez wersjonowania
-      hubMessage = await modChannel.send({
-        content: "📌 **Moderator Panel**",
-        components: [hubRow]
-      });
-      await updateModeratorPanelColumn("hubMessageId", hubMessage.id);
+    // --- Aktualizacja istniejących wiadomości ---
+    if (dateEmbedMsg) {
+      await dateEmbedMsg.edit({ embeds: [renderDateFormatsEmbed()] });
+      embedUpdated = true;
     }
 
-    // --- Pobierz aktualną wersję bota z Google Sheets ---
-    let currentInfo = await getModeratorPanelInfo();
-    let currentVersion = currentInfo?.lastUpdated ?? 0;
-    let newVersion = currentVersion;
+    if (hubMsg) {
+      await hubMsg.edit({ components: [renderModeratorHubRow()] });
+      hubUpdated = true;
+    }
 
-    // --- Jeśli coś faktycznie edytowane, zwiększ wersję i wysyłamy update ---
+    // --- Automatyczny rollback brakujących wiadomości ---
+    await syncModeratorPanel(modChannel, messagesMap);
+
+    // --- Pobierz wersję i timestamp z Google Sheets ---
+    const currentInfo = await getModeratorPanelInfo();
+    let currentVersionNum = currentInfo?.version
+      ? Number(currentInfo.version.split('.').join(''))
+      : 100; // 1.0.0
+    let newVersionNum = currentVersionNum;
+
+    // --- Jeśli faktyczna edycja, zwiększamy wersję i wysyłamy update ---
     if (embedUpdated || hubUpdated) {
-      newVersion = Number(currentVersion) + 1;
+      newVersionNum = currentVersionNum + 1;
       const unixTimestamp = Math.floor(Date.now() / 1000);
       await updatesChannel.send({
-        content: `Moderator Panel has been refreshed! Bot version: v${newVersion}\n<t:${unixTimestamp}:F>`
+        content: `Moderator Panel has been refreshed! Bot version: v${formatVersion(newVersionNum)}\n<t:${unixTimestamp}:F>`
       });
-
-      // zapis nowej wersji w Google Sheets
-      await updateModeratorPanelColumn("lastUpdated", newVersion);
+      await updateModeratorPanelColumn("version", formatVersion(newVersionNum));
+      await updateModeratorPanelColumn("lastUpdated", unixTimestamp);
     }
   }
 
-  // --- Globalny listener na przyciski ---
+  // --- Globalny listener przycisków ---
   client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
 
     switch (interaction.customId) {
-      case "moderator_event_menu":
-        await handleEventMenu(interaction);
-        break;
-      case "moderator_points_menu":
-        await handlePointsMenu(interaction);
-        break;
-      case "moderator_translate_menu":
-        await handleTranslateMenu(interaction);
-        break;
-      case "moderator_absence_menu":
-        await handleAbsenceMenu(interaction);
-        break;
-      case "moderator_help":
-        await handleModeratorHelp(interaction);
-        break;
+      case "moderator_event_menu": await handleEventMenu(interaction); break;
+      case "moderator_points_menu": await handlePointsMenu(interaction); break;
+      case "moderator_translate_menu": await handleTranslateMenu(interaction); break;
+      case "moderator_absence_menu": await handleAbsenceMenu(interaction); break;
+      case "moderator_help": await handleModeratorHelp(interaction); break;
     }
   });
+
+  // --- Interwał co minutę na rollback brakujących wiadomości ---
+  setInterval(async () => {
+    try {
+      await intervalModeratorPanelCheck(client);
+    } catch (err) {
+      console.error("Moderator panel rollback check failed:", err);
+    }
+  }, 60 * 1000); // co 1 minutę
 }
