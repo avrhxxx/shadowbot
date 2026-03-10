@@ -1,6 +1,6 @@
 // src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEventById, updateEventCell, getConfig, EventObject } from "../eventService";
+import { getEventById, updateEventCell, getConfig, EventObject, getEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 const CHECK_INTERVAL = 60_000; // 60s
@@ -33,11 +33,7 @@ async function checkEvents(guild: Guild) {
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  // Pobieramy wszystkie eventy (tylko ich nagłówki / kolumny w serwisie)
-  // I sprawdzamy po kolei tylko kolumnę reminderSent
-  const events = await Promise.all(
-    (await getAllEventIds(guild.id)).map(async (id) => await getEventById(guild.id, id))
-  );
+  const events = await getEvents(guild.id);
 
   for (const event of events) {
     if (!event || event.status !== "ACTIVE") continue;
@@ -124,7 +120,7 @@ async function sendEventNotification(
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
+  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
   if (type === "created") {
     description += `Event scheduled <t:${unixTime}:R>`;
   } else if (type === "upcoming") {
@@ -150,34 +146,3 @@ function getTextChannel(guild: Guild, channelId?: string) {
   const ch = guild.channels.cache.get(channelId);
   return ch && ch.isTextBased() ? (ch as TextChannel) : null;
 }
-
-function formatEventUTCObj(event: EventObject) {
-  return formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
-}
-
-// ======================================================
-// EXTRA HELPERS
-// ======================================================
-async function getAllEventIds(guildId: string): Promise<string[]> {
-  const events = await getEventIdsFromSheet(guildId);
-  return events;
-}
-
-// Pobieramy tylko kolumnę ID z arkusza (tylko po ID, żeby nie czytać całego arkusza)
-async function getEventIdsFromSheet(guildId: string): Promise<string[]> {
-  const rows: any[][] = await import("../googleSheetsStorage").then(GS => GS.readEventsSheet());
-  if (!rows.length) return [];
-  const headers = rows[0];
-  const idIndex = headers.indexOf("id");
-  const guildIndex = headers.indexOf("guildId");
-  if (idIndex === -1 || guildIndex === -1) return [];
-
-  return rows.slice(1)
-    .filter(r => r[guildIndex] === guildId)
-    .map(r => r[idIndex]);
-}
-
-// ======================================================
-// EXPORTS
-// ======================================================
-export { sendEventCreatedNotification, sendReminderMessage };
