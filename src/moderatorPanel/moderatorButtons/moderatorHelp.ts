@@ -17,6 +17,8 @@ export async function handleModeratorHelp(interaction: Interaction) {
 
 📝 **Translate Menu** – not implemented yet
 
+🕒 **Absence Menu** – not implemented yet
+
 ❓ **Help** – shows this description
 `);
 
