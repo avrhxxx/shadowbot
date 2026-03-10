@@ -1,6 +1,6 @@
 // src/absencePanel/absenceButtons/absenceSettings.ts
 import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
-import { setNotificationChannel, getConfig } from "../absenceService";
+import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
 
 // -----------------------------
 // HANDLER SETTINGS BUTTON
@@ -8,7 +8,6 @@ import { setNotificationChannel, getConfig } from "../absenceService";
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton() || !interaction.guild) return;
 
-  // defer, żeby Discord nie pokazał błędu
   if (!interaction.replied && !interaction.deferred) {
     await interaction.deferReply({ ephemeral: true }).catch(() => null);
   }
@@ -46,8 +45,7 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
   const channelId = interaction.values[0];
 
   try {
-    // Pobierz aktualną konfigurację
-    const config = await getConfig(guildId);
+    const config = await getAbsenceConfig(guildId);
 
     if (config.notificationChannel === channelId) {
       await interaction.reply({
@@ -57,7 +55,6 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
       return;
     }
 
-    // Zapisz nowy kanał w serwisie
     await setNotificationChannel(guildId, channelId);
 
     await interaction.reply({
