@@ -42,7 +42,7 @@ export function renderEventPanel(): MessageCreateOptions {
 
     new ButtonBuilder()
       .setCustomId("event_help")
-      .setLabel("Help")
+      .setLabel("Guide")
       .setStyle(ButtonStyle.Secondary)
   );
 

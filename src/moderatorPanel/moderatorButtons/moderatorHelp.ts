@@ -5,13 +5,22 @@ export async function handleModeratorHelp(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
   const embed = new EmbedBuilder()
-    .setTitle("Moderator Panel Help")
+    .setTitle("Moderator Panel Guide")
     .setDescription(`
-🟢 Event Menu – go to Event Panel  
-⭐ Points Menu – not implemented yet  
-📝 Translate Menu – not implemented yet  
-❓ Help – shows this description
-  `);
+🟢 **Event Menu** – opens the Event Panel where you can:
+  • Create new events
+  • View and manage participant lists
+  • Cancel events or send manual reminders
+  • Access all events at once and download/compare lists
+
+⭐ **Points Menu** – not implemented yet
+
+📝 **Translate Menu** – not implemented yet
+
+🕒 **Absence Menu** – not implemented yet
+
+❓ **Help** – shows this description
+`);
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }

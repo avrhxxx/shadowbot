@@ -1,4 +1,3 @@
-// src/eventsPanel/eventService.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as GS from "../googleSheetsStorage";
 
@@ -6,7 +5,7 @@ export interface EventObject {
   id: string;
   guildId: string;
   name: string;
-  eventType: string; // nowa właściwość
+  eventType: string;
   day: number;
   month: number;
   hour: number;
@@ -19,6 +18,7 @@ export interface EventObject {
   createdAt: number;
   reminderSent: boolean;
   started: boolean;
+  lastBirthdayYear?: number;
 }
 
 export interface EventConfig {
@@ -51,7 +51,7 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
       return {
         id: obj.id,
         guildId: obj.guildId,
-        eventType: obj.eventType ?? "custom", // domyślny typ
+        eventType: obj.eventType ?? "custom",
         name: obj.name,
         day: toNumber(obj.day),
         month: toNumber(obj.month),
@@ -65,17 +65,18 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
         createdAt: toNumber(obj.createdAt),
         reminderSent: toBool(obj.reminderSent),
         started: toBool(obj.started),
+        lastBirthdayYear: toNumber(obj.lastBirthdayYear ?? 0)
       } as EventObject;
     })
     .filter(e => e.guildId === guildId);
 }
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
-  return await loadEvents(guildId);
+  return loadEvents(guildId);
 }
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await getEvents(guildId);
+  const events = await loadEvents(guildId);
   return events.find(e => e.id === eventId) || null;
 }
 
@@ -175,11 +176,10 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0] ?? [
     "id","guildId","name","eventType","day","month","hour","minute","year",
-    "participants","absent","status","createdAt","reminderSent","started","reminderBefore"
+    "participants","absent","status","createdAt","reminderSent","started","reminderBefore","lastBirthdayYear"
   ];
 
-  // dopisanie brakujących kolumn, jeśli ich nie ma
-  ["eventType","participants","absent"].forEach(col => {
+  ["eventType","participants","absent","lastBirthdayYear"].forEach(col => {
     if (!headers.includes(col)) headers.push(col);
   });
 
@@ -188,11 +188,11 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
     if (h === "absent") return JSON.stringify(data.absent || []);
     if (h === "reminderSent") return data.reminderSent ? "true" : "false";
     if (h === "started") return data.started ? "true" : "false";
+    if (h === "lastBirthdayYear") return data.lastBirthdayYear ?? 0;
     return (data as any)[h] ?? "";
   });
 
   await GS.writeEventsSheet([headers, ...rows.slice(1), newRow]);
-
   return data;
 }
 
@@ -206,6 +206,9 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
     await updateEventCell(event.id, "status", event.status);
     await updateEventCell(event.id, "reminderSent", event.reminderSent ? "true" : "false");
     await updateEventCell(event.id, "started", event.started ? "true" : "false");
+    if (event.eventType === "birthdays") {
+      await updateEventCell(event.id, "lastBirthdayYear", event.lastBirthdayYear ?? 0);
+    }
   }
 }
 
@@ -253,9 +256,6 @@ export async function setConfig(guildId: string, key: string, value: any) {
   await GS.updateConfigCell(rowIndex + 1, keyIndex + 1, value);
 }
 
-// -----------------------------
-// CONFIG SHORTCUTS
-// -----------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   await setConfig(guildId, "notificationChannel", channelId);
 }

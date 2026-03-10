@@ -1,5 +1,3 @@
-// src/eventsPanel/eventsButtons/index.ts
-
 // -----------------------------
 // EVENTS CREATE
 // -----------------------------
@@ -73,7 +71,12 @@ export {
 // -----------------------------
 // EVENTS REMINDER
 // -----------------------------
-export { sendReminderMessage, sendEventCreatedNotification } from "./eventsReminder";
+export {
+  sendReminderMessage,
+  sendEventCreatedNotification,
+  initEventReminders,
+  stopEventReminders
+} from "./eventsReminder";
 
 // -----------------------------
 // EVENTS CLEAR

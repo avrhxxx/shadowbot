@@ -5,8 +5,7 @@ import {
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuInteraction,
-    ButtonInteraction,
-    BaseInteraction
+    ButtonInteraction
 } from "discord.js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -53,13 +52,6 @@ function parseEventDateTime(input: string) {
     return { day, month, hour, minute };
 }
 
-function canReply(interaction: BaseInteraction): interaction is
-    | ModalSubmitInteraction
-    | ButtonInteraction
-    | StringSelectMenuInteraction {
-    return "reply" in interaction;
-}
-
 async function safeReply(interaction: any, payload: any) {
     if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
     if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
@@ -78,7 +70,8 @@ async function safeReply(interaction: any, payload: any) {
 export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     const guildId = interaction.guildId!;
     const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
-    const eventType = typeMatch ? typeMatch[1] : "custom";
+    const rawType = typeMatch ? typeMatch[1] : "custom";
+    const eventType = rawType.startsWith("standard_") ? rawType.replace(/^standard_/, "") : rawType;
 
     let name = "";
     let datetimeRaw = "";
@@ -88,49 +81,56 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
     try { datetimeRaw = interaction.fields.getTextInputValue("event_datetime"); } catch {}
     try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
 
-    // prefille dla standardowych typów
+    // Prefill dla standardowych typów
     const prefillMap: Record<string,string> = {
         arcadian_conquest: "Arcadian Conquest",
         city_contest: "City Contest",
         reservoir_raid: "Reservoir Raid",
-        ghoulion_pursuit: "Ghoulion Pursuit"
+        ghoulion_pursuit: "Ghoulion Pursuit",
+        kvk: "KvK"
     };
     if (prefillMap[eventType]) name = prefillMap[eventType];
 
-    const parsed = parseEventDateTime(datetimeRaw);
-    if (!parsed || (!name && ["birthdays","custom"].includes(eventType))) {
-        if (canReply(interaction)) {
-            await safeReply(interaction, { content: "Invalid date/time format or missing name.", ephemeral: true });
+    let day: number, month: number, hour = 0, minute = 0, year: number | undefined;
+
+    if (eventType === "birthdays") {
+        const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+        if (!dateMatch) {
+            await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
+            return;
         }
-        return;
-    }
 
-    const { day, month, hour, minute } = parsed;
-    const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
-    const year = Number.isNaN(yearParsed) ? undefined : yearParsed;
+        day = parseInt(dateMatch[1], 10);
+        month = parseInt(dateMatch[2], 10);
+        hour = 0;
+        minute = 0;
+        year = new Date().getUTCFullYear();
 
-    const nowUTC = new Date();
-    let eventDateUTC = year
-        ? new Date(Date.UTC(year, month - 1, day, hour, minute))
-        : getEventDateUTC(day, month, hour, minute);
+        name = `${name}'s birthday! 🎉`;
 
-    // WALIDACJA KALENDARZA
-    if (
-        eventDateUTC.getUTCFullYear() !== (year ?? eventDateUTC.getUTCFullYear()) ||
-        eventDateUTC.getUTCMonth() + 1 !== month ||
-        eventDateUTC.getUTCDate() !== day
-    ) {
-        if (canReply(interaction)) {
-            await safeReply(interaction, { content: "Invalid calendar date (e.g., 30 Feb does not exist).", ephemeral: true });
+    } else {
+        const parsed = parseEventDateTime(datetimeRaw);
+        if (!parsed && eventType !== "custom") {
+            await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+            return;
         }
-        return;
+        day = parsed?.day ?? 1;
+        month = parsed?.month ?? 1;
+        hour = parsed?.hour ?? 0;
+        minute = parsed?.minute ?? 0;
+        const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
+        year = Number.isNaN(yearParsed) ? undefined : yearParsed;
     }
 
     const tempId = `E-${uuidv4()}`;
 
-    // data w przeszłości – tylko Birthday i Custom, jeśli nie podano roku
+    const nowUTC = new Date();
+    const eventDateUTC = year
+        ? new Date(Date.UTC(year, month - 1, day, hour, minute))
+        : getEventDateUTC(day, month, hour, minute);
+
     if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
-        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType });
+        tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType, notifyOnCreate: false });
         await safeReply(interaction, {
             content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
             components: [
@@ -144,7 +144,6 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         return;
     }
 
-    // zapis tymczasowy + reminderBefore 60 minut
     tempEventStore.set(tempId, {
         id: tempId,
         name,
@@ -154,11 +153,17 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
         minute,
         guildId,
         year: year ?? eventDateUTC.getUTCFullYear(),
-        reminderBefore: 60,
-        eventType
+        reminderBefore: eventType === "birthdays" ? 0 : 60,
+        eventType,
+        notifyOnCreate: eventType === "birthdays" ? false : undefined
     });
 
-    await showCreateNotificationConfirm(interaction, tempId);
+    // Pokazujemy przycisk powiadomień
+    if (eventType !== "birthdays") {
+        await showCreateNotificationConfirm(interaction, tempId);
+    } else {
+        await finalizeEvent(interaction, tempId);
+    }
 }
 
 // -----------------------------------------------------------
@@ -187,7 +192,7 @@ export async function showCreateNotificationConfirm(
 // FINALIZE EVENT
 // -----------------------------------------------------------
 export async function finalizeEvent(
-    interaction: ButtonInteraction | StringSelectMenuInteraction,
+    interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
     tempId: string
 ) {
     const tempData = tempEventStore.get(tempId);
@@ -199,7 +204,7 @@ export async function finalizeEvent(
     const newEvent: EventObject = {
         id: tempData.id,
         guildId: tempData.guildId,
-        name: tempData.name || "Unnamed Event",
+        name: tempData.name,
         day: tempData.day,
         month: tempData.month,
         hour: tempData.hour,
@@ -212,7 +217,7 @@ export async function finalizeEvent(
         reminderSent: false,
         started: false,
         reminderBefore: tempData.reminderBefore ?? 60,
-        eventType: tempData.eventType || "custom"
+        eventType: tempData.eventType
     };
 
     await createEvent(newEvent);
@@ -247,7 +252,7 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
 // -----------------------------------------------------------
 // FINALIZE NEXT YEAR EVENT
 // -----------------------------------------------------------
-export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
+export async function finalizeNextYearEvent(interaction: ButtonInteraction | ModalSubmitInteraction) {
     const [, tempId] = interaction.customId.split(/-(.+)/);
     const tempData = tempEventStore.get(tempId);
     if (!tempData) {
@@ -256,5 +261,10 @@ export async function finalizeNextYearEvent(interaction: ButtonInteraction) {
     }
 
     tempData.year = new Date().getUTCFullYear() + 1;
-    await showCreateNotificationConfirm(interaction, tempId);
+
+    if (tempData.eventType !== "birthdays") {
+        await showCreateNotificationConfirm(interaction, tempId);
+    } else {
+        await finalizeEvent(interaction, tempId);
+    }
 }

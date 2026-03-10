@@ -3,11 +3,15 @@ import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedB
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
 
+// Status emojis
 const STATUS_EMOJIS: Record<string, string> = {
   ACTIVE: "🟢",
   PAST: "⚪",
   CANCELED: "🔴"
 };
+
+// Kategorie, dla których przyciski Compare / Download / Show All Lists są aktywne
+const EVENT_TYPES_WITH_PARTICIPANTS = ["custom", "reservoir_raid"];
 
 function createButtonRow(...buttons: ButtonBuilder[]) {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
@@ -30,35 +34,77 @@ function createEventListText(events: any[]) {
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
-  const events = await getEvents(interaction.guildId!);
-  if (!events.length) return interaction.editReply({ content: "No events found." });
+  // 🔹 pobieramy wszystkie eventy poza birthdays
+  const events = (await getEvents(interaction.guildId!)).filter(e => e.eventType !== "birthdays");
+
+  if (!events.length) {
+    return interaction.editReply({ content: "No events found." });
+  }
+
+  // 🔹 przyciski Compare / Download / Show All Lists tylko dla Custom i Reservoir
+  const participantEvents = events.filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
 
   const row = createButtonRow(
-    new ButtonBuilder().setCustomId("compare_all_events").setLabel("Compare All").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("download_all_events").setLabel("Download All").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("show_all_lists").setLabel("Show All Lists").setStyle(ButtonStyle.Success)
+    new ButtonBuilder()
+      .setCustomId("compare_all_events")
+      .setLabel("Compare All")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(participantEvents.length === 0), // blokujemy jeśli brak odpowiednich eventów
+
+    new ButtonBuilder()
+      .setCustomId("download_all_events")
+      .setLabel("Download All")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(participantEvents.length === 0),
+
+    new ButtonBuilder()
+      .setCustomId("show_all_lists")
+      .setLabel("Show All Lists")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(participantEvents.length === 0)
   );
 
   const listText = createEventListText(events);
-  await interaction.editReply({ content: `📅 **All Events**\n\n${listText}`, components: [row] });
+
+  await interaction.editReply({
+    content: `📅 **All Events**\n\n${listText}`,
+    components: [row]
+  });
 }
 
 // ==========================
-// SHOW ALL PARTICIPANT LISTS
+// SHOW ALL PARTICIPANT LISTS (Custom & Reservoir only)
 // ==========================
 export async function handleShowAllLists(interaction: ButtonInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
-  const events = await getEvents(interaction.guildId!);
-  if (!events.length) return interaction.editReply({ content: "No events found." });
+  // 🔹 pobieramy tylko Custom i Reservoir eventy
+  const events = (await getEvents(interaction.guildId!))
+    .filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
+
+  if (!events.length) {
+    return interaction.editReply({ content: "No participant lists available for Custom/Reservoir events." });
+  }
 
   const fullText = events
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(e => {
       const date = `${e.day}/${e.month} ${e.hour}:${e.minute} UTC`;
-      const participants = e.participants.length ? e.participants.join("\n") : "None";
-      const absent = e.absent?.length ? e.absent.join("\n") : "None";
-      return `**${e.name}** — ${date} (${e.status})\nParticipants:\n${participants}\nAbsent:\n${absent}`;
+
+      const participants = e.participants.length
+        ? e.participants.join("\n")
+        : "None";
+
+      const absent = e.absent?.length
+        ? e.absent.join("\n")
+        : "None";
+
+      return `**${e.name}** — ${date} (${e.status})
+Participants:
+${participants}
+
+Absent:
+${absent}`;
     })
     .join("\n\n====================\n\n");
 
@@ -70,7 +116,10 @@ export async function handleShowAllLists(interaction: ButtonInteraction) {
       .setColor(0x00ff00)
       .setDescription(chunks[i]);
 
-    if (i === 0) await interaction.editReply({ embeds: [embed] }); // ✅ pierwsza część
-    else await interaction.followUp({ embeds: [embed], ephemeral: true }); // ✅ kolejne części
+    if (i === 0) {
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.followUp({ embeds: [embed], ephemeral: true });
+    }
   }
 }

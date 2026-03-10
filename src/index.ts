@@ -1,5 +1,3 @@
-// src/index.ts
-
 // 🔹 Import Google Sheets klienta jako pierwszy
 import "./googleSheetsClient";
 
@@ -25,13 +23,22 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
+  // -----------------------------
+  // Init modules
+  // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
 
+  // -----------------------------
+  // Init event reminders
+  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
   }
 
+  // -----------------------------
+  // Interaction handler
+  // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     await handleEventInteraction(interaction);
   });

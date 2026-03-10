@@ -14,9 +14,31 @@ const EVENT_TYPES = [
     { label: "City Contest", value: "city_contest", prefillName: "City Contest" },
     { label: "Reservoir Raid", value: "reservoir_raid", prefillName: "Reservoir Raid" },
     { label: "Ghoulion Pursuit", value: "ghoulion_pursuit", prefillName: "Ghoulion Pursuit" },
+    { label: "KvK", value: "kvk", prefillName: "KvK" },
     { label: "Birthdays", value: "birthdays" },
     { label: "Custom", value: "custom" }
 ];
+
+// ----------------------------
+// HELPERS TO CREATE INPUTS
+// ----------------------------
+function createDateInput(customId: string, labelText: string) {
+    return new TextInputBuilder()
+        .setCustomId(customId)
+        .setLabel(labelText)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Available formats are in the message above the panel")
+        .setRequired(true);
+}
+
+function createTextInput(customId: string, labelText: string, placeholder: string, required = true) {
+    return new TextInputBuilder()
+        .setCustomId(customId)
+        .setLabel(labelText)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(placeholder)
+        .setRequired(required);
+}
 
 // ----------------------------
 // Step 1: show type select
@@ -46,39 +68,42 @@ export async function handleTypeSelect(interaction: StringSelectMenuInteraction)
     const typeConfig = EVENT_TYPES.find(t => t.value === typeValue);
     if (!typeConfig) return;
 
-    const modal = new ModalBuilder()
-        .setCustomId(`event_create_modal_${typeValue}`)
-        .setTitle("Create Event");
+    const modal = new ModalBuilder().setTitle("Create Event");
 
-    // Data & Time (UTC) – zawsze wymagane
-    const datetimeInput = new TextInputBuilder()
-        .setCustomId("event_datetime")
-        .setLabel("Date & Time (UTC)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("See pinned message in this channel for formats")
-        .setRequired(true);
+    if (typeValue === "birthdays") {
+        modal.setCustomId("event_create_modal_birthdays");
 
-    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput));
+        const nickInput = createTextInput("event_name", "Enter Player Nickname", "Enter player nickname");
+        const dateInput = createDateInput("event_datetime", "Date (Day, Month, UTC)");
 
-    // Nazwa – tylko dla Birthday / Custom
-    if (typeValue === "birthdays" || typeValue === "custom") {
-        const nameInput = new TextInputBuilder()
-            .setCustomId("event_name")
-            .setLabel("Event Name")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(dateInput)
+        );
 
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
+    } else if (typeValue === "custom") {
+        modal.setCustomId("event_create_modal_custom");
 
-        // Rok – opcjonalny
-        const yearInput = new TextInputBuilder()
-            .setCustomId("event_year")
-            .setLabel("Year (optional)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Leave empty for current year")
-            .setRequired(false);
+        const nameInput = createTextInput("event_name", "Event Name", "Enter event name");
+        const datetimeInput = createDateInput("event_datetime", "Date & Time (Day, Month, Hour, Minute, UTC)");
+        const yearInput = createTextInput("event_year", "Year (optional)", "Leave empty for current year", false);
 
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput));
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(yearInput)
+        );
+
+    } else {
+        // standard events + KvK
+        const customId = typeValue === "kvk" ? "event_create_modal_standard_kvk" : `event_create_modal_standard_${typeValue}`;
+        modal.setCustomId(customId);
+
+        const datetimeInput = createDateInput("event_datetime", "Date & Time (Day, Month, Hour, Minute, UTC)");
+
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(datetimeInput)
+        );
     }
 
     await interaction.showModal(modal);

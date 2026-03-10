@@ -10,15 +10,15 @@ import {
 } from "discord.js";
 
 import { renderEventPanel } from "../eventsPanel/eventPanel"; // EventPanel renderer
-// import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
-// import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
 import { handleEventMenu } from "./moderatorButtons/eventMenu";
+import { handlePointsMenu } from "./moderatorButtons/pointsMenu"; // placeholder
+import { handleTranslateMenu } from "./moderatorButtons/translateMenu"; // placeholder
+import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu"; // placeholder
 
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
-  // Iteracja po guildach z await, żeby uniknąć podwójnego tworzenia paneli
   for (const guild of client.guilds.cache.values()) {
     let modChannel = guild.channels.cache.find(
       (c) =>
@@ -39,7 +39,7 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat jako EMBED ---
+    // --- wysyłamy wiadomość z formatami dat jako EMBED ---
     const embed = new EmbedBuilder()
       .setTitle("📅 Accepted Date & Time Formats")
       .setDescription("Please enter dates and times in one of the following formats:")
@@ -79,23 +79,19 @@ export async function initModeratorPanel(client: Client) {
 
     switch (interaction.customId) {
       case "moderator_event_menu":
-        await handleEventMenu(interaction);
+        await handleEventMenu(interaction); // zostaje nienaruszony
         break;
 
       case "moderator_points_menu":
-        // await handlePointsMenu(interaction); // placeholder
-        await interaction.reply({
-          content: "Points Menu – TODO",
-          ephemeral: true
-        });
+        await handlePointsMenu(interaction);
         break;
 
       case "moderator_translate_menu":
-        // await handleTranslateMenu(interaction); // placeholder
-        await interaction.reply({
-          content: "Translate Menu – TODO",
-          ephemeral: true
-        });
+        await handleTranslateMenu(interaction);
+        break;
+
+      case "moderator_absence_menu":
+        await handleAbsenceMenu(interaction);
         break;
 
       case "moderator_help":
@@ -121,6 +117,11 @@ export async function renderModeratorHub(channel: TextChannel) {
     new ButtonBuilder()
       .setCustomId("moderator_translate_menu")
       .setLabel("Translate Menu")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId("moderator_absence_menu")
+      .setLabel("Absence Menu")
       .setStyle(ButtonStyle.Secondary),
 
     new ButtonBuilder()

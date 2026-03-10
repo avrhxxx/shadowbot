@@ -19,7 +19,11 @@ export async function handleCancel(interaction: ButtonInteraction) {
   if (!guildId) return;
 
   const events = await getEvents(guildId);
-  const activeEvents = events.filter(e => e.status === "ACTIVE");
+
+  // ❌ Birthday events nie pojawią się w panelu
+  const activeEvents = events.filter(
+    e => e.status === "ACTIVE" && e.eventType !== "birthdays"
+  );
 
   if (!activeEvents.length) {
     await interaction.reply({
@@ -29,7 +33,9 @@ export async function handleCancel(interaction: ButtonInteraction) {
     return;
   }
 
-  const uniqueActiveEvents = Array.from(new Map(activeEvents.map(e => [e.id, e])).values());
+  const uniqueActiveEvents = Array.from(
+    new Map(activeEvents.map(e => [e.id, e])).values()
+  );
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId("event_cancel_select")
@@ -37,7 +43,13 @@ export async function handleCancel(interaction: ButtonInteraction) {
     .addOptions(
       uniqueActiveEvents.map(e => ({
         label: e.name,
-        description: formatEventUTC(e.day, e.month, e.hour, e.minute, e.year),
+        description: formatEventUTC(
+          e.day,
+          e.month,
+          e.hour,
+          e.minute,
+          e.year
+        ),
         value: e.id
       }))
     );
@@ -75,7 +87,13 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
     .setTitle("Confirm Cancellation")
     .setDescription(
       `Are you sure you want to cancel **${event.name}**?\n\n` +
-      `📅 ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}`
+      `📅 ${formatEventUTC(
+        event.day,
+        event.month,
+        event.hour,
+        event.minute,
+        event.year
+      )}`
     )
     .setColor("Orange");
 
@@ -105,10 +123,13 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
   await interaction.deferUpdate();
 
   const guildId = interaction.guildId!;
-  const event = await cancelEvent(guildId, eventId); // ✅ użycie cancelEvent aktualizuje arkusz
+  const event = await cancelEvent(guildId, eventId);
 
   if (!event) {
-    await interaction.followUp({ content: "Event not found.", ephemeral: true });
+    await interaction.followUp({
+      content: "Event not found.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -117,7 +138,11 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
     .setDescription(`**${event.name}** has been canceled.`)
     .setColor("Red");
 
-  await interaction.editReply({ content: "", embeds: [embed], components: [] });
+  await interaction.editReply({
+    content: "",
+    embeds: [embed],
+    components: []
+  });
 }
 
 /* ======================================================

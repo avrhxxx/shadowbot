@@ -3,7 +3,7 @@ import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
 import { getEvents, saveEvents, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
-const CHECK_INTERVAL = 30_000;
+const CHECK_INTERVAL = 60_000; // 60s
 const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 
 // ======================================================
@@ -29,7 +29,7 @@ export function stopEventReminders(guildId: string) {
 // ======================================================
 async function checkEvents(guild: Guild) {
   const events = await getEvents(guild.id);
-  const now = Date.now();
+  const now = new Date();
   let changed = false;
 
   const config = await getConfig(guild.id);
@@ -39,18 +39,34 @@ async function checkEvents(guild: Guild) {
   for (const event of events) {
     if (event.status !== "ACTIVE") continue;
 
+    // ----------------------
+    // Birthday special case
+    // ----------------------
+    if (event.eventType === "birthdays") {
+      if (
+        event.day === now.getUTCDate() &&
+        event.month === now.getUTCMonth() + 1 &&
+        (event.lastBirthdayYear ?? 0) < now.getUTCFullYear()
+      ) {
+        await sendBirthdayNotification(channel, event);
+        event.lastBirthdayYear = now.getUTCFullYear();
+        changed = true;
+      }
+      continue;
+    }
+
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
     // Upcoming reminder
-    if (!event.reminderSent && now >= reminderTime) {
+    if (!event.reminderSent && now.getTime() >= reminderTime) {
       await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
       event.reminderSent = true;
       changed = true;
     }
 
     // Event started
-    if (!event.started && now >= eventTime) {
+    if (!event.started && now.getTime() >= eventTime) {
       await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
       event.started = true;
       event.status = "PAST";
@@ -62,7 +78,19 @@ async function checkEvents(guild: Guild) {
 }
 
 // ======================================================
-// NOTIFICATIONS HELPERS
+// SEND BIRTHDAY NOTIFICATION (SPECIAL)
+// ======================================================
+async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
+  const embed = new EmbedBuilder()
+    .setTitle("🎂 Birthday Celebration!")
+    .setDescription(`Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`)
+    .setColor(0xffc107);
+
+  await channel.send({ content: "@everyone", embeds: [embed] });
+}
+
+// ======================================================
+// SEND REMINDERS / CREATED
 // ======================================================
 export async function sendEventCreatedNotification(event: EventObject, guild: Guild) {
   const config = await getConfig(guild.id);
