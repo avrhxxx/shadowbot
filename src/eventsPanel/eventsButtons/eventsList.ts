@@ -27,15 +27,23 @@ function cleanNickname(nick: string) {
 }
 
 function formatEventUTCObj(e: EventObject) {
-  return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year ?? new Date().getUTCFullYear());
+  return formatEventUTC(
+    e.day,
+    e.month,
+    e.hour,
+    e.minute,
+    e.year ?? new Date().getUTCFullYear()
+  );
 }
 
-// Formatuje nazwę kategorii, np. Arcadian_Conquest → Arcadian Conquest
+// Formatuje nazwę kategorii, np. arcadian_conquest → Arcadian Conquest
 function formatCategoryLabel(label: string) {
   return label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Tworzy embed i przyciski dla pojedynczego eventu
+// -----------------------------
+// CREATE EVENT EMBED + BUTTONS
+// -----------------------------
 function createEventEmbedAndRows(e: EventObject) {
   const embed = new EmbedBuilder()
     .setTitle(e.name)
@@ -46,16 +54,42 @@ function createEventEmbedAndRows(e: EventObject) {
     .setColor(STATUS_COLORS[e.status] ?? 0xffffff);
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`event_add_${e.id}`).setLabel("Add Participant").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`event_remove_${e.id}`).setLabel("Remove Participant").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`event_absent_${e.id}`).setLabel("Add Absent").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`event_show_list_${e.id}`).setLabel("Show List").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`event_download_single_${e.id}`).setLabel("Download").setStyle(ButtonStyle.Primary)
+    new ButtonBuilder()
+      .setCustomId(`event_add_${e.id}`)
+      .setLabel("Add Participant")
+      .setStyle(ButtonStyle.Primary),
+
+    new ButtonBuilder()
+      .setCustomId(`event_remove_${e.id}`)
+      .setLabel("Remove Participant")
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId(`event_absent_${e.id}`)
+      .setLabel("Mark Absent")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId(`event_show_list_${e.id}`)
+      .setLabel("Show List")
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId(`event_download_single_${e.id}`)
+      .setLabel("Download")
+      .setStyle(ButtonStyle.Primary)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`event_compare_${e.id}`).setLabel("Compare").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`event_clear_${e.id}`).setLabel("Clear Event Data").setStyle(ButtonStyle.Danger)
+    new ButtonBuilder()
+      .setCustomId(`event_compare_${e.id}`)
+      .setLabel("Compare")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId(`event_clear_${e.id}`)
+      .setLabel("Clear Event Data")
+      .setStyle(ButtonStyle.Danger)
   );
 
   return { embed, rows: [row1, row2] };
@@ -66,11 +100,9 @@ function createEventEmbedAndRows(e: EventObject) {
 // -----------------------------
 export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
   if (category) {
-    // jeśli kliknięto konkretną kategorię, pokaz listę eventów
     return await handleListByCategory(interaction, category);
   }
 
-  // jeśli brak kategorii – pokaz przyciski kategorii
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
 
@@ -81,7 +113,6 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
 
   const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
 
-  // Tworzymy rzędy po maks. 5 przycisków
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   let currentRow = new ActionRowBuilder<ButtonBuilder>();
 
@@ -127,14 +158,22 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
     : events;
 
   if (!filteredEvents.length) {
-    await interaction.reply({ content: `No events found for category "${category}".`, ephemeral: true });
+    await interaction.reply({
+      content: `No events found for category "${category}".`,
+      ephemeral: true
+    });
     return;
   }
 
   for (let i = 0; i < filteredEvents.length; i++) {
     const e = filteredEvents[i];
     const { embed, rows } = createEventEmbedAndRows(e);
-    const payload = { embeds: [embed], components: rows, ephemeral: true };
+
+    const payload = {
+      embeds: [embed],
+      components: rows,
+      ephemeral: true
+    };
 
     if (i === 0) await interaction.reply(payload);
     else await interaction.followUp(payload);
@@ -147,7 +186,7 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
   const guildId = interaction.guildId!;
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id === eventId.toString());
+  const event = events.find(e => e.id.toString() === eventId);
 
   if (!event) {
     await interaction.reply({ content: "Event not found.", ephemeral: true });
@@ -176,7 +215,8 @@ export async function updateEventEmbed(message: Message, eventId: string) {
   if (!guildId) return;
 
   const events = await getEvents(guildId);
-  const event = events.find(ev => ev.id.toString() === eventId.toString());
+  const event = events.find(ev => ev.id.toString() === eventId);
+
   if (!event) return;
 
   const { embed, rows } = createEventEmbedAndRows(event);
