@@ -1,4 +1,3 @@
-// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -58,9 +57,6 @@ export async function writeEventsSheet(values: any[][]) {
   await writeSheet(EVENTS_TAB, values);
 }
 
-// --------------------------
-// CONFIG STORAGE
-// --------------------------
 export async function readConfigSheet(): Promise<any[][]> {
   return await readSheet(EVENTS_CONFIG_TAB);
 }
@@ -69,14 +65,63 @@ export async function writeConfigSheet(values: any[][]) {
   await writeSheet(EVENTS_CONFIG_TAB, values);
 }
 
+export async function updateEventCell(row: number, col: number, value: any) {
+  const range = `${EVENTS_TAB}!${toA1(col, row)}`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+export async function updateConfigCell(row: number, col: number, value: any) {
+  const range = `${EVENTS_CONFIG_TAB}!${toA1(col, row)}`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [[value]] },
+  });
+}
+
+export async function deleteEventRow(row: number) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: 0,
+              dimension: "ROWS",
+              startIndex: row - 1,
+              endIndex: row,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
 // --------------------------
 // MODERATOR CONFIG STORAGE
 // --------------------------
+export async function ensureModeratorConfigHeaders() {
+  const rows = await readSheet(MODERATOR_CONFIG_TAB);
+  if (!rows || rows.length === 0 || rows[0].length === 0) {
+    const headers = [["modChannelId", "dateEmbedId", "hubMessageId", "updateChannelId", "lastUpdated", "version"]];
+    await writeSheet(`${MODERATOR_CONFIG_TAB}!A1:F1`, headers);
+  }
+}
+
 export async function readModeratorConfig(): Promise<any[][]> {
+  await ensureModeratorConfigHeaders();
   return await readSheet(MODERATOR_CONFIG_TAB);
 }
 
-// Zapis danych panelu do wiersza 2 (bez logiki wersji)
+// Zapis danych panelu do wiersza 2 (rollback / info)
 export async function saveModeratorPanelInfo(
   modChannelId: string,
   dateEmbedId: string,
@@ -110,49 +155,6 @@ function toA1(col: number, row: number): string {
 // --------------------------
 // UPDATE / DELETE CELLS
 // --------------------------
-export async function updateConfigCell(row: number, col: number, value: any) {
-  const range = `${EVENTS_CONFIG_TAB}!${toA1(col, row)}`;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range,
-    valueInputOption: "RAW",
-    requestBody: { values: [[value]] },
-  });
-}
-
-export async function updateEventCell(row: number, col: number, value: any) {
-  const range = `${EVENTS_TAB}!${toA1(col, row)}`;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range,
-    valueInputOption: "RAW",
-    requestBody: { values: [[value]] },
-  });
-}
-
-export async function deleteEventRow(row: number) {
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId: 0,
-              dimension: "ROWS",
-              startIndex: row - 1,
-              endIndex: row,
-            },
-          },
-        },
-      ],
-    },
-  });
-}
-
-// --------------------------
-// MODERATOR PANEL HELPERS
-// --------------------------
 export async function updateModeratorConfigCell(row: number, col: number, value: any) {
   const range = `${MODERATOR_CONFIG_TAB}!${toA1(col, row)}`;
   await sheets.spreadsheets.values.update({
@@ -163,6 +165,7 @@ export async function updateModeratorConfigCell(row: number, col: number, value:
   });
 }
 
+// Odczyt danych panelu
 export async function getModeratorPanelInfo(): Promise<{
   modChannelId: string;
   dateEmbedId: string;
@@ -181,7 +184,7 @@ export async function getModeratorPanelInfo(): Promise<{
     hubMessageId,
     updateChannelId,
     lastUpdated: Number(lastUpdated),
-    version: version || "1.0.0"
+    version: version || "1.0.0",
   };
 }
 
@@ -195,7 +198,7 @@ export async function updateModeratorPanelColumn(
     hubMessageId: 3,
     updateChannelId: 4,
     lastUpdated: 5,
-    version: 6
+    version: 6,
   };
   await updateModeratorConfigCell(2, colMap[col], value);
 }
