@@ -5,7 +5,7 @@ export async function handlePointsMenu(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
   await interaction.reply({
-    content: "Points Menu – TODO",
+    content: "Not implemented yet",
     ephemeral: true
   });
 }
