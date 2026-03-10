@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -64,7 +63,6 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
 
-  // 1️⃣ Sprawdź, czy nick już istnieje
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
     await interaction.followUp({
@@ -99,9 +97,14 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
+  // ----------------------------
+  // Generowanie ID: nick + daty
+  // ----------------------------
+  const id = `${nick}-${fromDate.day}${fromDate.month}-${toDate.day}${toDate.month}`;
+
   try {
     await createAbsence({
-      id: `${guildId}-${nick}-${Date.now()}`,
+      id,
       guildId,
       player: nick,
       startDate: `${fromDate.day}/${fromDate.month}`,
