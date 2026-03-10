@@ -1,16 +1,71 @@
 // src/absencePanel/absenceButtons/absenceRemove.ts
-import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
+import {
+  ButtonInteraction,
+  ModalSubmitInteraction,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder
+} from "discord.js";
 
+import { removeAbsence } from "../absenceService";
+
+// ----------------------------
+// SHOW REMOVE MODAL
+// ----------------------------
 export async function handleRemoveAbsence(interaction: ButtonInteraction) {
-  await interaction.reply({
-    content: "🛠 Remove Absence not implemented yet.",
-    ephemeral: true
-  });
+
+  const modal = new ModalBuilder()
+    .setTitle("Remove Absence")
+    .setCustomId("absence_remove_modal");
+
+  const nickInput = new TextInputBuilder()
+    .setCustomId("player_nick")
+    .setLabel("Player Nickname")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Enter nickname to remove")
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput)
+  );
+
+  await interaction.showModal(modal);
 }
 
+// ----------------------------
+// HANDLE MODAL SUBMIT
+// ----------------------------
 export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteraction) {
-  await interaction.reply({
-    content: "🛠 Remove Absence submit not implemented yet.",
-    ephemeral: true
-  });
+
+  const guildId = interaction.guildId!;
+  const nick = interaction.fields.getTextInputValue("player_nick").trim();
+
+  try {
+
+    const removed = await removeAbsence(guildId, nick);
+
+    if (!removed) {
+      await interaction.reply({
+        content: `❌ No absence found for **${nick}**.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    await interaction.reply({
+      content: `✅ Absence for **${nick}** removed.`,
+      ephemeral: true
+    });
+
+  } catch (err) {
+
+    console.error("Error removing absence:", err);
+
+    await interaction.reply({
+      content: "❌ Failed to remove absence.",
+      ephemeral: true
+    });
+
+  }
 }
