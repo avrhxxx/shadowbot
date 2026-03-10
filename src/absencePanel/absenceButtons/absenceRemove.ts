@@ -8,7 +8,7 @@ import {
   ActionRowBuilder
 } from "discord.js";
 
-import { getAbsences, removeAbsence } from "../absenceService";
+import { removeAbsence } from "../absenceService";
 
 // ----------------------------
 // SHOW REMOVE MODAL
@@ -36,51 +36,29 @@ export async function handleRemoveAbsence(interaction: ButtonInteraction) {
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
   const guildId = interaction.guildId!;
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
   try {
-    const absences = await getAbsences(guildId);
-    const target = absences.find(a => a.player.toLowerCase() === nick.toLowerCase());
-
-    if (!target) {
-      await interaction.reply({
-        content: `❌ No absence found for **${nick}** in the current list.`,
-        ephemeral: true
-      });
-      return;
-    }
-
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
-      await interaction.reply({
-        content: `❌ Failed to remove absence for **${nick}**.`,
-        ephemeral: true
+      await interaction.followUp({
+        content: `❌ No absence found for **${nick}**.`,
       });
       return;
     }
 
-    await interaction.reply({
+    await interaction.followUp({
       content: `✅ Absence for **${nick}** removed from the list and database.`,
-      ephemeral: true
     });
 
   } catch (err) {
     console.error("Error removing absence:", err);
-
-    if (interaction.isRepliable()) {
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "❌ An error occurred while trying to remove absence.",
-          ephemeral: true
-        });
-      } else {
-        await interaction.reply({
-          content: "❌ An error occurred while trying to remove absence.",
-          ephemeral: true
-        });
-      }
-    }
+    await interaction.followUp({
+      content: "❌ An error occurred while trying to remove absence.",
+    });
   }
 }
