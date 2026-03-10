@@ -1,5 +1,5 @@
-// src/absencePanel/absenceButtons/absenceShowList.ts
-import { ButtonInteraction, EmbedBuilder } from "discord.js";
+// src/absencePanel/absenceButtons/absenceList.ts
+import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { getAbsences, AbsenceObject } from "../absenceService";
 
 // -----------------------------
@@ -21,7 +21,7 @@ function getStatusDot(absence: AbsenceObject): string {
 // -----------------------------
 // MAIN HANDLER
 // -----------------------------
-export async function handleShowAbsences(interaction: ButtonInteraction) {
+export async function handleAbsenceList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId;
   if (!guildId) {
     await interaction.reply({ content: "❌ Cannot fetch absences: no guild.", ephemeral: true });
@@ -29,25 +29,51 @@ export async function handleShowAbsences(interaction: ButtonInteraction) {
   }
 
   const absences: AbsenceObject[] = await getAbsences(guildId);
-  if (!absences.length) {
-    await interaction.reply({ content: "✅ No absences recorded.", ephemeral: true });
-    return;
-  }
 
   const embed = new EmbedBuilder()
     .setTitle("📌 Current Absences")
-    .setColor(0x1E90FF) // niebieski dla panelu
+    .setColor(0x1E90FF)
     .setDescription("Status: 🔴 upcoming | 🟡 ongoing | 🟢 ended");
 
-  // Tworzymy pola po 3–4 osoby w rzędzie (inline)
-  for (const absence of absences) {
-    const dot = getStatusDot(absence);
-    embed.addFields({
-      name: `${dot} ${absence.player}`,
-      value: `${absence.startDate} ➜ ${absence.endDate}`,
-      inline: true
-    });
+  if (absences.length === 0) {
+    embed.setDescription("✅ No absences recorded.");
+  } else {
+    for (const absence of absences) {
+      const dot = getStatusDot(absence);
+      embed.addFields({
+        name: `${dot} ${absence.player}`,
+        value: `${absence.startDate} ➜ ${absence.endDate}`,
+        inline: true
+      });
+    }
   }
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  // -----------------------------
+  // ACTION ROW: dynamic buttons
+  // -----------------------------
+  const actionRow = new ActionRowBuilder<ButtonBuilder>();
+
+  // Add Absence – zawsze
+  actionRow.addComponents(
+    new ButtonBuilder()
+      .setCustomId("absence_add")
+      .setLabel("Add Absence")
+      .setStyle(ButtonStyle.Success)
+  );
+
+  // Remove Absence – tylko jeśli są osoby na liście
+  if (absences.length > 0) {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId("absence_remove")
+        .setLabel("Remove Absence")
+        .setStyle(ButtonStyle.Danger)
+    );
+  }
+
+  await interaction.reply({
+    embeds: [embed],
+    components: [actionRow],
+    ephemeral: true
+  });
 }
