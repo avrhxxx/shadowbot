@@ -1,6 +1,6 @@
 // src/absencePanel/absenceButtons/index.ts
 
-export * from "./absenceAdd";
-export * from "./absenceRemove";
-export * from "./absenceShowList";
-export * from "./absenceSettings";
+export { handleAddAbsence, handleAddAbsenceSubmit } from "./absenceAdd";
+export { handleRemoveAbsence, handleRemoveAbsenceSubmit } from "./absenceRemove";
+export { handleShowAbsences } from "./absenceShowList";
+export { handleSettings, handleSettingsSelect } from "./absenceSettings";
