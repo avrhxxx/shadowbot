@@ -18,7 +18,6 @@ import { handleEventMenu } from "./moderatorButtons/eventMenu";
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
-  // Iteracja po guildach z await, żeby uniknąć podwójnego tworzenia paneli
   for (const guild of client.guilds.cache.values()) {
     let modChannel = guild.channels.cache.find(
       (c) =>
@@ -39,7 +38,7 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- NOWOŚĆ: wysyłamy wiadomość z formatami dat jako EMBED ---
+    // --- wysyłamy wiadomość z formatami dat jako EMBED ---
     const embed = new EmbedBuilder()
       .setTitle("📅 Accepted Date & Time Formats")
       .setDescription("Please enter dates and times in one of the following formats:")
@@ -83,17 +82,22 @@ export async function initModeratorPanel(client: Client) {
         break;
 
       case "moderator_points_menu":
-        // await handlePointsMenu(interaction); // placeholder
         await interaction.reply({
-          content: "Points Menu – TODO",
+          content: "Points Menu – not implemented yet.",
           ephemeral: true
         });
         break;
 
       case "moderator_translate_menu":
-        // await handleTranslateMenu(interaction); // placeholder
         await interaction.reply({
-          content: "Translate Menu – TODO",
+          content: "Translate Menu – not implemented yet.",
+          ephemeral: true
+        });
+        break;
+
+      case "moderator_absence_menu":
+        await interaction.reply({
+          content: "Absence Menu – not implemented yet.",
           ephemeral: true
         });
         break;
@@ -121,6 +125,11 @@ export async function renderModeratorHub(channel: TextChannel) {
     new ButtonBuilder()
       .setCustomId("moderator_translate_menu")
       .setLabel("Translate Menu")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId("moderator_absence_menu")
+      .setLabel("Absence Menu")
       .setStyle(ButtonStyle.Secondary),
 
     new ButtonBuilder()
