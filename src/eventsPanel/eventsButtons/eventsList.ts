@@ -72,11 +72,30 @@ function createEventEmbedAndRows(e: EventObject) {
 
   // Reservoir / Custom – pełne przyciski
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`event_add_${e.id}`).setLabel("Add Participant").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`event_remove_${e.id}`).setLabel("Remove Participant").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`event_absent_${e.id}`).setLabel("Add Absent").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`event_show_list_${e.id}`).setLabel("Show List").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`event_download_single_${e.id}`).setLabel("Download").setStyle(ButtonStyle.Primary)
+    new ButtonBuilder()
+      .setCustomId(`event_add_${e.id}`)
+      .setLabel("Add Participant")
+      .setStyle(ButtonStyle.Primary),
+
+    new ButtonBuilder()
+      .setCustomId(`event_remove_${e.id}`)
+      .setLabel("Remove Participant") // tylko jedna osoba na raz
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId(`event_mark_absent_${e.id}`)
+      .setLabel("Mark Absent") // poprawiona nazwa przycisku
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId(`event_show_list_${e.id}`)
+      .setLabel("Show List")
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId(`event_download_single_${e.id}`)
+      .setLabel("Download")
+      .setStyle(ButtonStyle.Primary)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -169,7 +188,7 @@ export async function handleShowList(interaction: ButtonInteraction, eventId: st
 
   const showParticipants = ["custom", "reservoir_raid"].includes(event.eventType);
 
-  const eventDate = new Date(Date.UTC(event.year ?? new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
+  const eventDate = new Date(Date.UTC(e.year ?? new Date().getUTCFullYear(), event.month - 1, event.day, event.hour, event.minute));
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
   const embed = new EmbedBuilder()
