@@ -1,5 +1,6 @@
+// src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { checkAndSetReminder, getEvents, getConfig, EventObject } from "../eventService";
+import { getEventById, updateEventCell, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 const CHECK_INTERVAL = 60_000; // 60s
@@ -27,27 +28,33 @@ export function stopEventReminders(guildId: string) {
 // CHECK EVENTS
 // ======================================================
 async function checkEvents(guild: Guild) {
-  const events = await getEvents(guild.id);
   const now = new Date();
-
   const config = await getConfig(guild.id);
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
+  // Pobieramy wszystkie eventy (tylko ich nagłówki / kolumny w serwisie)
+  // I sprawdzamy po kolei tylko kolumnę reminderSent
+  const events = await Promise.all(
+    (await getAllEventIds(guild.id)).map(async (id) => await getEventById(guild.id, id))
+  );
+
   for (const event of events) {
-    if (event.status !== "ACTIVE") continue;
+    if (!event || event.status !== "ACTIVE") continue;
 
     // ----------------------
     // Birthday special case
     // ----------------------
     if (event.eventType === "birthdays") {
+      const thisYear = now.getUTCFullYear();
       if (
         event.day === now.getUTCDate() &&
         event.month === now.getUTCMonth() + 1 &&
-        (event.lastBirthdayYear ?? 0) < now.getUTCFullYear()
+        (event.lastBirthdayYear ?? 0) < thisYear
       ) {
         await sendBirthdayNotification(channel, event);
-        event.lastBirthdayYear = now.getUTCFullYear();
+        event.lastBirthdayYear = thisYear;
+        await updateEventCell(event.id, "lastBirthdayYear", thisYear);
       }
       continue;
     }
@@ -55,19 +62,24 @@ async function checkEvents(guild: Guild) {
     const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
     const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
 
+    // ----------------------
     // Upcoming reminder
-    if (now.getTime() >= reminderTime) {
-      const shouldSend = await checkAndSetReminder(event.id, true);
-      if (shouldSend) {
-        await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
-      }
+    // ----------------------
+    if (!event.reminderSent && now.getTime() >= reminderTime) {
+      await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
+      event.reminderSent = true;
+      await updateEventCell(event.id, "reminderSent", "true");
     }
 
+    // ----------------------
     // Event started
+    // ----------------------
     if (!event.started && now.getTime() >= eventTime) {
       await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
       event.started = true;
       event.status = "PAST";
+      await updateEventCell(event.id, "started", "true");
+      await updateEventCell(event.id, "status", "PAST");
     }
   }
 }
@@ -85,6 +97,21 @@ async function sendBirthdayNotification(channel: TextChannel, event: EventObject
 }
 
 // ======================================================
+// SEND REMINDERS / CREATED
+// ======================================================
+export async function sendEventCreatedNotification(event: EventObject, guild: Guild) {
+  const config = await getConfig(guild.id);
+  const channel = getTextChannel(guild, config?.notificationChannel);
+  if (!channel) return;
+
+  await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
+}
+
+export async function sendReminderMessage(channel: TextChannel, event: EventObject) {
+  await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
+}
+
+// ======================================================
 // SEND EVENT NOTIFICATION (UNIFIED SCHEME)
 // ======================================================
 async function sendEventNotification(
@@ -97,10 +124,14 @@ async function sendEventNotification(
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
 
-  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
-  if (type === "created") description += `Event scheduled <t:${unixTime}:R>`;
-  else if (type === "upcoming") description += `Event starts <t:${unixTime}:R>`;
-  else if (type === "started") description += `Event started <t:${unixTime}:R>`;
+  let description = `**Game Time:** ${formatEventUTCObj(event)}\n`;
+  if (type === "created") {
+    description += `Event scheduled <t:${unixTime}:R>`;
+  } else if (type === "upcoming") {
+    description += `Event starts <t:${unixTime}:R>`;
+  } else if (type === "started") {
+    description += `Event started <t:${unixTime}:R>`;
+  }
   description += `\n\n_Click the countdown to see the event time in your local timezone_`;
 
   const embed = new EmbedBuilder()
@@ -119,3 +150,34 @@ function getTextChannel(guild: Guild, channelId?: string) {
   const ch = guild.channels.cache.get(channelId);
   return ch && ch.isTextBased() ? (ch as TextChannel) : null;
 }
+
+function formatEventUTCObj(event: EventObject) {
+  return formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
+}
+
+// ======================================================
+// EXTRA HELPERS
+// ======================================================
+async function getAllEventIds(guildId: string): Promise<string[]> {
+  const events = await getEventIdsFromSheet(guildId);
+  return events;
+}
+
+// Pobieramy tylko kolumnę ID z arkusza (tylko po ID, żeby nie czytać całego arkusza)
+async function getEventIdsFromSheet(guildId: string): Promise<string[]> {
+  const rows: any[][] = await import("../googleSheetsStorage").then(GS => GS.readEventsSheet());
+  if (!rows.length) return [];
+  const headers = rows[0];
+  const idIndex = headers.indexOf("id");
+  const guildIndex = headers.indexOf("guildId");
+  if (idIndex === -1 || guildIndex === -1) return [];
+
+  return rows.slice(1)
+    .filter(r => r[guildIndex] === guildId)
+    .map(r => r[idIndex]);
+}
+
+// ======================================================
+// EXPORTS
+// ======================================================
+export { sendEventCreatedNotification, sendReminderMessage };
