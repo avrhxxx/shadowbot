@@ -1,5 +1,5 @@
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEventById, checkAndSetReminder, getAllEventIdsFromService, getConfig, EventObject } from "../eventService";
+import { getEventById, updateEventCell, getConfig, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 
 const CHECK_INTERVAL = 60_000; // 60s
@@ -10,6 +10,7 @@ const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 // ======================================================
 export async function initEventReminders(guild: Guild) {
   if (intervalHandles.has(guild.id)) return;
+
   const handle = setInterval(() => checkEvents(guild).catch(console.error), CHECK_INTERVAL);
   intervalHandles.set(guild.id, handle);
 }
@@ -31,13 +32,10 @@ async function checkEvents(guild: Guild) {
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
 
-  const allEventIds = await getAllEventIdsFromService(guild.id);
+  // Pobieramy wszystkie aktywne eventy z serwisu
+  const events = await getEvents(guild.id);
 
-  for (const eventId of allEventIds) {
-    const shouldSendReminder = await checkAndSetReminder(eventId, true);
-    if (!shouldSendReminder) continue;
-
-    const event = await getEventById(guild.id, eventId);
+  for (const event of events) {
     if (!event || event.status !== "ACTIVE") continue;
 
     // ----------------------
@@ -45,21 +43,45 @@ async function checkEvents(guild: Guild) {
     // ----------------------
     if (event.eventType === "birthdays") {
       const thisYear = now.getUTCFullYear();
-      if (event.day === now.getUTCDate() && event.month === now.getUTCMonth() + 1 && (event.lastBirthdayYear ?? 0) < thisYear) {
+      if (
+        event.day === now.getUTCDate() &&
+        event.month === now.getUTCMonth() + 1 &&
+        (event.lastBirthdayYear ?? 0) < thisYear
+      ) {
         await sendBirthdayNotification(channel, event);
+        event.lastBirthdayYear = thisYear;
+        await updateEventCell(event.id, "lastBirthdayYear", thisYear);
       }
       continue;
     }
 
+    const eventTime = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year).getTime();
+    const reminderTime = eventTime - (event.reminderBefore ?? 60) * 60_000;
+
     // ----------------------
     // Upcoming reminder
     // ----------------------
-    await sendReminderMessage(channel, event);
+    if (!event.reminderSent && now.getTime() >= reminderTime) {
+      await sendEventNotification(channel, event, "⏰ Upcoming Event", "upcoming", "Orange");
+      event.reminderSent = true;
+      await updateEventCell(event.id, "reminderSent", "true");
+    }
+
+    // ----------------------
+    // Event started
+    // ----------------------
+    if (!event.started && now.getTime() >= eventTime) {
+      await sendEventNotification(channel, event, "✅ Event Started", "started", "Blue");
+      event.started = true;
+      event.status = "PAST";
+      await updateEventCell(event.id, "started", "true");
+      await updateEventCell(event.id, "status", "PAST");
+    }
   }
 }
 
 // ======================================================
-// SEND BIRTHDAY NOTIFICATION
+// SEND BIRTHDAY NOTIFICATION (SPECIAL)
 // ======================================================
 async function sendBirthdayNotification(channel: TextChannel, event: EventObject) {
   const embed = new EmbedBuilder()
@@ -77,6 +99,7 @@ export async function sendEventCreatedNotification(event: EventObject, guild: Gu
   const config = await getConfig(guild.id);
   const channel = getTextChannel(guild, config?.notificationChannel);
   if (!channel) return;
+
   await sendEventNotification(channel, event, "🎉 Event Created", "created", "Green");
 }
 
@@ -87,10 +110,25 @@ export async function sendReminderMessage(channel: TextChannel, event: EventObje
 // ======================================================
 // SEND EVENT NOTIFICATION (UNIFIED SCHEME)
 // ======================================================
-async function sendEventNotification(channel: TextChannel, event: EventObject, title: string, type: "created" | "upcoming", color: ColorResolvable = "White") {
+async function sendEventNotification(
+  channel: TextChannel,
+  event: EventObject,
+  title: string,
+  type: "created" | "upcoming" | "started",
+  color: ColorResolvable = "White"
+) {
   const eventDate = getEventDateUTC(event.day, event.month, event.hour, event.minute, event.year);
   const unixTime = Math.floor(eventDate.getTime() / 1000);
-  const description = `${type === "created" ? "Event scheduled" : "Event starts"} <t:${unixTime}:R>\n\n_Click the countdown to see the event time in your local timezone_`;
+
+  let description = `**Game Time:** ${formatEventUTC(event.day, event.month, event.hour, event.minute, event.year)}\n`;
+  if (type === "created") {
+    description += `Event scheduled <t:${unixTime}:R>`;
+  } else if (type === "upcoming") {
+    description += `Event starts <t:${unixTime}:R>`;
+  } else if (type === "started") {
+    description += `Event started <t:${unixTime}:R>`;
+  }
+  description += `\n\n_Click the countdown to see the event time in your local timezone_`;
 
   const embed = new EmbedBuilder()
     .setTitle(`${title}: ${event.name}`)
