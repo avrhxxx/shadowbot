@@ -123,18 +123,22 @@ export async function updateAbsenceCell(absenceId: string, columnName: string, v
 
   if (colIndex === -1) throw new Error(`Column ${columnName} not found`);
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === absenceId);
+  const rowIndex = rows.findIndex((r: any[]) => r[headers.indexOf("id")] === absenceId);
   if (rowIndex === -1) throw new Error(`Absence ID ${absenceId} not found`);
 
   await GS.updateAbsenceCell(rowIndex + 1, colIndex + 1, value);
 }
 
+// DELETE ABSENCE BY ID (poprawione)
 export async function deleteAbsenceRow(absenceId: string) {
-
   const rows: any[][] = await GS.readAbsenceSheet();
   if (!rows.length) return;
 
-  const rowIndex = rows.findIndex((r: any[]) => r[0] === absenceId);
+  const headers = rows[0];
+  const idIndex = headers.indexOf("id"); // <- kolumna id
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+
+  const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
   if (rowIndex === -1) return;
 
   await GS.deleteAbsenceRow(rowIndex + 1);
@@ -144,12 +148,9 @@ export async function deleteAbsenceRow(absenceId: string) {
 // REMOVE ABSENCE BY PLAYER
 // -----------------------------
 export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-
   const absences = await loadAbsences(guildId);
 
-  const target = absences.find(
-    a => a.player.toLowerCase() === player.toLowerCase()
-  );
+  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
 
   if (!target) return false;
 
