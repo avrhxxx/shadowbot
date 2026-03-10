@@ -16,7 +16,7 @@ export const IDS = {
   BUTTONS: {
     ADD: "absence_add",
     REMOVE: "absence_remove",
-    SHOW_LIST: "absence_list", // <- dopasowane do nowego przycisku
+    SHOW_LIST: "absence_list",
     SETTINGS: "absence_settings",
   },
   SELECTS: {
@@ -51,8 +51,13 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
 async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
   const { customId } = interaction;
 
-  if (customId === IDS.MODALS.ADD) return await AB.handleAddAbsenceSubmit(interaction);
-  if (customId === IDS.MODALS.REMOVE) return await AB.handleRemoveAbsenceSubmit(interaction);
+  if (customId === IDS.MODALS.ADD) {
+    return await AB.handleAddAbsenceSubmit(interaction);
+  }
+
+  if (customId === IDS.MODALS.REMOVE) {
+    return await AB.handleRemoveAbsenceSubmit(interaction);
+  }
 }
 
 // ----------------------------
@@ -64,7 +69,6 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
       const handler = BUTTON_HANDLERS[interaction.customId];
       if (!handler) return;
 
-      // **Nie deferReply przy showModal** — modal Submit będzie osobną interakcją
       return await handler(interaction);
     }
 
@@ -83,10 +87,17 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     console.error("Error handling absence interaction:", error);
 
     if (interaction.isRepliable()) {
-      await interaction.reply({
-        content: "❌ An error occurred while processing this interaction.",
-        ephemeral: true,
-      });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      }
     }
   }
 }
