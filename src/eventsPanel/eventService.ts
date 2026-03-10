@@ -139,6 +139,10 @@ export async function deleteEventRow(eventId: string) {
   await GS.deleteEventRow(rowIndex + 1);
 }
 
+export async function deleteEvent(eventId: string) {
+  await deleteEventRow(eventId);
+}
+
 // -----------------------------
 // PARTICIPANT OPERATIONS
 // -----------------------------
@@ -200,12 +204,8 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
 }
 
 // -----------------------------
-// DELETE / CREATE EVENT
+// CREATE / SAVE EVENTS
 // -----------------------------
-export async function deleteEvent(eventId: string) {
-  await deleteEventRow(eventId);
-}
-
 export async function createEvent(data: EventObject): Promise<EventObject> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0] ?? [
@@ -230,9 +230,6 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
   return data;
 }
 
-// -----------------------------
-// SAVE EVENTS (FOR REMINDERS, PARTICIPANTS ETC.)
-// -----------------------------
 export async function saveEvents(guildId: string, events: EventObject[]) {
   for (const event of events) {
     await updateEventCell(event.id, "participants", JSON.stringify(event.participants));
@@ -247,7 +244,7 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
 }
 
 // -----------------------------
-// CONFIG SHEET HELPERS
+// CONFIG HELPERS
 // -----------------------------
 export async function getConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
