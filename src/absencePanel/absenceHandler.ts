@@ -31,17 +31,17 @@ export const IDS = {
 // Button handlers
 // ----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
-  [IDS.BUTTONS.ADD]: AB.handleAddAbsence,
-  [IDS.BUTTONS.REMOVE]: AB.handleRemoveAbsence,
-  [IDS.BUTTONS.SHOW_LIST]: AB.handleShowAbsences,
-  [IDS.BUTTONS.SETTINGS]: AB.handleSettings,
+  [IDS.BUTTONS.ADD]: async (i) => await AB.handleAddAbsence(i),
+  [IDS.BUTTONS.REMOVE]: async (i) => await AB.handleRemoveAbsence(i),
+  [IDS.BUTTONS.SHOW_LIST]: async (i) => await AB.handleShowAbsences(i),
+  [IDS.BUTTONS.SETTINGS]: async (i) => await AB.handleSettings(i),
 };
 
 // ----------------------------
 // Select handlers
 // ----------------------------
 const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: AB.handleSettingsSelect,
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await AB.handleSettingsSelect(i),
 };
 
 // ----------------------------
@@ -62,7 +62,8 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
       if (!handler) return;
-      return await handler(interaction); // funkcja sama wywoła modal/reply
+      // Funkcja przycisku sama wysyła modal lub reply
+      return await handler(interaction);
     }
 
     if (interaction.isStringSelectMenu()) {
@@ -77,12 +78,11 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
 
   } catch (error) {
     console.error("Error handling absence interaction:", error);
-
     if (interaction.isRepliable()) {
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
         ephemeral: true,
-      });
+      }).catch(() => null);
     }
   }
 }
