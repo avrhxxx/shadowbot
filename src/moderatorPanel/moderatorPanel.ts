@@ -16,6 +16,10 @@ import { handleEventMenu } from "./moderatorButtons/eventMenu";
 import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
 import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
+import {
+  saveModeratorPanelInfo,
+  updateModeratorPanelColumn
+} from "../googleSheetsStorage";
 
 // ---- helper do embedu z formatami dat i stopką ----
 function renderDateFormatsEmbed(): EmbedBuilder {
@@ -74,6 +78,7 @@ export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
+    // --- Szukamy kanału moderator-panel ---
     let modChannel = guild.channels.cache.find(
       (c) => c.type === 0 && c.name === "moderator-panel"
     ) as TextChannel;
@@ -88,38 +93,75 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    // --- Fetch wiadomości z kanału, aby sprawdzić, czy embed już istnieje ---
+    // --- Szukamy kanału bot-updates ---
+    let updatesChannel = guild.channels.cache.find(
+      (c) => c.type === 0 && c.name === "bot-updates"
+    ) as TextChannel;
+
+    if (!updatesChannel) {
+      updatesChannel = await guild.channels.create({
+        name: "bot-updates",
+        type: 0,
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: ["ViewChannel"] }
+        ]
+      });
+      await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
+    }
+
+    // --- Fetch wiadomości z moderator-panel ---
     const messages = await modChannel.messages.fetch({ limit: 50 });
-    let dateEmbedMessage: Message | undefined = messages.find((m) =>
-      m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
+
+    // --- Embed z datami ---
+    let dateEmbedMessage: Message | undefined = messages.find(
+      (m) => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats"
     );
 
     const dateEmbed = renderDateFormatsEmbed();
-
+    let embedUpdated = false;
     if (dateEmbedMessage) {
       await dateEmbedMessage.edit({ embeds: [dateEmbed] });
+      embedUpdated = true;
     } else {
       dateEmbedMessage = await modChannel.send({ embeds: [dateEmbed] });
     }
 
-    // --- Render root hub w tym kanale ---
+    // --- Root hub ---
     let hubMessage: Message | undefined = messages.find(
       (m) => m.content === "📌 **Moderator Panel**"
     );
-
-    const row = renderModeratorHubRow();
+    const hubRow = renderModeratorHubRow();
+    let hubUpdated = false;
 
     if (hubMessage) {
-      await hubMessage.edit({ components: [row] });
+      await hubMessage.edit({ components: [hubRow] });
+      hubUpdated = true;
     } else {
-      hubMessage = await modChannel.send({ content: "📌 **Moderator Panel**", components: [row] });
+      hubMessage = await modChannel.send({
+        content: "📌 **Moderator Panel**",
+        components: [hubRow]
+      });
     }
 
-    // --- TODO: tutaj możesz zapisać do Google Sheets:
-    // modChannel.id, dateEmbedMessage.id, hubMessage.id
+    // --- Zapis info do Google Sheets ---
+    await saveModeratorPanelInfo(
+      modChannel.id,
+      dateEmbedMessage.id,
+      hubMessage.id,
+      updatesChannel.id,
+      Math.floor(Date.now() / 1000)
+    );
+
+    // --- Jeśli cokolwiek odświeżone, wyślij powiadomienie do bot-updates ---
+    if (embedUpdated || hubUpdated) {
+      const unixTimestamp = Math.floor(Date.now() / 1000);
+      await updatesChannel.send({
+        content: `Moderator Panel has been refreshed: <t:${unixTimestamp}:F>`
+      });
+    }
   }
 
-  // Globalny listener na przyciski ModeratorPanel
+  // --- Globalny listener na przyciski ---
   client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
 
