@@ -6,15 +6,16 @@ import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
+import { handleAbsenceInteraction } from "./absencePanel/absenceHandler"; // <- Absence panel
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
@@ -40,7 +41,23 @@ client.once("ready", async () => {
   // Interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
-    await handleEventInteraction(interaction);
+    try {
+      // najpierw eventy
+      await handleEventInteraction(interaction);
+
+      // potem absence panel
+      await handleAbsenceInteraction(interaction);
+
+    } catch (err) {
+      console.error("Error in interactionCreate:", err);
+
+      if (interaction.isRepliable()) {
+        await interaction.reply({
+          content: "❌ An unexpected error occurred.",
+          ephemeral: true,
+        }).catch(() => null);
+      }
+    }
   });
 });
 
