@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsCompare.ts
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -56,7 +55,15 @@ export const handleCompareButton = async (
   }
 
   const events = await getEvents(interaction.guildId!);
-  const pastEvents = events.filter(e => e.status === "PAST" && e.id !== current.id).sort((a, b) => b.createdAt - a.createdAt);
+  const pastEvents = events
+    .filter(
+      e =>
+        e.status === "PAST" &&
+        e.id !== current.id &&
+        ["custom", "reservoir_raid"].includes(e.eventType)
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
+
   if (!pastEvents.length) {
     await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
     return;
@@ -141,13 +148,15 @@ export const handleCompareDownload = async (
 };
 
 // -----------------------------
-// Compare All (nie ruszamy)
+// Compare All (tylko custom + reservoir)
 // -----------------------------
 export const handleCompareAll = async (interaction: ButtonInteraction): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
   const events = await getEvents(interaction.guildId!);
-  if (!events.length) {
-    await interaction.editReply({ content: "No events to compare.", components: [] });
+  const relevantEvents = events.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+
+  if (!relevantEvents.length) {
+    await interaction.editReply({ content: "No events with participants to compare.", components: [] });
     return;
   }
 
@@ -163,23 +172,23 @@ export const handleCompareAll = async (interaction: ButtonInteraction): Promise<
 
 export const handleCompareAllDownload = async (interaction: ButtonInteraction): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
-  const guild = interaction.guild as Guild;
-  const events = await getEvents(guild.id);
-  if (!events.length) {
-    await interaction.editReply({ content: "No events to download.", components: [] });
+  const events = await getEvents(interaction.guildId!);
+  const relevantEvents = events.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+
+  if (!relevantEvents.length) {
+    await interaction.editReply({ content: "No events with participants to download.", components: [] });
     return;
   }
 
-  const { txtText } = buildComparisonAll(events, guild);
-  const config = await getConfig(guild.id);
+  const { txtText } = buildComparisonAll(relevantEvents, interaction.guild as Guild);
+  const config = await getConfig(interaction.guildId!);
 
-  const channelId = config?.downloadChannel;
-  if (!channelId) {
+  if (!config?.downloadChannel) {
     await interaction.editReply({ content: "Download channel not set.", components: [] });
     return;
   }
 
-  const channel = guild.channels.cache.get(channelId) as TextChannel;
+  const channel = interaction.guild!.channels.cache.get(config.downloadChannel) as TextChannel;
   if (!channel || !channel.isTextBased()) {
     await interaction.editReply({ content: "Download channel invalid.", components: [] });
     return;
@@ -190,7 +199,7 @@ export const handleCompareAllDownload = async (interaction: ButtonInteraction): 
     await sendComparisonFile(channel, `compare_all_part_${i + 1}.txt`, chunk);
   }
 
-  await interaction.editReply({ content: `Comparison for all events sent to <#${channelId}>`, components: [] });
+  await interaction.editReply({ content: `Comparison for all events sent to <#${config.downloadChannel}>`, components: [] });
 };
 
 // -----------------------------
