@@ -122,7 +122,25 @@ export async function checkAndSetReminder(eventId: string, reminderValue: boolea
     await GS.updateEventCell(rowIndex + 1, reminderIndex + 1, "true");
   }
 
-  return !currentValue;
+  return !currentValue; // true jeśli reminder jeszcze nie był wysłany
+}
+
+export async function deleteEventRow(eventId: string) {
+  const rows: any[][] = await GS.readEventsSheet();
+  if (!rows.length) return;
+
+  const headers: string[] = rows[0];
+  const idIndex = headers.indexOf("id");
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+
+  const rowIndex = rows.findIndex((r: any[]) => r[idIndex] === eventId);
+  if (rowIndex === -1) return;
+
+  await GS.deleteEventRow(rowIndex + 1);
+}
+
+export async function deleteEvent(eventId: string) {
+  await deleteEventRow(eventId);
 }
 
 // -----------------------------
@@ -186,18 +204,18 @@ export async function cancelEvent(guildId: string, eventId: string): Promise<Eve
 }
 
 // -----------------------------
-// DELETE / CREATE EVENT
+// CREATE / SAVE EVENTS
 // -----------------------------
-export async function deleteEvent(eventId: string) {
-  await GS.deleteEventRowById(eventId);
-}
-
 export async function createEvent(data: EventObject): Promise<EventObject> {
   const rows = await GS.readEventsSheet();
   const headers = rows[0] ?? [
     "id","guildId","name","eventType","day","month","hour","minute","year",
     "participants","absent","status","createdAt","reminderSent","started","reminderBefore","lastBirthdayYear"
   ];
+
+  ["eventType","participants","absent","lastBirthdayYear"].forEach(col => {
+    if (!headers.includes(col)) headers.push(col);
+  });
 
   const newRow = headers.map(h => {
     if (h === "participants") return JSON.stringify(data.participants || []);
@@ -212,8 +230,21 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
   return data;
 }
 
+export async function saveEvents(guildId: string, events: EventObject[]) {
+  for (const event of events) {
+    await updateEventCell(event.id, "participants", JSON.stringify(event.participants));
+    await updateEventCell(event.id, "absent", JSON.stringify(event.absent));
+    await updateEventCell(event.id, "status", event.status);
+    await updateEventCell(event.id, "reminderSent", event.reminderSent ? "true" : "false");
+    await updateEventCell(event.id, "started", event.started ? "true" : "false");
+    if (event.eventType === "birthdays") {
+      await updateEventCell(event.id, "lastBirthdayYear", event.lastBirthdayYear ?? 0);
+    }
+  }
+}
+
 // -----------------------------
-// CONFIG SHEET HELPERS
+// CONFIG HELPERS
 // -----------------------------
 export async function getConfig(guildId: string): Promise<EventConfig> {
   const rows = await GS.readConfigSheet();
