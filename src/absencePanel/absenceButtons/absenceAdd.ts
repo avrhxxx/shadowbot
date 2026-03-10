@@ -7,7 +7,7 @@ import {
   ActionRowBuilder, 
   ModalSubmitInteraction 
 } from "discord.js";
-import { createAbsence } from "../absenceService";
+import { createAbsence, getAbsences } from "../absenceService";
 
 // ----------------------------
 // HELPERS TO CREATE INPUTS
@@ -61,6 +61,17 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
+
+  // -----------------------------
+  // 1️⃣ Sprawdź, czy nick już istnieje w aktualnej liście
+  const absences = await getAbsences(guildId);
+  if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
+    await interaction.reply({
+      content: `❌ Player **${nick}** is already on the absence list.`,
+      ephemeral: true
+    });
+    return;
+  }
 
   const parseDate = (input: string) => {
     const cleaned = input.replace(/[^\d]/g, "");
