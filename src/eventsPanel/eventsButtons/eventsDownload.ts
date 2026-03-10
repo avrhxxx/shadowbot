@@ -1,4 +1,3 @@
-// src/eventsPanel/eventsButtons/eventsDownload.ts
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import { getEvents, getConfig, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
@@ -52,13 +51,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
 
-    const date = formatEventUTC(
-      event.day,
-      event.month,
-      event.hour,
-      event.minute,
-      event.year
-    );
+    const date = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     const content = [
       `Event: ${event.name}`,
@@ -87,20 +80,21 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
   }
 
   // -------------------------
-  // ALL EVENTS (nie zmieniamy)
+  // ALL EVENTS (tylko custom + reservoir)
   // -------------------------
   await interaction.deferReply({ ephemeral: true });
 
-  if (!allEvents.length) {
+  const relevantEvents = allEvents.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+
+  if (!relevantEvents.length) {
     await interaction.editReply({
-      content: "No events to download.",
+      content: "No events with participants to download.",
       components: []
     });
     return;
   }
 
-  const blocks = allEvents.map(event => {
-
+  const blocks = relevantEvents.map(event => {
     const status =
       event.status === "PAST" ? "[PAST]" :
       event.status === "CANCELED" ? "[CANCELED]" :
@@ -109,13 +103,7 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
     const participants = event.participants.length ? event.participants.join("\n") : "None";
     const absent = event.absent?.length ? event.absent.join("\n") : "None";
 
-    const date = formatEventUTC(
-      event.day,
-      event.month,
-      event.hour,
-      event.minute,
-      event.year
-    );
+    const date = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
 
     return [
       `Event: ${event.name}`,
@@ -124,7 +112,6 @@ export async function handleDownload(interaction: ButtonInteraction, singleEvent
       `Participants:\n${participants}`,
       `Absent:\n${absent}`
     ].join("\n\n");
-
   });
 
   const file = new AttachmentBuilder(
