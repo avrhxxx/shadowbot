@@ -1,10 +1,11 @@
-import { 
-  ButtonInteraction, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ActionRowBuilder, 
-  ModalSubmitInteraction 
+// src/absencePanel/absenceButtons/absenceAdd.ts
+import {
+  ButtonInteraction,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+  ModalSubmitInteraction
 } from "discord.js";
 import { createAbsence } from "../absenceService";
 
@@ -25,7 +26,7 @@ function createDateInput(customId: string, label: string) {
     .setCustomId(customId)
     .setLabel(label)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("DD/MM")
+    .setPlaceholder("Available formats are in the message above the panel")
     .setRequired(true);
 }
 
@@ -53,6 +54,22 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
 }
 
 // ----------------------------
+// PARSE DATE
+// ----------------------------
+function parseDate(input: string) {
+  const cleaned = input.trim();
+  // Akceptujemy: DD/MM, DD.MM, DD-MM, DDMM
+  const match = cleaned.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+  if (!match) return null;
+
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+  return { day, month };
+}
+
+// ----------------------------
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
@@ -61,20 +78,11 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
 
-  const parseDate = (input: string) => {
-    const match = input.match(/^(\d{1,2})[./-](\d{1,2})$/);
-    if (!match) return null;
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-    return { day, month };
-  };
-
   const fromDate = parseDate(fromRaw);
   const toDate = parseDate(toRaw);
 
   if (!fromDate || !toDate) {
-    await interaction.reply({ content: "Invalid date format. Use DD/MM.", ephemeral: true });
+    await interaction.reply({ content: "Invalid date format. Use valid formats above the panel.", ephemeral: true });
     return;
   }
 
