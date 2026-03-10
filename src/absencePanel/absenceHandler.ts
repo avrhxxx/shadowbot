@@ -62,13 +62,16 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
       if (!handler) return;
-      // Funkcja przycisku sama wysyła modal lub reply
+
+      // **Nie deferReply przy showModal** — modal Submit będzie osobną interakcją
       return await handler(interaction);
     }
 
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (!handler) return;
+
+      // defer tylko jeśli funkcja nie wysyła od razu reply
       return await handler(interaction);
     }
 
@@ -78,11 +81,12 @@ export async function handleAbsenceInteraction(interaction: Interaction<CacheTyp
 
   } catch (error) {
     console.error("Error handling absence interaction:", error);
+
     if (interaction.isRepliable()) {
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
         ephemeral: true,
-      }).catch(() => null);
+      });
     }
   }
 }
