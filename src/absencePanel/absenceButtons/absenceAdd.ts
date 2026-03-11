@@ -27,20 +27,30 @@ function createDateInput(customId: string, label: string) {
     .setCustomId(customId)
     .setLabel(label)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("day.month")
+    .setPlaceholder("Available formats are in the message above the panel")
     .setRequired(true);
 }
 
 // ----------------------------
 // PARSING & VALIDATION
 // ----------------------------
-function parseDate(input: string): { day: number; month: number; year: number } | null {
-  const match = input.match(/^(\d{1,2})[./-](\d{1,2})$/);
-  if (!match) return null;
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const year = new Date().getFullYear(); // zawsze bieżący rok
+function parseDayMonth(input: string): { day: number; month: number; year: number } | null {
+  const cleaned = input.replace(/[^\d]/g, "");
+  let day: number, month: number;
+
+  if (cleaned.length === 4) {
+    // format DDMM
+    day = parseInt(cleaned.slice(0, 2), 10);
+    month = parseInt(cleaned.slice(2), 10);
+  } else {
+    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+    if (!match) return null;
+    day = parseInt(match[1], 10);
+    month = parseInt(match[2], 10);
+  }
+
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+  const year = new Date().getFullYear();
   return { day, month, year };
 }
 
@@ -59,8 +69,8 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
     .setCustomId("absence_add_modal");
 
   const nickInput = createTextInput("player_nick", "Player Nickname", "Enter player nickname");
-  const fromInput = createDateInput("absence_from", "From Date (day.month)");
-  const toInput = createDateInput("absence_to", "To Date (day.month)");
+  const fromInput = createDateInput("absence_from", "From Date (day, month)");
+  const toInput = createDateInput("absence_to", "To Date (day, month)");
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
@@ -89,10 +99,10 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
-  const fromDate = parseDate(fromRaw);
-  const toDate = parseDate(toRaw);
+  const fromDate = parseDayMonth(fromRaw);
+  const toDate = parseDayMonth(toRaw);
   if (!fromDate || !toDate) {
-    await interaction.followUp({ content: "❌ Invalid date format. Use day.month" });
+    await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
     return;
   }
 
