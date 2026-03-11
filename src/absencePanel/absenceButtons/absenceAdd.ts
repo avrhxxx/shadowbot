@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -54,7 +53,7 @@ function parseDateWithYear(input: string, referenceYear?: number): Date | null {
   const year = referenceYear ?? new Date().getFullYear();
   let date = new Date(year, month - 1, day);
 
-  // jeżeli data końcowa < data początkowa, przyjmujemy rok następny
+  // jeśli data końcowa < data początkowa, ustaw rok następny
   if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
     date.setFullYear(year + 1);
   }
@@ -114,13 +113,13 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
 
   const fromDateObj = parseDateWithYear(fromRaw);
   if (!fromDateObj) {
-    await interaction.followUp({ content: "Invalid start date format." });
+    await interaction.followUp({ content: "❌ Invalid start date format." });
     return;
   }
 
   const toDateObj = parseDateWithYear(toRaw, fromDateObj.getFullYear());
   if (!toDateObj) {
-    await interaction.followUp({ content: "Invalid end date format." });
+    await interaction.followUp({ content: "❌ Invalid end date format." });
     return;
   }
 
@@ -134,14 +133,13 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
       endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
       createdAt: Date.now(),
-      notified: false
     });
 
     await interaction.followUp({
       content: `✅ Absence for **${nick}** added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // odśwież embed i powiadomienia przez serwis
+    // Odśwież embed i wyślij powiadomienie tylko dla tego gracza
     await updateAbsenceNotifications(guild, [nick]);
 
   } catch (err) {
