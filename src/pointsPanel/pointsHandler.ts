@@ -1,4 +1,3 @@
-// src/pointsPanel/pointsHandler.ts
 import { Interaction, ButtonInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
@@ -19,28 +18,59 @@ export const IDS = {
 };
 
 // Mapowanie przycisków na funkcje
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
-  // Główny wybór kategorii
-  [IDS.BUTTONS.DONATIONS]: (i) => PB.pointsDonations.handleDonationsPanel(i),
-  [IDS.BUTTONS.DUEL]: (i) => PB.pointsDuel.handleDuelPanel(i),
+const BUTTON_HANDLERS: Record<
+  string,
+  (i: ButtonInteraction<CacheType>) => Promise<void>
+> = {
+  // Kategorie
+  [IDS.BUTTONS.DONATIONS]: (i) =>
+    PB.pointsDonations.handleDonationsPanel(i),
 
-  // Opcjonalne / placeholdery
-  [IDS.BUTTONS.GUIDE]: (i) => PB.handleGuide?.(i) ?? Promise.resolve(),
-  [IDS.BUTTONS.SETTINGS]: (i) => PB.handleSettings?.(i) ?? Promise.resolve(),
+  [IDS.BUTTONS.DUEL]: (i) =>
+    PB.pointsDuel.handleDuelPanel(i),
 
-  // Create / List Weeks
-  [IDS.BUTTONS.CREATE_WEEK]: (i) => PB.pointsCreate.handleCreateWeek(i),
-  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i),
+  // Placeholdery (do zrobienia później)
+  [IDS.BUTTONS.GUIDE]: async (i) => {
+    await i.reply({
+      content: "📖 Guide not implemented yet.",
+      ephemeral: true
+    });
+  },
 
-  // Przyciski wewnątrz paneli kategorii
+  [IDS.BUTTONS.SETTINGS]: async (i) => {
+    await i.reply({
+      content: "⚙️ Settings not implemented yet.",
+      ephemeral: true
+    });
+  },
+
+  // Week system
+  [IDS.BUTTONS.CREATE_WEEK]: (i) =>
+    PB.pointsCreate.handleCreateWeek(i),
+
+  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
+    PB.pointsListWeeks.handleListWeeks(i),
+
+  // Actions
   [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),
+
   [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),
+
   [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i),
-  [IDS.BUTTONS.BACK]: (i) => PB.handleBackToCategory?.(i) ?? Promise.resolve()
+
+  // Back placeholder
+  [IDS.BUTTONS.BACK]: async (i) => {
+    await i.reply({
+      content: "↩️ Back action not implemented yet.",
+      ephemeral: true
+    });
+  }
 };
 
-// Globalny handler dla wszystkich przycisków w Points Panel
-export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
+// Globalny handler dla panelu
+export async function handlePointsInteraction(
+  interaction: Interaction<CacheType>
+) {
   try {
     if (!interaction.isButton()) return;
 
@@ -50,12 +80,17 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
     await handler(interaction);
   } catch (error) {
     console.error("Error handling points interaction:", error);
+
     if (interaction.isRepliable()) {
-      const replyPayload = { content: "❌ An error occurred.", ephemeral: true };
+      const payload = {
+        content: "❌ An error occurred.",
+        ephemeral: true
+      };
+
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(replyPayload);
+        await interaction.followUp(payload);
       } else {
-        await interaction.reply(replyPayload);
+        await interaction.reply(payload);
       }
     }
   }
