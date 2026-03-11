@@ -1,4 +1,3 @@
-// src/absencePanel/absenceService.ts
 import * as GS from "../googleSheetsStorage";
 
 export interface AbsenceObject {
@@ -49,9 +48,13 @@ export async function getAbsenceByPlayer(guildId: string, player: string): Promi
   return absences.find(a => a.player.toLowerCase() === player.toLowerCase()) || null;
 }
 
+// -------------------------
+// CREATE / REMOVE ABSENCE
+// -------------------------
 export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
   const existing = await getAbsenceByPlayer(data.guildId, data.player);
   if (existing) throw new Error(`Player ${data.player} is already on absence list.`);
+
   const rows = await GS.readAbsenceSheet();
   const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
   if (!headers.includes("notified")) headers.push("notified");
@@ -64,6 +67,14 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
 
   await GS.writeAbsenceSheet([headers, ...rows.slice(1), newRow]);
   return data;
+}
+
+export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
+  const absences = await loadAbsences(guildId);
+  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
+  if (!target) return false;
+  await deleteAbsenceRow(target.id);
+  return true;
 }
 
 export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
@@ -89,14 +100,6 @@ export async function deleteAbsenceRow(absenceId: string) {
   await GS.deleteAbsenceRow(rowIndex + 1);
 }
 
-export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-  const absences = await loadAbsences(guildId);
-  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
-  if (!target) return false;
-  await deleteAbsenceRow(target.id);
-  return true;
-}
-
 // -------------------------
 // CONFIG
 // -------------------------
@@ -114,29 +117,19 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
   return config;
 }
 
-// -------------------------
-// SET NOTIFICATION CHANNEL
-// -------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   await setConfig(guildId, "notificationChannel", channelId);
 }
 
-// -------------------------
-// SET ABSENCE EMBED ID
-// -------------------------
 export async function setAbsenceEmbedId(guildId: string, messageId: string) {
   await setConfig(guildId, "absenceEmbedId", messageId);
 }
 
-// -------------------------
-// UNIVERSAL CONFIG SETTER
-// -------------------------
 export async function setConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readAbsenceConfigSheet();
   const headers = rows[0] ?? ["guildId", "notificationChannel"];
   const dataRows = rows.slice(1);
 
-  // Dodaj kolumnę jeśli nie istnieje
   if (!headers.includes(key)) {
     headers.push(key);
     for (const r of dataRows) while (r.length < headers.length) r.push("");
