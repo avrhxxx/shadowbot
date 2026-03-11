@@ -1,3 +1,4 @@
+// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -27,8 +28,45 @@ function createDateInput(customId: string, label: string) {
     .setCustomId(customId)
     .setLabel(label)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Available formats are in the message above the panel")
+    .setPlaceholder("Formats: dd/mm or dd.mm")
     .setRequired(true);
+}
+
+// ----------------------------
+// PARSING & VALIDATION
+// ----------------------------
+function parseDateWithYear(input: string, referenceYear?: number): Date | null {
+  const cleaned = input.replace(/[^\d]/g, "");
+  let day: number, month: number;
+
+  if (/^\d{4}$/.test(cleaned)) {
+    day = parseInt(cleaned.slice(0, 2), 10);
+    month = parseInt(cleaned.slice(2), 10);
+  } else {
+    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+    if (!match) return null;
+    day = parseInt(match[1], 10);
+    month = parseInt(match[2], 10);
+  }
+
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+
+  const year = referenceYear ?? new Date().getFullYear();
+  let date = new Date(year, month - 1, day);
+
+  // jeżeli data końcowa < data początkowa, przyjmujemy rok następny
+  if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
+    date.setFullYear(year + 1);
+  }
+
+  return date;
+}
+
+function formatDateDisplay(date: Date): string {
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
 }
 
 // ----------------------------
@@ -68,52 +106,43 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
 
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    await interaction.followUp({ content: `❌ Player **${nick}** is already on the absence list.` });
+    await interaction.followUp({
+      content: `❌ Player **${nick}** is already on the absence list.`
+    });
     return;
   }
 
-  const parseDate = (input: string) => {
-    const cleaned = input.replace(/[^\d]/g, "");
-    let day: number, month: number;
-    if (/^\d{4}$/.test(cleaned)) {
-      day = parseInt(cleaned.slice(0, 2), 10);
-      month = parseInt(cleaned.slice(2), 10);
-    } else {
-      const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-      if (!match) return null;
-      day = parseInt(match[1], 10);
-      month = parseInt(match[2], 10);
-    }
-    if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-    return { day, month };
-  };
-
-  const fromDate = parseDate(fromRaw);
-  const toDate = parseDate(toRaw);
-  if (!fromDate || !toDate) {
-    await interaction.followUp({ content: "Invalid date format." });
+  const fromDateObj = parseDateWithYear(fromRaw);
+  if (!fromDateObj) {
+    await interaction.followUp({ content: "Invalid start date format." });
     return;
   }
 
-  const id = `${nick}-${fromDate.day}${fromDate.month}-${toDate.day}${toDate.month}`;
+  const toDateObj = parseDateWithYear(toRaw, fromDateObj.getFullYear());
+  if (!toDateObj) {
+    await interaction.followUp({ content: "Invalid end date format." });
+    return;
+  }
+
+  const id = `${nick}-${fromDateObj.getDate()}${fromDateObj.getMonth() + 1}-${toDateObj.getDate()}${toDateObj.getMonth() + 1}`;
 
   try {
     await createAbsence({
       id,
       guildId,
       player: nick,
-      startDate: `${fromDate.day}/${fromDate.month}`,
-      endDate: `${toDate.day}/${toDate.month}`,
+      startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
+      endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
       createdAt: Date.now(),
       notified: false
     });
 
     await interaction.followUp({
-      content: `✅ Absence for **${nick}** added: ${fromDate.day}.${fromDate.month} → ${toDate.day}.${toDate.month}`,
+      content: `✅ Absence for **${nick}** added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // ← odświeżamy embed i wysyłamy powiadomienie w notification
-    await updateAbsenceNotifications(guild);
+    // odśwież embed i powiadomienia przez serwis
+    await updateAbsenceNotifications(guild, [nick]);
 
   } catch (err) {
     console.error("Error saving absence:", err);
