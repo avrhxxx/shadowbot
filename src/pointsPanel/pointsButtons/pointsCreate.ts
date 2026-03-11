@@ -1,3 +1,4 @@
+// src/pointsPanel/pointsButtons/pointsCreate.ts
 import {
   ButtonInteraction,
   ModalSubmitInteraction,
@@ -7,11 +8,10 @@ import {
   ModalBuilder,
   CacheType
 } from "discord.js";
-import * as PS from "../pointsService";
+import * as pointsService from "../pointsService";
 
 /**
- * Kliknięcie przycisku "Create Week"
- * Otwiera modal do wpisania nazwy tygodnia
+ * Otwiera modal tworzenia tygodnia
  */
 export async function handleCreateWeek(i: ButtonInteraction<CacheType>) {
 
@@ -21,7 +21,7 @@ export async function handleCreateWeek(i: ButtonInteraction<CacheType>) {
 
   const weekInput = new TextInputBuilder()
     .setCustomId("week_name")
-    .setLabel("Week (example: 01.03-07.03)")
+    .setLabel("Week name (example: 01.03-07.03)")
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
     .setPlaceholder("01.03-07.03");
@@ -34,26 +34,29 @@ export async function handleCreateWeek(i: ButtonInteraction<CacheType>) {
 }
 
 /**
- * Obsługa wysłania modala
+ * Po wysłaniu modala
  */
 export async function handleCreateWeekSubmit(i: ModalSubmitInteraction<CacheType>) {
 
-  const week = i.fields.getTextInputValue("week_name");
+  const weekName = i.fields.getTextInputValue("week_name");
 
   try {
-    await PS.createWeek(week);
+
+    await pointsService.createWeek(weekName);
 
     await i.reply({
-      content: `✅ Week **${week}** created successfully.`,
+      content: `✅ Week **${weekName}** created.`,
       ephemeral: true
     });
 
   } catch (error) {
+
     console.error("Create week error:", error);
 
     await i.reply({
       content: "❌ Failed to create week.",
       ephemeral: true
     });
+
   }
 }
