@@ -7,7 +7,7 @@ export interface AbsenceObject {
   startDate: string;
   endDate: string;
   createdAt: number;
-  year?: number;
+  year: number; // zawsze bieżący rok
 }
 
 export interface AbsenceConfig {
@@ -33,8 +33,8 @@ export async function loadAbsences(guildId: string): Promise<AbsenceObject[]> {
         player: obj.player,
         startDate: obj.startDate,
         endDate: obj.endDate,
+        year: obj.year ? Number(obj.year) : new Date().getFullYear(),
         createdAt: toNumber(obj.createdAt),
-        year: obj.year ? Number(obj.year) : new Date().getFullYear()
       } as AbsenceObject;
     })
     .filter(a => a.guildId === guildId);
@@ -52,10 +52,10 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
   if (existing) throw new Error(`Player ${data.player} is already on absence list.`);
 
   const rows = await GS.readAbsenceSheet();
-  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","year"];
+  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","year","createdAt"];
   const newRow = headers.map(h => {
-    if (h === "createdAt") return data.createdAt ?? Date.now();
     if (h === "year") return data.year ?? new Date().getFullYear();
+    if (h === "createdAt") return data.createdAt ?? Date.now();
     return (data as any)[h] ?? "";
   });
 
@@ -82,7 +82,9 @@ export async function removeAbsence(guildId: string, player: string): Promise<Ab
   return target;
 }
 
+// -------------------------
 // CONFIG
+// -------------------------
 export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> {
   const rows = await GS.readAbsenceConfigSheet();
   if (!rows.length) return {};
