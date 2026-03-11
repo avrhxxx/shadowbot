@@ -4,13 +4,13 @@ import {
   TextInputBuilder, 
   TextInputStyle, 
   ActionRowBuilder, 
-  ModalSubmitInteraction 
+  ModalSubmitInteraction, 
+  Guild 
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
+import { updateAbsenceNotifications } from "./absenceNotification"; // <- dodajemy
 
-// ----------------------------
-// HELPERS TO CREATE INPUTS
-// ----------------------------
+// Helpers...
 function createTextInput(customId: string, label: string, placeholder: string) {
   return new TextInputBuilder()
     .setCustomId(customId)
@@ -19,7 +19,6 @@ function createTextInput(customId: string, label: string, placeholder: string) {
     .setPlaceholder(placeholder)
     .setRequired(true);
 }
-
 function createDateInput(customId: string, label: string) {
   return new TextInputBuilder()
     .setCustomId(customId)
@@ -29,9 +28,7 @@ function createDateInput(customId: string, label: string) {
     .setRequired(true);
 }
 
-// ----------------------------
-// SHOW MODAL
-// ----------------------------
+// Show modal
 export async function handleAddAbsence(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
@@ -52,29 +49,25 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
   await interaction.showModal(modal);
 }
 
-// ----------------------------
-// HANDLE MODAL SUBMIT
-// ----------------------------
+// Handle modal submit
 export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
+  const guild = interaction.guild as Guild; // <- potrzebne do odświeżenia embedu
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
 
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    await interaction.followUp({
-      content: `❌ Player **${nick}** is already on the absence list.`,
-    });
+    await interaction.followUp({ content: `❌ Player **${nick}** is already on the absence list.` });
     return;
   }
 
   const parseDate = (input: string) => {
     const cleaned = input.replace(/[^\d]/g, "");
     let day: number, month: number;
-
     if (/^\d{4}$/.test(cleaned)) {
       day = parseInt(cleaned.slice(0, 2), 10);
       month = parseInt(cleaned.slice(2), 10);
@@ -84,22 +77,17 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       day = parseInt(match[1], 10);
       month = parseInt(match[2], 10);
     }
-
     if (day < 1 || day > 31 || month < 1 || month > 12) return null;
     return { day, month };
   };
 
   const fromDate = parseDate(fromRaw);
   const toDate = parseDate(toRaw);
-
   if (!fromDate || !toDate) {
     await interaction.followUp({ content: "Invalid date format." });
     return;
   }
 
-  // ----------------------------
-  // Generowanie ID: nick + daty
-  // ----------------------------
   const id = `${nick}-${fromDate.day}${fromDate.month}-${toDate.day}${toDate.month}`;
 
   try {
@@ -116,6 +104,9 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     await interaction.followUp({
       content: `✅ Absence for **${nick}** added: ${fromDate.day}.${fromDate.month} → ${toDate.day}.${toDate.month}`,
     });
+
+    // ← odświeżamy embed natychmiast
+    await updateAbsenceNotifications(guild);
 
   } catch (err) {
     console.error("Error saving absence:", err);
