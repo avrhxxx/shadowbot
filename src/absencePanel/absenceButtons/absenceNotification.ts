@@ -49,8 +49,14 @@ export async function updateAbsenceNotifications(guild: Guild) {
 
     if (config.absenceEmbedId) {
       // Edytuj istniejący embed
-      message = await channel.messages.fetch(config.absenceEmbedId);
-      await message.edit({ embeds: [embed] });
+      try {
+        message = await channel.messages.fetch(config.absenceEmbedId);
+        await message.edit({ embeds: [embed] });
+      } catch {
+        // fallback: embed usunięty -> utwórz nowy
+        message = await channel.send({ embeds: [embed] });
+        await AS.setConfig(guildId, "absenceEmbedId", message.id);
+      }
     } else {
       // Utwórz nową wiadomość z embedem
       message = await channel.send({ embeds: [embed] });
