@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceNotification.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
 
@@ -20,12 +19,8 @@ function parseAbsenceDate(dateStr: string): Date | null {
   let day = Number(match[1]);
   let month = Number(match[2]) - 1;
   let year = new Date().getFullYear();
-  const date = new Date(year, month, day);
-  if (date.getTime() < Date.now() && month < new Date().getMonth()) {
-    year += 1;
-    return new Date(year, month, day);
-  }
-  return date;
+  if (month < new Date().getMonth()) year += 1;
+  return new Date(year, month, day);
 }
 
 // -----------------------------
@@ -45,7 +40,7 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 }
 
 // -----------------------------
-// EMBED ONLY
+// EMBED ONLY (nie wysyła powiadomień)
 // -----------------------------
 export async function updateAbsenceEmbed(guild: Guild) {
   const channel = await getNotificationChannel(guild);
@@ -101,12 +96,12 @@ export async function updateAbsenceEmbed(guild: Guild) {
 }
 
 // -----------------------------
-// NOTIFICATIONS
+// NOTIFICATIONS (tylko w momencie zdarzenia)
 // -----------------------------
 export async function notifyAbsenceAdded(guild: Guild, player: string, startDate: string, endDate: string) {
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
-  await channel.send(`Player **${player}** is now absent from ${formatAbsenceDate(startDate)} to ${formatAbsenceDate(endDate)}.`);
+  await channel.send(`Player **${player}** will be absent from ${formatAbsenceDate(startDate)} to ${formatAbsenceDate(endDate)}.`);
 }
 
 export async function notifyAbsenceRemoved(guild: Guild, player: string) {
@@ -152,6 +147,7 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15*60*1000) {
 // INIT
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
+  // embed odświeża się niezależnie, bez powiadomień
   await updateAbsenceEmbed(guild);
   startAbsenceAutoRefresh(guild);
   startAbsenceAutoCleaner(guild);
