@@ -1,3 +1,4 @@
+// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -25,9 +26,9 @@ function createTextInput(customId: string, label: string, placeholder: string) {
 function createDateInput(customId: string, label: string) {
   return new TextInputBuilder()
     .setCustomId(customId)
-    .setLabel(label)
+    .setLabel(`${label} (day, month)`) // <-- label pokazuje day, month
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Formats: dd/mm or dd.mm")
+    .setPlaceholder("Available formats are in the message above the panel") // <-- zmieniony placeholder
     .setRequired(true);
 }
 
@@ -53,6 +54,7 @@ function parseDateWithYear(input: string, referenceYear?: number): Date | null {
   const year = referenceYear ?? new Date().getFullYear();
   let date = new Date(year, month - 1, day);
 
+  // jeżeli data końcowa < data początkowa, przyjmujemy rok następny
   if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
     date.setFullYear(year + 1);
   }
@@ -136,7 +138,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // Powiadomienie tylko dla tego dodanego
+    // Powiadomienie tylko dla tego dodanego gracza
     await notifyAbsenceAdded(
       guild,
       nick,
