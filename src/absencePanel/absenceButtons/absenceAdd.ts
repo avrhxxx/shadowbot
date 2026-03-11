@@ -27,38 +27,25 @@ function createDateInput(customId: string, label: string) {
     .setCustomId(customId)
     .setLabel(label)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Available formats are in the message above the panel")
+    .setPlaceholder("day.month")
     .setRequired(true);
 }
 
 // ----------------------------
 // PARSING & VALIDATION
 // ----------------------------
-function parseDateWithYear(input: string, referenceYear?: number): Date | null {
-  const cleaned = input.replace(/[^\d]/g, "");
-  let day: number, month: number;
-
-  if (/^\d{4}$/.test(cleaned)) {
-    day = parseInt(cleaned.slice(0, 2), 10);
-    month = parseInt(cleaned.slice(2), 10);
-  } else {
-    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-    if (!match) return null;
-    day = parseInt(match[1], 10);
-    month = parseInt(match[2], 10);
-  }
-
+function parseDate(input: string): { day: number; month: number; year: number } | null {
+  const match = input.match(/^(\d{1,2})[./-](\d{1,2})$/);
+  if (!match) return null;
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year = new Date().getFullYear();
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-
-  const year = referenceYear ?? new Date().getFullYear();
-  return new Date(year, month - 1, day);
+  return { day, month, year };
 }
 
-function formatDateDisplay(date: Date): string {
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}.${month}.${year}`;
+function formatDateDisplay({ day, month, year }: { day: number; month: number; year: number }) {
+  return `${day.toString().padStart(2, "0")}.${month.toString().padStart(2, "0")}.${year}`;
 }
 
 // ----------------------------
@@ -72,8 +59,8 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
     .setCustomId("absence_add_modal");
 
   const nickInput = createTextInput("player_nick", "Player Nickname", "Enter player nickname");
-  const fromInput = createDateInput("absence_from", "From Date (day, month)");
-  const toInput = createDateInput("absence_to", "To Date (day, month)");
+  const fromInput = createDateInput("absence_from", "From Date (day.month)");
+  const toInput = createDateInput("absence_to", "To Date (day.month)");
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
@@ -102,39 +89,43 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
-  const fromDateObj = parseDateWithYear(fromRaw);
-  const toDateObj = parseDateWithYear(toRaw, fromDateObj?.getFullYear());
-  if (!fromDateObj || !toDateObj) {
+  const fromDate = parseDate(fromRaw);
+  const toDate = parseDate(toRaw);
+  if (!fromDate || !toDate) {
     await interaction.followUp({ content: "Invalid date format." });
     return;
   }
 
-  if (fromDateObj > toDateObj) {
+  // WALIDACJA: from <= to
+  const fromTs = new Date(fromDate.year, fromDate.month - 1, fromDate.day).getTime();
+  const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
+  if (fromTs > toTs) {
     await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
   }
 
-  const id = `${nick}-${fromDateObj.getDate()}${fromDateObj.getMonth() + 1}-${toDateObj.getDate()}${toDateObj.getMonth() + 1}`;
+  const id = `${nick}-${fromDate.day}${fromDate.month}-${toDate.day}${toDate.month}`;
 
   try {
     await createAbsence({
       id,
       guildId,
       player: nick,
-      startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
-      endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
+      startDate: `${fromDate.day}/${fromDate.month}`,
+      endDate: `${toDate.day}/${toDate.month}`,
+      year: fromDate.year,
       createdAt: Date.now()
     });
 
     await interaction.followUp({
-      content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
+      content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDate)} → ${formatDateDisplay(toDate)}`
     });
 
     await notifyAbsenceAdded(
       guild,
       nick,
-      `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
-      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`
+      `${fromDate.day}/${fromDate.month}`,
+      `${toDate.day}/${toDate.month}`
     );
 
   } catch (err) {
