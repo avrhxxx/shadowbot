@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceNotification.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
 
@@ -24,7 +23,7 @@ function parseAbsenceDate(dateStr: string): Date | null {
 }
 
 // -----------------------------
-// GET CHANNEL FROM SETTINGS
+// GET CHANNEL
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await AS.getAbsenceConfig(guild.id);
@@ -40,7 +39,7 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 }
 
 // -----------------------------
-// UPDATE EMBED
+// UPDATE EMBED & NOTIFY
 // -----------------------------
 export async function updateAbsenceNotifications(guild: Guild) {
   const channel = await getNotificationChannel(guild);
@@ -93,7 +92,7 @@ export async function updateAbsenceNotifications(guild: Guild) {
 
     if (!message.pinned) await message.pin().catch(() => {});
 
-    // Powiadomienia o nowych absencjach
+    // POWIADOMIENIA O NOWYCH ABSENCJACH
     const toNotify = activeAbsences.filter(a => !a.notified);
     for (const absence of toNotify) {
       const fromDate = formatAbsenceDate(absence.startDate);
@@ -107,15 +106,12 @@ export async function updateAbsenceNotifications(guild: Guild) {
 }
 
 // -----------------------------
-// AUTO REFRESH 1 MIN
+// AUTO REFRESH & CLEANER
 // -----------------------------
 export function startAbsenceAutoRefresh(guild: Guild, intervalMs = 60 * 1000) {
   setInterval(() => updateAbsenceNotifications(guild), intervalMs);
 }
 
-// -----------------------------
-// AUTO CLEANER 15 MIN
-// -----------------------------
 export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
   setInterval(async () => {
     const channel = await getNotificationChannel(guild);
@@ -137,7 +133,7 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
 }
 
 // -----------------------------
-// MAIN INIT
+// INIT
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
   await updateAbsenceNotifications(guild);
