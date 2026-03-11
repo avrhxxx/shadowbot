@@ -52,23 +52,23 @@ function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
     new ButtonBuilder()
       .setCustomId("moderator_event_menu")
       .setLabel("Event Menu")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Primary), // niebieski
     new ButtonBuilder()
       .setCustomId("moderator_points_menu")
       .setLabel("Points Menu")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary), // niebieski
     new ButtonBuilder()
-      .setCustomId("moderator_absence_menu")   // <-- zamienione miejsce z Translate Menu
+      .setCustomId("moderator_absence_menu")
       .setLabel("Absence Menu")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary), // niebieski
     new ButtonBuilder()
-      .setCustomId("moderator_translate_menu") // <-- zamienione miejsce z Absence Menu
+      .setCustomId("moderator_translate_menu")
       .setLabel("Translate Menu")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary), // niebieski
     new ButtonBuilder()
       .setCustomId("moderator_help")
       .setLabel("Help")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Success) // zielony
   );
 }
 
