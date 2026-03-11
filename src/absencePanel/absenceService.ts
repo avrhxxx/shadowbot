@@ -1,3 +1,4 @@
+// src/absencePanel/absenceService.ts
 import * as GS from "../googleSheetsStorage";
 
 export interface AbsenceObject {
@@ -7,7 +8,7 @@ export interface AbsenceObject {
   startDate: string;
   endDate: string;
   createdAt: number;
-  notified: boolean;
+  notified: boolean; // tylko do embedu
 }
 
 export interface AbsenceConfig {
@@ -94,18 +95,6 @@ export async function removeAbsence(guildId: string, player: string): Promise<bo
   if (!target) return false;
   await deleteAbsenceRow(target.id);
   return true;
-}
-
-// -------------------------
-// Notification helpers
-// -------------------------
-export async function getAbsencesToNotify(guildId: string): Promise<AbsenceObject[]> {
-  const absences = await loadAbsences(guildId);
-  return absences.filter(a => !a.notified);
-}
-
-export async function markAbsenceNotified(absenceId: string) {
-  await updateAbsenceCell(absenceId, "notified", true);
 }
 
 // -------------------------
