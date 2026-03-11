@@ -17,7 +17,11 @@ export async function handleModeratorHelp(interaction: Interaction) {
 
 📝 **Translate Menu** – not implemented yet
 
-🕒 **Absence Menu** – not implemented yet
+🕒 **Absence Menu** – manage player absences:
+  • Add or remove absences
+  • See who is currently absent
+  • Automatic notifications when absences start or end
+  • Embed shows active absences and expected return dates
 
 ❓ **Help** – shows this description
 `);
