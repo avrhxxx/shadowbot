@@ -1,115 +1,60 @@
-// src/absencePanel/absenceNotification.ts
 import { Client, TextChannel, EmbedBuilder } from "discord.js";
-import { getAbsences, AbsenceObject, getAbsenceConfig, setConfig } from "../absencePanel/absenceService";
+import * as AS from "./absenceService";
 
-const AUTO_CLEAN_INTERVAL_MIN = 15;
+let absenceEmbedMessageId: string | null = null;
 
-interface NotificationState {
-  channelId?: string;
-  embedId?: string;
+export async function sendAbsenceNotification(client: Client, guildId: string, player: string, startDate: string, endDate: string, action: "add" | "remove") {
+  const config = await AS.getAbsenceConfig(guildId);
+  if (!config.notificationChannel) return;
+  const channel = client.channels.cache.get(config.notificationChannel) as TextChannel;
+  if (!channel) return;
+
+  if (!absenceEmbedMessageId) {
+    const embed = new EmbedBuilder()
+      .setTitle("Absence List")
+      .setDescription("Current absences will appear here.")
+      .setColor("Yellow")
+      .setTimestamp();
+
+    const msg = await channel.send({ embeds: [embed] });
+    absenceEmbedMessageId = msg.id;
+  }
+
+  const embedMsg = await channel.messages.fetch(absenceEmbedMessageId);
+  const absences = await AS.getAbsences(guildId);
+
+  const embed = new EmbedBuilder()
+    .setTitle("Absence List")
+    .setColor("Yellow")
+    .setDescription(absences.map(a => `${a.player}: ${a.startDate} → ${a.endDate}`).join("\n") || "No absences")
+    .setFooter({ text: `Last update: ${new Date().toLocaleString()}` });
+
+  await embedMsg.edit({ embeds: [embed] });
+
+  if (action === "add" || action === "remove") {
+    const notificationEmbed = new EmbedBuilder()
+      .setColor(action === "add" ? "Green" : "Red")
+      .setDescription(action === "add"
+        ? `${player} will be absent from ${startDate} to ${endDate}`
+        : `${player} absence removed.`);
+
+    const notifMsg = await channel.send({ embeds: [notificationEmbed] });
+    setTimeout(() => notifMsg.delete().catch(() => {}), 24 * 60 * 60 * 1000);
+  }
 }
 
-export class AbsenceNotifier {
-  private client: Client;
-  private guildId: string;
-  private state: NotificationState = {};
+// -------------------------
+// AUTO-CLEANER
+// -------------------------
+export function startAbsenceAutoCleaner(client: Client, guildId: string) {
+  setInterval(async () => {
+    const absences = await AS.getAbsences(guildId);
+    const now = Date.now();
+    const toRemove = absences.filter(a => new Date(a.endDate).getTime() < now);
 
-  constructor(client: Client, guildId: string) {
-    this.client = client;
-    this.guildId = guildId;
-    this.init();
-  }
-
-  private async init() {
-    const config = await getAbsenceConfig(this.guildId);
-    this.state.channelId = config.notificationChannel ?? undefined;
-    this.state.embedId = config.absenceEmbedId ?? undefined;
-
-    this.startAutoClean();
-  }
-
-  /** Wyślij powiadomienie o dodaniu absencji */
-  public async notifyAdd(absence: AbsenceObject) {
-    if (!this.state.channelId) return;
-    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
-    if (!channel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("📌 New Absence Added")
-      .setColor(0x1E90FF)
-      .setDescription(`Player **${absence.player}** will be absent from **${absence.startDate}** to **${absence.endDate}**.`)
-      .setTimestamp(new Date());
-
-    await channel.send({ embeds: [embed] });
-    await this.updateAbsenceListEmbed();
-  }
-
-  /** Wyślij powiadomienie o usunięciu absencji */
-  public async notifyRemove(absence: AbsenceObject, reason: string = "manual") {
-    if (!this.state.channelId) return;
-    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
-    if (!channel) return;
-
-    const embed = new EmbedBuilder()
-      .setTitle("✅ Absence Removed")
-      .setColor(0x32CD32)
-      .setDescription(`Player **${absence.player}** absence removed (${reason}).`)
-      .setTimestamp(new Date());
-
-    await channel.send({ embeds: [embed] });
-    await this.updateAbsenceListEmbed();
-  }
-
-  /** Utwórz / zaktualizuj embed listy absencji */
-  private async updateAbsenceListEmbed() {
-    if (!this.state.channelId) return;
-    const channel = this.client.channels.cache.get(this.state.channelId) as TextChannel;
-    if (!channel) return;
-
-    const absences = await getAbsences(this.guildId);
-    const embed = new EmbedBuilder()
-      .setTitle("📋 Current Absences")
-      .setColor(0x1E90FF)
-      .setTimestamp(new Date());
-
-    if (absences.length === 0) {
-      embed.setDescription("✅ No absences recorded.");
-    } else {
-      for (const absence of absences) {
-        embed.addFields({
-          name: absence.player,
-          value: `${absence.startDate} → ${absence.endDate}`,
-          inline: false,
-        });
-      }
+    for (const a of toRemove) {
+      await AS.removeAbsence(guildId, a.player);
+      await sendAbsenceNotification(client, guildId, a.player, a.startDate, a.endDate, "remove");
     }
-
-    try {
-      if (this.state.embedId) {
-        const msg = await channel.messages.fetch(this.state.embedId);
-        await msg.edit({ embeds: [embed] });
-      } else {
-        const msg = await channel.send({ embeds: [embed] });
-        this.state.embedId = msg.id;
-        await setConfig(this.guildId, "absenceEmbedId", msg.id);
-      }
-    } catch (err) {
-      console.error("Error updating absence embed:", err);
-    }
-  }
-
-  /** Automatyczne czyszczenie przeterminowanych absencji */
-  private startAutoClean() {
-    setInterval(async () => {
-      const absences = await getAbsences(this.guildId);
-      const now = new Date();
-      for (const absence of absences) {
-        const [toDay, toMonth] = absence.endDate.split("/").map(Number);
-        const toDate = new Date(now.getFullYear(), toMonth - 1, toDay, 23, 59, 59);
-        if (toDate < now) {
-          await this.notifyRemove(absence, "auto-clean");
-        }
-      }
-    }, AUTO_CLEAN_INTERVAL_MIN * 60 * 1000);
-  }
+  }, 15 * 60 * 1000);
 }
