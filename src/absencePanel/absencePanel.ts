@@ -18,7 +18,7 @@ export function renderAbsencePanel(): MessageCreateOptions {
 
     new ButtonBuilder()
       .setCustomId("absence_help")
-      .setLabel("Help")
+      .setLabel("Guide")
       .setStyle(ButtonStyle.Secondary)
   );
 
