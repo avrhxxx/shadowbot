@@ -13,6 +13,7 @@ export interface AbsenceObject {
 
 export interface AbsenceConfig {
   notificationChannel?: string;
+  absenceEmbedId?: string;
   [key: string]: any;
 }
 
@@ -113,8 +114,18 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
   return config;
 }
 
+// -------------------------
+// SET NOTIFICATION CHANNEL
+// -------------------------
 export async function setNotificationChannel(guildId: string, channelId: string) {
   await setConfig(guildId, "notificationChannel", channelId);
+}
+
+// -------------------------
+// SET ABSENCE EMBED ID
+// -------------------------
+export async function setAbsenceEmbedId(guildId: string, messageId: string) {
+  await setConfig(guildId, "absenceEmbedId", messageId);
 }
 
 // -------------------------
