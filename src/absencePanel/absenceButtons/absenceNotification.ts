@@ -48,8 +48,8 @@ export async function updateAbsenceNotifications(guild: Guild) {
     let message;
 
     if (config.absenceEmbedId) {
-      // Edytuj istniejący embed
       try {
+        // Edytuj istniejący embed
         message = await channel.messages.fetch(config.absenceEmbedId);
         await message.edit({ embeds: [embed] });
       } catch {
@@ -61,6 +61,11 @@ export async function updateAbsenceNotifications(guild: Guild) {
       // Utwórz nową wiadomość z embedem i zapisz ID
       message = await channel.send({ embeds: [embed] });
       await AS.setAbsenceEmbedId(guildId, message.id);
+    }
+
+    // Przypnij wiadomość jeśli jeszcze nie jest przypięta
+    if (!message.pinned) {
+      await message.pin().catch(err => console.error("Failed to pin absence embed:", err));
     }
 
     // Powiadomienia o nowych absencjach
