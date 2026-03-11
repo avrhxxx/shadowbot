@@ -1,2 +1,10 @@
+import { ButtonInteraction, CacheType } from "discord.js";
 
-1
+export async function handleDuelPanel(
+  interaction: ButtonInteraction<CacheType>
+) {
+  await interaction.reply({
+    content: "⚔️ Duel panel is not implemented yet.",
+    ephemeral: true
+  });
+}
