@@ -39,7 +39,7 @@ function parseDate(input: string): { day: number; month: number; year: number } 
   if (!match) return null;
   const day = parseInt(match[1], 10);
   const month = parseInt(match[2], 10);
-  const year = new Date().getFullYear();
+  const year = new Date().getFullYear(); // zawsze bieżący rok
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
   return { day, month, year };
 }
@@ -92,7 +92,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const fromDate = parseDate(fromRaw);
   const toDate = parseDate(toRaw);
   if (!fromDate || !toDate) {
-    await interaction.followUp({ content: "Invalid date format." });
+    await interaction.followUp({ content: "❌ Invalid date format. Use day.month" });
     return;
   }
 
