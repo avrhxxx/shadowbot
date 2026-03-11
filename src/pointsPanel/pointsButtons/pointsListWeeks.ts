@@ -8,7 +8,7 @@ import * as pointsService from "../pointsService";
 export async function handleListWeeks(i: ButtonInteraction<CacheType>) {
   try {
     // Pobieramy wszystkie tygodnie z serwisu
-    const weeks = await pointsService.getAllWeeks();
+    const weeks: string[] = await pointsService.getAllWeeks();
 
     if (!weeks || weeks.length === 0) {
       return await i.reply({
@@ -18,7 +18,7 @@ export async function handleListWeeks(i: ButtonInteraction<CacheType>) {
     }
 
     // Formatujemy listę do czytelnej wiadomości
-    const weekList = weeks.map((w, idx) => `${idx + 1}. ${w}`).join("\n");
+    const weekList = weeks.map((w: string, idx: number) => `${idx + 1}. ${w}`).join("\n");
 
     await i.reply({
       content: `📋 **Created Weeks:**\n${weekList}`,
