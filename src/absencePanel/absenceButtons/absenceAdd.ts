@@ -35,11 +35,21 @@ function createDateInput(customId: string, label: string) {
 // PARSING & VALIDATION
 // ----------------------------
 function parseDateWithYear(input: string, referenceYear?: number): Date | null {
-  const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-  if (!match) return null;
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
+  const cleaned = input.replace(/[^\d]/g, "");
+  let day: number, month: number;
+
+  if (/^\d{4}$/.test(cleaned)) {
+    day = parseInt(cleaned.slice(0, 2), 10);
+    month = parseInt(cleaned.slice(2), 10);
+  } else {
+    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+    if (!match) return null;
+    day = parseInt(match[1], 10);
+    month = parseInt(match[2], 10);
+  }
+
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+
   const year = referenceYear ?? new Date().getFullYear();
   return new Date(year, month - 1, day);
 }
@@ -92,18 +102,15 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
-  const currentYear = new Date().getFullYear();
-  const fromDateObj = parseDateWithYear(fromRaw, currentYear);
-  const toDateObj = parseDateWithYear(toRaw, currentYear);
-
+  const fromDateObj = parseDateWithYear(fromRaw);
+  const toDateObj = parseDateWithYear(toRaw, fromDateObj?.getFullYear());
   if (!fromDateObj || !toDateObj) {
     await interaction.followUp({ content: "Invalid date format." });
     return;
   }
 
-  // WALIDACJA: from ≤ to
-  if (fromDateObj.getTime() > toDateObj.getTime()) {
-    await interaction.followUp({ content: "❌ 'From Date' cannot be after 'To Date'." });
+  if (fromDateObj > toDateObj) {
+    await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
   }
 
@@ -123,7 +130,6 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // Powiadomienie tylko dla tego dodanego
     await notifyAbsenceAdded(
       guild,
       nick,
