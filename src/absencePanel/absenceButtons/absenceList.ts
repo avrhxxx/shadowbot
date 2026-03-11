@@ -4,7 +4,7 @@ import { getAbsences, AbsenceObject } from "../absenceService";
 import { getEventDateUTC } from "../../utils/timeUtils";
 
 // -----------------------------
-// Formatowanie daty: DD.MM.YYYY → DD.MM.YYYY back
+// Formatowanie daty: DD.MM.YYYY – DD.MM.YYYY + unix return
 // -----------------------------
 function formatAbsenceDate(absence: AbsenceObject): string {
   const today = new Date();
@@ -14,18 +14,17 @@ function formatAbsenceDate(absence: AbsenceObject): string {
   const [fromDay, fromMonth] = absence.startDate.split("/").map(Number);
   const [toDay, toMonth] = absence.endDate.split("/").map(Number);
 
-  // Obliczamy datę końcową
   let toYear = currentYear;
   const toDateCandidate = new Date(currentYear, toMonth - 1, toDay);
+
   if (toDateCandidate < today) {
-    // jeśli data już minęła w tym roku, ustaw rok na następny
     toYear += 1;
   }
 
   const toDate = getEventDateUTC(toDay, toMonth, 0, 0, toYear);
   const toUnix = Math.floor(toDate.getTime() / 1000);
 
-  return `${pad(fromDay)}.${pad(fromMonth)}.${currentYear} → ${pad(toDay)}.${pad(toMonth)}.${toYear} back: <t:${toUnix}:R>`;
+  return `${pad(fromDay)}.${pad(fromMonth)}.${currentYear} – ${pad(toDay)}.${pad(toMonth)}.${toYear}\n⏳ returns <t:${toUnix}:R>`;
 }
 
 // -----------------------------
@@ -33,8 +32,12 @@ function formatAbsenceDate(absence: AbsenceObject): string {
 // -----------------------------
 export async function handleAbsenceList(interaction: ButtonInteraction) {
   const guildId = interaction.guildId;
+
   if (!guildId) {
-    await interaction.reply({ content: "❌ Cannot fetch absences: no guild.", ephemeral: true });
+    await interaction.reply({
+      content: "❌ Cannot fetch absences: no guild.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -61,7 +64,7 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
   // -----------------------------
   const actionRow = new ActionRowBuilder<ButtonBuilder>();
 
-  // Add Absence – zawsze
+  // Add Absence – zawsze dostępny
   actionRow.addComponents(
     new ButtonBuilder()
       .setCustomId("absence_add")
