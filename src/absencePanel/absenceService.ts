@@ -1,145 +1,137 @@
-import { 
-  ButtonInteraction, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ActionRowBuilder, 
-  ModalSubmitInteraction, 
-  Guild 
-} from "discord.js";
-import { createAbsence, getAbsences } from "../absenceService";
-import { notifyAbsenceAdded } from "./absenceNotification";
+import * as GS from "../googleSheetsStorage";
 
-// ----------------------------
-// HELPERS TO CREATE INPUTS
-// ----------------------------
-function createTextInput(customId: string, label: string, placeholder: string) {
-  return new TextInputBuilder()
-    .setCustomId(customId)
-    .setLabel(label)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder(placeholder)
-    .setRequired(true);
+export interface AbsenceObject {
+  id: string;
+  guildId: string;
+  player: string;
+  startDate: string;
+  endDate: string;
+  createdAt: number;
+  year: number; // zawsze bieżący rok
 }
 
-function createDateInput(customId: string, label: string) {
-  return new TextInputBuilder()
-    .setCustomId(customId)
-    .setLabel(label)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Available formats are in the message above the panel")
-    .setRequired(true);
+export interface AbsenceConfig {
+  notificationChannel?: string;
+  absenceEmbedId?: string;
+  [key: string]: any;
 }
 
-// ----------------------------
-// PARSING & VALIDATION
-// ----------------------------
-function parseDayMonth(input: string): { day: number; month: number; year: number } | null {
-  const cleaned = input.replace(/[^\d]/g, "");
-  let day: number, month: number;
+function toNumber(value: any, fallback = 0) { return value != null ? Number(value) : fallback; }
 
-  if (cleaned.length === 4) {
-    // format DDMM
-    day = parseInt(cleaned.slice(0, 2), 10);
-    month = parseInt(cleaned.slice(2), 10);
+export async function loadAbsences(guildId: string): Promise<AbsenceObject[]> {
+  const rows: any[][] = await GS.readAbsenceSheet();
+  if (!rows.length) return [];
+  const headers: string[] = rows[0];
+
+  return rows.slice(1)
+    .map((row: any[]) => {
+      const obj: Record<string, any> = {};
+      headers.forEach((h, i) => obj[h] = row[i] ?? null);
+      return {
+        id: obj.id,
+        guildId: obj.guildId,
+        player: obj.player,
+        startDate: obj.startDate,
+        endDate: obj.endDate,
+        year: obj.year ? Number(obj.year) : new Date().getFullYear(),
+        createdAt: toNumber(obj.createdAt),
+      } as AbsenceObject;
+    })
+    .filter(a => a.guildId === guildId);
+}
+
+export async function getAbsences(guildId: string) { return loadAbsences(guildId); }
+
+export async function getAbsenceByPlayer(guildId: string, player: string): Promise<AbsenceObject | null> {
+  const absences = await loadAbsences(guildId);
+  return absences.find(a => a.player.toLowerCase() === player.toLowerCase()) || null;
+}
+
+export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
+  const existing = await getAbsenceByPlayer(data.guildId, data.player);
+  if (existing) throw new Error(`Player ${data.player} is already on absence list.`);
+
+  const rows = await GS.readAbsenceSheet();
+  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","year","createdAt"];
+  const newRow = headers.map(h => {
+    if (h === "year") return data.year ?? new Date().getFullYear();
+    if (h === "createdAt") return data.createdAt ?? Date.now();
+    return (data as any)[h] ?? "";
+  });
+
+  await GS.writeAbsenceSheet([headers, ...rows.slice(1), newRow]);
+  return data;
+}
+
+export async function deleteAbsenceRow(absenceId: string) {
+  const rows: any[][] = await GS.readAbsenceSheet();
+  if (!rows.length) return;
+  const headers = rows[0];
+  const idIndex = headers.indexOf("id");
+  if (idIndex === -1) throw new Error("Column 'id' not found");
+  const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
+  if (rowIndex === -1) return;
+  await GS.deleteAbsenceRow(rowIndex + 1);
+}
+
+export async function removeAbsence(guildId: string, player: string): Promise<AbsenceObject | null> {
+  const absences = await loadAbsences(guildId);
+  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
+  if (!target) return null;
+  await deleteAbsenceRow(target.id);
+  return target;
+}
+
+// -------------------------
+// CONFIG
+// -------------------------
+export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> {
+  const rows = await GS.readAbsenceConfigSheet();
+  if (!rows.length) return {};
+  const headers = rows[0];
+  const dataRows = rows.slice(1);
+  const guildIndex = headers.indexOf("guildId");
+  if (guildIndex === -1) return {};
+  const row = dataRows.find(r => r[guildIndex] === guildId);
+  if (!row) return {};
+  const config: AbsenceConfig = {};
+  headers.forEach((h, i) => (config[h] = row[i] ?? null));
+  return config;
+}
+
+export async function setNotificationChannel(guildId: string, channelId: string) {
+  await setConfig(guildId, "notificationChannel", channelId);
+}
+
+export async function setAbsenceEmbedId(guildId: string, messageId: string) {
+  await setConfig(guildId, "absenceEmbedId", messageId);
+}
+
+export async function setConfig(guildId: string, key: string, value: any) {
+  const rows = await GS.readAbsenceConfigSheet();
+  const headers = rows[0] ?? ["guildId", "notificationChannel"];
+  const dataRows = rows.slice(1);
+
+  if (!headers.includes(key)) {
+    headers.push(key);
+    for (const r of dataRows) while (r.length < headers.length) r.push("");
+  }
+
+  const guildIndex = headers.indexOf("guildId");
+  const keyIndex = headers.indexOf(key);
+
+  let row = dataRows.find(r => r[guildIndex] === guildId);
+  let rowIndex: number;
+
+  if (!row) {
+    row = new Array(headers.length).fill("");
+    row[guildIndex] = guildId;
+    dataRows.push(row);
+    rowIndex = dataRows.length;
   } else {
-    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-    if (!match) return null;
-    day = parseInt(match[1], 10);
-    month = parseInt(match[2], 10);
+    rowIndex = dataRows.indexOf(row) + 1;
   }
 
-  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-  const year = new Date().getFullYear();
-  return { day, month, year };
-}
-
-function formatDateDisplay({ day, month, year }: { day: number; month: number; year: number }) {
-  return `${day.toString().padStart(2, "0")}.${month.toString().padStart(2, "0")}.${year}`;
-}
-
-// ----------------------------
-// SHOW MODAL
-// ----------------------------
-export async function handleAddAbsence(interaction: ButtonInteraction) {
-  if (!interaction.isButton()) return;
-
-  const modal = new ModalBuilder()
-    .setTitle("Add Absence")
-    .setCustomId("absence_add_modal");
-
-  const nickInput = createTextInput("player_nick", "Player Nickname", "Enter player nickname");
-  const fromInput = createDateInput("absence_from", "From Date (day, month)");
-  const toInput = createDateInput("absence_to", "To Date (day, month)");
-
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(fromInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(toInput)
-  );
-
-  await interaction.showModal(modal);
-}
-
-// ----------------------------
-// HANDLE MODAL SUBMIT
-// ----------------------------
-export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guildId = interaction.guildId!;
-  const guild = interaction.guild as Guild;
-  const nick = interaction.fields.getTextInputValue("player_nick").trim();
-  const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
-  const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
-
-  const absences = await getAbsences(guildId);
-  if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    await interaction.followUp({ content: `❌ Player ${nick} is already on the absence list.` });
-    return;
-  }
-
-  const fromDate = parseDayMonth(fromRaw);
-  const toDate = parseDayMonth(toRaw);
-  if (!fromDate || !toDate) {
-    await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
-    return;
-  }
-
-  // WALIDACJA: from <= to
-  const fromTs = new Date(fromDate.year, fromDate.month - 1, fromDate.day).getTime();
-  const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
-  if (fromTs > toTs) {
-    await interaction.followUp({ content: "❌ From date cannot be after To date." });
-    return;
-  }
-
-  const id = `${nick}-${fromDate.day}${fromDate.month}-${toDate.day}${toDate.month}`;
-
-  try {
-    await createAbsence({
-      id,
-      guildId,
-      player: nick,
-      startDate: `${fromDate.day}/${fromDate.month}`,
-      endDate: `${toDate.day}/${toDate.month}`,
-      year: fromDate.year,
-      createdAt: Date.now()
-    });
-
-    await interaction.followUp({
-      content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDate)} → ${formatDateDisplay(toDate)}`
-    });
-
-    await notifyAbsenceAdded(
-      guild,
-      nick,
-      `${fromDate.day}/${fromDate.month}`,
-      `${toDate.day}/${toDate.month}`
-    );
-
-  } catch (err) {
-    console.error("Error saving absence:", err);
-    await interaction.followUp({ content: "❌ Failed to save absence." });
-  }
+  await GS.writeAbsenceConfigSheet([headers, ...dataRows]);
+  await GS.updateAbsenceConfigCell(rowIndex + 1, keyIndex + 1, value);
 }
