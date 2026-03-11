@@ -1,3 +1,4 @@
+// src/absencePanel/absenceButtons/absenceNotification.ts
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
 
@@ -23,7 +24,7 @@ function parseAbsenceDate(dateStr: string): Date | null {
 }
 
 // -----------------------------
-// GET CHANNEL
+// GET CHANNEL FROM SETTINGS
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await AS.getAbsenceConfig(guild.id);
@@ -39,7 +40,7 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 }
 
 // -----------------------------
-// UPDATE EMBED & NOTIFY
+// UPDATE EMBED & NOTIFICATIONS
 // -----------------------------
 export async function updateAbsenceNotifications(guild: Guild) {
   const channel = await getNotificationChannel(guild);
@@ -92,12 +93,15 @@ export async function updateAbsenceNotifications(guild: Guild) {
 
     if (!message.pinned) await message.pin().catch(() => {});
 
-    // POWIADOMIENIA O NOWYCH ABSENCJACH
+    // -----------------------------
+    // POWIADOMIENIA DLA NOWYCH ABSENCJI
+    // -----------------------------
     const toNotify = activeAbsences.filter(a => !a.notified);
     for (const absence of toNotify) {
       const fromDate = formatAbsenceDate(absence.startDate);
       const toDate = formatAbsenceDate(absence.endDate);
-      await channel.send(`Player **${absence.player}** will be absent from ${fromDate} to ${toDate}.`);
+      await channel.send(`✨ Player **${absence.player}** will be absent from ${fromDate} to ${toDate}.`);
+      // natychmiast ustawiamy notified = true
       await AS.updateAbsenceCell(absence.id, "notified", true);
     }
   } catch (err) {
@@ -106,12 +110,22 @@ export async function updateAbsenceNotifications(guild: Guild) {
 }
 
 // -----------------------------
-// AUTO REFRESH & CLEANER
+// AUTO REFRESH 1 MIN (TYLKO EMBED)
 // -----------------------------
 export function startAbsenceAutoRefresh(guild: Guild, intervalMs = 60 * 1000) {
-  setInterval(() => updateAbsenceNotifications(guild), intervalMs);
+  setInterval(async () => {
+    try {
+      const channel = await getNotificationChannel(guild);
+      if (!channel) return;
+      // tylko embed, bez dodatkowych powiadomień
+      await updateAbsenceNotifications(guild);
+    } catch {}
+  }, intervalMs);
 }
 
+// -----------------------------
+// AUTO CLEANER 15 MIN
+// -----------------------------
 export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
   setInterval(async () => {
     const channel = await getNotificationChannel(guild);
@@ -124,7 +138,7 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
       const endDate = parseAbsenceDate(a.endDate);
       if (endDate && endDate < now) {
         await AS.deleteAbsenceRow(a.id);
-        await channel.send(`Player **${a.player}** is back and no longer listed as absent.`);
+        await channel.send(`🎉 Player **${a.player}** is back and no longer listed as absent.`);
       }
     }
 
@@ -133,7 +147,7 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
 }
 
 // -----------------------------
-// INIT
+// MAIN INIT
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
   await updateAbsenceNotifications(guild);
