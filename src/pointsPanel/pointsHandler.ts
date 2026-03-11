@@ -28,8 +28,8 @@ const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promi
   // Główny wybór kategorii
   [IDS.BUTTONS.DONATIONS]: (i) => PB.PBDonations.handleDonationsPanel(i),
   [IDS.BUTTONS.DUEL]: (i) => PB.PBDuel.handleDuelPanel(i),
-  
-  // Opcjonalne, mogą nie istnieć jeszcze w module
+
+  // Opcjonalne
   [IDS.BUTTONS.GUIDE]: (i) => PB.handleGuide?.(i) ?? Promise.resolve(),
   [IDS.BUTTONS.SETTINGS]: (i) => PB.handleSettings?.(i) ?? Promise.resolve(),
 
