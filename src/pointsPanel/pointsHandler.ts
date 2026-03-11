@@ -5,17 +5,12 @@ import * as PS from "./pointsService";
 
 export const IDS = {
   BUTTONS: {
-    // Główny panel kategorii
     DONATIONS: "points_category_donations",
     DUEL: "points_category_duel",
     GUIDE: "points_guide",
     SETTINGS: "points_settings",
-
-    // Create / List Weeks w panelu głównym
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
-
-    // Przyciski wewnątrz paneli kategorii
     ADD: "points_add",
     LIST: "points_list",
     COMPARE: "points_compare",
@@ -26,16 +21,16 @@ export const IDS = {
 // Mapowanie przycisków na funkcje
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
   // Główny wybór kategorii
-  [IDS.BUTTONS.DONATIONS]: (i) => PB.PBDonations.handleDonationsPanel(i),
-  [IDS.BUTTONS.DUEL]: (i) => PB.PBDuel.handleDuelPanel(i),
+  [IDS.BUTTONS.DONATIONS]: (i) => PB.pointsDonations.handleDonationsPanel(i),
+  [IDS.BUTTONS.DUEL]: (i) => PB.pointsDuel.handleDuelPanel(i),
 
-  // Opcjonalne
+  // Opcjonalne / placeholdery
   [IDS.BUTTONS.GUIDE]: (i) => PB.handleGuide?.(i) ?? Promise.resolve(),
   [IDS.BUTTONS.SETTINGS]: (i) => PB.handleSettings?.(i) ?? Promise.resolve(),
 
   // Create / List Weeks
-  [IDS.BUTTONS.CREATE_WEEK]: (i) => PB.PBCreate.handleCreateWeek(i),
-  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.PBListWeeks.handleListWeeks(i),
+  [IDS.BUTTONS.CREATE_WEEK]: (i) => PB.pointsCreate.handleCreateWeek(i),
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i),
 
   // Przyciski wewnątrz paneli kategorii
   [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),
