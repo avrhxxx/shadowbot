@@ -1,11 +1,11 @@
 // src/moderatorPanel/moderatorButtons/pointsMenu.ts
 import { Interaction } from "discord.js";
-import { renderPointsPanel } from "../pointsPanel/pointsPanel";
+import { renderPointsCategoryPanel } from "../../pointsPanel/pointsPanel"; // <-- poprawiona ścieżka
 
 export async function handlePointsMenu(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  const panel = renderPointsPanel();
+  const panel = renderPointsCategoryPanel(); // <-- używamy poprawnej nazwy funkcji
 
   await interaction.reply({
     content: panel.content,
