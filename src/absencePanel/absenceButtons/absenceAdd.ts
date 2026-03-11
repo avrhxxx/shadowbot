@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -35,15 +34,12 @@ function createDateInput(customId: string, label: string) {
 // ----------------------------
 // PARSING & VALIDATION
 // ----------------------------
-function parseDate(input: string, referenceYear?: number): Date | null {
+function parseDateWithYear(input: string, referenceYear?: number): Date | null {
   const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
   if (!match) return null;
-
   const day = parseInt(match[1], 10);
   const month = parseInt(match[2], 10);
-
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-
   const year = referenceYear ?? new Date().getFullYear();
   return new Date(year, month - 1, day);
 }
@@ -97,17 +93,17 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   }
 
   const currentYear = new Date().getFullYear();
-  const fromDateObj = parseDate(fromRaw, currentYear);
-  const toDateObj = parseDate(toRaw, currentYear);
+  const fromDateObj = parseDateWithYear(fromRaw, currentYear);
+  const toDateObj = parseDateWithYear(toRaw, currentYear);
 
   if (!fromDateObj || !toDateObj) {
-    await interaction.followUp({ content: "❌ Invalid date format." });
+    await interaction.followUp({ content: "Invalid date format." });
     return;
   }
 
-  // WALIDACJA: from <= to
+  // WALIDACJA: from ≤ to
   if (fromDateObj.getTime() > toDateObj.getTime()) {
-    await interaction.followUp({ content: "❌ Start date cannot be after end date." });
+    await interaction.followUp({ content: "❌ 'From Date' cannot be after 'To Date'." });
     return;
   }
 
@@ -120,20 +116,19 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       player: nick,
       startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
       endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
-      createdAt: Date.now(),
-      year: currentYear
+      createdAt: Date.now()
     });
 
     await interaction.followUp({
       content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
+    // Powiadomienie tylko dla tego dodanego
     await notifyAbsenceAdded(
       guild,
       nick,
       `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
-      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
-      currentYear
+      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`
     );
 
   } catch (err) {
