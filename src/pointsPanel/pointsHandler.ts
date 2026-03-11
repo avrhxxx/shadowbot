@@ -15,7 +15,7 @@ export const IDS = {
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
 
-    // Przyciski w panelach kategorii
+    // Przyciski wewnątrz paneli kategorii
     ADD: "points_add",
     LIST: "points_list",
     COMPARE: "points_compare",
@@ -24,22 +24,24 @@ export const IDS = {
 };
 
 // Mapowanie przycisków na funkcje
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
+const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
   // Główny wybór kategorii
-  [IDS.BUTTONS.DONATIONS]: async (i) => await PB.PBDonations.handleDonationsPanel(i),
-  [IDS.BUTTONS.DUEL]: async (i) => await PB.PBDuel.handleDuelPanel(i),
-  [IDS.BUTTONS.GUIDE]: async (i) => await PB.handleGuide?.(i),
-  [IDS.BUTTONS.SETTINGS]: async (i) => await PB.handleSettings?.(i),
+  [IDS.BUTTONS.DONATIONS]: (i) => PB.PBDonations.handleDonationsPanel(i),
+  [IDS.BUTTONS.DUEL]: (i) => PB.PBDuel.handleDuelPanel(i),
+  
+  // Opcjonalne, mogą nie istnieć jeszcze w module
+  [IDS.BUTTONS.GUIDE]: (i) => PB.handleGuide?.(i) ?? Promise.resolve(),
+  [IDS.BUTTONS.SETTINGS]: (i) => PB.handleSettings?.(i) ?? Promise.resolve(),
 
   // Create / List Weeks
-  [IDS.BUTTONS.CREATE_WEEK]: async (i) => await PB.PBCreate.handleCreateWeek(i),
-  [IDS.BUTTONS.LIST_WEEKS]: async (i) => await PB.PBListWeeks.handleListWeeks(i),
+  [IDS.BUTTONS.CREATE_WEEK]: (i) => PB.PBCreate.handleCreateWeek(i),
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.PBListWeeks.handleListWeeks(i),
 
   // Przyciski wewnątrz paneli kategorii
-  [IDS.BUTTONS.ADD]: async (i) => await PS.handleAddPoints(i),
-  [IDS.BUTTONS.LIST]: async (i) => await PS.handlePointsList(i),
-  [IDS.BUTTONS.COMPARE]: async (i) => await PS.handleCompareWeeks(i),
-  [IDS.BUTTONS.BACK]: async (i) => await PB.handleBackToCategory?.(i)
+  [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),
+  [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),
+  [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i),
+  [IDS.BUTTONS.BACK]: (i) => PB.handleBackToCategory?.(i) ?? Promise.resolve()
 };
 
 // Globalny handler dla wszystkich przycisków w Points Panel
@@ -54,10 +56,11 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
   } catch (error) {
     console.error("Error handling points interaction:", error);
     if (interaction.isRepliable()) {
+      const replyPayload = { content: "❌ An error occurred.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: "❌ An error occurred.", ephemeral: true });
+        await interaction.followUp(replyPayload);
       } else {
-        await interaction.reply({ content: "❌ An error occurred.", ephemeral: true });
+        await interaction.reply(replyPayload);
       }
     }
   }
