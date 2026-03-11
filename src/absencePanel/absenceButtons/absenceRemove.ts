@@ -8,7 +8,7 @@ import {
   Guild
 } from "discord.js";
 import { removeAbsence } from "../absenceService";
-import { updateAbsenceNotifications } from "./absenceNotification";
+import { notifyAbsenceRemoved } from "./absenceNotification";
 
 // ----------------------------
 // SHOW REMOVE MODAL
@@ -43,14 +43,14 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
-      await interaction.followUp({ content: `❌ No absence found for **${nick}**.` });
+      await interaction.followUp({ content: `❌ No absence found for ${nick}.` });
       return;
     }
 
-    await interaction.followUp({ content: `✅ Absence for **${nick}** removed.` });
+    await interaction.followUp({ content: `✅ Absence for ${nick} removed from the list.` });
 
-    // Odśwież embed i wyślij powiadomienie tylko dla tego gracza
-    await updateAbsenceNotifications(guild, [nick]);
+    // Powiadomienie tylko dla remove
+    await notifyAbsenceRemoved(guild, nick);
 
   } catch (err) {
     console.error("Error removing absence:", err);
