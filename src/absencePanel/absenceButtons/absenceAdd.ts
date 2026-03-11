@@ -1,4 +1,3 @@
-// src/absencePanel/absenceButtons/absenceAdd.ts
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -6,7 +5,10 @@ import {
   TextInputStyle, 
   ActionRowBuilder, 
   ModalSubmitInteraction, 
-  Guild 
+  Guild,
+  ButtonBuilder,
+  ButtonStyle,
+  InteractionCollector
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
 import { notifyAbsenceAdded } from "./absenceNotification";
@@ -26,40 +28,34 @@ function createTextInput(customId: string, label: string, placeholder: string) {
 function createDateInput(customId: string, label: string) {
   return new TextInputBuilder()
     .setCustomId(customId)
-    .setLabel(`${label} (day, month)`) // <-- label pokazuje day, month
+    .setLabel(label)
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Available formats are in the message above the panel") // <-- zmieniony placeholder
+    .setPlaceholder("Available formats are in the message above the panel")
     .setRequired(true);
 }
 
 // ----------------------------
 // PARSING & VALIDATION
 // ----------------------------
-function parseDateWithYear(input: string, referenceYear?: number): Date | null {
+function parseDate(input: string, referenceYear?: number): { date: Date, yearUsed: number } | null {
   const cleaned = input.replace(/[^\d]/g, "");
   let day: number, month: number;
 
-  if (/^\d{4}$/.test(cleaned)) {
-    day = parseInt(cleaned.slice(0, 2), 10);
-    month = parseInt(cleaned.slice(2), 10);
-  } else {
-    const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-    if (!match) return null;
-    day = parseInt(match[1], 10);
-    month = parseInt(match[2], 10);
-  }
+  const match = input.match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+  if (!match) return null;
+
+  day = parseInt(match[1], 10);
+  month = parseInt(match[2], 10);
 
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
 
-  const year = referenceYear ?? new Date().getFullYear();
+  let year = referenceYear ?? new Date().getFullYear();
   let date = new Date(year, month - 1, day);
 
-  // jeżeli data końcowa < data początkowa, przyjmujemy rok następny
-  if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
-    date.setFullYear(year + 1);
-  }
+  if (date.getTime() < Date.now()) year += 1; // jeśli przeszła, ustaw następny rok
+  date = new Date(year, month - 1, day);
 
-  return date;
+  return { date, yearUsed: year };
 }
 
 function formatDateDisplay(date: Date): string {
@@ -80,8 +76,8 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
     .setCustomId("absence_add_modal");
 
   const nickInput = createTextInput("player_nick", "Player Nickname", "Enter player nickname");
-  const fromInput = createDateInput("absence_from", "From Date");
-  const toInput = createDateInput("absence_to", "To Date");
+  const fromInput = createDateInput("absence_from", "From Date (day, month)");
+  const toInput = createDateInput("absence_to", "To Date (day, month)");
 
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput),
@@ -110,27 +106,30 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
-  const fromDateObj = parseDateWithYear(fromRaw);
-  if (!fromDateObj) {
+  const fromParsed = parseDate(fromRaw);
+  if (!fromParsed) {
     await interaction.followUp({ content: "Invalid start date format." });
     return;
   }
 
-  const toDateObj = parseDateWithYear(toRaw, fromDateObj.getFullYear());
-  if (!toDateObj) {
+  const toParsed = parseDate(toRaw, fromParsed.yearUsed);
+  if (!toParsed) {
     await interaction.followUp({ content: "Invalid end date format." });
     return;
   }
 
-  const id = `${nick}-${fromDateObj.getDate()}${fromDateObj.getMonth() + 1}-${toDateObj.getDate()}${toDateObj.getMonth() + 1}`;
+  const { date: fromDateObj } = fromParsed;
+  const { date: toDateObj } = toParsed;
+
+  const id = `${nick}-${fromDateObj.getDate()}${fromDateObj.getMonth() + 1}-${toDateObj.getDate()}${toDateObj.getMonth() + 1}-${fromDateObj.getFullYear()}`;
 
   try {
     await createAbsence({
       id,
       guildId,
       player: nick,
-      startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
-      endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
+      startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}/${fromDateObj.getFullYear()}`,
+      endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}/${toDateObj.getFullYear()}`,
       createdAt: Date.now()
     });
 
@@ -138,12 +137,11 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // Powiadomienie tylko dla tego dodanego gracza
     await notifyAbsenceAdded(
       guild,
       nick,
-      `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
-      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`
+      `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}/${fromDateObj.getFullYear()}`,
+      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}/${toDateObj.getFullYear()}`
     );
 
   } catch (err) {
