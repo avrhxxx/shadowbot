@@ -40,9 +40,9 @@ function renderDateFormatsEmbed(): EmbedBuilder {
       "- 1807\n\n" +
       "📅 **Year Only**\n" +
       "- 2026\n\n" +
-      "✨ Tip: Don’t overthink it — just type it straight!"
+      "✨ Tip: Don’t overthink it — just type it straight!\n\n" +
+      `⏱ Last Update: <t:${unixTimestamp}:F>`
     )
-    .setFooter({ text: `Last Update: <t:${unixTimestamp}:F>` })
     .setColor("Blue");
 }
 
