@@ -1,4 +1,3 @@
-// src/moderatorPanel/moderatorPanel.ts
 import {
   Client,
   TextChannel,
@@ -29,24 +28,21 @@ function renderDateFormatsEmbed(): EmbedBuilder {
   const unixTimestamp = Math.floor(Date.now() / 1000);
   return new EmbedBuilder()
     .setTitle("📅 Accepted Date & Time Formats")
-    .setDescription("Please enter dates and times in one of the following formats:")
-    .addFields(
-      {
-        name: "🕰 Date + Time",
-        value:
-          `DD.MM HH:MM   → 18.07 20:30\n` +
-          `DD/MM HH:MM   → 18/07 20:30\n` +
-          `DD-MM HH:MM   → 18-07 20:30\n` +
-          `DD.MM HHMM    → 18.07 2030\n` +
-          `DD/MM HHMM    → 18/07 2030\n` +
-          `DD-MM HHMM    → 18-07 2030\n` +
-          `DDMM HHMM     → 1807 2030\n` +
-          `DDMMHHMM      → 18072030`
-      },
-      { name: "📆 Year only", value: "YYYY → 2026" },
-      { name: "Tip", value: "No need for magic wands — just type it straight! ✨" },
-      { name: "Last Update", value: `<t:${unixTimestamp}:F>` }
+    .setDescription(
+      "💡 Some forms require full date & time, others just day/month.\n\n" +
+      "🕰 **Full Date + Time Examples**\n" +
+      "- 18.07 20:30\n" +
+      "- 18/07 20:30\n" +
+      "- 18072030\n\n" +
+      "📆 **Day & Month Only**\n" +
+      "- 18.07\n" +
+      "- 18/07\n" +
+      "- 1807\n\n" +
+      "📅 **Year Only**\n" +
+      "- 2026\n\n" +
+      "✨ Tip: Don’t overthink it — just type it straight!"
     )
+    .setFooter({ text: `Last Update: <t:${unixTimestamp}:F>` })
     .setColor("Blue");
 }
 
