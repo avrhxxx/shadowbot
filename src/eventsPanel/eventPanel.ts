@@ -3,7 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } fr
 /**
  * Renderuje Event Panel
  * Rząd 1: operacje
- * Rząd 2: ustawienia i help
+ * Rząd 2: guide i ustawienia
  */
 export function renderEventPanel(): MessageCreateOptions {
 
@@ -11,39 +11,39 @@ export function renderEventPanel(): MessageCreateOptions {
     new ButtonBuilder()
       .setCustomId("event_create")
       .setLabel("Create Event")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Primary), // niebieski
 
     new ButtonBuilder()
       .setCustomId("event_list")
       .setLabel("Events List")
-      .setStyle(ButtonStyle.Primary),
-
-    new ButtonBuilder()
-      .setCustomId("event_cancel")
-      .setLabel("Cancel Event")
-      .setStyle(ButtonStyle.Danger),
+      .setStyle(ButtonStyle.Primary), // niebieski
 
     new ButtonBuilder()
       .setCustomId("event_manual_reminder")
       .setLabel("Manual Reminder")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary), // niebieski
 
     new ButtonBuilder()
       .setCustomId("event_show_all")
       .setLabel("Show All")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Primary), // niebieski
+
+    new ButtonBuilder()
+      .setCustomId("event_cancel")
+      .setLabel("Cancel Event")
+      .setStyle(ButtonStyle.Danger) // czerwony
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("event_settings")
-      .setLabel("Settings")
-      .setStyle(ButtonStyle.Secondary),
-
-    new ButtonBuilder()
       .setCustomId("event_help")
       .setLabel("Guide")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Success), // zielony
+
+    new ButtonBuilder()
+      .setCustomId("event_settings")
+      .setLabel("Settings")
+      .setStyle(ButtonStyle.Secondary) // szary, na końcu
   );
 
   return {

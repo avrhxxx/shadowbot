@@ -1,20 +1,22 @@
-// 🔹 Import Google Sheets klienta jako pierwszy
-import "./googleSheetsClient";
+// src/index.ts
+import "./googleSheetsClient"; // 🔹 Google Sheets klient
 
 import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
+import { handleAbsenceInteraction } from "./absencePanel/absenceHandler"; 
+import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification"; // <- nowa integracja
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
 if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
@@ -30,17 +32,39 @@ client.once("ready", async () => {
   initModeratorPanel(client);
 
   // -----------------------------
-  // Init event reminders
+  // Init event reminders i absence notifications
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
+    // Event reminders
     initEventReminders(guild);
+
+    // Absence notifications (embed + auto cleaner)
+    initAbsenceNotifications(guild).catch(err => {
+      console.error(`Error initializing absence notifications for guild ${guild.id}:`, err);
+    });
   }
 
   // -----------------------------
   // Interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
-    await handleEventInteraction(interaction);
+    try {
+      // Obsługa eventów
+      await handleEventInteraction(interaction);
+
+      // Obsługa absence panel
+      await handleAbsenceInteraction(interaction);
+
+    } catch (err) {
+      console.error("Error in interactionCreate:", err);
+
+      if (interaction.isRepliable()) {
+        await interaction.reply({
+          content: "❌ An unexpected error occurred.",
+          ephemeral: true,
+        }).catch(() => null);
+      }
+    }
   });
 });
 
