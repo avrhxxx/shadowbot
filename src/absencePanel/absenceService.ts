@@ -1,4 +1,3 @@
-// src/absencePanel/absenceService.ts
 import * as GS from "../googleSheetsStorage";
 
 export interface AbsenceObject {
@@ -8,6 +7,7 @@ export interface AbsenceObject {
   startDate: string;
   endDate: string;
   createdAt: number;
+  year?: number;
 }
 
 export interface AbsenceConfig {
@@ -34,6 +34,7 @@ export async function loadAbsences(guildId: string): Promise<AbsenceObject[]> {
         startDate: obj.startDate,
         endDate: obj.endDate,
         createdAt: toNumber(obj.createdAt),
+        year: obj.year ? Number(obj.year) : new Date().getFullYear()
       } as AbsenceObject;
     })
     .filter(a => a.guildId === guildId);
@@ -51,9 +52,10 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
   if (existing) throw new Error(`Player ${data.player} is already on absence list.`);
 
   const rows = await GS.readAbsenceSheet();
-  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt"];
+  const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","year"];
   const newRow = headers.map(h => {
     if (h === "createdAt") return data.createdAt ?? Date.now();
+    if (h === "year") return data.year ?? new Date().getFullYear();
     return (data as any)[h] ?? "";
   });
 
@@ -80,9 +82,7 @@ export async function removeAbsence(guildId: string, player: string): Promise<Ab
   return target;
 }
 
-// -------------------------
 // CONFIG
-// -------------------------
 export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> {
   const rows = await GS.readAbsenceConfigSheet();
   if (!rows.length) return {};
