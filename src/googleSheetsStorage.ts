@@ -7,10 +7,18 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 // --------------------------
 
 const MODERATOR_CONFIG_TAB = "moderator_config";
+
 const EVENTS_TAB = "events";
 const EVENTS_CONFIG_TAB = "events_config";
+
+const POINTS_TAB = "points";
+const POINTS_CONFIG_TAB = "points_config";
+
 const ABSENCE_TAB = "absence";
 const ABSENCE_CONFIG_TAB = "absence_config";
+
+const TRANSLATE_TAB = "translate";
+const TRANSLATE_CONFIG_TAB = "translate_config";
 
 // --------------------------
 // ENV VALIDATION
