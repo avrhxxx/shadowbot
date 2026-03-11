@@ -1,52 +1,48 @@
 // src/absencePanel/absenceButtons/absenceNotification.ts
-import { Guild, TextChannel, EmbedBuilder, ChannelType } from "discord.js";
+import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
 
 // -----------------------------
-// CHANNEL CREATION & EMBED MANAGEMENT
+// FETCH CHANNEL FROM SETTINGS
 // -----------------------------
-export async function ensureAwayBoardChannel(guild: Guild): Promise<TextChannel> {
-  const channelName = "away-board";
-  let channel = guild.channels.cache.find(
-    (c) => c.name === channelName && c.type === ChannelType.GuildText
-  ) as TextChannel;
+export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
+  const config = await AS.getAbsenceConfig(guild.id);
+  if (!config.notificationChannel) return null;
 
-  if (!channel) {
-    channel = await guild.channels.create({
-      name: channelName,
-      type: ChannelType.GuildText,
-      reason: "Absence Board channel for notifications",
-    });
-  }
+  const channel = guild.channels.cache.get(config.notificationChannel);
+  if (!channel || !channel.isTextBased()) return null;
 
-  return channel;
+  return channel as TextChannel;
 }
 
 // -----------------------------
-// CHECK ABSENCES & NOTIFICATIONS
+// CHECK ABSENCES & UPDATE EMBED
 // -----------------------------
-export async function updateAbsenceNotifications(guildId: string, channel: TextChannel) {
-  const absences = await AS.loadAbsences(guildId);
+export async function updateAbsenceNotifications(guild: Guild) {
+  const channel = await getNotificationChannel(guild);
+  if (!channel) return;
+
+  const absences = await AS.loadAbsences(guild.id);
   const now = new Date();
 
   // Filtrujemy aktywne absencje
-  const activeAbsences = absences.filter((a: AS.AbsenceObject) => new Date(a.endDate) >= now);
+  const activeAbsences = absences.filter(a => new Date(a.endDate) >= now);
 
-  // Przygotowujemy embed z listą absencji
+  // Przygotowujemy embed
   const embed = new EmbedBuilder()
     .setTitle("Absence List")
     .setDescription(
       activeAbsences.length
         ? activeAbsences
-            .map((a: AS.AbsenceObject) => `**${a.player}**: from ${a.startDate} to ${a.endDate}`)
+            .map(a => `**${a.player}**: from ${a.startDate} to ${a.endDate}`)
             .join("\n")
         : "No active absences"
     )
     .setColor("Blue")
     .setTimestamp();
 
-  // Sprawdzamy, czy istnieje wiadomość z embedem (przechowujemy ID w service lub config)
-  const config = await AS.getAbsenceConfig(guildId);
+  // Pobieramy lub tworzymy wiadomość z embedem
+  const config = await AS.getAbsenceConfig(guild.id);
   let message;
   try {
     if (config.absenceEmbedId) {
@@ -54,14 +50,14 @@ export async function updateAbsenceNotifications(guildId: string, channel: TextC
       await message.edit({ embeds: [embed] });
     } else {
       message = await channel.send({ embeds: [embed] });
-      await AS.setConfig(guildId, "absenceEmbedId", message.id);
+      await AS.setConfig(guild.id, "absenceEmbedId", message.id);
     }
   } catch (err) {
     console.error("Error updating absence embed:", err);
   }
 
   // Powiadomienia dla nowych absencji
-  const toNotify = activeAbsences.filter((a: AS.AbsenceObject) => !a.notified);
+  const toNotify = activeAbsences.filter(a => !a.notified);
   for (const absence of toNotify) {
     await channel.send(
       `Player **${absence.player}** will be absent from ${absence.startDate} to ${absence.endDate}.`
@@ -73,9 +69,12 @@ export async function updateAbsenceNotifications(guildId: string, channel: TextC
 // -----------------------------
 // AUTO CLEANER
 // -----------------------------
-export function startAbsenceAutoCleaner(guildId: string, channel: TextChannel, intervalMs = 15 * 60 * 1000) {
+export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
   setInterval(async () => {
-    const absences = await AS.loadAbsences(guildId);
+    const channel = await getNotificationChannel(guild);
+    if (!channel) return;
+
+    const absences = await AS.loadAbsences(guild.id);
     const now = new Date();
 
     for (const a of absences) {
@@ -87,7 +86,7 @@ export function startAbsenceAutoCleaner(guildId: string, channel: TextChannel, i
     }
 
     // Zaktualizuj embed po usunięciu
-    await updateAbsenceNotifications(guildId, channel);
+    await updateAbsenceNotifications(guild);
   }, intervalMs);
 }
 
@@ -95,12 +94,12 @@ export function startAbsenceAutoCleaner(guildId: string, channel: TextChannel, i
 // MAIN INITIALIZATION
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
-  const channel = await ensureAwayBoardChannel(guild);
-  const guildId = guild.id;
+  const channel = await getNotificationChannel(guild);
+  if (!channel) return;
 
   // Od razu zaktualizuj listę
-  await updateAbsenceNotifications(guildId, channel);
+  await updateAbsenceNotifications(guild);
 
   // Uruchom automatyczny cleaner co 15 minut
-  startAbsenceAutoCleaner(guildId, channel, 15 * 60 * 1000);
+  startAbsenceAutoCleaner(guild, 15 * 60 * 1000);
 }
