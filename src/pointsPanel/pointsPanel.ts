@@ -1,38 +1,42 @@
-// src/moderatorPanel/pointsPanel/pointsPanel.ts
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } from "discord.js";
+// src/pointsPanel/pointsPanel.ts
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions, Interaction } from "discord.js";
 
-/**
- * Renderuje Points Panel – główny wybór kategorii + guide/settings
- */
-export function renderPointsPanel(): MessageCreateOptions {
-  // Rząd 1: wybór kategorii
+export function renderPointsCategoryPanel(): MessageCreateOptions {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("points_category_donations") // Alliance Donations
+      .setCustomId("points_category_donations")
       .setLabel("Alliance Donations")
       .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("points_category_duel") // Alliance Duel
+      .setCustomId("points_category_duel")
       .setLabel("Alliance Duel")
       .setStyle(ButtonStyle.Primary)
   );
 
-  // Rząd 2: guide i settings
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_guide")
       .setLabel("Guide")
-      .setStyle(ButtonStyle.Success), // zielony
+      .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
       .setCustomId("points_settings")
       .setLabel("Settings")
-      .setStyle(ButtonStyle.Secondary) // szary
+      .setStyle(ButtonStyle.Secondary)
   );
 
   return {
-    content: "📌 **Points Panel – Choose a category**",
+    content: "📌 **Points Panel – Choose Category**",
     components: [row1, row2]
   };
+}
+
+export async function handlePointsMenu(interaction: Interaction) {
+  if (!interaction.isButton()) return;
+
+  await interaction.reply({
+    ...renderPointsCategoryPanel(),
+    ephemeral: true
+  });
 }
