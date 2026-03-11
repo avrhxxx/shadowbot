@@ -20,23 +20,6 @@ function parseAbsenceDate(dateStr: string, year: number): Date | null {
   return new Date(year, month, day);
 }
 
-// Liczy różnicę w czytelnej formie: dni/godziny/minuty
-function formatBackTime(end: Date): string {
-  const now = new Date();
-  let diff = end.getTime() - now.getTime();
-  if (diff <= 0) return "Back now";
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  diff -= days * (1000 * 60 * 60 * 24);
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  diff -= hours * (1000 * 60 * 60);
-  const minutes = Math.floor(diff / (1000 * 60));
-
-  if (days > 0) return `Back in ${days} day${days > 1 ? "s" : ""}`;
-  if (hours > 0) return `Back in ${hours} hour${hours > 1 ? "s" : ""}`;
-  return `Back in ${minutes} minute${minutes !== 1 ? "s" : ""}`;
-}
-
 // -----------------------------
 // GET CHANNEL
 // -----------------------------
@@ -57,13 +40,12 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 // NOTIFICATIONS
 // -----------------------------
 export async function notifyAbsenceAdded(guild: Guild, player: string, startDate: string, endDate: string) {
+  const absences = await AS.getAbsences(guild.id);
+  const absence = absences.find(a => a.player === player);
+  const year = absence?.year ?? new Date().getFullYear();
+
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
-
-  const absences = await AS.getAbsences(guild.id);
-  const record = absences.find(a => a.player === player);
-  const year = record?.year ?? new Date().getFullYear();
-
   await channel.send(`📌 Player ${player} is now absent from ${formatAbsenceDate(startDate, year)} to ${formatAbsenceDate(endDate, year)}.`);
 }
 
@@ -99,9 +81,9 @@ export async function initAbsenceNotifications(guild: Guild) {
   } else {
     embed.setDescription(
       absences.map(a => {
-        const endDate = parseAbsenceDate(a.endDate, a.year);
-        const backStr = endDate ? formatBackTime(endDate) : "Unknown";
-        return `• ${a.player} — ${formatAbsenceDate(a.startDate, a.year)} → ${formatAbsenceDate(a.endDate, a.year)} (Back: ${backStr})`;
+        const endDate = parseAbsenceDate(a.endDate, a.year ?? new Date().getFullYear());
+        const backStr = endDate ? `<t:${Math.floor(endDate.getTime()/1000)}:R>` : "Unknown";
+        return `• ${a.player} — ${formatAbsenceDate(a.startDate, a.year ?? new Date().getFullYear())} → ${formatAbsenceDate(a.endDate, a.year ?? new Date().getFullYear())} (Back: ${backStr})`;
       }).join("\n")
     );
   }
@@ -139,7 +121,7 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15*60*1000) {
     const now = new Date();
 
     for (const a of absences) {
-      const endDate = parseAbsenceDate(a.endDate, a.year);
+      const endDate = parseAbsenceDate(a.endDate, a.year ?? new Date().getFullYear());
       if (endDate && endDate < now) {
         await AS.deleteAbsenceRow(a.id);
         await notifyAbsenceAutoClean(guild, a.player);
