@@ -48,13 +48,9 @@ export async function getAbsenceByPlayer(guildId: string, player: string): Promi
   return absences.find(a => a.player.toLowerCase() === player.toLowerCase()) || null;
 }
 
-// -------------------------
-// CREATE / REMOVE ABSENCE
-// -------------------------
 export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject> {
   const existing = await getAbsenceByPlayer(data.guildId, data.player);
   if (existing) throw new Error(`Player ${data.player} is already on absence list.`);
-
   const rows = await GS.readAbsenceSheet();
   const headers = rows[0] ?? ["id","guildId","player","startDate","endDate","createdAt","notified"];
   if (!headers.includes("notified")) headers.push("notified");
@@ -67,14 +63,6 @@ export async function createAbsence(data: AbsenceObject): Promise<AbsenceObject>
 
   await GS.writeAbsenceSheet([headers, ...rows.slice(1), newRow]);
   return data;
-}
-
-export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
-  const absences = await loadAbsences(guildId);
-  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
-  if (!target) return false;
-  await deleteAbsenceRow(target.id);
-  return true;
 }
 
 export async function updateAbsenceCell(absenceId: string, columnName: string, value: any) {
@@ -98,6 +86,26 @@ export async function deleteAbsenceRow(absenceId: string) {
   const rowIndex = rows.findIndex(r => r[idIndex] === absenceId);
   if (rowIndex === -1) return;
   await GS.deleteAbsenceRow(rowIndex + 1);
+}
+
+export async function removeAbsence(guildId: string, player: string): Promise<boolean> {
+  const absences = await loadAbsences(guildId);
+  const target = absences.find(a => a.player.toLowerCase() === player.toLowerCase());
+  if (!target) return false;
+  await deleteAbsenceRow(target.id);
+  return true;
+}
+
+// -------------------------
+// Notification helpers
+// -------------------------
+export async function getAbsencesToNotify(guildId: string): Promise<AbsenceObject[]> {
+  const absences = await loadAbsences(guildId);
+  return absences.filter(a => !a.notified);
+}
+
+export async function markAbsenceNotified(absenceId: string) {
+  await updateAbsenceCell(absenceId, "notified", true);
 }
 
 // -------------------------
