@@ -1,3 +1,4 @@
+// src/absencePanel/absenceService.ts
 import * as GS from "../googleSheetsStorage";
 
 export interface AbsenceObject {
@@ -113,19 +114,38 @@ export async function getAbsenceConfig(guildId: string): Promise<AbsenceConfig> 
 }
 
 export async function setNotificationChannel(guildId: string, channelId: string) {
+  await setConfig(guildId, "notificationChannel", channelId);
+}
+
+// -------------------------
+// UNIVERSAL CONFIG SETTER
+// -------------------------
+export async function setConfig(guildId: string, key: string, value: any) {
   const rows = await GS.readAbsenceConfigSheet();
-  const headers = rows[0] ?? ["guildId","notificationChannel"];
+  const headers = rows[0] ?? ["guildId", "notificationChannel"];
   const dataRows = rows.slice(1);
+
+  // Dodaj kolumnę jeśli nie istnieje
+  if (!headers.includes(key)) {
+    headers.push(key);
+    for (const r of dataRows) while (r.length < headers.length) r.push("");
+  }
+
   const guildIndex = headers.indexOf("guildId");
+  const keyIndex = headers.indexOf(key);
+
   let row = dataRows.find(r => r[guildIndex] === guildId);
   let rowIndex: number;
+
   if (!row) {
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
     dataRows.push(row);
     rowIndex = dataRows.length;
-  } else rowIndex = dataRows.indexOf(row) + 1;
-  const keyIndex = headers.indexOf("notificationChannel");
+  } else {
+    rowIndex = dataRows.indexOf(row) + 1;
+  }
+
   await GS.writeAbsenceConfigSheet([headers, ...dataRows]);
-  await GS.updateAbsenceConfigCell(rowIndex + 1, keyIndex + 1, channelId);
+  await GS.updateAbsenceConfigCell(rowIndex + 1, keyIndex + 1, value);
 }
