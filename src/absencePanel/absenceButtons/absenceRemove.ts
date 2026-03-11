@@ -47,10 +47,10 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
       return;
     }
 
-    await interaction.followUp({ content: `✅ Absence for **${nick}** removed from the list.` });
+    await interaction.followUp({ content: `✅ Absence for **${nick}** removed.` });
 
-    // ← odświeżamy embed i wysyłamy powiadomienie w notification
-    await updateAbsenceNotifications(guild);
+    // Odśwież embed i wyślij powiadomienie tylko dla tego gracza
+    await updateAbsenceNotifications(guild, [nick]);
 
   } catch (err) {
     console.error("Error removing absence:", err);
