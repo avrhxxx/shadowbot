@@ -1,9 +1,9 @@
-// src/moderatorPanel/moderatorButtons/pointsMenu.ts
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from "discord.js";
 
 // --- Funkcja renderująca główny panel wyboru kategorii ---
 export function renderPointsCategoryPanel() {
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  // Rząd 1: wybór kategorii
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_category_donations") // Alliance Donations
       .setLabel("Alliance Donations")
@@ -15,9 +15,22 @@ export function renderPointsCategoryPanel() {
       .setStyle(ButtonStyle.Primary)
   );
 
+  // Rząd 2: guide i settings
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("points_guide")
+      .setLabel("Guide")
+      .setStyle(ButtonStyle.Success), // zielony
+
+    new ButtonBuilder()
+      .setCustomId("points_settings")
+      .setLabel("Settings")
+      .setStyle(ButtonStyle.Secondary) // szary
+  );
+
   return {
     content: "📌 **Points Panel – Wybierz kategorię**",
-    components: [row]
+    components: [row1, row2]
   };
 }
 
