@@ -10,7 +10,12 @@ export const IDS = {
     DUEL: "points_category_duel",
     GUIDE: "points_guide",
     SETTINGS: "points_settings",
-    // Przyciski w panelach kategorii
+
+    // Create / List Weeks w panelu głównym
+    CREATE_WEEK: "points_create_week",
+    LIST_WEEKS: "points_list_weeks",
+
+    // Przykładowe przyciski w panelach kategorii
     ADD: "points_add",
     LIST: "points_list",
     COMPARE: "points_compare",
@@ -21,19 +26,23 @@ export const IDS = {
 // Mapowanie przycisków na funkcje
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
   // Główny wybór kategorii
-  [IDS.BUTTONS.DONATIONS]: async (i) => await PB.handleDonationsPanel(i),
-  [IDS.BUTTONS.DUEL]: async (i) => await PB.handleDuelPanel(i),
+  [IDS.BUTTONS.DONATIONS]: async (i) => await PB.pointsDonations.handleDonationsPanel(i),
+  [IDS.BUTTONS.DUEL]: async (i) => await PB.pointsDuel.handleDuelPanel(i),
   [IDS.BUTTONS.GUIDE]: async (i) => await PB.handleGuide(i),
   [IDS.BUTTONS.SETTINGS]: async (i) => await PB.handleSettings(i),
 
-  // Przykładowe przyciski w panelach (możesz rozszerzać)
+  // Create / List Weeks
+  [IDS.BUTTONS.CREATE_WEEK]: async (i) => await PB.pointsCreate.handleCreateWeek(i),
+  [IDS.BUTTONS.LIST_WEEKS]: async (i) => await PB.pointsListWeeks.handleListWeeks(i),
+
+  // Przyciski wewnątrz paneli kategorii (rozszerzalne)
   [IDS.BUTTONS.ADD]: async (i) => await PS.handleAddPoints(i),
   [IDS.BUTTONS.LIST]: async (i) => await PS.handlePointsList(i),
   [IDS.BUTTONS.COMPARE]: async (i) => await PS.handleCompareWeeks(i),
   [IDS.BUTTONS.BACK]: async (i) => await PB.handleBackToCategory(i)
 };
 
-// Globalny handler dla interakcji w pointsPanel
+// Globalny handler dla wszystkich przycisków w Points Panel
 export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
   try {
     if (!interaction.isButton()) return;
