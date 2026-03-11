@@ -6,8 +6,9 @@ import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
-import { handleAbsenceInteraction } from "./absencePanel/absenceHandler"; 
-import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification"; // <- nowa integracja
+import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
+import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
+import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
 
 const client = new Client({
   intents: [
@@ -45,7 +46,7 @@ client.once("ready", async () => {
   }
 
   // -----------------------------
-  // Interaction handler
+  // Global interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
@@ -54,6 +55,9 @@ client.once("ready", async () => {
 
       // Obsługa absence panel
       await handleAbsenceInteraction(interaction);
+
+      // Obsługa points panel
+      await handlePointsInteraction(interaction);
 
     } catch (err) {
       console.error("Error in interactionCreate:", err);
