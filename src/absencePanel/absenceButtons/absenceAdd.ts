@@ -53,7 +53,6 @@ function parseDateWithYear(input: string, referenceYear?: number): Date | null {
   const year = referenceYear ?? new Date().getFullYear();
   let date = new Date(year, month - 1, day);
 
-  // jeśli data końcowa < data początkowa, przyjmujemy rok następny
   if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
     date.setFullYear(year + 1);
   }
@@ -105,9 +104,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
 
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    await interaction.followUp({
-      content: `❌ Player ${nick} is already on the absence list.`
-    });
+    await interaction.followUp({ content: `❌ Player ${nick} is already on the absence list.` });
     return;
   }
 
@@ -132,16 +129,20 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       player: nick,
       startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
       endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
-      createdAt: Date.now(),
-      notified: false // teraz zbędne, ale zostawione dla kompatybilności
+      createdAt: Date.now()
     });
 
     await interaction.followUp({
       content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // Powiadomienie tylko dla tego add
-    await notifyAbsenceAdded(guild, nick, `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`, `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`);
+    // Powiadomienie tylko dla tego dodanego
+    await notifyAbsenceAdded(
+      guild,
+      nick,
+      `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
+      `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`
+    );
 
   } catch (err) {
     console.error("Error saving absence:", err);
