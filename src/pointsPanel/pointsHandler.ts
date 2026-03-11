@@ -15,7 +15,7 @@ export const IDS = {
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
 
-    // Przykładowe przyciski w panelach kategorii
+    // Przyciski w panelach kategorii
     ADD: "points_add",
     LIST: "points_list",
     COMPARE: "points_compare",
@@ -26,20 +26,20 @@ export const IDS = {
 // Mapowanie przycisków na funkcje
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
   // Główny wybór kategorii
-  [IDS.BUTTONS.DONATIONS]: async (i) => await PB.pointsDonations.handleDonationsPanel(i),
-  [IDS.BUTTONS.DUEL]: async (i) => await PB.pointsDuel.handleDuelPanel(i),
-  [IDS.BUTTONS.GUIDE]: async (i) => await PB.handleGuide(i),
-  [IDS.BUTTONS.SETTINGS]: async (i) => await PB.handleSettings(i),
+  [IDS.BUTTONS.DONATIONS]: async (i) => await PB.PBDonations.handleDonationsPanel(i),
+  [IDS.BUTTONS.DUEL]: async (i) => await PB.PBDuel.handleDuelPanel(i),
+  [IDS.BUTTONS.GUIDE]: async (i) => await PB.handleGuide?.(i),
+  [IDS.BUTTONS.SETTINGS]: async (i) => await PB.handleSettings?.(i),
 
   // Create / List Weeks
-  [IDS.BUTTONS.CREATE_WEEK]: async (i) => await PB.pointsCreate.handleCreateWeek(i),
-  [IDS.BUTTONS.LIST_WEEKS]: async (i) => await PB.pointsListWeeks.handleListWeeks(i),
+  [IDS.BUTTONS.CREATE_WEEK]: async (i) => await PB.PBCreate.handleCreateWeek(i),
+  [IDS.BUTTONS.LIST_WEEKS]: async (i) => await PB.PBListWeeks.handleListWeeks(i),
 
-  // Przyciski wewnątrz paneli kategorii (rozszerzalne)
+  // Przyciski wewnątrz paneli kategorii
   [IDS.BUTTONS.ADD]: async (i) => await PS.handleAddPoints(i),
   [IDS.BUTTONS.LIST]: async (i) => await PS.handlePointsList(i),
   [IDS.BUTTONS.COMPARE]: async (i) => await PS.handleCompareWeeks(i),
-  [IDS.BUTTONS.BACK]: async (i) => await PB.handleBackToCategory(i)
+  [IDS.BUTTONS.BACK]: async (i) => await PB.handleBackToCategory?.(i)
 };
 
 // Globalny handler dla wszystkich przycisków w Points Panel
@@ -54,10 +54,11 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
   } catch (error) {
     console.error("Error handling points interaction:", error);
     if (interaction.isRepliable()) {
-      if (interaction.replied || interaction.deferred)
+      if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: "❌ An error occurred.", ephemeral: true });
-      else
+      } else {
         await interaction.reply({ content: "❌ An error occurred.", ephemeral: true });
+      }
     }
   }
 }
