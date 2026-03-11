@@ -8,7 +8,8 @@ import {
   ModalSubmitInteraction, 
   Guild, 
   ButtonBuilder, 
-  ButtonStyle
+  ButtonStyle, 
+  CacheType 
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
 import { notifyAbsenceAdded } from "./absenceNotification";
@@ -24,6 +25,8 @@ export const tempAbsenceStore = new Map<string, {
   fromDateObj: Date;
   toDateObj: Date;
 }>();
+
+type InteractionType = ModalSubmitInteraction<CacheType> | ButtonInteraction<CacheType>;
 
 // ----------------------------
 // HELPERS TO CREATE INPUTS
@@ -137,7 +140,6 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
 
   const now = new Date();
   if (fromDateObj.getTime() < now.getTime()) {
-    // Save temporary data for next year
     const tempId = `${nick}-${Date.now()}`;
     tempAbsenceStore.set(tempId, { nick, fromRaw, toRaw, guildId, fromDateObj, toDateObj });
 
@@ -166,7 +168,7 @@ export async function createAndNotifyAbsence(
   fromDateObj: Date,
   toDateObj: Date,
   guildId: string,
-  interaction?: ModalSubmitInteraction
+  interaction?: InteractionType
 ) {
   const id = `${nick}-${fromDateObj.getDate()}${fromDateObj.getMonth() + 1}-${toDateObj.getDate()}${toDateObj.getMonth() + 1}`;
 
@@ -181,7 +183,7 @@ export async function createAndNotifyAbsence(
       year: fromDateObj.getFullYear()
     });
 
-    if (interaction) {
+    if (interaction && "followUp" in interaction) {
       await interaction.followUp({
         content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
       });
@@ -197,7 +199,7 @@ export async function createAndNotifyAbsence(
 
   } catch (err) {
     console.error("Error saving absence:", err);
-    if (interaction) {
+    if (interaction && "followUp" in interaction) {
       await interaction.followUp({ content: "❌ Failed to save absence." });
     }
   }
