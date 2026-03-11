@@ -9,17 +9,17 @@ export function renderAbsencePanel(): MessageCreateOptions {
     new ButtonBuilder()
       .setCustomId("absence_list")  // nowy plik i handler
       .setLabel("Absences List")    // widoczne dla użytkownika
-      .setStyle(ButtonStyle.Primary),
-
-    new ButtonBuilder()
-      .setCustomId("absence_settings")
-      .setLabel("Settings")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary), // niebieski
 
     new ButtonBuilder()
       .setCustomId("absence_help")
       .setLabel("Guide")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Success), // zielony
+
+    new ButtonBuilder()
+      .setCustomId("absence_settings")
+      .setLabel("Settings")
+      .setStyle(ButtonStyle.Secondary) // szary, na końcu
   );
 
   return {
