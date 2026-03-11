@@ -47,9 +47,9 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
       return;
     }
 
-    await interaction.followUp({ content: `✅ Absence for ${nick} removed from the list.` });
+    await interaction.followUp({ content: `📌 Absence for ${nick} removed from the list.` });
 
-    // Powiadomienie tylko dla remove
+    // Powiadomienie tylko dla tego usuniętego
     await notifyAbsenceRemoved(guild, nick);
 
   } catch (err) {
