@@ -1,4 +1,5 @@
 // src/pointsPanel/pointsService.ts
+import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
 
 /**
  * Tworzy nowy tydzień w systemie punktów
@@ -23,9 +24,10 @@ export async function getAllWeeks(): Promise<string[]> {
 }
 
 /**
- * Placeholder: Dodaje punkty dla gracza w określonej kategorii i tygodniu
+ * Dodaje punkty dla gracza w określonej kategorii i tygodniu
+ * Placeholder do późniejszej implementacji
  */
-export async function handleAddPoints(interaction: any): Promise<void> {
+export async function handleAddPoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
     content: "Add Points functionality coming soon.",
     ephemeral: true
@@ -33,9 +35,10 @@ export async function handleAddPoints(interaction: any): Promise<void> {
 }
 
 /**
- * Placeholder: Pokazuje listę punktów dla kategorii/tygodnia
+ * Pokazuje listę punktów dla kategorii/tygodnia
+ * Placeholder do późniejszej implementacji
  */
-export async function handlePointsList(interaction: any): Promise<void> {
+export async function handlePointsList(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
     content: "Points List functionality coming soon.",
     ephemeral: true
@@ -43,9 +46,10 @@ export async function handlePointsList(interaction: any): Promise<void> {
 }
 
 /**
- * Placeholder: Porównuje tygodnie w ramach jednej kategorii
+ * Porównuje tygodnie w ramach jednej kategorii
+ * Placeholder do późniejszej implementacji
  */
-export async function handleCompareWeeks(interaction: any): Promise<void> {
+export async function handleCompareWeeks(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
     content: "Compare Weeks functionality coming soon.",
     ephemeral: true
