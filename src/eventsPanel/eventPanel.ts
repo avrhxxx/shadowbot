@@ -3,7 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } fr
 /**
  * Renderuje Event Panel
  * Rząd 1: operacje
- * Rząd 2: ustawienia i guide
+ * Rząd 2: guide i ustawienia
  */
 export function renderEventPanel(): MessageCreateOptions {
 
@@ -36,14 +36,14 @@ export function renderEventPanel(): MessageCreateOptions {
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("event_settings")
-      .setLabel("Settings")
+      .setCustomId("event_help")
+      .setLabel("Guide")
       .setStyle(ButtonStyle.Success), // zielony
 
     new ButtonBuilder()
-      .setCustomId("event_help")
-      .setLabel("Guide")
-      .setStyle(ButtonStyle.Success) // zielony
+      .setCustomId("event_settings")
+      .setLabel("Settings")
+      .setStyle(ButtonStyle.Secondary) // szary, na końcu
   );
 
   return {
