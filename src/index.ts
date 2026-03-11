@@ -1,12 +1,13 @@
-// 🔹 Import Google Sheets klienta jako pierwszy
-import "./googleSheetsClient";
+// src/index.ts
+import "./googleSheetsClient"; // 🔹 Google Sheets klient
 
 import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
-import { handleAbsenceInteraction } from "./absencePanel/absenceHandler"; // <- Absence panel
+import { handleAbsenceInteraction } from "./absencePanel/absenceHandler"; 
+import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification"; // <- nowa integracja
 
 const client = new Client({
   intents: [
@@ -31,10 +32,16 @@ client.once("ready", async () => {
   initModeratorPanel(client);
 
   // -----------------------------
-  // Init event reminders
+  // Init event reminders i absence notifications
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
+    // Event reminders
     initEventReminders(guild);
+
+    // Absence notifications (embed + auto cleaner)
+    initAbsenceNotifications(guild).catch(err => {
+      console.error(`Error initializing absence notifications for guild ${guild.id}:`, err);
+    });
   }
 
   // -----------------------------
@@ -42,10 +49,10 @@ client.once("ready", async () => {
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
-      // najpierw eventy
+      // Obsługa eventów
       await handleEventInteraction(interaction);
 
-      // potem absence panel
+      // Obsługa absence panel
       await handleAbsenceInteraction(interaction);
 
     } catch (err) {
