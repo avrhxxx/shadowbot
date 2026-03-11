@@ -1,6 +1,26 @@
 // src/absencePanel/absenceButtons/absenceNotification.ts
-import { TextChannel, EmbedBuilder } from "discord.js";
-import * as AS from "../absenceService"; // Poprawiony import
+import { Guild, TextChannel, EmbedBuilder, ChannelType } from "discord.js";
+import * as AS from "../absenceService";
+
+// -----------------------------
+// CHANNEL CREATION & EMBED MANAGEMENT
+// -----------------------------
+export async function ensureAwayBoardChannel(guild: Guild): Promise<TextChannel> {
+  const channelName = "away-board";
+  let channel = guild.channels.cache.find(
+    (c) => c.name === channelName && c.type === ChannelType.GuildText
+  ) as TextChannel;
+
+  if (!channel) {
+    channel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      reason: "Absence Board channel for notifications",
+    });
+  }
+
+  return channel;
+}
 
 // -----------------------------
 // CHECK ABSENCES & NOTIFICATIONS
@@ -17,9 +37,9 @@ export async function updateAbsenceNotifications(guildId: string, channel: TextC
     .setTitle("Absence List")
     .setDescription(
       activeAbsences.length
-        ? activeAbsences.map((a: AS.AbsenceObject) =>
-            `**${a.player}**: from ${a.startDate} to ${a.endDate}`
-          ).join("\n")
+        ? activeAbsences
+            .map((a: AS.AbsenceObject) => `**${a.player}**: from ${a.startDate} to ${a.endDate}`)
+            .join("\n")
         : "No active absences"
     )
     .setColor("Blue")
@@ -69,4 +89,18 @@ export function startAbsenceAutoCleaner(guildId: string, channel: TextChannel, i
     // Zaktualizuj embed po usunięciu
     await updateAbsenceNotifications(guildId, channel);
   }, intervalMs);
+}
+
+// -----------------------------
+// MAIN INITIALIZATION
+// -----------------------------
+export async function initAbsenceNotifications(guild: Guild) {
+  const channel = await ensureAwayBoardChannel(guild);
+  const guildId = guild.id;
+
+  // Od razu zaktualizuj listę
+  await updateAbsenceNotifications(guildId, channel);
+
+  // Uruchom automatyczny cleaner co 15 minut
+  startAbsenceAutoCleaner(guildId, channel, 15 * 60 * 1000);
 }
