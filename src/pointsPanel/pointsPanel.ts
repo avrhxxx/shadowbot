@@ -1,21 +1,13 @@
 // src/pointsPanel/pointsPanel.ts
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  MessageCreateOptions,
-  Interaction
-} from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions, Interaction } from "discord.js";
 
 /**
- * Renderuje główny panel Points
- * Row 1: kategorie punktów
- * Row 2: zarządzanie tygodniami
- * Row 3: guide + settings
+ * Renderuje główny panel wyboru kategorii
+ * Rząd 1: wybór kategorii
+ * Rząd 2: Guide / Settings / Create Week / Weeks List
  */
-export function renderPointsCategoryPanel(): MessageCreateOptions {
-
-  // Row 1 — Categories
+export function renderPointsPanel(): MessageCreateOptions {
+  // Rząd 1: wybór kategorii
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_category_donations")
@@ -28,45 +20,42 @@ export function renderPointsCategoryPanel(): MessageCreateOptions {
       .setStyle(ButtonStyle.Primary)
   );
 
-  // Row 2 — Week management
+  // Rząd 2: dodatkowe akcje
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_create_week")
       .setLabel("Create Week")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Success), // zielony
 
     new ButtonBuilder()
       .setCustomId("points_list_weeks")
-      .setLabel("List Weeks")
-      .setStyle(ButtonStyle.Secondary)
-  );
+      .setLabel("Weeks List")
+      .setStyle(ButtonStyle.Primary), // niebieski
 
-  // Row 3 — Info / settings
-  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_guide")
       .setLabel("Guide")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success), // zielony
 
     new ButtonBuilder()
       .setCustomId("points_settings")
       .setLabel("Settings")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Secondary) // szary
   );
 
   return {
     content: "📌 **Points Panel – Choose Category**",
-    components: [row1, row2, row3]
+    components: [row1, row2]
   };
 }
 
 /**
- * Handler przycisku Points Menu
+ * Handler dla głównego przycisku Points Menu
  */
 export async function handlePointsMenu(interaction: Interaction) {
   if (!interaction.isButton()) return;
 
-  const panel = renderPointsCategoryPanel();
+  const panel = renderPointsPanel();
 
   await interaction.reply({
     content: panel.content,
