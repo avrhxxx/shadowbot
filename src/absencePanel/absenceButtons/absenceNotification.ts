@@ -19,8 +19,12 @@ function parseAbsenceDate(dateStr: string): Date | null {
   let day = Number(match[1]);
   let month = Number(match[2]) - 1;
   let year = new Date().getFullYear();
-  if (month < new Date().getMonth()) year += 1;
-  return new Date(year, month, day);
+  const date = new Date(year, month, day);
+  if (date.getTime() < Date.now() && month < new Date().getMonth()) {
+    year += 1;
+    return new Date(year, month, day);
+  }
+  return date;
 }
 
 // -----------------------------
@@ -40,7 +44,7 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 }
 
 // -----------------------------
-// EMBED ONLY (nie wysyła powiadomień)
+// EMBED ONLY
 // -----------------------------
 export async function updateAbsenceEmbed(guild: Guild) {
   const channel = await getNotificationChannel(guild);
@@ -64,7 +68,7 @@ export async function updateAbsenceEmbed(guild: Guild) {
       activeAbsences.map(a => {
         const endDate = parseAbsenceDate(a.endDate);
         const backStr = endDate ? `<t:${Math.floor(endDate.getTime()/1000)}:R>` : "Unknown";
-        return `• **${a.player}** — ${formatAbsenceDate(a.startDate)} → ${formatAbsenceDate(a.endDate)} (Back: ${backStr})`;
+        return `• ${a.player} — ${formatAbsenceDate(a.startDate)} → ${formatAbsenceDate(a.endDate)} (Back: ${backStr})`;
       }).join("\n")
     );
   }
@@ -96,24 +100,24 @@ export async function updateAbsenceEmbed(guild: Guild) {
 }
 
 // -----------------------------
-// NOTIFICATIONS (tylko w momencie zdarzenia)
+// NOTIFICATIONS
 // -----------------------------
 export async function notifyAbsenceAdded(guild: Guild, player: string, startDate: string, endDate: string) {
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
-  await channel.send(`Player **${player}** will be absent from ${formatAbsenceDate(startDate)} to ${formatAbsenceDate(endDate)}.`);
+  await channel.send(`📌 Player ${player} is now absent from ${formatAbsenceDate(startDate)} to ${formatAbsenceDate(endDate)}.`);
 }
 
 export async function notifyAbsenceRemoved(guild: Guild, player: string) {
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
-  await channel.send(`Player **${player}** has returned and is no longer absent.`);
+  await channel.send(`✅ Player ${player} has returned and is no longer absent.`);
 }
 
 export async function notifyAbsenceAutoClean(guild: Guild, player: string) {
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
-  await channel.send(`Player **${player}** was automatically removed after absence ended.`);
+  await channel.send(`🗑️ Player ${player} was automatically removed after absence ended.`);
 }
 
 // -----------------------------
@@ -147,7 +151,6 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15*60*1000) {
 // INIT
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
-  // embed odświeża się niezależnie, bez powiadomień
   await updateAbsenceEmbed(guild);
   startAbsenceAutoRefresh(guild);
   startAbsenceAutoCleaner(guild);
