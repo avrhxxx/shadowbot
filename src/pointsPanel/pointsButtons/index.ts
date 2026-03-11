@@ -1,6 +1,6 @@
 // src/pointsPanel/pointsButtons/index.ts
 
-export * as PBCreate from "./pointsCreate";
-export * as PBListWeeks from "./pointsListWeeks";
-export * as PBDonations from "./pointsDonations";
-export * as PBDuel from "./pointsDuel";
+export * as pointsCreate from "./pointsCreate";
+export * as pointsListWeeks from "./pointsListWeeks";
+export * as pointsDonations from "./pointsDonations";
+export * as pointsDuel from "./pointsDuel";
