@@ -58,12 +58,12 @@ function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
       .setLabel("Points Menu")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId("moderator_translate_menu")
-      .setLabel("Translate Menu")
+      .setCustomId("moderator_absence_menu")   // <-- zamienione miejsce z Translate Menu
+      .setLabel("Absence Menu")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId("moderator_absence_menu")
-      .setLabel("Absence Menu")
+      .setCustomId("moderator_translate_menu") // <-- zamienione miejsce z Absence Menu
+      .setLabel("Translate Menu")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("moderator_help")
