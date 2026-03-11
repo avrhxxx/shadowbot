@@ -8,7 +8,7 @@ import {
   Guild 
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
-import { updateAbsenceNotifications } from "./absenceNotification";
+import { notifyAbsenceAdded } from "./absenceNotification";
 
 // ----------------------------
 // HELPERS TO CREATE INPUTS
@@ -53,7 +53,7 @@ function parseDateWithYear(input: string, referenceYear?: number): Date | null {
   const year = referenceYear ?? new Date().getFullYear();
   let date = new Date(year, month - 1, day);
 
-  // jeśli data końcowa < data początkowa, ustaw rok następny
+  // jeśli data końcowa < data początkowa, przyjmujemy rok następny
   if (referenceYear && date.getTime() < new Date(referenceYear, 0, 1).getTime()) {
     date.setFullYear(year + 1);
   }
@@ -106,20 +106,20 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const absences = await getAbsences(guildId);
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
     await interaction.followUp({
-      content: `❌ Player **${nick}** is already on the absence list.`
+      content: `❌ Player ${nick} is already on the absence list.`
     });
     return;
   }
 
   const fromDateObj = parseDateWithYear(fromRaw);
   if (!fromDateObj) {
-    await interaction.followUp({ content: "❌ Invalid start date format." });
+    await interaction.followUp({ content: "Invalid start date format." });
     return;
   }
 
   const toDateObj = parseDateWithYear(toRaw, fromDateObj.getFullYear());
   if (!toDateObj) {
-    await interaction.followUp({ content: "❌ Invalid end date format." });
+    await interaction.followUp({ content: "Invalid end date format." });
     return;
   }
 
@@ -133,14 +133,15 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       startDate: `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`,
       endDate: `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`,
       createdAt: Date.now(),
+      notified: false // teraz zbędne, ale zostawione dla kompatybilności
     });
 
     await interaction.followUp({
-      content: `✅ Absence for **${nick}** added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
+      content: `📌 Absence for ${nick} added: ${formatDateDisplay(fromDateObj)} → ${formatDateDisplay(toDateObj)}`
     });
 
-    // Odśwież embed i wyślij powiadomienie tylko dla tego gracza
-    await updateAbsenceNotifications(guild, [nick]);
+    // Powiadomienie tylko dla tego add
+    await notifyAbsenceAdded(guild, nick, `${fromDateObj.getDate()}/${fromDateObj.getMonth() + 1}`, `${toDateObj.getDate()}/${toDateObj.getMonth() + 1}`);
 
   } catch (err) {
     console.error("Error saving absence:", err);
