@@ -25,7 +25,6 @@ export async function getAllWeeks(): Promise<string[]> {
 
 /**
  * Dodaje punkty dla gracza w określonej kategorii i tygodniu
- * Placeholder do późniejszej implementacji
  */
 export async function handleAddPoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
@@ -36,7 +35,6 @@ export async function handleAddPoints(interaction: ButtonInteraction | ModalSubm
 
 /**
  * Pokazuje listę punktów dla kategorii/tygodnia
- * Placeholder do późniejszej implementacji
  */
 export async function handlePointsList(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
@@ -47,7 +45,6 @@ export async function handlePointsList(interaction: ButtonInteraction | ModalSub
 
 /**
  * Porównuje tygodnie w ramach jednej kategorii
- * Placeholder do późniejszej implementacji
  */
 export async function handleCompareWeeks(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
