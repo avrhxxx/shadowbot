@@ -1,28 +1,26 @@
 import {
   ButtonInteraction,
+  CacheType,
   ModalBuilder,
-  ModalSubmitInteraction,
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
-  CacheType
+  ModalSubmitInteraction
 } from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
 
-// Bezpieczne reply / editReply dla obu typów interakcji
-async function safeReply(
+// ✅ Helper do bezpiecznego reply/edit
+function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
 ) {
-  if (interaction.replied || interaction.deferred) {
-    return interaction.editReply(payload);
-  }
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
 
-// Parsowanie daty tygodnia
+// Parsowanie daty z inputu
 function parseWeekDate(input: string) {
   const trimmed = input.trim();
   let match = trimmed.match(/^(\d{2})(\d{2})$/);
@@ -46,9 +44,7 @@ function formatWeekName(from: { day: number; month: number }, to: { day: number;
   return `${pad(from.day)}-${pad(from.month)} - ${pad(to.day)}-${pad(to.month)}`;
 }
 
-// ----------------------------
-// HANDLE BUTTON → OPEN MODAL
-// ----------------------------
+// Otwieranie modala tworzenia tygodnia
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
 
@@ -77,9 +73,7 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
   await interaction.showModal(modal);
 }
 
-// ----------------------------
-// HANDLE MODAL SUBMIT
-// ----------------------------
+// Obsługa submitu modala
 export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
   const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
   const category = categoryMatch ? categoryMatch[1] : null;
@@ -113,13 +107,12 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
       ephemeral: true
     });
 
-    // Delegowanie do odpowiedniej kategorii
-    switch (category.toLowerCase()) {
+    switch (category) {
       case "donations":
-        await pointsDonations.handlePointsDonations(interaction);
+        await pointsDonations.renderWeeks(interaction as ButtonInteraction<CacheType>);
         break;
       case "duel":
-        await pointsDuel.handlePointsDuel(interaction);
+        await pointsDuel.renderWeeks(interaction as ButtonInteraction<CacheType>);
         break;
       default:
         await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
