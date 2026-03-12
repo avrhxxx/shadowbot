@@ -1,6 +1,7 @@
 import { Interaction, ButtonInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
+import * as Utils from "./pointsButtons/utils";
 
 export const IDS = {
   BUTTONS: {
@@ -21,20 +22,33 @@ const BUTTON_HANDLERS: Record<
   string,
   (i: ButtonInteraction<CacheType>) => Promise<void>
 > = {
-  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
+    PB.pointsManagement.handlePointsManagementMain(i),
+
   [IDS.BUTTONS.GUIDE]: async (i) => {
-    await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
+    await i.reply({
+      content: "📖 Guide not implemented yet.",
+      ephemeral: true
+    });
   },
+
   [IDS.BUTTONS.SETTINGS]: async (i) => {
-    await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
+    await i.reply({
+      content: "⚙️ Settings not implemented yet.",
+      ephemeral: true
+    });
   },
-  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
+
+  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
+    PB.pointsListWeeks.handleListWeeks(i)
 };
 
 // -----------------------------
 // GLOBAL INTERACTION HANDLER
 // -----------------------------
-export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
+export async function handlePointsInteraction(
+  interaction: Interaction<CacheType>
+) {
   try {
     if (!interaction.isButton()) return;
 
@@ -46,39 +60,57 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       return;
     }
 
-    // 2️⃣ Stały przycisk Create Week: points_create_week_<category>
-    const createWeekMatch = customId.match(/^points_create_week_(.+)$/);
-    if (createWeekMatch) {
-      const category = createWeekMatch[1];
+    // 2️⃣ Create Week
+    if (Utils.isCreateWeek(customId)) {
+      const category = Utils.parseCreateWeekId(customId);
+
       const module = getCategoryModule(category);
+
       if (module) {
         await module.handleCreateWeek(interaction);
       } else {
-        await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        await safeReply(interaction, {
+          content: `⚠️ Unknown category: ${category}`,
+          ephemeral: true
+        });
       }
+
       return;
     }
 
-    // 3️⃣ Dynamiczne tygodnie: points_<category>_week_<week>
-    const weekMatch = customId.match(/^points_(.+)_week_(.+)$/);
-    if (weekMatch) {
-      const [, category, week] = weekMatch;
+    // 3️⃣ Kliknięcie tygodnia
+    if (Utils.isWeek(customId)) {
+      const { category, week } = Utils.parseWeekId(customId);
+
       const module = getCategoryModule(category);
+
       if (module) {
         await module.handleWeekClick(interaction, week);
       } else {
-        await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        await safeReply(interaction, {
+          content: `⚠️ Unknown category: ${category}`,
+          ephemeral: true
+        });
       }
+
       return;
     }
 
-    // 4️⃣ Dynamiczne akcje Add/Remove/List/Compare: points_<action>_<category>_<week>
-    const actionMatch = customId.match(/^points_(add|remove|list|compare)_(.+)_(.+)$/);
-    if (actionMatch) {
-      const [, action, category, week] = actionMatch as [string, ActionType, string, string];
+    // 4️⃣ Akcje Add / Remove / List / Compare
+    if (Utils.isAction(customId)) {
+      const { action, category } = Utils.parseActionId(customId) as {
+        action: ActionType;
+        category: string;
+        week: string;
+      };
+
       const module = getCategoryModule(category);
+
       if (!module) {
-        await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        await safeReply(interaction, {
+          content: `⚠️ Unknown category: ${category}`,
+          ephemeral: true
+        });
         return;
       }
 
@@ -86,23 +118,32 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
         case "add":
           await PS.handleAddPoints(interaction);
           break;
+
         case "remove":
           await PS.handleRemovePoints(interaction);
           break;
+
         case "list":
           await PS.handlePointsList(interaction);
           break;
+
         case "compare":
           await PS.handleCompareWeeks(interaction);
           break;
       }
+
       return;
     }
 
   } catch (error) {
     console.error("Error handling points interaction:", error);
+
     if (interaction.isRepliable()) {
-      const payload = { content: "❌ An error occurred.", ephemeral: true };
+      const payload = {
+        content: "❌ An error occurred.",
+        ephemeral: true
+      };
+
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload);
       } else {
@@ -115,18 +156,27 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
-  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+function safeReply(
+  interaction: ButtonInteraction<CacheType>,
+  payload: any
+) {
+  if (interaction.replied || interaction.deferred)
+    return interaction.editReply(payload);
+
   return interaction.reply(payload);
 }
 
-// Funkcja zwracająca moduł kategorii (donations, duel, etc.)
+// -----------------------------
+// CATEGORY MODULE ROUTER
+// -----------------------------
 function getCategoryModule(category: string) {
   switch (category) {
     case "donations":
       return PB.pointsDonations;
+
     case "duel":
       return PB.pointsDuel;
+
     default:
       return null;
   }
