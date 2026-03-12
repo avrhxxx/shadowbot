@@ -1,3 +1,4 @@
+// src/pointsPanel/pointsHandler.ts
 import { Interaction, ButtonInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
@@ -6,14 +7,16 @@ export const IDS = {
   BUTTONS: {
     DONATIONS: "points_category_donations",
     DUEL: "points_category_duel",
+
     GUIDE: "points_guide",
     SETTINGS: "points_settings",
+
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
+
     ADD: "points_add",
     LIST: "points_list",
-    COMPARE: "points_compare",
-    BACK: "points_back"
+    COMPARE: "points_compare"
   }
 };
 
@@ -24,10 +27,10 @@ const BUTTON_HANDLERS: Record<
 > = {
   // Kategorie
   [IDS.BUTTONS.DONATIONS]: (i) =>
-    PB.pointsDonations.handleDonationsPanel(i),
+    PB.pointsDonations.handlePointsDonations(i),
 
   [IDS.BUTTONS.DUEL]: (i) =>
-    PB.pointsDuel.handleDuelPanel(i),
+    PB.pointsDuel.handlePointsDuel(i),
 
   // Placeholdery (do zrobienia później)
   [IDS.BUTTONS.GUIDE]: async (i) => {
@@ -46,7 +49,7 @@ const BUTTON_HANDLERS: Record<
 
   // Week system
   [IDS.BUTTONS.CREATE_WEEK]: (i) =>
-    PB.pointsCreate.handleCreateWeek(i),
+    PB.pointsCreate.handleCreateWeekCategory(i, "unknown_category"),
 
   [IDS.BUTTONS.LIST_WEEKS]: (i) =>
     PB.pointsListWeeks.handleListWeeks(i),
@@ -56,15 +59,7 @@ const BUTTON_HANDLERS: Record<
 
   [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),
 
-  [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i),
-
-  // Back placeholder
-  [IDS.BUTTONS.BACK]: async (i) => {
-    await i.reply({
-      content: "↩️ Back action not implemented yet.",
-      ephemeral: true
-    });
-  }
+  [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i)
 };
 
 // Globalny handler dla panelu
