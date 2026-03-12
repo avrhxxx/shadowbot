@@ -2,36 +2,31 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions, Interaction } from "discord.js";
 
 /**
- * Renderuje główny panel wyboru kategorii
- * Rząd 1: wybór kategorii
- * Rząd 2: Guide / Settings / Create Week / Weeks List
+ * Renderuje główny panel punktów
+ * Rząd 1: Create Week / Weeks List / Categories
+ * Rząd 2: Guide / Settings
  */
 export function renderPointsPanel(): MessageCreateOptions {
-  // Rząd 1: wybór kategorii
+  // Rząd 1: najważniejsze akcje
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("points_category_donations")
-      .setLabel("Alliance Donations")
+      .setCustomId("points_create_week")
+      .setLabel("Create Week")
       .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("points_category_duel")
-      .setLabel("Alliance Duel")
+      .setCustomId("points_list_weeks")
+      .setLabel("Weeks List")
+      .setStyle(ButtonStyle.Primary),
+
+    new ButtonBuilder()
+      .setCustomId("points_category_select")
+      .setLabel("Categories")
       .setStyle(ButtonStyle.Primary)
   );
 
   // Rząd 2: dodatkowe akcje
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("points_create_week")
-      .setLabel("Create Week")
-      .setStyle(ButtonStyle.Success), // zielony
-
-    new ButtonBuilder()
-      .setCustomId("points_list_weeks")
-      .setLabel("Weeks List")
-      .setStyle(ButtonStyle.Primary), // niebieski
-
     new ButtonBuilder()
       .setCustomId("points_guide")
       .setLabel("Guide")
@@ -44,7 +39,7 @@ export function renderPointsPanel(): MessageCreateOptions {
   );
 
   return {
-    content: "📌 **Points Panel – Choose Category**",
+    content: "📌 **Points Panel – Main Menu**",
     components: [row1, row2]
   };
 }
