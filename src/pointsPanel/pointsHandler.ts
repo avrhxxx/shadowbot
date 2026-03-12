@@ -47,10 +47,10 @@ const BUTTON_HANDLERS: Record<
 
   [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i),
 
-  [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),
-  [IDS.BUTTONS.REMOVE]: (i) => PS.handleRemovePoints(i),
-  [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),
-  [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i)
+  [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),        // placeholder
+  [IDS.BUTTONS.REMOVE]: (i) => PS.handleRemovePoints(i),  // placeholder
+  [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),      // placeholder
+  [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i)  // placeholder
 };
 
 // Globalny handler panelu
@@ -62,7 +62,7 @@ export async function handlePointsInteraction(
 
     const { customId } = interaction;
 
-    // 1️⃣ najpierw sprawdzamy czy to dynamiczny tydzień Donations
+    // 1️⃣ dynamiczny tydzień Donations
     if (customId.startsWith("points_donations_week_")) {
       const week = customId.replace("points_donations_week_", "");
       await PB.pointsDonations.handleWeekClick(interaction, week);
@@ -85,16 +85,16 @@ export async function handlePointsInteraction(
 
       switch (action) {
         case "add":
-          await PS.handleAddPoints(interaction, category, week);
+          await PS.handleAddPoints(interaction);      // placeholder
           break;
         case "remove":
-          await PS.handleRemovePoints(interaction, category, week);
+          await PS.handleRemovePoints(interaction);   // placeholder
           break;
         case "compare":
-          await PS.handleCompareWeeks(interaction, category, week);
+          await PS.handleCompareWeeks(interaction);   // placeholder
           break;
         case "list":
-          await PS.handlePointsList(interaction, category, week);
+          await PS.handlePointsList(interaction);     // placeholder
           break;
       }
       return;
