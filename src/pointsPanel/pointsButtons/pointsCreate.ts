@@ -11,9 +11,6 @@ import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
 
-// -----------------------------
-// HELPERS
-// -----------------------------
 function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
@@ -22,15 +19,11 @@ function safeReply(
   return interaction.reply(payload);
 }
 
-// -----------------------------
-// Parsowanie daty
-// -----------------------------
 function parseWeekDate(input: string) {
   const trimmed = input.trim();
   let match = trimmed.match(/^(\d{2})(\d{2})$/);
-  if (match) {
-    return { day: parseInt(match[1], 10), month: parseInt(match[2], 10), hour: 0, minute: 0 };
-  }
+  if (match) return { day: parseInt(match[1], 10), month: parseInt(match[2], 10), hour: 0, minute: 0 };
+
   match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
   if (!match) return null;
 
@@ -43,17 +36,11 @@ function parseWeekDate(input: string) {
   return { day, month, hour, minute };
 }
 
-// -----------------------------
-// Format nazwy tygodnia
-// -----------------------------
 function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(from.day)}-${pad(from.month)} - ${pad(to.day)}-${pad(to.month)}`;
 }
 
-// -----------------------------
-// HANDLE CREATE WEEK BUTTON
-// -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
 
@@ -82,9 +69,6 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
   await interaction.showModal(modal);
 }
 
-// -----------------------------
-// HANDLE MODAL SUBMIT
-// -----------------------------
 export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
   const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
   const category = categoryMatch ? categoryMatch[1] : null;
@@ -118,7 +102,6 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
       ephemeral: true
     });
 
-    // Odświeżamy panel kategorii
     switch (category) {
       case "donations":
         await pointsDonations.handlePointsDonations(interaction);
