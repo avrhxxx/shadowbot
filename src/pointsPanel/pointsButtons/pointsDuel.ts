@@ -1,6 +1,5 @@
 import {
   ButtonInteraction,
-  ModalSubmitInteraction,
   CacheType,
   ActionRowBuilder,
   ButtonBuilder,
@@ -14,10 +13,7 @@ const CATEGORY_ID = "duel";
 const CATEGORY_LABEL = "Alliance Duel";
 
 // -----------------------------
-function safeReply(
-  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
-  payload: any
-) {
+function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
@@ -25,22 +21,22 @@ function safeReply(
 // -----------------------------
 // Render panel wyboru tygodni + Create Week
 // -----------------------------
-export async function handlePointsDuel(
-  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>
-) {
+export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
 
   const components: ActionRowBuilder<ButtonBuilder>[] = [];
 
+  // Row 1: dynamiczne przyciski tygodni
   if (weeks.length) {
     const weekRow = new ActionRowBuilder<ButtonBuilder>();
     weeks.forEach(week => {
-      const buttons = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week).components;
-      buttons.forEach(btn => weekRow.addComponents(btn));
+      const btns = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week).components;
+      btns.forEach(btn => weekRow.addComponents(btn));
     });
     components.push(weekRow);
   }
 
+  // Row 2: Create Week
   const createRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`points_create_week_${CATEGORY_ID}`)
@@ -57,14 +53,14 @@ export async function handlePointsDuel(
 }
 
 // -----------------------------
-// Handler kliknięcia tygodnia
+// Handler kliknięcia tygodnia (pokazuje Add/Remove/Compare/List)
 // -----------------------------
-export async function handleWeekClick(
-  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
-  week: string
-) {
+export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
+  const row = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week);
+
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Week ${week} clicked**`,
+    content: `📌 **${CATEGORY_LABEL} – Week ${week}**`,
+    components: [row],
     ephemeral: true
   });
 }
@@ -72,8 +68,6 @@ export async function handleWeekClick(
 // -----------------------------
 // Handler kliknięcia Create Week
 // -----------------------------
-export async function handleCreateWeek(
-  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>
-) {
-  await pointsCreate.handleCreateWeek(interaction as ButtonInteraction<CacheType>);
+export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
+  await pointsCreate.handleCreateWeek(interaction);
 }
