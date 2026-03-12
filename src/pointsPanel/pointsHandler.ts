@@ -14,6 +14,8 @@ export const IDS = {
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
 
+    POINTS_MANAGEMENT: "points_management", // nowy przycisk
+
     ADD: "points_add",
     LIST: "points_list",
     COMPARE: "points_compare"
@@ -32,7 +34,11 @@ const BUTTON_HANDLERS: Record<
   [IDS.BUTTONS.DUEL]: (i) =>
     PB.pointsDuel.handlePointsDuel(i),
 
-  // Placeholdery (do zrobienia później)
+  // Nowy główny przycisk Points Management
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
+    PB.pointsManagement.handlePointsManagementMain(i),
+
+  // Placeholdery
   [IDS.BUTTONS.GUIDE]: async (i) => {
     await i.reply({
       content: "📖 Guide not implemented yet.",
