@@ -1,3 +1,4 @@
+// src/pointsPanel/pointsHandler.ts
 import { Interaction, ButtonInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
@@ -13,7 +14,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number];
+type ActionType = typeof IDS.ACTIONS[number;
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -60,10 +61,15 @@ export async function handlePointsInteraction(
       return;
     }
 
-    // 2️⃣ Create Week
+    // 2️⃣ Kliknięcia w kategorie Points Management
+    if (customId.startsWith("points_management_category_")) {
+      await PB.pointsManagement.handlePointsManagement(interaction);
+      return;
+    }
+
+    // 3️⃣ Create Week
     if (Utils.isCreateWeek(customId)) {
       const category = Utils.parseCreateWeekId(customId);
-
       const module = getCategoryModule(category);
 
       if (module) {
@@ -78,10 +84,9 @@ export async function handlePointsInteraction(
       return;
     }
 
-    // 3️⃣ Kliknięcie tygodnia
+    // 4️⃣ Kliknięcie tygodnia
     if (Utils.isWeek(customId)) {
       const { category, week } = Utils.parseWeekId(customId);
-
       const module = getCategoryModule(category);
 
       if (module) {
@@ -96,7 +101,7 @@ export async function handlePointsInteraction(
       return;
     }
 
-    // 4️⃣ Akcje Add / Remove / List / Compare
+    // 5️⃣ Akcje Add / Remove / List / Compare
     if (Utils.isAction(customId)) {
       const { action, category } = Utils.parseActionId(customId) as {
         action: ActionType;
@@ -134,7 +139,6 @@ export async function handlePointsInteraction(
 
       return;
     }
-
   } catch (error) {
     console.error("Error handling points interaction:", error);
 
@@ -160,9 +164,7 @@ function safeReply(
   interaction: ButtonInteraction<CacheType>,
   payload: any
 ) {
-  if (interaction.replied || interaction.deferred)
-    return interaction.editReply(payload);
-
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
 
