@@ -15,14 +15,12 @@ import * as pointsService from "../pointsService";
 export async function getWeeksByCategory(categoryId: string): Promise<string[]> {
   const allWeeks = await pointsService.getAllWeeks();
 
-  // W docelowej wersji zakładamy, że wszystkie tygodnie należą do obu kategorii,
-  // bo w Google Sheets każdy tydzień jest tworzony dla każdej kategorii
-  // Możemy filtrować później, jeśli będzie rozdział
+  // Placeholder: wszystkie tygodnie należą do obu kategorii na razie
   return allWeeks;
 }
 
 // -----------------------------
-// Render panel przycisków dla wybranego tygodnia
+// Render panel przycisków dla wybranego tygodnia (placeholder actions)
 // -----------------------------
 export function renderWeekButtons(categoryId: string, week: string): ActionRowBuilder<ButtonBuilder> {
   const row = new ActionRowBuilder<ButtonBuilder>();
@@ -50,14 +48,14 @@ export function renderWeekButtons(categoryId: string, week: string): ActionRowBu
 }
 
 // -----------------------------
-// Handler wyświetlania tygodni dla kategorii
+// Handler wyświetlania tygodni dla kategorii (placeholder)
 // -----------------------------
 export async function handleSelectWeek(interaction: ButtonInteraction<CacheType>, categoryId: string) {
   const weeks = await getWeeksByCategory(categoryId);
 
   if (!weeks.length) {
     await interaction.reply({
-      content: `⚠️ No weeks created yet for **${categoryId}**.`,
+      content: `⚠️ No weeks created yet for **${categoryId}** (placeholder).`,
       ephemeral: true
     });
     return;
@@ -67,7 +65,7 @@ export async function handleSelectWeek(interaction: ButtonInteraction<CacheType>
   const components = weeks.map(week => renderWeekButtons(categoryId, week));
 
   await interaction.reply({
-    content: `📌 **Weeks for ${categoryId}** – choose a week to manage:`,
+    content: `📌 **Weeks for ${categoryId}** – choose a week (placeholder):`,
     components,
     ephemeral: true
   });
