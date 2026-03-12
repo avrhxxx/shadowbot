@@ -1,22 +1,9 @@
-import {
-  ButtonInteraction,
-  CacheType,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-} from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
 import * as pointsService from "../pointsService";
 
-const CATEGORY = "Duel";
-
-// Renderowanie przycisków wszystkich tygodni
-export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>) {
+// Render wszystkich tygodni dla kategorii Duel
+export async function renderWeeks(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsService.getAllWeeks("Duel");
-
-  if (weeks.length === 0) {
-    await interaction.reply({ content: "⚠️ No weeks found for Duel.", ephemeral: true });
-    return;
-  }
 
   const rows = weeks.map(week =>
     new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -28,13 +15,13 @@ export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>
   );
 
   await interaction.reply({
-    content: `📌 **${CATEGORY} – Select Week**`,
+    content: "📅 Select a week:",
     components: rows,
     ephemeral: true
   });
 }
 
-// Obsługa kliknięcia tygodnia
+// Obsługa kliknięcia przycisku tygodnia
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -43,7 +30,7 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`points_remove_duel_${week}`)
-      .setLabel("Remove")
+      .setLabel("Remove Points")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId(`points_compare_duel_${week}`)
@@ -52,12 +39,11 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
     new ButtonBuilder()
       .setCustomId(`points_list_duel_${week}`)
       .setLabel("List")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Primary)
   );
 
   await interaction.update({
-    content: `📌 **Duel – Week ${week}**`,
-    components: [row],
-    ephemeral: true
+    content: `📌 Duel – Week ${week}`,
+    components: [row] // ❌ ephemeral usunięte
   });
 }
