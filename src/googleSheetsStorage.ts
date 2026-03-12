@@ -4,27 +4,39 @@ import { google } from "googleapis";
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 
 // --------------------------
-// TABS
+// MODERATOR CONFIG TABS
 // --------------------------
-
 const MODERATOR_CONFIG_TAB = "moderator_config";
+
+// --------------------------
+// EVENTS TABS
+// --------------------------
 const EVENTS_TAB = "events";
 const EVENTS_CONFIG_TAB = "events_config";
 
-// <-- zmienione zakładki points -->
-const POINTS_DONATIONS_TAB = "points_donations"; // poprzednio POINTS_TAB = "points"
+// --------------------------
+// POINTS TABS
+// --------------------------
+const POINTS_WEEKS_TAB = "points_weeks";
+const POINTS_DONATIONS_TAB = "points_donations";
 const POINTS_DUEL_TAB = "points_duel";
 const POINTS_CONFIG_TAB = "points_config";
 
+// --------------------------
+// ABSENCE TABS
+// --------------------------
 const ABSENCE_TAB = "absence";
 const ABSENCE_CONFIG_TAB = "absence_config";
+
+// --------------------------
+// TRANSLATE TABS
+// --------------------------
 const TRANSLATE_TAB = "translate";
 const TRANSLATE_CONFIG_TAB = "translate_config";
 
 // --------------------------
 // ENV VALIDATION
 // --------------------------
-
 if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
 if (!process.env.GOOGLE_SERVICE_ACCOUNT) throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
 
@@ -40,7 +52,6 @@ const sheets = google.sheets({ version: "v4", auth });
 // --------------------------
 // BASIC READ / WRITE
 // --------------------------
-
 async function readSheet(tab: string): Promise<any[][]> {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
@@ -62,7 +73,6 @@ async function writeSheet(tab: string, values: any[][]) {
 // --------------------------
 // GENERIC HELPERS
 // --------------------------
-
 async function getSheetId(tab: string): Promise<number> {
   const res = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
   const sheet = res.data.sheets?.find(s => s.properties?.title === tab);
@@ -108,7 +118,6 @@ async function deleteRow(tab: string, row: number) {
 // --------------------------
 // EVENTS STORAGE
 // --------------------------
-
 export async function readEventsSheet(): Promise<any[][]> {
   return readSheet(EVENTS_TAB);
 }
@@ -140,7 +149,6 @@ export async function deleteEventRow(row: number) {
 // --------------------------
 // MODERATOR CONFIG STORAGE
 // --------------------------
-
 export async function ensureModeratorConfigHeaders() {
   const rows = await readSheet(MODERATOR_CONFIG_TAB);
   if (!rows || rows.length === 0 || rows[0].length === 0) {
@@ -200,7 +208,6 @@ export async function updateModeratorPanelColumn(
 // --------------------------
 // ABSENCE STORAGE
 // --------------------------
-
 export async function readAbsenceSheet(): Promise<any[][]> {
   return readSheet(ABSENCE_TAB);
 }
@@ -245,27 +252,49 @@ export async function readAbsenceConfig(): Promise<any[][]> {
 // --------------------------
 // POINTS STORAGE (HELPERS)
 // --------------------------
-
-export async function readPointsSheet(): Promise<any[][]> {
-  return readSheet(POINTS_DONATIONS_TAB); // <- użycie poprawionej zakładki
+export async function readPointsWeeksSheet(): Promise<any[][]> {
+  return readSheet(POINTS_WEEKS_TAB);
 }
 
-export async function writePointsSheet(values: any[][]) {
-  return writeSheet(POINTS_DONATIONS_TAB, values); // <- użycie poprawionej zakładki
+export async function readPointsDonationsSheet(): Promise<any[][]> {
+  return readSheet(POINTS_DONATIONS_TAB);
 }
 
-export async function updatePointsCell(row: number, col: number, value: any) {
-  return updateCell(POINTS_DONATIONS_TAB, row, col, value); // <- użycie poprawionej zakładki
+export async function readPointsDuelSheet(): Promise<any[][]> {
+  return readSheet(POINTS_DUEL_TAB);
 }
 
-export async function deletePointsRow(row: number) {
-  return deleteRow(POINTS_DONATIONS_TAB); // <- użycie poprawionej zakładki
+export async function readPointsConfigSheet(): Promise<any[][]> {
+  return readSheet(POINTS_CONFIG_TAB);
+}
+
+export async function writePointsDonationsSheet(values: any[][]) {
+  return writeSheet(POINTS_DONATIONS_TAB, values);
+}
+
+export async function writePointsDuelSheet(values: any[][]) {
+  return writeSheet(POINTS_DUEL_TAB, values);
+}
+
+export async function updatePointsDonationsCell(row: number, col: number, value: any) {
+  return updateCell(POINTS_DONATIONS_TAB, row, col, value);
+}
+
+export async function updatePointsDuelCell(row: number, col: number, value: any) {
+  return updateCell(POINTS_DUEL_TAB, row, col, value);
+}
+
+export async function deletePointsDonationsRow(row: number) {
+  return deleteRow(POINTS_DONATIONS_TAB, row);
+}
+
+export async function deletePointsDuelRow(row: number) {
+  return deleteRow(POINTS_DUEL_TAB, row);
 }
 
 // --------------------------
 // HELPERS
 // --------------------------
-
 function toA1(col: number, row: number): string {
   let result = "";
   while (col > 0) {
