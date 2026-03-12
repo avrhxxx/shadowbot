@@ -1,3 +1,4 @@
+// src/pointsPanel/pointsButtons/pointsDonations.ts
 import {
   ButtonInteraction,
   CacheType,
@@ -6,7 +7,6 @@ import {
   ButtonStyle
 } from "discord.js";
 import * as pointsSelectWeek from "./pointsSelectWeek";
-import * as pointsCreate from "./pointsCreate";
 
 // Kategoria
 const CATEGORY_ID = "donations";
@@ -21,7 +21,7 @@ function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
 }
 
 // -----------------------------
-// Render panel wyboru tygodni + create week
+// Render panel wyboru tygodni + placeholder
 // -----------------------------
 export async function handlePointsDonations(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
@@ -38,38 +38,38 @@ export async function handlePointsDonations(interaction: ButtonInteraction<Cache
     components.push(weekRow);
   }
 
-  // Row 2: stały przycisk Create Week
+  // Row 2: placeholder “Create Week”
   const createRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`points_create_week_${CATEGORY_ID}`)
-      .setLabel("Create Week")
+      .setLabel("Create Week – placeholder")
       .setStyle(ButtonStyle.Success)
   );
   components.push(createRow);
 
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new**`,
+    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new (placeholder)**`,
     components,
     ephemeral: true
   });
 }
 
 // -----------------------------
-// Handler kliknięcia tygodnia
+// Handler kliknięcia tygodnia (placeholder)
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
-  const row = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week);
-
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Week ${week}**`,
-    components: [row],
+    content: `📌 **${CATEGORY_LABEL} – Week ${week} clicked (placeholder)**`,
     ephemeral: true
   });
 }
 
 // -----------------------------
-// Handler kliknięcia Create Week
+// Handler kliknięcia Create Week (placeholder)
 // -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
-  await pointsCreate.handleCreateWeekCategory(interaction, CATEGORY_ID);
+  await safeReply(interaction, {
+    content: `🟢 Create Week clicked (placeholder)`,
+    ephemeral: true
+  });
 }
