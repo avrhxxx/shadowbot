@@ -14,80 +14,102 @@ export const IDS = {
     CREATE_WEEK: "points_create_week",
     LIST_WEEKS: "points_list_weeks",
 
-    POINTS_MANAGEMENT: "points_management", // nowy przycisk
+    POINTS_MANAGEMENT: "points_management",
 
     ADD: "points_add",
+    REMOVE: "points_remove",
     LIST: "points_list",
     COMPARE: "points_compare"
   }
 };
 
-// Mapowanie przycisków na funkcje
+// Mapowanie stałych przycisków
 const BUTTON_HANDLERS: Record<
   string,
   (i: ButtonInteraction<CacheType>) => Promise<void>
 > = {
-  // Kategorie
-  [IDS.BUTTONS.DONATIONS]: (i) =>
-    PB.pointsDonations.handlePointsDonations(i),
+  [IDS.BUTTONS.DONATIONS]: (i) => PB.pointsDonations.handlePointsDonations(i),
+  [IDS.BUTTONS.DUEL]: (i) => PB.pointsDuel.handlePointsDuel(i),
 
-  [IDS.BUTTONS.DUEL]: (i) =>
-    PB.pointsDuel.handlePointsDuel(i),
-
-  // Nowy główny przycisk Points Management
   [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
     PB.pointsManagement.handlePointsManagementMain(i),
 
-  // Placeholdery
   [IDS.BUTTONS.GUIDE]: async (i) => {
-    await i.reply({
-      content: "📖 Guide not implemented yet.",
-      ephemeral: true
-    });
+    await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
   },
 
   [IDS.BUTTONS.SETTINGS]: async (i) => {
-    await i.reply({
-      content: "⚙️ Settings not implemented yet.",
-      ephemeral: true
-    });
+    await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
   },
 
-  // Week system
   [IDS.BUTTONS.CREATE_WEEK]: (i) =>
     PB.pointsCreate.handleCreateWeekCategory(i, "unknown_category"),
 
-  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
-    PB.pointsListWeeks.handleListWeeks(i),
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i),
 
-  // Actions
   [IDS.BUTTONS.ADD]: (i) => PS.handleAddPoints(i),
-
+  [IDS.BUTTONS.REMOVE]: (i) => PS.handleRemovePoints(i),
   [IDS.BUTTONS.LIST]: (i) => PS.handlePointsList(i),
-
   [IDS.BUTTONS.COMPARE]: (i) => PS.handleCompareWeeks(i)
 };
 
-// Globalny handler dla panelu
+// Globalny handler panelu
 export async function handlePointsInteraction(
   interaction: Interaction<CacheType>
 ) {
   try {
     if (!interaction.isButton()) return;
 
-    const handler = BUTTON_HANDLERS[interaction.customId];
-    if (!handler) return;
+    const { customId } = interaction;
 
-    await handler(interaction);
+    // 1️⃣ najpierw sprawdzamy czy to dynamiczny tydzień Donations
+    if (customId.startsWith("points_donations_week_")) {
+      const week = customId.replace("points_donations_week_", "");
+      await PB.pointsDonations.handleWeekClick(interaction, week);
+      return;
+    }
+
+    // 2️⃣ dynamiczny tydzień Duel
+    if (customId.startsWith("points_duel_week_")) {
+      const week = customId.replace("points_duel_week_", "");
+      await PB.pointsDuel.handleWeekClick(interaction, week);
+      return;
+    }
+
+    // 3️⃣ dynamiczne kliknięcia Add/Remove/Compare/List z tygodni
+    const actionMatch = customId.match(
+      /^points_(add|remove|compare|list)_(donations|duel)_(.+)$/
+    );
+    if (actionMatch) {
+      const [, action, category, week] = actionMatch;
+
+      switch (action) {
+        case "add":
+          await PS.handleAddPoints(interaction, category, week);
+          break;
+        case "remove":
+          await PS.handleRemovePoints(interaction, category, week);
+          break;
+        case "compare":
+          await PS.handleCompareWeeks(interaction, category, week);
+          break;
+        case "list":
+          await PS.handlePointsList(interaction, category, week);
+          break;
+      }
+      return;
+    }
+
+    // 4️⃣ jeśli to stały przycisk
+    const handler = BUTTON_HANDLERS[customId];
+    if (handler) {
+      await handler(interaction);
+    }
   } catch (error) {
     console.error("Error handling points interaction:", error);
 
     if (interaction.isRepliable()) {
-      const payload = {
-        content: "❌ An error occurred.",
-        ephemeral: true
-      };
-
+      const payload = { content: "❌ An error occurred.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload);
       } else {
