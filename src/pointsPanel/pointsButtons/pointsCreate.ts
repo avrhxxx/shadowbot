@@ -115,8 +115,8 @@ export async function handleCreateWeekSubmit(i: ModalSubmitInteraction<CacheType
   tempPointsWeekStore.set(tempId, { id: tempId, category, fromDate: from, toDate: to, weekName });
 
   try {
-    // <-- tu dajemy tylko weekName, żeby TS przestał krzyczeć
-    await pointsService.createWeek(weekName);
+    // Przekazujemy też kategorię do createWeek, żeby można było filtrować później
+    await pointsService.createWeek(category, weekName);
 
     await safeReply(i, {
       content: `✅ Week **${weekName}** for category **${category}** created successfully.`,
