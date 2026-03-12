@@ -57,7 +57,6 @@ async function readSheet(tab: string): Promise<any[][]> {
     spreadsheetId: SHEET_ID,
     range: tab,
   });
-
   return res.data.values || [];
 }
 
@@ -256,40 +255,48 @@ export async function readPointsWeeksSheet(): Promise<any[][]> {
   return readSheet(POINTS_WEEKS_TAB);
 }
 
+export async function writePointsWeeksSheet(values: any[][]) {
+  return writeSheet(POINTS_WEEKS_TAB, values);
+}
+
 export async function readPointsDonationsSheet(): Promise<any[][]> {
   return readSheet(POINTS_DONATIONS_TAB);
-}
-
-export async function readPointsDuelSheet(): Promise<any[][]> {
-  return readSheet(POINTS_DUEL_TAB);
-}
-
-export async function readPointsConfigSheet(): Promise<any[][]> {
-  return readSheet(POINTS_CONFIG_TAB);
 }
 
 export async function writePointsDonationsSheet(values: any[][]) {
   return writeSheet(POINTS_DONATIONS_TAB, values);
 }
 
-export async function writePointsDuelSheet(values: any[][]) {
-  return writeSheet(POINTS_DUEL_TAB, values);
-}
-
 export async function updatePointsDonationsCell(row: number, col: number, value: any) {
   return updateCell(POINTS_DONATIONS_TAB, row, col, value);
-}
-
-export async function updatePointsDuelCell(row: number, col: number, value: any) {
-  return updateCell(POINTS_DUEL_TAB, row, col, value);
 }
 
 export async function deletePointsDonationsRow(row: number) {
   return deleteRow(POINTS_DONATIONS_TAB, row);
 }
 
+export async function readPointsDuelSheet(): Promise<any[][]> {
+  return readSheet(POINTS_DUEL_TAB);
+}
+
+export async function writePointsDuelSheet(values: any[][]) {
+  return writeSheet(POINTS_DUEL_TAB, values);
+}
+
+export async function updatePointsDuelCell(row: number, col: number, value: any) {
+  return updateCell(POINTS_DUEL_TAB, row, col, value);
+}
+
 export async function deletePointsDuelRow(row: number) {
   return deleteRow(POINTS_DUEL_TAB, row);
+}
+
+export async function readPointsConfigSheet(): Promise<any[][]> {
+  return readSheet(POINTS_CONFIG_TAB);
+}
+
+export async function writePointsConfigSheet(values: any[][]) {
+  return writeSheet(POINTS_CONFIG_TAB, values);
 }
 
 // --------------------------
