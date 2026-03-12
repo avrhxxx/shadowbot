@@ -20,6 +20,14 @@ export const POINT_CATEGORIES = [
 ];
 
 // -----------------------------
+// HELPERS
+// -----------------------------
+function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  return interaction.reply(payload);
+}
+
+// -----------------------------
 // Render panelu wyboru kategorii
 // -----------------------------
 export function renderPointsManagementCategories(): MessageCreateOptions {
@@ -44,7 +52,7 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
 // -----------------------------
 export async function handlePointsManagementMain(interaction: ButtonInteraction<CacheType>) {
   const panel = renderPointsManagementCategories();
-  await interaction.reply({
+  await safeReply(interaction, {
     content: panel.content,
     components: panel.components,
     ephemeral: true
@@ -64,7 +72,7 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
   } else if (categoryId === "duel") {
     await pointsDuel.handlePointsDuel(interaction);
   } else {
-    await interaction.reply({
+    await safeReply(interaction, {
       content: `⚠️ Unknown category: ${categoryId}`,
       ephemeral: true
     });
