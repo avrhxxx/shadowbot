@@ -1,26 +1,9 @@
-import {
-  ButtonInteraction,
-  CacheType,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-} from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
 import * as pointsService from "../pointsService";
-import * as pointsList from "./pointsList";
-import * as pointsAdd from "./pointsAdd";
-import * as pointsRemove from "./pointsRemove";
-import * as pointsCompare from "./pointsCompare";
 
-const CATEGORY = "Donations";
-
-// Renderowanie przycisków wszystkich tygodni
-export async function handlePointsDonations(interaction: ButtonInteraction<CacheType>) {
+// Render wszystkich tygodni dla kategorii Donations
+export async function renderWeeks(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsService.getAllWeeks("Donations");
-
-  if (weeks.length === 0) {
-    await interaction.reply({ content: "⚠️ No weeks found for Donations.", ephemeral: true });
-    return;
-  }
 
   const rows = weeks.map(week =>
     new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -32,13 +15,13 @@ export async function handlePointsDonations(interaction: ButtonInteraction<Cache
   );
 
   await interaction.reply({
-    content: `📌 **${CATEGORY} – Select Week**`,
+    content: "📅 Select a week:",
     components: rows,
     ephemeral: true
   });
 }
 
-// Obsługa kliknięcia tygodnia
+// Obsługa kliknięcia przycisku tygodnia
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -56,12 +39,11 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
     new ButtonBuilder()
       .setCustomId(`points_list_donations_${week}`)
       .setLabel("List")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Primary)
   );
 
   await interaction.update({
-    content: `📌 **Donations – Week ${week}**`,
-    components: [row],
-    ephemeral: true
+    content: `📌 Donations – Week ${week}`,
+    components: [row] // ❌ ephemeral usunięte
   });
 }
