@@ -1,6 +1,30 @@
+// src/pointsPanel/pointsButtons/pointsManagement.ts
+import {
+  MessageCreateOptions,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ButtonInteraction,
+  CacheType
+} from "discord.js";
+
+import * as pointsDonations from "./pointsDonations";
+import * as pointsDuel from "./pointsDuel";
+
+// -----------------------------
+// Tymczasowe kategorie punktów
+// -----------------------------
+export const POINT_CATEGORIES = [
+  { id: "donations", label: "Alliance Donations" },
+  { id: "duel", label: "Alliance Duel" }
+];
+
+// -----------------------------
+// Render panelu wyboru kategorii
+// -----------------------------
 export function renderPointsManagementCategories(): MessageCreateOptions {
   const row = new ActionRowBuilder<ButtonBuilder>();
-  POINT_CATEGORIES.forEach(cat => {
+  POINT_CATEGORIES.forEach((cat) => {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`points_management_category_${cat.id}`)
@@ -15,13 +39,22 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
   };
 }
 
+// -----------------------------
+// Handler kliknięcia w kategorię
+// -----------------------------
 export async function handlePointsManagement(interaction: ButtonInteraction<CacheType>) {
-  if (interaction.customId.startsWith("points_management_category_")) {
-    const categoryId = interaction.customId.replace("points_management_category_", "");
-    if (categoryId === "donations") {
-      await pointsDonations.handlePointsDonations(interaction);
-    } else if (categoryId === "duel") {
-      await pointsDuel.handlePointsDuel(interaction);
-    }
+  if (!interaction.customId.startsWith("points_management_category_")) return;
+
+  const categoryId = interaction.customId.replace("points_management_category_", "");
+
+  if (categoryId === "donations") {
+    await pointsDonations.handlePointsDonations(interaction);
+  } else if (categoryId === "duel") {
+    await pointsDuel.handlePointsDuel(interaction);
+  } else {
+    await interaction.reply({
+      content: `⚠️ Unknown category: ${categoryId}`,
+      ephemeral: true
+    });
   }
 }
