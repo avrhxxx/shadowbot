@@ -1,4 +1,3 @@
-// src/pointsPanel/pointsButtons/pointsCreate.ts
 import {
   ButtonInteraction,
   ModalSubmitInteraction,
@@ -60,7 +59,7 @@ function formatWeekName(from: { day: number; month: number }, to: { day: number;
 }
 
 // -----------------------------
-// HANDLE CREATE WEEK BUTTON
+// HANDLE CREATE WEEK BUTTON (ButtonInteraction)
 // -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
@@ -91,7 +90,7 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
 }
 
 // -----------------------------
-// HANDLE MODAL SUBMIT
+// HANDLE MODAL SUBMIT (ModalSubmitInteraction)
 // -----------------------------
 export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
   const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
