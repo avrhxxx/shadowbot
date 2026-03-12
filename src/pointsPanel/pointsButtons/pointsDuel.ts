@@ -1,4 +1,3 @@
-// src/pointsPanel/pointsButtons/pointsDuel.ts
 import {
   ButtonInteraction,
   CacheType,
@@ -7,6 +6,7 @@ import {
   ButtonStyle
 } from "discord.js";
 import * as pointsSelectWeek from "./pointsSelectWeek";
+import * as pointsCreate from "./pointsCreate";
 
 // Kategoria
 const CATEGORY_ID = "duel";
@@ -19,7 +19,7 @@ function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
 }
 
 // -----------------------------
-// Render panel wyboru tygodni + placeholder
+// Render panel wyboru tygodni + Create Week
 // -----------------------------
 export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
@@ -36,38 +36,35 @@ export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>
     components.push(weekRow);
   }
 
-  // Row 2: placeholder “Create Week”
+  // Row 2: Create Week
   const createRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`points_create_week_${CATEGORY_ID}`)
-      .setLabel("Create Week – placeholder")
+      .setLabel("Create Week")
       .setStyle(ButtonStyle.Success)
   );
   components.push(createRow);
 
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new (placeholder)**`,
+    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new**`,
     components,
     ephemeral: true
   });
 }
 
 // -----------------------------
-// Handler kliknięcia tygodnia (placeholder)
+// Handler kliknięcia tygodnia
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Week ${week} clicked (placeholder)**`,
+    content: `📌 **${CATEGORY_LABEL} – Week ${week} clicked**`,
     ephemeral: true
   });
 }
 
 // -----------------------------
-// Handler kliknięcia Create Week (placeholder)
+// Handler kliknięcia Create Week
 // -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
-  await safeReply(interaction, {
-    content: `🟢 Create Week clicked (placeholder)`,
-    ephemeral: true
-  });
+  await pointsCreate.handleCreateWeek(interaction);
 }
