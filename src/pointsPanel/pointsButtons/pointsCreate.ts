@@ -1,62 +1,129 @@
 // src/pointsPanel/pointsButtons/pointsCreate.ts
-import { ButtonInteraction, ModalSubmitInteraction, CacheType } from "discord.js";
+import {
+  ButtonInteraction,
+  ModalSubmitInteraction,
+  CacheType,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder
+} from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
 
 // -----------------------------
-// Tworzenie nowego tygodnia (przycisk)
+// HELPERS
+// -----------------------------
+function safeReply(interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>, payload: any) {
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  return interaction.reply(payload);
+}
+
+// Parsowanie daty w formacie DD/MM lub DD/MM HH:mm
+function parseWeekDate(input: string) {
+  const trimmed = input.trim();
+  const match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (!match) return null;
+
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const hour = match[3] ? parseInt(match[3], 10) : 0;
+  const minute = match[4] ? parseInt(match[4], 10) : 0;
+
+  if (day < 1 || day > 31 || month < 1 || month > 12 || hour > 23 || minute > 59) return null;
+
+  return { day, month, hour, minute };
+}
+
+// Generowanie nazwy tygodnia: DD-MM - DD-MM
+function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(from.day)}-${pad(from.month)} - ${pad(to.day)}-${pad(to.month)}`;
+}
+
+// -----------------------------
+// HANDLE CREATE WEEK BUTTON
 // -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
 
-  // Prosty generator nowego tygodnia placeholder (Week 01, Week 02...)
-  const allWeeks = await pointsService.getAllWeeks();
-  const nextWeekNumber = allWeeks.length + 1;
-  const weekName = `Week ${String(nextWeekNumber).padStart(2, "0")}`;
+  // Wyświetlamy modal z polami od-do
+  const modal = new ModalBuilder()
+    .setCustomId(`points_create_modal_${category}`)
+    .setTitle(`Create Week – ${category}`)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("week_from")
+          .setLabel("From (DD/MM or DD/MM HH:mm)")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("01/03")
+          .setRequired(true)
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("week_to")
+          .setLabel("To (DD/MM or DD/MM HH:mm)")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("07/03")
+          .setRequired(true)
+      )
+    );
+
+  await interaction.showModal(modal);
+}
+
+// -----------------------------
+// HANDLE MODAL SUBMIT
+// -----------------------------
+export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
+  const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
+  const category = categoryMatch ? categoryMatch[1] : null;
+
+  if (!category) {
+    await safeReply(interaction, { content: "⚠️ Unknown category.", ephemeral: true });
+    return;
+  }
+
+  let fromRaw = "";
+  let toRaw = "";
+  try { fromRaw = interaction.fields.getTextInputValue("week_from"); } catch {}
+  try { toRaw = interaction.fields.getTextInputValue("week_to"); } catch {}
+
+  const fromParsed = parseWeekDate(fromRaw);
+  const toParsed = parseWeekDate(toRaw);
+
+  if (!fromParsed || !toParsed) {
+    await safeReply(interaction, { content: "❌ Invalid date format. Use DD/MM or DD/MM HH:mm.", ephemeral: true });
+    return;
+  }
+
+  const weekName = formatWeekName(fromParsed, toParsed);
 
   try {
-    // Tworzymy tydzień w arkuszu (placeholder)
+    // Tworzymy tydzień w serwisie
     await pointsService.createWeek(weekName);
 
-    // Potwierdzenie
-    await interaction.reply({
+    await safeReply(interaction, {
       content: `🟢 Created new week: **${weekName}** for category **${category}**`,
       ephemeral: true
     });
 
-    // Odświeżamy panel kategorii, aby pokazać nowy tydzień
+    // Odświeżamy panel kategorii
     switch (category) {
       case "donations":
         await pointsDonations.handlePointsDonations(interaction);
         break;
-
       case "duel":
         await pointsDuel.handlePointsDuel(interaction);
         break;
-
       default:
-        await interaction.followUp({
-          content: `⚠️ Unknown category: ${category}`,
-          ephemeral: true
-        });
+        await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
         break;
     }
   } catch (error) {
     console.error("Create Week error:", error);
-    await interaction.reply({
-      content: "❌ Failed to create week (placeholder).",
-      ephemeral: true
-    });
+    await safeReply(interaction, { content: "❌ Failed to create week.", ephemeral: true });
   }
-}
-
-// -----------------------------
-// Placeholder dla modal submit (jeśli kiedyś użyjemy formy)
-// -----------------------------
-export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
-  await interaction.reply({
-    content: "🟢 Create Week Submit – placeholder functionality. To be implemented.",
-    ephemeral: true
-  });
 }
