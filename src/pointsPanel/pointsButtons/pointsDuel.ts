@@ -1,6 +1,11 @@
-// src/pointsPanel/pointsButtons/pointsDuel.ts
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, CacheType, MessageCreateOptions } from "discord.js";
-import * as pointsCreate from "./pointsCreate";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  CacheType,
+  MessageCreateOptions
+} from "discord.js";
 import * as pointsSelectWeek from "./pointsSelectWeek";
 
 // Kategoria
@@ -8,12 +13,19 @@ const CATEGORY_ID = "duel";
 const CATEGORY_LABEL = "Alliance Duel";
 
 // -----------------------------
+// HELPERS
+// -----------------------------
+function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  return interaction.reply(payload);
+}
+
+// -----------------------------
 // Render panel dla tej kategorii
 // -----------------------------
 export function renderPointsDuelPanel(weeks: string[]): MessageCreateOptions {
   const row = new ActionRowBuilder<ButtonBuilder>();
 
-  // Tygodnie
   weeks.forEach(week => {
     row.addComponents(
       new ButtonBuilder()
@@ -28,7 +40,7 @@ export function renderPointsDuelPanel(weeks: string[]): MessageCreateOptions {
     new ButtonBuilder()
       .setCustomId(`points_create_week_${CATEGORY_ID}`)
       .setLabel("Create Week")
-      .setStyle(ButtonStyle.Success) // zielony
+      .setStyle(ButtonStyle.Success)
   );
 
   return {
@@ -41,10 +53,9 @@ export function renderPointsDuelPanel(weeks: string[]): MessageCreateOptions {
 // Handler kliknięcia w panel tej kategorii
 // -----------------------------
 export async function handlePointsDuel(interaction: ButtonInteraction<CacheType>) {
-  // Pobieramy aktualne tygodnie z serwisu
   const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
 
-  await interaction.reply({
+  await safeReply(interaction, {
     content: `📌 **${CATEGORY_LABEL} – Choose Week or create new**`,
     components: renderPointsDuelPanel(weeks).components,
     ephemeral: true
@@ -75,7 +86,7 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
         .setStyle(ButtonStyle.Primary)
     );
 
-  await interaction.reply({
+  await safeReply(interaction, {
     content: `📌 **${CATEGORY_LABEL} – Week ${week}**`,
     components: [row],
     ephemeral: true
