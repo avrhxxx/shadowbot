@@ -8,16 +8,12 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 // --------------------------
 
 const MODERATOR_CONFIG_TAB = "moderator_config";
-
 const EVENTS_TAB = "events";
 const EVENTS_CONFIG_TAB = "events_config";
-
 const POINTS_TAB = "points";
 const POINTS_CONFIG_TAB = "points_config";
-
 const ABSENCE_TAB = "absence";
 const ABSENCE_CONFIG_TAB = "absence_config";
-
 const TRANSLATE_TAB = "translate";
 const TRANSLATE_CONFIG_TAB = "translate_config";
 
@@ -144,14 +140,7 @@ export async function deleteEventRow(row: number) {
 export async function ensureModeratorConfigHeaders() {
   const rows = await readSheet(MODERATOR_CONFIG_TAB);
   if (!rows || rows.length === 0 || rows[0].length === 0) {
-    const headers = [[
-      "modChannelId",
-      "dateEmbedId",
-      "hubMessageId",
-      "updateChannelId",
-      "lastUpdated",
-      "version"
-    ]];
+    const headers = [["modChannelId", "dateEmbedId", "hubMessageId", "updateChannelId", "lastUpdated", "version"]];
     await writeSheet(`${MODERATOR_CONFIG_TAB}!A1:F1`, headers);
   }
 }
@@ -282,3 +271,8 @@ function toA1(col: number, row: number): string {
   }
   return result + row;
 }
+
+// --------------------------
+// EKSPORT DLA TS / POINTS SERVICE
+// --------------------------
+export { readSheet, writeSheet };
