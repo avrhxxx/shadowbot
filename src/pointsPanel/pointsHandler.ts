@@ -1,9 +1,7 @@
-// src/pointsPanel/pointsHandler.ts
-import { Interaction, ButtonInteraction, ModalSubmitInteraction, CacheType } from "discord.js";
+import { Interaction, ButtonInteraction, CacheType, ModalSubmitInteraction } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
-import * as pointsCreate from "./pointsButtons/pointsCreate";
 
 export const IDS = {
   BUTTONS: {
@@ -20,23 +18,15 @@ type ActionType = typeof IDS.ACTIONS[number];
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
 // -----------------------------
-const BUTTON_HANDLERS: Record<
-  string,
-  (i: ButtonInteraction<CacheType>) => Promise<void>
-> = {
-  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
-    PB.pointsManagement.handlePointsManagementMain(i),
-
+const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
   [IDS.BUTTONS.GUIDE]: async (i) => {
     await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
   },
-
   [IDS.BUTTONS.SETTINGS]: async (i) => {
     await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
   },
-
-  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
-    PB.pointsListWeeks.handleListWeeks(i)
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
 };
 
 // -----------------------------
@@ -44,112 +34,78 @@ const BUTTON_HANDLERS: Record<
 // -----------------------------
 export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
   try {
-    // -----------------------------
-    // MODAL SUBMIT
-    // -----------------------------
+    // 1️⃣ Button
+    if (interaction.isButton()) {
+      const { customId } = interaction;
+
+      if (BUTTON_HANDLERS[customId]) {
+        await BUTTON_HANDLERS[customId](interaction);
+        return;
+      }
+
+      if (customId.startsWith("points_management_category_")) {
+        await PB.pointsManagement.handlePointsManagement(interaction);
+        return;
+      }
+
+      // Create Week
+      if (Utils.isCreateWeek(customId)) {
+        const category = Utils.parseCreateWeekId(customId);
+        const module = getCategoryModule(category);
+        if (module) {
+          await module.handleCreateWeek(interaction); // ButtonInteraction
+        } else {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        }
+        return;
+      }
+
+      // Kliknięcie tygodnia
+      if (Utils.isWeek(customId)) {
+        const { category, week } = Utils.parseWeekId(customId);
+        const module = getCategoryModule(category);
+        if (module) {
+          await module.handleWeekClick(interaction, week);
+        } else {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        }
+        return;
+      }
+
+      // Add / Remove / List / Compare
+      if (Utils.isAction(customId)) {
+        const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
+        const module = getCategoryModule(category);
+        if (!module) {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+          return;
+        }
+
+        switch (action) {
+          case "add": await PS.handleAddPoints(interaction); break;
+          case "remove": await PS.handleRemovePoints(interaction); break;
+          case "list": await PS.handlePointsList(interaction); break;
+          case "compare": await PS.handleCompareWeeks(interaction); break;
+        }
+        return;
+      }
+    }
+
+    // 2️⃣ Modal Submit
     if (interaction.isModalSubmit()) {
-      if (interaction.customId.startsWith("points_create_modal_")) {
-        await pointsCreate.handleCreateWeekSubmit(interaction);
+      const { customId } = interaction;
+
+      if (customId.startsWith("points_create_modal_")) {
+        await PB.pointsCreate.handleCreateWeekSubmit(interaction); // ModalSubmitInteraction
         return;
       }
-    }
-
-    // -----------------------------
-    // BUTTONS
-    // -----------------------------
-    if (!interaction.isButton()) return;
-
-    const { customId } = interaction;
-
-    // 1️⃣ Stałe przyciski globalne
-    if (BUTTON_HANDLERS[customId]) {
-      await BUTTON_HANDLERS[customId](interaction);
-      return;
-    }
-
-    // 2️⃣ Kliknięcia w kategorie Points Management
-    if (customId.startsWith("points_management_category_")) {
-      await PB.pointsManagement.handlePointsManagement(interaction);
-      return;
-    }
-
-    // 3️⃣ Create Week (przycisk, który otwiera modal)
-    if (Utils.isCreateWeek(customId)) {
-      const category = Utils.parseCreateWeekId(customId);
-      const module = getCategoryModule(category);
-
-      if (module) {
-        await module.handleCreateWeek(interaction);
-      } else {
-        await safeReply(interaction, {
-          content: `⚠️ Unknown category: ${category}`,
-          ephemeral: true
-        });
-      }
-      return;
-    }
-
-    // 4️⃣ Kliknięcie tygodnia
-    if (Utils.isWeek(customId)) {
-      const { category, week } = Utils.parseWeekId(customId);
-      const module = getCategoryModule(category);
-
-      if (module) {
-        await module.handleWeekClick(interaction, week);
-      } else {
-        await safeReply(interaction, {
-          content: `⚠️ Unknown category: ${category}`,
-          ephemeral: true
-        });
-      }
-      return;
-    }
-
-    // 5️⃣ Akcje Add / Remove / List / Compare
-    if (Utils.isAction(customId)) {
-      const { action, category, week } = Utils.parseActionId(customId) as {
-        action: ActionType;
-        category: string;
-        week: string;
-      };
-
-      const module = getCategoryModule(category);
-
-      if (!module) {
-        await safeReply(interaction, {
-          content: `⚠️ Unknown category: ${category}`,
-          ephemeral: true
-        });
-        return;
-      }
-
-      switch (action) {
-        case "add":
-          await PS.handleAddPoints(interaction);
-          break;
-        case "remove":
-          await PS.handleRemovePoints(interaction);
-          break;
-        case "list":
-          await PS.handlePointsList(interaction);
-          break;
-        case "compare":
-          await PS.handleCompareWeeks(interaction);
-          break;
-      }
-
-      return;
     }
   } catch (error) {
     console.error("Error handling points interaction:", error);
-
     if (interaction.isRepliable()) {
       const payload = { content: "❌ An error occurred.", ephemeral: true };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(payload);
-      } else {
-        await interaction.reply(payload);
-      }
+      if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+      else await interaction.reply(payload);
     }
   }
 }
@@ -157,10 +113,7 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeReply(
-  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
-  payload: any
-) {
+function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
@@ -170,11 +123,8 @@ function safeReply(
 // -----------------------------
 function getCategoryModule(category: string) {
   switch (category) {
-    case "donations":
-      return PB.pointsDonations;
-    case "duel":
-      return PB.pointsDuel;
-    default:
-      return null;
+    case "donations": return PB.pointsDonations;
+    case "duel": return PB.pointsDuel;
+    default: return null;
   }
 }
