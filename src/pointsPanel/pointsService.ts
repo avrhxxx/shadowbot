@@ -37,7 +37,6 @@ export async function createWeek(weekName: string): Promise<void> {
   const rawRows: any[][] = await readSheet("points");
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  // sprawdzamy, czy tydzień już istnieje w jakiejkolwiek kategorii
   const exists = rows.some(r => r[3] === weekName);
   if (exists) return;
 
@@ -125,25 +124,32 @@ export async function compareWeeks(category: PointsCategory, week1: string, week
 }
 
 // ----------------------------
-// HANDLERY BUTTONÓW (ephemeral placeholder)
+// HANDLERY BUTTONÓW (ephemeral placeholders)
 // ----------------------------
 export async function handleAddPoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
-    content: "Add Points functionality coming soon.",
+    content: "🟢 Add Points functionality placeholder – to be implemented.",
+    ephemeral: true
+  });
+}
+
+export async function handleRemovePoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+  await interaction.reply({
+    content: "🔴 Remove Points functionality placeholder – to be implemented.",
     ephemeral: true
   });
 }
 
 export async function handlePointsList(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
-    content: "Points List functionality coming soon.",
+    content: "📋 Points List functionality placeholder – to be implemented.",
     ephemeral: true
   });
 }
 
 export async function handleCompareWeeks(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
-    content: "Compare Weeks functionality coming soon.",
+    content: "📊 Compare Points functionality placeholder – to be implemented.",
     ephemeral: true
   });
 }
