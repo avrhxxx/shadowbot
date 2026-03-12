@@ -1,27 +1,68 @@
 // src/pointsPanel/pointsButtons/utils.ts
 
 /* ===========================
-   PARSOWANIE CUSTOM ID
+   TYPE GUARDS / CHECKERS
 =========================== */
 
-/**
- * Wyciąga kategorię z customId przycisku: points_add_category_week
- */
-export function parseCategoryFromCustomId(customId: string): string {
-  const match = customId.match(/^points_(add|remove|list|compare|create)_([^_]+)_?/);
-  return match ? match[2] : "";
+/** Czy to Create Week button */
+export function isCreateWeek(id: string): boolean {
+  return id.startsWith("points_create_week_");
 }
 
-/**
- * Wyciąga tydzień z customId przycisku: points_add_category_week
- */
-export function parseWeekFromCustomId(customId: string): string | null {
-  const match = customId.match(/^points_(add|remove|list|compare)_[^_]+_(.+)$/);
-  return match ? match[2] : null;
+/** Czy to kliknięcie tygodnia */
+export function isWeek(id: string): boolean {
+  return /^points_[^_]+_week_.+$/.test(id);
+}
+
+/** Czy to akcja tygodnia (add/remove/list/compare) */
+export function isAction(id: string): boolean {
+  return /^points_(add|remove|list|compare)_[^_]+_.+$/.test(id);
 }
 
 /* ===========================
-   DYNAMICZNE CUSTOM ID BUTTONÓW
+   PARSOWANIE CUSTOM ID
+=========================== */
+
+/** points_create_week_<category> */
+export function parseCreateWeekId(id: string): string {
+  return id.replace("points_create_week_", "");
+}
+
+/** points_<category>_week_<week> */
+export function parseWeekId(id: string) {
+  const match = id.match(/^points_(.+)_week_(.+)$/);
+
+  if (!match) {
+    return { category: "", week: "" };
+  }
+
+  return {
+    category: match[1],
+    week: match[2]
+  };
+}
+
+/** points_<action>_<category>_<week> */
+export function parseActionId(id: string) {
+  const match = id.match(/^points_(add|remove|list|compare)_(.+)_(.+)$/);
+
+  if (!match) {
+    return {
+      action: "",
+      category: "",
+      week: ""
+    };
+  }
+
+  return {
+    action: match[1],
+    category: match[2],
+    week: match[3]
+  };
+}
+
+/* ===========================
+   DYNAMICZNE CUSTOM ID
 =========================== */
 
 /** Add Points */
