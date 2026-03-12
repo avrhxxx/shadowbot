@@ -1,44 +1,67 @@
-import { ButtonInteraction, CacheType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
-import * as pointsSelectWeek from "./pointsSelectWeek";
-import * as pointsCreate from "./pointsCreate";
+import {
+  ButtonInteraction,
+  CacheType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from "discord.js";
+import * as pointsService from "../pointsService";
+import * as pointsList from "./pointsList";
+import * as pointsAdd from "./pointsAdd";
+import * as pointsRemove from "./pointsRemove";
+import * as pointsCompare from "./pointsCompare";
 
-const CATEGORY_ID = "donations";
-const CATEGORY_LABEL = "Alliance Donations";
+const CATEGORY = "Donations";
 
-function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
-  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
-  return interaction.reply(payload);
-}
-
+// Renderowanie przycisków wszystkich tygodni
 export async function handlePointsDonations(interaction: ButtonInteraction<CacheType>) {
-  const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
+  const weeks = await pointsService.getAllWeeks("Donations");
 
-  const components: ActionRowBuilder<ButtonBuilder>[] = [];
+  if (weeks.length === 0) {
+    await interaction.reply({ content: "⚠️ No weeks found for Donations.", ephemeral: true });
+    return;
+  }
 
-  weeks.forEach(week => {
-    components.push(pointsSelectWeek.renderWeekButton(CATEGORY_ID, week));
-  });
-
-  components.push(
+  const rows = weeks.map(week =>
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(`points_create_week_${CATEGORY_ID}`)
-        .setLabel("Create Week")
-        .setStyle(ButtonStyle.Success)
+        .setCustomId(`points_week_donations_${week}`)
+        .setLabel(week)
+        .setStyle(ButtonStyle.Primary)
     )
   );
 
-  await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new**`,
-    components,
+  await interaction.reply({
+    content: `📌 **${CATEGORY} – Select Week**`,
+    components: rows,
     ephemeral: true
   });
 }
 
+// Obsługa kliknięcia tygodnia
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
-  await pointsSelectWeek.handleWeekClick(interaction, CATEGORY_ID, week);
-}
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`points_add_donations_${week}`)
+      .setLabel("Add Points")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`points_remove_donations_${week}`)
+      .setLabel("Remove Points")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`points_compare_donations_${week}`)
+      .setLabel("Compare")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`points_list_donations_${week}`)
+      .setLabel("List")
+      .setStyle(ButtonStyle.Secondary)
+  );
 
-export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
-  await pointsCreate.handleCreateWeek(interaction);
+  await interaction.update({
+    content: `📌 **Donations – Week ${week}**`,
+    components: [row],
+    ephemeral: true
+  });
 }
