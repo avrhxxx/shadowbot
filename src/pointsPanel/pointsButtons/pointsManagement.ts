@@ -28,7 +28,7 @@ function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
 }
 
 // -----------------------------
-// Render panelu wyboru kategorii
+// Render panelu wyboru kategorii (placeholder)
 // -----------------------------
 export function renderPointsManagementCategories(): MessageCreateOptions {
   const row = new ActionRowBuilder<ButtonBuilder>();
@@ -42,7 +42,7 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
   });
 
   return {
-    content: "📌 **Points Management – Choose Category**",
+    content: "📌 **Points Management – Choose Category (placeholder)**",
     components: [row]
   };
 }
@@ -60,8 +60,7 @@ export async function handlePointsManagementMain(interaction: ButtonInteraction<
 }
 
 // -----------------------------
-// Handler kliknięcia w kategorię
-// -----------------------------
+// Handler kliknięcia w kategorię (placeholder)
 export async function handlePointsManagement(interaction: ButtonInteraction<CacheType>) {
   if (!interaction.customId.startsWith("points_management_category_")) return;
 
@@ -73,7 +72,7 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
     await pointsDuel.handlePointsDuel(interaction);
   } else {
     await safeReply(interaction, {
-      content: `⚠️ Unknown category: ${categoryId}`,
+      content: `⚠️ Unknown category: ${categoryId} (placeholder)`,
       ephemeral: true
     });
   }
