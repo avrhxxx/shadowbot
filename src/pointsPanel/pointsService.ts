@@ -1,6 +1,6 @@
 // src/pointsPanel/pointsService.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import { readSheet, writeSheet } from "../googleSheetsStorage";
+import * as GS from "../googleSheetsStorage";
 
 // ----------------------------
 // TYPES
@@ -21,19 +21,17 @@ type PointsRow = [string, string, string, string, string];
 // WEEKS
 // ----------------------------
 export async function createWeek(weekName: string): Promise<void> {
-  const rows: PointsRow[] = await readSheet("points");
-  // sprawdzamy, czy tydzień już istnieje w jakiejkolwiek kategorii
+  const rows: PointsRow[] = await GS.readPointsSheet();
   const exists = rows.some((r: PointsRow) => r[3] === weekName);
   if (exists) return;
 
-  // dodajemy w każdej kategorii jako placeholder (można później zostawić puste)
   const newRow: PointsRow = ["Donations", "", "", weekName, ""];
   const newRow2: PointsRow = ["Duel", "", "", weekName, ""];
-  await writeSheet("points", [...rows, newRow, newRow2]);
+  await GS.writePointsSheet([...rows, newRow, newRow2]);
 }
 
 export async function getAllWeeks(): Promise<string[]> {
-  const rows: PointsRow[] = await readSheet("points");
+  const rows: PointsRow[] = await GS.readPointsSheet();
   const weeksSet = new Set<string>();
   rows.forEach((r: PointsRow) => {
     if (r[3]) weeksSet.add(r[3]);
@@ -45,7 +43,7 @@ export async function getAllWeeks(): Promise<string[]> {
 // ADD POINTS
 // ----------------------------
 export async function addPoints(entry: PointsEntry): Promise<void> {
-  const rows: PointsRow[] = await readSheet("points");
+  const rows: PointsRow[] = await GS.readPointsSheet();
 
   const rowIndex = rows.findIndex((r: PointsRow) =>
     r[0] === entry.category &&
@@ -66,14 +64,14 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
     rows.push(newRow);
   }
 
-  await writeSheet("points", rows);
+  await GS.writePointsSheet(rows);
 }
 
 // ----------------------------
 // GET POINTS
 // ----------------------------
 export async function getPoints(category: PointsCategory, week?: string): Promise<PointsEntry[]> {
-  const rows: PointsRow[] = await readSheet("points");
+  const rows: PointsRow[] = await GS.readPointsSheet();
 
   return rows
     .filter((r: PointsRow) => r[0] === category && (!week || r[3] === week))
@@ -89,7 +87,7 @@ export async function getPoints(category: PointsCategory, week?: string): Promis
 // COMPARE WEEKS
 // ----------------------------
 export async function compareWeeks(category: PointsCategory, week1: string, week2: string) {
-  const rows: PointsRow[] = await readSheet("points");
+  const rows: PointsRow[] = await GS.readPointsSheet();
 
   const week1Rows = rows.filter((r: PointsRow) => r[0] === category && r[3] === week1);
   const week2Rows = rows.filter((r: PointsRow) => r[0] === category && r[3] === week2);
