@@ -29,7 +29,7 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
       new ButtonBuilder()
         .setCustomId(`points_management_category_${cat.id}`)
         .setLabel(cat.label)
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary) // niebieski
     );
   });
 
@@ -37,6 +37,18 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
     content: "📌 **Points Management – Choose Category**",
     components: [row]
   };
+}
+
+// -----------------------------
+// Handler dla głównego przycisku Points Management
+// -----------------------------
+export async function handlePointsManagementMain(interaction: ButtonInteraction<CacheType>) {
+  const panel = renderPointsManagementCategories();
+  await interaction.reply({
+    content: panel.content,
+    components: panel.components,
+    ephemeral: true
+  });
 }
 
 // -----------------------------
