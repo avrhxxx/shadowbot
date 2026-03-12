@@ -3,30 +3,20 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions, Int
 
 /**
  * Renderuje główny panel punktów
- * Rząd 1: Create Week / Weeks List / Categories
- * Rząd 2: Guide / Settings
+ * Jeden rząd: Points Management | Weeks List | Guide | Settings
  */
 export function renderPointsPanel(): MessageCreateOptions {
-  // Rząd 1: najważniejsze akcje
-  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("points_create_week")
-      .setLabel("Create Week")
-      .setStyle(ButtonStyle.Primary),
+      .setCustomId("points_management")
+      .setLabel("Points Management")
+      .setStyle(ButtonStyle.Primary), // niebieski
 
     new ButtonBuilder()
       .setCustomId("points_list_weeks")
       .setLabel("Weeks List")
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary), // niebieski
 
-    new ButtonBuilder()
-      .setCustomId("points_category_select")
-      .setLabel("Categories")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  // Rząd 2: dodatkowe akcje
-  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("points_guide")
       .setLabel("Guide")
@@ -39,8 +29,8 @@ export function renderPointsPanel(): MessageCreateOptions {
   );
 
   return {
-    content: "📌 **Points Panel – Main Menu**",
-    components: [row1, row2]
+    content: "📌 **Points Panel**",
+    components: [row]
   };
 }
 
