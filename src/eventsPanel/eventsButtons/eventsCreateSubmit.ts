@@ -1,152 +1,259 @@
-// src/pointsPanel/pointsButtons/pointsCreate.ts
+// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
 import {
-  ButtonInteraction,
   ModalSubmitInteraction,
-  TextInputBuilder,
-  TextInputStyle,
   ActionRowBuilder,
-  ModalBuilder,
-  CacheType
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuInteraction,
+  ButtonInteraction
 } from "discord.js";
 import { v4 as uuidv4 } from "uuid";
-import * as pointsService from "../pointsService";
+import { createEvent, EventObject } from "../eventService";
+import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { sendEventCreatedNotification } from "./eventsReminder";
+
+// -----------------------------------------------------------
+// TEMP DATA TYPE
+// -----------------------------------------------------------
+export type TempEventData = {
+  id: string;
+  name: string;
+  day: number;
+  month: number;
+  hour: number;
+  minute: number;
+  guildId: string;
+  year?: number;
+  reminderBefore?: number;
+  notifyOnCreate?: boolean;
+  eventType: string;
+};
 
 // -----------------------------------------------------------
 // TEMP STORE
 // -----------------------------------------------------------
-export type TempPointsWeek = {
-  id: string;
-  weekName: string; // np. "March 01.03 - 07.03"
-};
-
-export const tempPointsWeekStore = new Map<string, TempPointsWeek>();
+export const tempEventStore = new Map<string, TempEventData>();
 
 // -----------------------------------------------------------
 // HELPERS
 // -----------------------------------------------------------
-
-/**
- * Parsuje input tygodnia w formacie DD.MM lub DDM M (0103 lub 01.03)
- */
-function parseDayMonth(input: string) {
-  const cleaned = input.replace(/[^\d]/g, ""); // usuń wszystko poza cyframi
-  if (cleaned.length !== 4) return null;
-
-  const day = Number(cleaned.slice(0, 2));
-  const month = Number(cleaned.slice(2, 4));
-
-  if (isNaN(day) || isNaN(month)) return null;
-  if (day < 1 || day > 31) return null;
-  if (month < 1 || month > 12) return null;
-
-  return { day, month };
+function parseEventDateTime(input: string) {
+  const cleaned = input.trim();
+  const match = cleaned.match(
+    /^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/
+  );
+  if (!match) return null;
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const hour = parseInt(match[3], 10);
+  const minute = match[4] ? parseInt(match[4], 10) : 0;
+  if (hour > 23 || minute > 59) return null;
+  return { day, month, hour, minute };
 }
 
-/**
- * Format DD.MM do stringa
- */
-function formatDayMonth(d: number, m: number) {
-  const dd = d.toString().padStart(2, "0");
-  const mm = m.toString().padStart(2, "0");
-  return `${dd}.${mm}`;
-}
-
-/**
- * Bezpieczne reply
- */
-async function safeReply(interaction: ButtonInteraction | ModalSubmitInteraction, payload: any) {
+async function safeReply(interaction: any, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
+  if (payload.ephemeral) {
+    payload.flags = 64;
+    delete payload.ephemeral;
+  }
   return interaction.reply(payload);
 }
 
 // -----------------------------------------------------------
-// HANDLE CREATE WEEK BUTTON
+// HANDLE CREATE SUBMIT
 // -----------------------------------------------------------
-export async function handleCreateWeek(i: ButtonInteraction<CacheType>) {
-  const modal = new ModalBuilder()
-    .setCustomId("points_create_week_modal")
-    .setTitle("Create Points Week");
+export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
+  const guildId = interaction.guildId!;
+  const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
+  const rawType = typeMatch ? typeMatch[1] : "custom";
+  const eventType = rawType.startsWith("standard_") ? rawType.replace(/^standard_/, "") : rawType;
 
-  const weekFromInput = new TextInputBuilder()
-    .setCustomId("week_from")
-    .setLabel("Week FROM (example: 01.03 or 0103)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setPlaceholder("01.03");
+  let name = "";
+  let datetimeRaw = "";
+  let yearRaw: string | undefined;
 
-  const weekToInput = new TextInputBuilder()
-    .setCustomId("week_to")
-    .setLabel("Week TO (example: 07.03 or 0703)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setPlaceholder("07.03");
+  try { name = interaction.fields.getTextInputValue("event_name"); } catch {}
+  try { datetimeRaw = interaction.fields.getTextInputValue("event_datetime"); } catch {}
+  try { yearRaw = interaction.fields.getTextInputValue("event_year"); } catch {}
 
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(weekFromInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(weekToInput)
-  );
+  // Prefill dla standardowych typów
+  const prefillMap: Record<string, string> = {
+    arcadian_conquest: "Arcadian Conquest",
+    city_contest: "City Contest",
+    reservoir_raid: "Reservoir Raid",
+    ghoulion_pursuit: "Ghoulion Pursuit",
+    kvk: "KvK"
+  };
+  if (prefillMap[eventType]) name = prefillMap[eventType];
 
-  await i.showModal(modal);
+  let day: number, month: number, hour = 0, minute = 0, year: number | undefined;
+
+  if (eventType === "birthdays") {
+    const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
+    if (!dateMatch) {
+      await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
+      return;
+    }
+    day = parseInt(dateMatch[1], 10);
+    month = parseInt(dateMatch[2], 10);
+    hour = 0;
+    minute = 0;
+    year = new Date().getUTCFullYear();
+    name = `${name}'s birthday! 🎉`;
+  } else {
+    const parsed = parseEventDateTime(datetimeRaw);
+    if (!parsed && eventType !== "custom") {
+      await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+      return;
+    }
+    day = parsed?.day ?? 1;
+    month = parsed?.month ?? 1;
+    hour = parsed?.hour ?? 0;
+    minute = parsed?.minute ?? 0;
+    const yearParsed = yearRaw ? parseInt(yearRaw, 10) : undefined;
+    year = Number.isNaN(yearParsed) ? undefined : yearParsed;
+  }
+
+  const tempId = `E-${uuidv4()}`;
+  const nowUTC = new Date();
+  const eventDateUTC = year
+    ? new Date(Date.UTC(year, month - 1, day, hour, minute))
+    : getEventDateUTC(day, month, hour, minute);
+
+  if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
+    tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType, notifyOnCreate: false });
+    await safeReply(interaction, {
+      content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId(`next_year_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`next_year_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+        )
+      ],
+      ephemeral: true
+    });
+    return;
+  }
+
+  tempEventStore.set(tempId, {
+    id: tempId,
+    name,
+    day,
+    month,
+    hour,
+    minute,
+    guildId,
+    year: year ?? eventDateUTC.getUTCFullYear(),
+    reminderBefore: eventType === "birthdays" ? 0 : 60,
+    eventType,
+    notifyOnCreate: eventType === "birthdays" ? false : undefined
+  });
+
+  // Pokazujemy przycisk powiadomień
+  if (eventType !== "birthdays") {
+    await showCreateNotificationConfirm(interaction, tempId);
+  } else {
+    await finalizeEvent(interaction, tempId);
+  }
 }
 
 // -----------------------------------------------------------
-// HANDLE MODAL SUBMIT
+// SHOW CREATE NOTIFICATION CONFIRM
 // -----------------------------------------------------------
-export async function handleCreateWeekSubmit(i: ModalSubmitInteraction<CacheType>) {
-  const weekFromRaw = i.fields.getTextInputValue("week_from");
-  const weekToRaw = i.fields.getTextInputValue("week_to");
+export async function showCreateNotificationConfirm(
+  interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+  tempId: string
+) {
+  const tempData = tempEventStore.get(tempId);
+  if (!tempData) return;
 
-  const from = parseDayMonth(weekFromRaw);
-  const to = parseDayMonth(weekToRaw);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`notify_create_yes-${tempId}`).setLabel("Yes").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`notify_create_no-${tempId}`).setLabel("No").setStyle(ButtonStyle.Danger)
+  );
 
-  if (!from) {
-    await safeReply(i, { content: "❌ Invalid FROM date. Use DD.MM or DDM M, e.g., 01.03", ephemeral: true });
+  await safeReply(interaction, {
+    content: "Do you want to send a notification about creating this event?",
+    components: [row],
+    ephemeral: true
+  });
+}
+
+// -----------------------------------------------------------
+// FINALIZE EVENT
+// -----------------------------------------------------------
+export async function finalizeEvent(
+  interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
+  tempId: string
+) {
+  const tempData = tempEventStore.get(tempId);
+  if (!tempData) {
+    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
     return;
   }
-  if (!to) {
-    await safeReply(i, { content: "❌ Invalid TO date. Use DD.MM or DDM M, e.g., 07.03", ephemeral: true });
+
+  const newEvent: EventObject = {
+    id: tempData.id,
+    guildId: tempData.guildId,
+    name: tempData.name,
+    day: tempData.day,
+    month: tempData.month,
+    hour: tempData.hour,
+    minute: tempData.minute,
+    year: tempData.year ?? new Date().getUTCFullYear(),
+    status: "ACTIVE",
+    participants: [],
+    absent: [],
+    createdAt: Date.now(),
+    reminderSent: false,
+    started: false,
+    reminderBefore: tempData.reminderBefore ?? 60,
+    eventType: tempData.eventType
+  };
+
+  await createEvent(newEvent);
+  tempEventStore.delete(tempId);
+
+  if (interaction.guild && tempData.notifyOnCreate) {
+    await sendEventCreatedNotification(newEvent, interaction.guild);
+  }
+
+  await safeReply(interaction, { content: `Event **${newEvent.name}** scheduled successfully.`, components: [], ephemeral: true });
+}
+
+// -----------------------------------------------------------
+// HANDLE NOTIFICATION RESPONSE
+// -----------------------------------------------------------
+export async function handleNotificationResponse(interaction: ButtonInteraction) {
+  const [, tempId] = interaction.customId.split(/-(.+)/);
+  const tempData = tempEventStore.get(tempId);
+  if (!tempData) {
+    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
     return;
   }
 
-  // Chronologia: FROM <= TO
-  const fromValue = from.month * 100 + from.day;
-  const toValue = to.month * 100 + to.day;
-  if (fromValue > toValue) {
-    await safeReply(i, { content: "❌ FROM date cannot be after TO date.", ephemeral: true });
+  tempData.notifyOnCreate = interaction.customId.startsWith("notify_create_yes");
+  await finalizeEvent(interaction, tempId);
+}
+
+// -----------------------------------------------------------
+// FINALIZE NEXT YEAR EVENT
+// -----------------------------------------------------------
+export async function finalizeNextYearEvent(interaction: ButtonInteraction | ModalSubmitInteraction) {
+  const [, tempId] = interaction.customId.split(/-(.+)/);
+  const tempData = tempEventStore.get(tempId);
+  if (!tempData) {
+    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
     return;
   }
 
-  // Autoformatowanie
-  const weekFromStr = formatDayMonth(from.day, from.month);
-  const weekToStr = formatDayMonth(to.day, to.month);
+  tempData.year = new Date().getUTCFullYear() + 1;
 
-  // Wyciągamy nazwę miesiąca z daty startowej
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  const monthName = monthNames[from.month - 1] || "Unknown";
-
-  const weekName = `${monthName} ${weekFromStr} - ${weekToStr}`;
-  const tempId = `W-${uuidv4()}`;
-
-  // Dodajemy tymczasowo
-  tempPointsWeekStore.set(tempId, { id: tempId, weekName });
-
-  try {
-    await pointsService.createWeek(weekName);
-
-    await safeReply(i, {
-      content: `✅ Week **${weekName}** created successfully.`,
-      ephemeral: true
-    });
-  } catch (error) {
-    console.error("Create week error:", error);
-    await safeReply(i, {
-      content: "❌ Failed to create week.",
-      ephemeral: true
-    });
-  } finally {
-    tempPointsWeekStore.delete(tempId); // czyszczenie temp store
+  if (tempData.eventType !== "birthdays") {
+    await showCreateNotificationConfirm(interaction, tempId);
+  } else {
+    await finalizeEvent(interaction, tempId);
   }
 }
