@@ -1,6 +1,6 @@
 // src/pointsPanel/pointsService.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import { readSheet, writeSheet } from "../googleSheetsStorage";
+import { readSheet, writeSheet, updateCell } from "../googleSheetsStorage";
 
 // ----------------------------
 // TYPES
@@ -14,8 +14,8 @@ export interface PointsEntry {
   week: string;   // np. "01-03 - 07-03"
 }
 
-// Typ wiersza w arkuszu Google Sheets (A-E kolumny)
-type PointsRow = [string, string, string, string, string];
+// Typ wiersza w arkuszu Google Sheets (A-D kolumny)
+type PointsRow = [string, string, string, string];
 
 // ----------------------------
 // HELPERS
@@ -25,81 +25,70 @@ function normalizePointsRows(rows: any[][]): PointsRow[] {
     r[0] ?? "",
     r[1] ?? "",
     r[2] ?? "",
-    r[3] ?? "",
-    r[4] ?? ""
+    r[3] ?? ""
   ] as PointsRow);
 }
 
 // ----------------------------
-// WEEKS
+// WEEKS TAB
 // ----------------------------
 export async function createWeek(weekName: string): Promise<void> {
-  const rawRows: any[][] = await readSheet("points");
+  const rawRows: any[][] = await readSheet("points_weeks");
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const exists = rows.some(r => r[3] === weekName);
+  const exists = rows.some(r => r[1] === weekName);
   if (exists) return;
 
-  // dodajemy w każdej kategorii jako placeholder
-  const newRow: PointsRow = ["Donations", "", "", weekName, ""];
-  const newRow2: PointsRow = ["Duel", "", "", weekName, ""];
-  await writeSheet("points", [...rows, newRow, newRow2]);
+  const newRowDonations: PointsRow = ["Donations", weekName, "", ""];
+  const newRowDuel: PointsRow = ["Duel", weekName, "", ""];
+  await writeSheet("points_weeks", [...rows, newRowDonations, newRowDuel]);
 }
 
-export async function getAllWeeks(): Promise<string[]> {
-  const rawRows: any[][] = await readSheet("points");
+export async function getAllWeeks(category?: PointsCategory): Promise<string[]> {
+  const rawRows: any[][] = await readSheet("points_weeks");
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
   const weeksSet = new Set<string>();
   rows.forEach(r => {
-    if (r[3]) weeksSet.add(r[3]);
+    if (!category || r[0] === category) weeksSet.add(r[1]);
   });
   return Array.from(weeksSet);
 }
 
 // ----------------------------
-// ADD POINTS
+// ADD / UPDATE POINTS
 // ----------------------------
+
+// Funkcja zapisuje punkt gracza w jednej komórce, nie nadpisując reszty wiersza
 export async function addPoints(entry: PointsEntry): Promise<void> {
-  const rawRows: any[][] = await readSheet("points");
+  const tab = entry.category === "Donations" ? "points_donations" : "points_duel";
+  const rawRows: any[][] = await readSheet(tab);
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const rowIndex = rows.findIndex(r =>
-    r[0] === entry.category &&
-    r[1] === entry.nick &&
-    r[3] === entry.week
-  );
+  const rowIndex = rows.findIndex(r => r[1] === entry.week && r[2] === entry.nick);
 
   if (rowIndex !== -1) {
-    rows[rowIndex][2] = entry.points;
+    // update punktów po komórce (kolumna D)
+    await updateCell(tab, rowIndex + 2, 4, entry.points);
   } else {
-    const newRow: PointsRow = [
-      entry.category,
-      entry.nick,
-      entry.points,
-      entry.week,
-      ""
-    ];
-    rows.push(newRow);
+    // dodajemy nowy wiersz po całym wierszu
+    const newRow: PointsRow = [entry.category, entry.week, entry.nick, entry.points];
+    await writeSheet(tab, [...rows, newRow]);
   }
-
-  await writeSheet("points", rows);
 }
 
-// ----------------------------
-// GET POINTS
-// ----------------------------
 export async function getPoints(category: PointsCategory, week?: string): Promise<PointsEntry[]> {
-  const rawRows: any[][] = await readSheet("points");
+  const tab = category === "Donations" ? "points_donations" : "points_duel";
+  const rawRows: any[][] = await readSheet(tab);
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
   return rows
-    .filter(r => r[0] === category && (!week || r[3] === week))
+    .filter(r => (!week || r[1] === week))
     .map(r => ({
       category: r[0] as PointsCategory,
-      nick: r[1],
-      points: r[2],
-      week: r[3]
+      week: r[1],
+      nick: r[2],
+      points: r[3]
     }));
 }
 
@@ -107,19 +96,20 @@ export async function getPoints(category: PointsCategory, week?: string): Promis
 // COMPARE WEEKS
 // ----------------------------
 export async function compareWeeks(category: PointsCategory, week1: string, week2: string) {
-  const rawRows: any[][] = await readSheet("points");
+  const tab = category === "Donations" ? "points_donations" : "points_duel";
+  const rawRows: any[][] = await readSheet(tab);
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const week1Rows = rows.filter(r => r[0] === category && r[3] === week1);
-  const week2Rows = rows.filter(r => r[0] === category && r[3] === week2);
+  const week1Rows = rows.filter(r => r[1] === week1);
+  const week2Rows = rows.filter(r => r[1] === week2);
 
   const week2Map = new Map<string, string>();
-  week2Rows.forEach(r => week2Map.set(r[1], r[2]));
+  week2Rows.forEach(r => week2Map.set(r[2], r[3]));
 
   return week1Rows.map(r => ({
-    nick: r[1],
-    week1Points: r[2],
-    week2Points: week2Map.get(r[1]) || "0"
+    nick: r[2],
+    week1Points: r[3],
+    week2Points: week2Map.get(r[2]) || "0"
   }));
 }
 
