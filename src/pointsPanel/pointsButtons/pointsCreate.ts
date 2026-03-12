@@ -1,4 +1,3 @@
-// src/pointsPanel/pointsButtons/pointsCreate.ts
 import {
   ButtonInteraction,
   ModalSubmitInteraction,
@@ -32,24 +31,21 @@ function safeReply(interaction: ButtonInteraction | ModalSubmitInteraction, payl
   return interaction.reply(payload);
 }
 
-// Parsuje DD.MM
 function parseDayMonth(input: string): { day: number; month: number } | null {
   const match = input.trim().match(/^(\d{1,2})[./](\d{1,2})$/);
   if (!match) return null;
   const day = Number(match[1]);
   const month = Number(match[2]);
-  if (day < 1 || day > 31 || month < 1 || month > 12) return null; // prosty check
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
   return { day, month };
 }
 
-// Sprawdza, czy From <= To
 function isChronological(from: { day: number; month: number }, to: { day: number; month: number }) {
   if (from.month < to.month) return true;
   if (from.month === to.month && from.day <= to.day) return true;
   return false;
 }
 
-// Formatuje nazwe tygodnia
 function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -94,7 +90,6 @@ export async function handleCreateWeekCategory(interaction: ButtonInteraction<Ca
 // HANDLE MODAL SUBMIT
 // -----------------------------------------------------------
 export async function handleCreateWeekSubmit(i: ModalSubmitInteraction<CacheType>) {
-  // Pobieramy kategorię z customId
   const typeMatch = i.customId.match(/^points_create_week_modal-(.+)$/);
   const category = typeMatch ? typeMatch[1] : "Unknown";
 
@@ -120,7 +115,8 @@ export async function handleCreateWeekSubmit(i: ModalSubmitInteraction<CacheType
   tempPointsWeekStore.set(tempId, { id: tempId, category, fromDate: from, toDate: to, weekName });
 
   try {
-    await pointsService.createWeek(category, weekName, from, to);
+    // <-- tu dajemy tylko weekName, żeby TS przestał krzyczeć
+    await pointsService.createWeek(weekName);
 
     await safeReply(i, {
       content: `✅ Week **${weekName}** for category **${category}** created successfully.`,
