@@ -1,4 +1,3 @@
-// src/pointsPanel/pointsHandler.ts
 import { Interaction, ButtonInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
@@ -41,13 +40,26 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
 
     const { customId } = interaction;
 
-    // 1️⃣ Stałe przyciski
+    // 1️⃣ Stałe przyciski globalne
     if (BUTTON_HANDLERS[customId]) {
       await BUTTON_HANDLERS[customId](interaction);
       return;
     }
 
-    // 2️⃣ Dynamiczne tygodnie i akcje w formacie: points_<category>_week_<week>
+    // 2️⃣ Stały przycisk Create Week: points_create_week_<category>
+    const createWeekMatch = customId.match(/^points_create_week_(.+)$/);
+    if (createWeekMatch) {
+      const category = createWeekMatch[1];
+      const module = getCategoryModule(category);
+      if (module) {
+        await module.handleCreateWeek(interaction);
+      } else {
+        await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+      }
+      return;
+    }
+
+    // 3️⃣ Dynamiczne tygodnie: points_<category>_week_<week>
     const weekMatch = customId.match(/^points_(.+)_week_(.+)$/);
     if (weekMatch) {
       const [, category, week] = weekMatch;
@@ -60,12 +72,11 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       return;
     }
 
-    // 3️⃣ Dynamiczne akcje Add/Remove/List/Compare: points_<action>_<category>_<week>
+    // 4️⃣ Dynamiczne akcje Add/Remove/List/Compare: points_<action>_<category>_<week>
     const actionMatch = customId.match(/^points_(add|remove|list|compare)_(.+)_(.+)$/);
     if (actionMatch) {
       const [, action, category, week] = actionMatch as [string, ActionType, string, string];
       const module = getCategoryModule(category);
-
       if (!module) {
         await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
         return;
