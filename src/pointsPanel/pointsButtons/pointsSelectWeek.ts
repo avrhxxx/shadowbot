@@ -1,10 +1,13 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, CacheType } from "discord.js";
 import * as pointsService from "../pointsService";
+import * as pointsDonations from "./pointsDonations";
+import * as pointsDuel from "./pointsDuel";
 
-// Pobiera wszystkie tygodnie dla kategorii
+// Pobranie wszystkich tygodni dla danej kategorii
 export async function getWeeksByCategory(categoryId: string): Promise<string[]> {
-  const allWeeks = await pointsService.getAllWeeks();
-  return allWeeks;
+  // categoryId: "donations" | "duel"
+  const cat: "Donations" | "Duel" = categoryId.toLowerCase() === "donations" ? "Donations" : "Duel";
+  return pointsService.getAllWeeks(cat);
 }
 
 // Render pojedynczego przycisku tygodnia
@@ -20,9 +23,12 @@ export function renderWeekButton(categoryId: string, week: string): ActionRowBui
 }
 
 // Obsługa kliknięcia tygodnia → render Add/Remove/Compare/List
-export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, categoryId: string, week: string) {
-  const row = new ActionRowBuilder<ButtonBuilder>();
-  row.addComponents(
+export async function handleWeekClick(
+  interaction: ButtonInteraction<CacheType>,
+  categoryId: string,
+  week: string
+) {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`points_add_${categoryId}_${week}`)
       .setLabel("Add Points")
@@ -44,6 +50,6 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
   await interaction.update({
     content: `📌 **${categoryId} – Week ${week}**`,
     components: [row],
-    ephemeral: true
+    ephemeral: true,
   });
 }
