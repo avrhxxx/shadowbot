@@ -14,7 +14,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number;
+type ActionType = typeof IDS.ACTIONS[number];
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -103,7 +103,7 @@ export async function handlePointsInteraction(
 
     // 5️⃣ Akcje Add / Remove / List / Compare
     if (Utils.isAction(customId)) {
-      const { action, category } = Utils.parseActionId(customId) as {
+      const { action, category, week } = Utils.parseActionId(customId) as {
         action: ActionType;
         category: string;
         week: string;
