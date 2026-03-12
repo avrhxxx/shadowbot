@@ -1,8 +1,9 @@
 // src/pointsPanel/pointsHandler.ts
-import { Interaction, ButtonInteraction, CacheType } from "discord.js";
+import { Interaction, ButtonInteraction, ModalSubmitInteraction, CacheType } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
+import * as pointsCreate from "./pointsButtons/pointsCreate";
 
 export const IDS = {
   BUTTONS: {
@@ -27,17 +28,11 @@ const BUTTON_HANDLERS: Record<
     PB.pointsManagement.handlePointsManagementMain(i),
 
   [IDS.BUTTONS.GUIDE]: async (i) => {
-    await i.reply({
-      content: "📖 Guide not implemented yet.",
-      ephemeral: true
-    });
+    await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
   },
 
   [IDS.BUTTONS.SETTINGS]: async (i) => {
-    await i.reply({
-      content: "⚙️ Settings not implemented yet.",
-      ephemeral: true
-    });
+    await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
   },
 
   [IDS.BUTTONS.LIST_WEEKS]: (i) =>
@@ -47,10 +42,21 @@ const BUTTON_HANDLERS: Record<
 // -----------------------------
 // GLOBAL INTERACTION HANDLER
 // -----------------------------
-export async function handlePointsInteraction(
-  interaction: Interaction<CacheType>
-) {
+export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
   try {
+    // -----------------------------
+    // MODAL SUBMIT
+    // -----------------------------
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith("points_create_modal_")) {
+        await pointsCreate.handleCreateWeekSubmit(interaction);
+        return;
+      }
+    }
+
+    // -----------------------------
+    // BUTTONS
+    // -----------------------------
     if (!interaction.isButton()) return;
 
     const { customId } = interaction;
@@ -67,7 +73,7 @@ export async function handlePointsInteraction(
       return;
     }
 
-    // 3️⃣ Create Week
+    // 3️⃣ Create Week (przycisk, który otwiera modal)
     if (Utils.isCreateWeek(customId)) {
       const category = Utils.parseCreateWeekId(customId);
       const module = getCategoryModule(category);
@@ -80,7 +86,6 @@ export async function handlePointsInteraction(
           ephemeral: true
         });
       }
-
       return;
     }
 
@@ -97,7 +102,6 @@ export async function handlePointsInteraction(
           ephemeral: true
         });
       }
-
       return;
     }
 
@@ -123,15 +127,12 @@ export async function handlePointsInteraction(
         case "add":
           await PS.handleAddPoints(interaction);
           break;
-
         case "remove":
           await PS.handleRemovePoints(interaction);
           break;
-
         case "list":
           await PS.handlePointsList(interaction);
           break;
-
         case "compare":
           await PS.handleCompareWeeks(interaction);
           break;
@@ -143,11 +144,7 @@ export async function handlePointsInteraction(
     console.error("Error handling points interaction:", error);
 
     if (interaction.isRepliable()) {
-      const payload = {
-        content: "❌ An error occurred.",
-        ephemeral: true
-      };
-
+      const payload = { content: "❌ An error occurred.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload);
       } else {
@@ -161,7 +158,7 @@ export async function handlePointsInteraction(
 // HELPERS
 // -----------------------------
 function safeReply(
-  interaction: ButtonInteraction<CacheType>,
+  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
 ) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
@@ -175,10 +172,8 @@ function getCategoryModule(category: string) {
   switch (category) {
     case "donations":
       return PB.pointsDonations;
-
     case "duel":
       return PB.pointsDuel;
-
     default:
       return null;
   }
