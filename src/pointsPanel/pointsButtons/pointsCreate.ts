@@ -15,15 +15,30 @@ import * as pointsDuel from "./pointsDuel";
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeReply(interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>, payload: any) {
+function safeReply(
+  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
+  payload: any
+) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
 
-// Parsowanie daty w formacie DD/MM lub DD/MM HH:mm
+// -----------------------------
+// Parsowanie daty w formacie DD/MM, DD/MM HH:mm lub DDMM
+// -----------------------------
 function parseWeekDate(input: string) {
   const trimmed = input.trim();
-  const match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+
+  // 1️⃣ Skrótowy format ciągły DDMM
+  let match = trimmed.match(/^(\d{2})(\d{2})$/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return { day, month, hour: 0, minute: 0 };
+  }
+
+  // 2️⃣ Format z separatorem DD/MM lub DD/MM HH:mm
+  match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
   if (!match) return null;
 
   const day = parseInt(match[1], 10);
@@ -36,7 +51,9 @@ function parseWeekDate(input: string) {
   return { day, month, hour, minute };
 }
 
+// -----------------------------
 // Generowanie nazwy tygodnia: DD-MM - DD-MM
+// -----------------------------
 function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(from.day)}-${pad(from.month)} - ${pad(to.day)}-${pad(to.month)}`;
@@ -48,7 +65,6 @@ function formatWeekName(from: { day: number; month: number }, to: { day: number;
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
 
-  // Wyświetlamy modal z polami od-do
   const modal = new ModalBuilder()
     .setCustomId(`points_create_modal_${category}`)
     .setTitle(`Create Week – ${category}`)
@@ -56,17 +72,17 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId("week_from")
-          .setLabel("From (DD/MM or DD/MM HH:mm)")
+          .setLabel("From (DD/MM, DD/MM HH:mm or DDMM)")
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder("01/03")
+          .setPlaceholder("1003")
           .setRequired(true)
       ),
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId("week_to")
-          .setLabel("To (DD/MM or DD/MM HH:mm)")
+          .setLabel("To (DD/MM, DD/MM HH:mm or DDMM)")
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder("07/03")
+          .setPlaceholder("1703")
           .setRequired(true)
       )
     );
@@ -95,14 +111,16 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
   const toParsed = parseWeekDate(toRaw);
 
   if (!fromParsed || !toParsed) {
-    await safeReply(interaction, { content: "❌ Invalid date format. Use DD/MM or DD/MM HH:mm.", ephemeral: true });
+    await safeReply(interaction, {
+      content: "❌ Invalid date format. Use DD/MM, DD/MM HH:mm or DDMM.",
+      ephemeral: true
+    });
     return;
   }
 
   const weekName = formatWeekName(fromParsed, toParsed);
 
   try {
-    // Tworzymy tydzień w serwisie
     await pointsService.createWeek(weekName);
 
     await safeReply(interaction, {
