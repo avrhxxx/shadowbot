@@ -1,13 +1,12 @@
-// src/pointsPanel/pointsButtons/pointsDonations.ts
 import {
   ButtonInteraction,
   CacheType,
-  MessageCreateOptions,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle
 } from "discord.js";
 import * as pointsSelectWeek from "./pointsSelectWeek";
+import * as pointsCreate from "./pointsCreate";
 
 // Kategoria
 const CATEGORY_ID = "donations";
@@ -22,31 +21,41 @@ function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
 }
 
 // -----------------------------
-// Render panel wyboru tygodni z przyciskami
+// Render panel wyboru tygodni + create week
 // -----------------------------
 export async function handlePointsDonations(interaction: ButtonInteraction<CacheType>) {
   const weeks = await pointsSelectWeek.getWeeksByCategory(CATEGORY_ID);
 
-  if (!weeks.length) {
-    await safeReply(interaction, {
-      content: `⚠️ No weeks created yet for **${CATEGORY_LABEL}**.`,
-      ephemeral: true
+  const components: ActionRowBuilder<ButtonBuilder>[] = [];
+
+  // Row 1: dynamiczne przyciski tygodni
+  if (weeks.length) {
+    const weekRow = new ActionRowBuilder<ButtonBuilder>();
+    weeks.forEach(week => {
+      const buttons = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week).components;
+      buttons.forEach(btn => weekRow.addComponents(btn));
     });
-    return;
+    components.push(weekRow);
   }
 
-  // Każdy tydzień dostaje własny wiersz przycisków
-  const components = weeks.map(week => pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week));
+  // Row 2: stały przycisk Create Week
+  const createRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`points_create_week_${CATEGORY_ID}`)
+      .setLabel("Create Week")
+      .setStyle(ButtonStyle.Success)
+  );
+  components.push(createRow);
 
   await safeReply(interaction, {
-    content: `📌 **${CATEGORY_LABEL} – Choose a week to manage**`,
+    content: `📌 **${CATEGORY_LABEL} – Choose a week or create new**`,
     components,
     ephemeral: true
   });
 }
 
 // -----------------------------
-// Opcjonalnie: Handler dla pojedynczego tygodnia (jeżeli potrzebny gdzie indziej)
+// Handler kliknięcia tygodnia
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = pointsSelectWeek.renderWeekButtons(CATEGORY_ID, week);
@@ -56,4 +65,11 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
     components: [row],
     ephemeral: true
   });
+}
+
+// -----------------------------
+// Handler kliknięcia Create Week
+// -----------------------------
+export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
+  await pointsCreate.handleCreateWeekCategory(interaction, CATEGORY_ID);
 }
