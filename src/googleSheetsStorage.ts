@@ -1,3 +1,4 @@
+// src/googleSheetsStorage.ts
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -63,13 +64,8 @@ async function writeSheet(tab: string, values: any[][]) {
 // --------------------------
 
 async function getSheetId(tab: string): Promise<number> {
-  const res = await sheets.spreadsheets.get({
-    spreadsheetId: SHEET_ID,
-  });
-
-  const sheet = res.data.sheets?.find(
-    s => s.properties?.title === tab
-  );
+  const res = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const sheet = res.data.sheets?.find(s => s.properties?.title === tab);
 
   if (!sheet?.properties?.sheetId) {
     throw new Error(`Sheet "${tab}" not found`);
@@ -80,7 +76,6 @@ async function getSheetId(tab: string): Promise<number> {
 
 async function updateCell(tab: string, row: number, col: number, value: any) {
   const range = `${tab}!${toA1(col, row)}`;
-
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range,
@@ -91,7 +86,6 @@ async function updateCell(tab: string, row: number, col: number, value: any) {
 
 async function deleteRow(tab: string, row: number) {
   const sheetId = await getSheetId(tab);
-
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: {
@@ -149,7 +143,6 @@ export async function deleteEventRow(row: number) {
 
 export async function ensureModeratorConfigHeaders() {
   const rows = await readSheet(MODERATOR_CONFIG_TAB);
-
   if (!rows || rows.length === 0 || rows[0].length === 0) {
     const headers = [[
       "modChannelId",
@@ -159,7 +152,6 @@ export async function ensureModeratorConfigHeaders() {
       "lastUpdated",
       "version"
     ]];
-
     await writeSheet(`${MODERATOR_CONFIG_TAB}!A1:F1`, headers);
   }
 }
@@ -177,15 +169,7 @@ export async function saveModeratorPanelInfo(
   lastUpdated: number,
   version?: string
 ) {
-  const values = [[
-    modChannelId,
-    dateEmbedId,
-    hubMessageId,
-    updateChannelId,
-    lastUpdated,
-    version || "1.0.0"
-  ]];
-
+  const values = [[modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated, version || "1.0.0"]];
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: `${MODERATOR_CONFIG_TAB}!A2:F2`,
@@ -206,44 +190,17 @@ export async function getModeratorPanelInfo(): Promise<{
   lastUpdated: number;
   version?: string;
 } | null> {
-
   const rows = await readModeratorConfig();
-
   if (!rows || rows.length < 2) return null;
-
-  const [
-    modChannelId,
-    dateEmbedId,
-    hubMessageId,
-    updateChannelId,
-    lastUpdated,
-    version
-  ] = rows[1];
-
-  return {
-    modChannelId,
-    dateEmbedId,
-    hubMessageId,
-    updateChannelId,
-    lastUpdated: Number(lastUpdated),
-    version: version || "1.0.0",
-  };
+  const [modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated, version] = rows[1];
+  return { modChannelId, dateEmbedId, hubMessageId, updateChannelId, lastUpdated: Number(lastUpdated), version: version || "1.0.0" };
 }
 
 export async function updateModeratorPanelColumn(
   col: "modChannelId" | "dateEmbedId" | "hubMessageId" | "updateChannelId" | "lastUpdated" | "version",
   value: string | number
 ) {
-
-  const colMap: Record<typeof col, number> = {
-    modChannelId: 1,
-    dateEmbedId: 2,
-    hubMessageId: 3,
-    updateChannelId: 4,
-    lastUpdated: 5,
-    version: 6,
-  };
-
+  const colMap: Record<typeof col, number> = { modChannelId: 1, dateEmbedId: 2, hubMessageId: 3, updateChannelId: 4, lastUpdated: 5, version: 6 };
   await updateModeratorConfigCell(2, colMap[col], value);
 }
 
@@ -279,21 +236,10 @@ export async function deleteAbsenceRow(row: number) {
   return deleteRow(ABSENCE_TAB, row);
 }
 
-// --------------------------
-// ABSENCE CONFIG HEADERS
-// --------------------------
-
 export async function ensureAbsenceConfigHeaders() {
   const rows = await readSheet(ABSENCE_CONFIG_TAB);
-
   if (!rows || rows.length === 0 || rows[0].length === 0) {
-    const headers = [[
-      "guildId",
-      "notificationChannel",
-      "otherSetting1",
-      "otherSetting2"
-    ]];
-
+    const headers = [["guildId", "notificationChannel", "otherSetting1", "otherSetting2"]];
     await writeSheet(`${ABSENCE_CONFIG_TAB}!A1:D1`, headers);
   }
 }
@@ -304,18 +250,35 @@ export async function readAbsenceConfig(): Promise<any[][]> {
 }
 
 // --------------------------
+// POINTS STORAGE (HELPERS)
+// --------------------------
+
+export async function readPointsSheet(): Promise<any[][]> {
+  return readSheet(POINTS_TAB);
+}
+
+export async function writePointsSheet(values: any[][]) {
+  return writeSheet(POINTS_TAB, values);
+}
+
+export async function updatePointsCell(row: number, col: number, value: any) {
+  return updateCell(POINTS_TAB, row, col, value);
+}
+
+export async function deletePointsRow(row: number) {
+  return deleteRow(POINTS_TAB, row);
+}
+
+// --------------------------
 // HELPERS
 // --------------------------
 
 function toA1(col: number, row: number): string {
-
   let result = "";
-
   while (col > 0) {
     const rem = (col - 1) % 26;
     result = String.fromCharCode(65 + rem) + result;
     col = Math.floor((col - 1) / 26);
   }
-
   return result + row;
 }
