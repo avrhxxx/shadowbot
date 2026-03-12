@@ -10,4 +10,4 @@ export * as pointsCompare from "./pointsCompare";
 export * as pointsList from "./pointsList";
 export * as pointsSelectWeek from "./pointsSelectWeek";
 export * as pointsManagement from "./pointsManagement";
-export * as utils from "./utils"; // ⭐ brakujący eksport
+export * as utils from "./utils"; // ⭐ dodany brakujący eksport
