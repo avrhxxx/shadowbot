@@ -23,20 +23,14 @@ function safeReply(
 }
 
 // -----------------------------
-// Parsowanie daty w formacie DD/MM, DD/MM HH:mm lub DDMM
+// Parsowanie daty
 // -----------------------------
 function parseWeekDate(input: string) {
   const trimmed = input.trim();
-
-  // 1️⃣ Skrótowy format ciągły DDMM
   let match = trimmed.match(/^(\d{2})(\d{2})$/);
   if (match) {
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    return { day, month, hour: 0, minute: 0 };
+    return { day: parseInt(match[1], 10), month: parseInt(match[2], 10), hour: 0, minute: 0 };
   }
-
-  // 2️⃣ Format z separatorem DD/MM lub DD/MM HH:mm
   match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
   if (!match) return null;
 
@@ -46,12 +40,11 @@ function parseWeekDate(input: string) {
   const minute = match[4] ? parseInt(match[4], 10) : 0;
 
   if (day < 1 || day > 31 || month < 1 || month > 12 || hour > 23 || minute > 59) return null;
-
   return { day, month, hour, minute };
 }
 
 // -----------------------------
-// Generowanie nazwy tygodnia: DD-MM - DD-MM
+// Format nazwy tygodnia
 // -----------------------------
 function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
   const pad = (n: number) => String(n).padStart(2, "0");
