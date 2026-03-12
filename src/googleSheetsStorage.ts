@@ -10,8 +10,12 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 const MODERATOR_CONFIG_TAB = "moderator_config";
 const EVENTS_TAB = "events";
 const EVENTS_CONFIG_TAB = "events_config";
-const POINTS_TAB = "points";
+
+// <-- zmienione zakładki points -->
+const POINTS_DONATIONS_TAB = "points_donations"; // poprzednio POINTS_TAB = "points"
+const POINTS_DUEL_TAB = "points_duel";
 const POINTS_CONFIG_TAB = "points_config";
+
 const ABSENCE_TAB = "absence";
 const ABSENCE_CONFIG_TAB = "absence_config";
 const TRANSLATE_TAB = "translate";
@@ -243,19 +247,19 @@ export async function readAbsenceConfig(): Promise<any[][]> {
 // --------------------------
 
 export async function readPointsSheet(): Promise<any[][]> {
-  return readSheet(POINTS_TAB);
+  return readSheet(POINTS_DONATIONS_TAB); // <- użycie poprawionej zakładki
 }
 
 export async function writePointsSheet(values: any[][]) {
-  return writeSheet(POINTS_TAB, values);
+  return writeSheet(POINTS_DONATIONS_TAB, values); // <- użycie poprawionej zakładki
 }
 
 export async function updatePointsCell(row: number, col: number, value: any) {
-  return updateCell(POINTS_TAB, row, col, value);
+  return updateCell(POINTS_DONATIONS_TAB, row, col, value); // <- użycie poprawionej zakładki
 }
 
 export async function deletePointsRow(row: number) {
-  return deleteRow(POINTS_TAB, row);
+  return deleteRow(POINTS_DONATIONS_TAB); // <- użycie poprawionej zakładki
 }
 
 // --------------------------
