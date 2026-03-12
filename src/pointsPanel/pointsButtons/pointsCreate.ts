@@ -1,11 +1,11 @@
 import {
   ButtonInteraction,
-  ModalSubmitInteraction,
   CacheType,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  ActionRowBuilder
+  ActionRowBuilder,
+  ModalSubmitInteraction
 } from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
@@ -59,7 +59,7 @@ function formatWeekName(from: { day: number; month: number }, to: { day: number;
 }
 
 // -----------------------------
-// HANDLE CREATE WEEK BUTTON (ButtonInteraction)
+// HANDLE CREATE WEEK BUTTON
 // -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
@@ -90,7 +90,7 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
 }
 
 // -----------------------------
-// HANDLE MODAL SUBMIT (ModalSubmitInteraction)
+// HANDLE MODAL SUBMIT
 // -----------------------------
 export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
   const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
@@ -101,10 +101,8 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
     return;
   }
 
-  let fromRaw = "";
-  let toRaw = "";
-  try { fromRaw = interaction.fields.getTextInputValue("week_from"); } catch {}
-  try { toRaw = interaction.fields.getTextInputValue("week_to"); } catch {}
+  const fromRaw = interaction.fields.getTextInputValue("week_from");
+  const toRaw = interaction.fields.getTextInputValue("week_to");
 
   const fromParsed = parseWeekDate(fromRaw);
   const toParsed = parseWeekDate(toRaw);
