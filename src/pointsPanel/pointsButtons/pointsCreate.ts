@@ -12,7 +12,7 @@ import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
 
 // ✅ Helper do bezpiecznego reply/edit
-function safeReply(
+export function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
 ) {
