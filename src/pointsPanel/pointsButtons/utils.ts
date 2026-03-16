@@ -1,5 +1,3 @@
-// src/pointsPanel/pointsButtons/utils.ts
-
 /* ===========================
    TYPE GUARDS / CHECKERS
 =========================== */
@@ -11,7 +9,7 @@ export function isCreateWeek(id: string): boolean {
 
 /** Czy to kliknięcie tygodnia */
 export function isWeek(id: string): boolean {
-  return /^points_[^_]+_week_.+$/.test(id);
+  return /^points_([^_]+)_week_.+$/.test(id);
 }
 
 /** Czy to akcja tygodnia (add/remove/list/compare) */
@@ -30,35 +28,20 @@ export function parseCreateWeekId(id: string): string {
 
 /** points_<category>_week_<week> */
 export function parseWeekId(id: string) {
-  const match = id.match(/^points_(.+)_week_(.+)$/);
+  const match = id.match(/^points_([^_]+)_week_(.+)$/);
 
-  if (!match) {
-    return { category: "", week: "" };
-  }
+  if (!match) return { category: "", week: "" };
 
-  return {
-    category: match[1],
-    week: match[2]
-  };
+  return { category: match[1], week: match[2] };
 }
 
 /** points_<action>_<category>_<week> */
 export function parseActionId(id: string) {
-  const match = id.match(/^points_(add|remove|list|compare)_(.+)_(.+)$/);
+  const match = id.match(/^points_(add|remove|list|compare)_([^_]+)_(.+)$/);
 
-  if (!match) {
-    return {
-      action: "",
-      category: "",
-      week: ""
-    };
-  }
+  if (!match) return { action: "", category: "", week: "" };
 
-  return {
-    action: match[1],
-    category: match[2],
-    week: match[3]
-  };
+  return { action: match[1], category: match[2], week: match[3] };
 }
 
 /* ===========================
