@@ -1,11 +1,9 @@
-// src/pointsPanel/pointsButtons/pointsManagement.ts
-
 import { MessageCreateOptions, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
 import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
 
 // -----------------------------
-// Tymczasowe kategorie punktów
+// Kategorie punktów
 // -----------------------------
 export const POINT_CATEGORIES = [
   { id: "donations", label: "Alliance Donations" },
