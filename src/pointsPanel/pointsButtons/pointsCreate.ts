@@ -1,4 +1,4 @@
-##src/pointsPanel/pointsButtons/pointsCreate.ts
+// src/pointsPanel/pointsButtons/pointsCreate.ts
 
 import {
   ButtonInteraction,
