@@ -9,11 +9,8 @@ import {
 } from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
-import * as pointsDuel from "./pointsDuel";
 
-// -----------------------------
-// Helper do bezpiecznego reply/edit
-// -----------------------------
+// ✅ Helper do bezpiecznego reply/edit
 export async function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
@@ -22,9 +19,7 @@ export async function safeReply(
   return interaction.reply(payload);
 }
 
-// -----------------------------
 // Parsowanie daty z inputu
-// -----------------------------
 function parseWeekDate(input: string) {
   const trimmed = input.trim();
   let match = trimmed.match(/^(\d{2})(\d{2})$/);
@@ -42,17 +37,13 @@ function parseWeekDate(input: string) {
   return { day, month, hour, minute };
 }
 
-// -----------------------------
 // Formatowanie nazwy tygodnia
-// -----------------------------
 function formatWeekName(from: { day: number; month: number }, to: { day: number; month: number }) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(from.day)}-${pad(from.month)} - ${pad(to.day)}-${pad(to.month)}`;
 }
 
-// -----------------------------
 // Otwieranie modala tworzenia tygodnia
-// -----------------------------
 export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
   const category = interaction.customId.replace("points_create_week_", "");
 
@@ -81,9 +72,7 @@ export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>
   await interaction.showModal(modal);
 }
 
-// -----------------------------
 // Obsługa submitu modala
-// -----------------------------
 export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
   const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
   const category = categoryMatch ? categoryMatch[1] : null;
@@ -110,28 +99,22 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
   const weekName = formatWeekName(fromParsed, toParsed);
 
   try {
-    // Tworzymy tydzień w DB
     await pointsService.createWeek(category === "donations" ? "Donations" : "Duel", weekName);
 
-    // Pobieramy wszystkie tygodnie i przygotowujemy przyciski
-    let weekRows: ActionRowBuilder<ButtonBuilder>[] = [];
-    let createButton: ButtonBuilder;
-
-    if (category === "donations") {
-      weekRows = await pointsDonations.renderWeeks();
-      createButton = pointsDonations.createWeekButton("donations");
-    } else {
-      weekRows = await pointsDuel.renderWeeks();
-      createButton = pointsDuel.createWeekButton("duel");
-    }
-
-    const allRows = [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
-
     await safeReply(interaction, {
-      content: `🟢 Created new week: **${weekName}** – Select a week or create a new one:`,
-      components: allRows,
+      content: `🟢 Created new week: **${weekName}** for category **${category}**`,
       ephemeral: true
     });
+
+    // Po stworzeniu tygodnia renderujemy nowe przyciski
+    if (category === "donations") {
+      const weekRows = await pointsDonations.renderWeeks();
+      await interaction.editReply({
+        content: `📅 Donations – Select a week or create a new one:`,
+        components: [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(pointsDonations.createWeekButton("donations"))]
+      });
+    }
+
   } catch (error) {
     console.error("Create Week error:", error);
     await safeReply(interaction, { content: "❌ Failed to create week.", ephemeral: true });
