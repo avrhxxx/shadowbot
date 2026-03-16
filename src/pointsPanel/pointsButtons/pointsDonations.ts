@@ -3,6 +3,14 @@ import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonSt
 import * as pointsService from "../pointsService";
 
 // -----------------------------
+// Typ dla pojedynczego wpisu punktów
+// -----------------------------
+export interface PointsEntry {
+  user: string;
+  amount: number;
+}
+
+// -----------------------------
 // Render wszystkich tygodni dla kategorii Donations
 // -----------------------------
 export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
@@ -23,10 +31,13 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
 // Obsługa kliknięcia przycisku tygodnia
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
+  // ✅ DeferUpdate, żeby Discord nie zgłaszał błędu
+  if (!interaction.deferred) await interaction.deferUpdate();
+
   // Pobranie aktualnych punktów
-  const points = await pointsService.getPoints("Donations", week);
+  const points: PointsEntry[] = await pointsService.getPoints("Donations", week) || [];
   const pointsText = points.length > 0 
-    ? points.map(p => `${p.user}: ${p.amount}`).join("\n")
+    ? points.map((p: PointsEntry) => `${p.user}: ${p.amount}`).join("\n")
     : "_No points recorded yet_";
 
   // Przyciski akcji
@@ -49,7 +60,7 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary)
   );
 
-  // ✅ Sprawdzenie, czy interakcja była już reply/defer
+  // ✅ Edytujemy wiadomość po deferUpdate lub reply
   if (interaction.deferred || interaction.replied) {
     await interaction.editReply({
       content: `📌 Donations – Week ${week}\n\n${pointsText}`,
