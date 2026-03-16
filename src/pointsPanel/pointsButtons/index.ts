@@ -8,6 +8,5 @@ export * as pointsAdd from "./pointsAdd";
 export * as pointsRemove from "./pointsRemove";
 export * as pointsCompare from "./pointsCompare";
 export * as pointsList from "./pointsList";
-export * as pointsSelectWeek from "./pointsSelectWeek";
 export * as pointsManagement from "./pointsManagement";
 export * as utils from "./utils"; // ⭐ dodany brakujący eksport
