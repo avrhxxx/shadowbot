@@ -1,11 +1,6 @@
+// src/pointsPanel/pointsButtons/pointsDonations.ts
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
 import * as pointsService from "../pointsService";
-
-// Typ PointsEntry musi mieć user i amount
-export interface PointsEntry {
-  user: string;
-  amount: number;
-}
 
 // -----------------------------
 // Render wszystkich tygodni dla kategorii Donations
@@ -32,9 +27,9 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
   if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
 
   // Pobranie aktualnych punktów
-  const points: PointsEntry[] = await pointsService.getPoints("Donations", week);
+  const points = await pointsService.getPoints("Donations", week);
   const pointsText = points.length > 0 
-    ? points.map(p => `${p.user}: ${p.amount}`).join("\n")
+    ? points.map(p => `${p.nick}: ${p.points}`).join("\n")
     : "_No points recorded yet_";
 
   // Przyciski akcji
@@ -57,7 +52,7 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary)
   );
 
-  // ✅ Edytujemy wiadomość po deferUpdate lub reply
+  // ✅ Bezpieczne reply/edit
   if (interaction.deferred || interaction.replied) {
     await interaction.editReply({
       content: `📌 Donations – Week ${week}\n\n${pointsText}`,
