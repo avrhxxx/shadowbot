@@ -1,10 +1,10 @@
 // src/modules/quickadd/commands/QuickAddChannelInit.ts
 
 import { Client, TextChannel, PermissionsBitField, ChannelType } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export async function initQuickAddChannel(client: Client) {
-  const sessionManager = SessionManager.getInstance();
+  const sessionManager = QuickAddSessionManager.getInstance();
 
   for (const guild of client.guilds.cache.values()) {
     let quickAddChannel = guild.channels.cache.find(
@@ -34,9 +34,9 @@ export async function initQuickAddChannel(client: Client) {
       console.log(`ℹ️ Kanał #quickadd już istnieje w guild ${guild.id}`);
     }
 
-    // Rejestracja kanału w SessionManager
+    // Rejestracja kanału w QuickAddSessionManager
     if (quickAddChannel) {
-      sessionManager.registerQuickAddChannel?.(quickAddChannel.id);
+      sessionManager.registerQuickAddChannel(quickAddChannel.id);
     }
   }
 }
