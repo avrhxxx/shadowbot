@@ -1,5 +1,3 @@
-// src/modules/quickadd/session/QuickAddSession.ts
-
 import { QuickAddEntry } from "../types/QuickAddEntry";
 import { PreviewBuffer } from "../preview/PreviewBuffer";
 import { QuickAddService } from "../services/QuickAddService";
@@ -18,25 +16,6 @@ export class QuickAddSession {
   public readonly moderatorId: string;
   public readonly channelId: string;
   private previewBuffer: PreviewBuffer;
-
-  // ------------------------
-  // Stary SessionManager wbudowany
-  private static instance: QuickAddSession | null = null;
-  public static getInstance(): QuickAddSession | null {
-    return QuickAddSession.instance;
-  }
-  public static hasActiveSession(): boolean {
-    return !!QuickAddSession.instance;
-  }
-  public static startSession(session: QuickAddSession): boolean {
-    if (QuickAddSession.instance) return false;
-    QuickAddSession.instance = session;
-    return true;
-  }
-  public static endSession(): void {
-    QuickAddSession.instance = null;
-  }
-  // ------------------------
 
   constructor(sessionId: string, moderatorId: string, channelId: string) {
     this.sessionId = sessionId;
