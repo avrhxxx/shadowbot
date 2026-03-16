@@ -1,7 +1,12 @@
+// src/pointsPanel/pointsHandler.ts
+
 import { Interaction, ButtonInteraction, CacheType, ModalSubmitInteraction } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
+
+// Dodajemy pointsSelectWeek
+import * as pointsSelectWeek from "./pointsButtons/pointsSelectWeek";
 
 export const IDS = {
   BUTTONS: {
@@ -13,7 +18,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number];
+type ActionType = typeof IDS.ACTIONS[number;
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -38,42 +43,32 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
     if (interaction.isButton()) {
       const { customId } = interaction;
 
+      // Global button handlers
       if (BUTTON_HANDLERS[customId]) {
         await BUTTON_HANDLERS[customId](interaction);
         return;
       }
 
+      // Kliknięcie kategorii w Points Management
       if (customId.startsWith("points_management_category_")) {
         await PB.pointsManagement.handlePointsManagement(interaction);
         return;
       }
 
-      // ----- DODANE: Obsługa Create Week -----
+      // ----- Create Week -----
       if (customId.startsWith("points_create_")) {
-        // Pobieramy kategorię z customId np. 'donations' lub 'duel'
-        const category = customId.replace("points_create_", "");
-        // Wywołujemy pointsCreate.handleCreateWeek
-        if (PB.pointsCreate && PB.pointsCreate.handleCreateWeek) {
-          await PB.pointsCreate.handleCreateWeek(interaction);
-        } else {
-          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
-        }
+        await PB.pointsCreate.handleCreateWeek(interaction);
         return;
       }
 
-      // Kliknięcie tygodnia
+      // ----- Kliknięcie tygodnia -----
       if (Utils.isWeek(customId)) {
-        const { category, week } = Utils.parseWeekId(customId);
-        const module = getCategoryModule(category);
-        if (module) {
-          await module.handleWeekClick(interaction, week);
-        } else {
-          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
-        }
+        // Teraz delegujemy do pointsSelectWeek
+        await pointsSelectWeek.handleSelectWeek(interaction);
         return;
       }
 
-      // Add / Remove / List / Compare
+      // ----- Add / Remove / List / Compare -----
       if (Utils.isAction(customId)) {
         const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
         const module = getCategoryModule(category);
