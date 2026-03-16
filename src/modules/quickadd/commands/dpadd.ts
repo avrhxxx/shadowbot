@@ -1,7 +1,5 @@
-// src/modules/quickadd/commands/dpadd.ts
-
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager, QuickAddSession } from "../session/QuickAddSession";
 import { DuelPointsParser } from "../parsers/DuelPointsParser";
 
 export default {
@@ -19,9 +17,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const dateArg = interaction.options.getString("date", true);
 
-    const sessionManager = SessionManager.getInstance();
+    const manager = QuickAddSessionManager.getInstance();
 
-    if (sessionManager.hasActiveSession()) {
+    if (manager.hasActiveSession()) {
       await interaction.reply({
         content: "⚠️ A QuickAdd session is already active.",
         ephemeral: true,
@@ -30,15 +28,20 @@ export default {
     }
 
     try {
-      const session = sessionManager.createSession({
-        guildId: interaction.guildId!,
-        moderatorId: interaction.user.id,
-        eventType: "DuelPoints",
-        date: dateArg,
-        parser: new DuelPointsParser(),
-      });
+      // Tworzymy nową sesję
+      const session = new QuickAddSession(
+        `duelpoints-${Date.now()}`,
+        interaction.user.id,
+        interaction.channelId!
+      );
 
-      await session.initChannel();
+      // Przypisujemy parser i typ sesji
+      (session as any).parser = new DuelPointsParser();
+      (session as any).eventType = "DuelPoints";
+      (session as any).date = dateArg;
+
+      // Rejestrujemy sesję
+      manager.startSession(session);
 
       await interaction.reply({
         content: `🟢 QuickAdd session started for Duel Points on ${dateArg}`,
