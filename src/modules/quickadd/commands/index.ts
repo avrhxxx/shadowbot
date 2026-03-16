@@ -1,16 +1,36 @@
 // src/modules/quickadd/commands/index.ts
-// Indeks dla wszystkich komend QuickAdd
+// Poprawiony indeks dla komend QuickAdd
 
-export { AdjustCommand } from "./adjust";
-export { cadd } from "./cadd";
-export { cattend } from "./cattend";
-export { default as confirm } from "./confirm"; // default → named
-export { dnAddCommand } from "./dnadd";
-export { dpAddCommand } from "./dpadd";
-export { PreviewCommand } from "./preview";
-export { default as redo } from "./redo"; // default → named
-export { RepairCommand } from "./repair";
-export { rrAddCommand } from "./rradd";
-export { default as rrattend } from "./rrattend"; // default → named
-export { initQuickAddChannel } from "./QuickAddChannelInit";
-export { QuickAddCommands, registerQuickAddCommands } from "./QuickAddCommandRegistry";
+// 🔹 Komendy typu Command (z export const)
+import { AdjustCommand } from "./adjust";
+import cadd from "./cadd";
+import cattend from "./cattend";
+import { PreviewCommand } from "./preview";
+import { RepairCommand } from "./repair";
+import rrattend from "./rrattend";
+
+// 🔹 Komendy typu funkcja (z default export lub named export)
+import dnAddCommand from "./dnadd";
+import dpAddCommand from "./dpadd";
+import rrAddCommand from "./rradd";
+import confirmCommand from "./confirm";
+import redoCommand from "./redo";
+import QuickAddChannelInit from "./QuickAddChannelInit";
+import QuickAddCommandRegistry from "./QuickAddCommandRegistry";
+
+// Eksporty – w jednej paczce dla łatwego importu
+export {
+  AdjustCommand,
+  cadd,
+  cattend,
+  PreviewCommand,
+  RepairCommand,
+  rrattend,
+  dnAddCommand,
+  dpAddCommand,
+  rrAddCommand,
+  confirmCommand,
+  redoCommand,
+  QuickAddChannelInit,
+  QuickAddCommandRegistry,
+};
