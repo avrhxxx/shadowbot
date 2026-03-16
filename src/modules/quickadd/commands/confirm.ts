@@ -1,15 +1,13 @@
-// src/modules/quickadd/commands/confirm.ts
-
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export default {
   name: "confirm",
   description: "Zatwierdza dane w preview i wysyła je do warstwy serwisów.",
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const sessionManager = SessionManager.getInstance();
-    const session = sessionManager.getActiveSession(interaction.guildId!);
+    const manager = QuickAddSessionManager.getInstance();
+    const session = manager.getActiveSession();
 
     if (!session) {
       await interaction.reply({
@@ -20,7 +18,7 @@ export default {
     }
 
     try {
-      await session.confirmPreview();
+      await session.confirm(); // teraz używamy nowej metody confirm()
 
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({
@@ -33,6 +31,9 @@ export default {
           ephemeral: true,
         });
       }
+
+      // Opcjonalnie zakończ sesję po zatwierdzeniu
+      manager.endSession();
 
     } catch (error) {
       console.error("QuickAdd confirm error:", error);
