@@ -23,9 +23,6 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
 // Obsługa kliknięcia przycisku tygodnia
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
-  // ✅ DeferUpdate, żeby Discord nie zgłaszał błędu
-  if (!interaction.deferred) await interaction.deferUpdate();
-
   // Pobranie aktualnych punktów
   const points = await pointsService.getPoints("Donations", week);
   const pointsText = points.length > 0 
@@ -52,11 +49,19 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary)
   );
 
-  // ✅ Edytujemy wiadomość po deferUpdate
-  await interaction.editReply({
-    content: `📌 Donations – Week ${week}\n\n${pointsText}`,
-    components: [row]
-  });
+  // ✅ Sprawdzenie, czy interakcja była już reply/defer
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply({
+      content: `📌 Donations – Week ${week}\n\n${pointsText}`,
+      components: [row]
+    });
+  } else {
+    await interaction.reply({
+      content: `📌 Donations – Week ${week}\n\n${pointsText}`,
+      components: [row],
+      ephemeral: true
+    });
+  }
 }
 
 // -----------------------------
