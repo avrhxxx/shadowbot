@@ -1,7 +1,5 @@
-// src/modules/quickadd/commands/adjust.ts
-
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export default {
   name: "adjust",
@@ -22,8 +20,7 @@ export default {
   ],
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const session = SessionManager.getInstance().getActiveSession(interaction.guildId!);
-
+    const session = QuickAddSessionManager.getInstance().getActiveSession();
     if (!session) {
       await interaction.reply({
         content: "❌ Nie ma aktywnej sesji QuickAdd na tym serwerze.",
@@ -35,18 +32,21 @@ export default {
     const lineNumber = interaction.options.getInteger("line", true);
     const newValue = interaction.options.getString("value", true);
 
-    const result = session.adjustLine(lineNumber - 1, newValue);
-
-    if (result) {
+    // Operujemy na previewBuffer
+    const entries = session.getEntries();
+    if (lineNumber < 1 || lineNumber > entries.length) {
       await interaction.reply({
-        content: `✅ Linia [${lineNumber}] została zaktualizowana na: ${newValue}`,
+        content: `❌ Linia [${lineNumber}] nie istnieje w preview.`,
         ephemeral: true,
       });
-    } else {
-      await interaction.reply({
-        content: `❌ Nie udało się zaktualizować linii [${lineNumber}].`,
-        ephemeral: true,
-      });
+      return;
     }
+
+    entries[lineNumber - 1].value = newValue;
+
+    await interaction.reply({
+      content: `✅ Linia [${lineNumber}] została zaktualizowana na: ${newValue}`,
+      ephemeral: true,
+    });
   },
 };
