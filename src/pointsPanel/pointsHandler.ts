@@ -52,11 +52,18 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       if (Utils.isWeek(customId)) {
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
-        if (module) {
-          await module.handleWeekClick(interaction, week);
-        } else {
+
+        if (!module) {
           await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+          return;
         }
+
+        // ✅ Deferujemy od razu, żeby Discord nie zgłaszał błędu
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.deferUpdate();
+        }
+
+        await module.handleWeekClick(interaction, week);
         return;
       }
 
@@ -64,7 +71,11 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       if (Utils.isAction(customId)) {
         const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
         const module = getCategoryModule(category);
-        if (!module) { await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true }); return; }
+
+        if (!module) {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+          return;
+        }
 
         switch (action) {
           case "add": await PS.handleAddPoints(interaction); break;
