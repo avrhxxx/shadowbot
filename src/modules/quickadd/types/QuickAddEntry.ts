@@ -1,3 +1,4 @@
+// src/modules/quickadd/types/QuickAddEntry.ts
 export interface QuickAddEntry {
   lineId: number;       // numer linii w preview buffer
   rawText: string;      // surowy tekst z OCR lub manualnego inputu
@@ -5,4 +6,5 @@ export interface QuickAddEntry {
   value: string;        // wartość punktowa/donacji/raid score w formacie tekstowym
   status: 'OK' | 'DUPLICATE' | 'INVALID' | 'UNREADABLE';
   confidence?: number;  // opcjonalny poziom pewności OCR
+  type?: string;        // opcjonalne pole typu, potrzebne np. dla customEvent, RR itd.
 }
