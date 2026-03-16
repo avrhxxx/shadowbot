@@ -1,27 +1,43 @@
-import { Command } from "../../types/Command";
-import { QuickAddSessionManager } from "../session/SessionManager";
+// src/modules/quickadd/commands/preview.ts
 
-export const PreviewCommand: Command = {
+import { ChatInputCommandInteraction } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
+
+export default {
   name: "preview",
   description: "Wyświetla podgląd danych w bieżącej sesji QuickAdd",
-  execute: async (message, args) => {
-    const session = QuickAddSessionManager.getActiveSession(message.guildId);
+
+  async execute(interaction: ChatInputCommandInteraction) {
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.getActiveSession(interaction.guildId!);
+
     if (!session) {
-      message.reply("❌ Nie ma aktywnej sesji QuickAdd na tym serwerze.");
+      await interaction.reply({
+        content: "❌ Nie ma aktywnej sesji QuickAdd na tym serwerze.",
+        ephemeral: true,
+      });
       return;
     }
 
     const preview = session.getPreviewBuffer();
-    if (preview.length === 0) {
-      message.reply("⚠️ Preview jest puste. Dodaj najpierw dane do sesji.");
+
+    if (!preview || preview.length === 0) {
+      await interaction.reply({
+        content: "⚠️ Preview jest puste. Dodaj najpierw dane do sesji.",
+        ephemeral: true,
+      });
       return;
     }
 
     let previewMessage = "📝 **Preview danych QuickAdd:**\n";
-    preview.forEach((entry, index) => {
-      previewMessage += `[${index + 1}] ${entry.nickname} – ${entry.value || "brak danych"}\n`;
+
+    preview.forEach((entry: any, index: number) => {
+      previewMessage += `[${index + 1}] ${entry.nickname} – ${entry.value ?? "brak danych"}\n`;
     });
 
-    message.reply(previewMessage);
+    await interaction.reply({
+      content: previewMessage,
+      ephemeral: true,
+    });
   },
 };
