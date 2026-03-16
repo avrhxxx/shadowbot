@@ -14,7 +14,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number>;
+type ActionType = typeof IDS.ACTIONS[number]; // <-- Poprawione
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
