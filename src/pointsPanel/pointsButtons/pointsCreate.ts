@@ -1,3 +1,5 @@
+##src/pointsPanel/pointsButtons/pointsCreate.ts
+
 import {
   ButtonInteraction,
   CacheType,
