@@ -45,7 +45,7 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
 // Przygotowanie przycisku Create Week
 export function createWeekButton(category = "duel") {
   return new ButtonBuilder()
-    .setCustomId(`points_create_${category}`)
+    .setCustomId(`points_create_week_${category}`) // <-- tutaj poprawione
     .setLabel("Create Week")
     .setStyle(ButtonStyle.Success);
 }
