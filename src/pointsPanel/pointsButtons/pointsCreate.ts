@@ -1,5 +1,4 @@
 // src/pointsPanel/pointsButtons/pointsCreate.ts
-
 import {
   ButtonInteraction,
   CacheType,
@@ -102,7 +101,8 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
   const weekName = formatWeekName(fromParsed, toParsed);
 
   try {
-    await pointsService.createWeek(weekName);
+    // teraz zapisujemy tylko dla konkretnej kategorii
+    await pointsService.createWeek(category === "donations" ? "Donations" : "Duel", weekName);
 
     await safeReply(interaction, {
       content: `🟢 Created new week: **${weekName}** for category **${category}**`,
