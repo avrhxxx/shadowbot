@@ -1,16 +1,16 @@
 // src/modules/quickadd/commands/index.ts
-// Placeholder indeks dla wszystkich komend QuickAdd
+// Indeks dla wszystkich komend QuickAdd
 
-export * from "./adjust";
-export * from "./cadd";
-export * from "./cattend";
-export * from "./confirm";
-export * from "./dnadd";
-export * from "./dpadd";
-export * from "./preview";
-export * from "./redo";
-export * from "./repair";
-export * from "./rradd";
-export * from "./rrattend";
-export * from "./QuickAddChannelInit";
-export * from "./QuickAddCommandRegistry";
+export { AdjustCommand } from "./adjust";
+export { cadd } from "./cadd";
+export { cattend } from "./cattend";
+export { default as confirm } from "./confirm"; // default → named
+export { dnAddCommand } from "./dnadd";
+export { dpAddCommand } from "./dpadd";
+export { PreviewCommand } from "./preview";
+export { default as redo } from "./redo"; // default → named
+export { RepairCommand } from "./repair";
+export { rrAddCommand } from "./rradd";
+export { default as rrattend } from "./rrattend"; // default → named
+export { initQuickAddChannel } from "./QuickAddChannelInit";
+export { QuickAddCommands, registerQuickAddCommands } from "./QuickAddCommandRegistry";
