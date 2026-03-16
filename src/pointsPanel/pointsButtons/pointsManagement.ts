@@ -28,7 +28,7 @@ export function renderPointsManagementCategories(): MessageCreateOptions {
       new ButtonBuilder()
         .setCustomId(`points_management_category_${cat.id}`)
         .setLabel(cat.label)
-        .setStyle(ButtonStyle.Primary) // niebieski
+        .setStyle(ButtonStyle.Primary)
     );
   });
 
@@ -52,40 +52,34 @@ export async function handlePointsManagementMain(interaction: ButtonInteraction<
 
 // -----------------------------
 // Handler kliknięcia w kategorię
-// -----------------------------
 export async function handlePointsManagement(interaction: ButtonInteraction<CacheType>) {
   if (!interaction.customId.startsWith("points_management_category_")) return;
 
   const categoryId = interaction.customId.replace("points_management_category_", "");
 
-  // Tworzymy przycisk "Create Week"
-  const createWeekButton = new ButtonBuilder()
-    .setCustomId(`points_create_week_${categoryId}`)
-    .setLabel("Create Week")
-    .setStyle(ButtonStyle.Success); // zielony
+  let weekRows: ActionRowBuilder<ButtonBuilder>[] = [];
+  let createButton: ButtonBuilder;
 
   if (categoryId === "donations") {
-    // Render wszystkich tygodni dla Donations
-    const weeksPanel = await pointsDonations.renderWeeks(interaction); 
-    // Dodajemy przycisk Create Week
-    const allRows = [...weeksPanel.components, new ActionRowBuilder<ButtonBuilder>().addComponents(createWeekButton)];
-    await interaction.editReply({
-      content: "📅 Donations – Select a week or create a new one:",
-      components: allRows,
-      ephemeral: true
-    });
+    weekRows = await pointsDonations.renderWeeks();
+    createButton = pointsDonations.createWeekButton("donations");
   } else if (categoryId === "duel") {
-    const weeksPanel = await pointsDuel.renderWeeks(interaction);
-    const allRows = [...weeksPanel.components, new ActionRowBuilder<ButtonBuilder>().addComponents(createWeekButton)];
-    await interaction.editReply({
-      content: "📅 Duel – Select a week or create a new one:",
-      components: allRows,
-      ephemeral: true
-    });
+    weekRows = await pointsDuel.renderWeeks();
+    createButton = pointsDuel.createWeekButton("duel");
   } else {
     await safeReply(interaction, {
       content: `⚠️ Unknown category: ${categoryId}`,
       ephemeral: true
     });
+    return;
   }
+
+  // Dodaj przycisk Create Week jako osobny ActionRow
+  const allRows = [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
+
+  await safeReply(interaction, {
+    content: `📅 ${categoryId === "donations" ? "Donations" : "Duel"} – Select a week or create a new one:`,
+    components: allRows,
+    ephemeral: true
+  });
 }
