@@ -11,10 +11,14 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
 
 // -----------------------------
-// QuickAdd
+// QuickAdd (placeholder imports)
 // -----------------------------
 import { registerQuickAddCommands } from "./modules/quickadd/commands/QuickAddCommandRegistry";
 import { initQuickAddChannel } from "./modules/quickadd/commands/QuickAddChannelInit";
+
+// Placeholdery dla QuickAddCommandRegistry i QuickAddChannelInit
+// dzięki temu TypeScript nie wywala błędów i można deployować
+// prawdziwą logikę wstawimy później w tych plikach
 
 const client = new Client({
   intents: [
@@ -51,8 +55,8 @@ client.once("ready", async () => {
   // -----------------------------
   // Init QuickAdd channel i komendy
   // -----------------------------
-  await initQuickAddChannel(client);          // 🔹 tworzy #quickadd jeśli nie istnieje
-  registerQuickAddCommands(client);           // 🔹 rejestruje wszystkie komendy QuickAdd
+  await initQuickAddChannel(client);  // 🔹 tworzy #quickadd jeśli nie istnieje
+  registerQuickAddCommands(client);   // 🔹 rejestruje wszystkie komendy QuickAdd
 
   // -----------------------------
   // Global interaction handler
