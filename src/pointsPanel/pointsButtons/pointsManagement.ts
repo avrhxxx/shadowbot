@@ -1,3 +1,5 @@
+// src/pointsPanel/pointsButtons/pointsManagement.ts
+
 import { MessageCreateOptions, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
 import * as pointsDonations from "./pointsDonations";
 import * as pointsDuel from "./pointsDuel";
@@ -19,7 +21,7 @@ function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
 }
 
 // -----------------------------
-// Render panelu wyboru kategorii (placeholder)
+// Render panelu wyboru kategorii
 // -----------------------------
 export function renderPointsManagementCategories(): MessageCreateOptions {
   const row = new ActionRowBuilder<ButtonBuilder>();
@@ -52,6 +54,7 @@ export async function handlePointsManagementMain(interaction: ButtonInteraction<
 
 // -----------------------------
 // Handler kliknięcia w kategorię
+// -----------------------------
 export async function handlePointsManagement(interaction: ButtonInteraction<CacheType>) {
   if (!interaction.customId.startsWith("points_management_category_")) return;
 
@@ -61,10 +64,10 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
   let createButton: ButtonBuilder;
 
   if (categoryId === "donations") {
-    weekRows = await pointsDonations.renderWeeks();
+    weekRows = await pointsDonations.renderWeeks(interaction); // teraz przekazujemy interaction
     createButton = pointsDonations.createWeekButton("donations");
   } else if (categoryId === "duel") {
-    weekRows = await pointsDuel.renderWeeks();
+    weekRows = await pointsDuel.renderWeeks(interaction);
     createButton = pointsDuel.createWeekButton("duel");
   } else {
     await safeReply(interaction, {
@@ -75,7 +78,7 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
   }
 
   // Dodaj przycisk Create Week jako osobny ActionRow
-  const allRows = [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
+  const allRows = [...(weekRows || []), new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
 
   await safeReply(interaction, {
     content: `📅 ${categoryId === "donations" ? "Donations" : "Duel"} – Select a week or create a new one:`,
