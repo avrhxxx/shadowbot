@@ -1,91 +1,40 @@
-// src/index.ts
-import "./googleSheetsClient"; // 🔹 Google Sheets klient
+// src/modules/quickadd/services/QuickAddService.ts
+import { Client, Guild, TextChannel } from "discord.js";
 
-import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
-import { initTranslationModule } from "./modules/TranslationModule";
-import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
-import { handleEventInteraction } from "./eventsPanel/eventHandlers";
-import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
-import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
-import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
-import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
+export class QuickAddService {
+  constructor(private client: Client) {}
 
-// -----------------------------
-// QuickAdd (placeholder import dla komend)
-// -----------------------------
-import { registerQuickAddCommands } from "./modules/quickadd/commands/QuickAddCommandRegistry";
-import { QuickAddService } from "./modules/quickadd/services/QuickAddService"; // 🔹 serwis obsługujący kanał
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions,
-  ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
-});
-
-if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
-const BOT_TOKEN = process.env.BOT_TOKEN;
-
-client.once("ready", async () => {
-  console.log(`Logged in as ${client.user?.tag}`);
-
-  // -----------------------------
-  // Init modules
-  // -----------------------------
-  initTranslationModule(client);
-  initModeratorPanel(client);
-
-  // -----------------------------
-  // Init event reminders i absence notifications
-  // -----------------------------
-  for (const guild of client.guilds.cache.values()) {
-    initEventReminders(guild);
-    initAbsenceNotifications(guild).catch(err => {
-      console.error(`Error initializing absence notifications for guild ${guild.id}:`, err);
-    });
-  }
-
-  // -----------------------------
-  // QuickAdd: tworzenie kanału i rejestracja komend
-  // -----------------------------
-  const quickAddService = new QuickAddService(client);
-
-  for (const guild of client.guilds.cache.values()) {
-    await quickAddService.ensureQuickAddChannel(guild); // 🔹 tworzy #quickadd jeśli nie istnieje
-  }
-
-  registerQuickAddCommands(client); // 🔹 rejestruje wszystkie komendy QuickAdd
-
-  // -----------------------------
-  // Global interaction handler
-  // -----------------------------
-  client.on("interactionCreate", async (interaction: Interaction) => {
+  /**
+   * Tworzy kanał #quickadd w podanym guildzie, jeśli nie istnieje.
+   * Placeholder - na razie tylko loguje akcję.
+   */
+  async ensureQuickAddChannel(guild: Guild): Promise<TextChannel> {
     try {
-      // Obsługa eventów
-      await handleEventInteraction(interaction);
+      const existingChannel = guild.channels.cache.find(
+        (ch) => ch.name === "quickadd" && ch.isTextBased()
+      ) as TextChannel | undefined;
 
-      // Obsługa absence panel
-      await handleAbsenceInteraction(interaction);
-
-      // Obsługa points panel
-      await handlePointsInteraction(interaction);
-
-      // QuickAdd sesyjne komendy działają tylko w kanale #quickadd
-      // dzięki QuickAddSessionManager (sprawdzi channel.id)
-    } catch (err) {
-      console.error("Error in interactionCreate:", err);
-
-      if (interaction.isRepliable()) {
-        await interaction.reply({
-          content: "❌ An unexpected error occurred.",
-          ephemeral: true,
-        }).catch(() => null);
+      if (existingChannel) {
+        console.log(`[QuickAdd] Channel #quickadd already exists in guild ${guild.id}`);
+        return existingChannel;
       }
-    }
-  });
-});
 
-client.login(BOT_TOKEN);
+      const channel = await guild.channels.create({
+        name: "quickadd",
+        type: 0, // Text channel
+        reason: "QuickAdd channel placeholder creation",
+      }) as TextChannel;
+
+      console.log(`[QuickAdd] Created channel #quickadd in guild ${guild.id}`);
+      return channel;
+    } catch (err) {
+      console.error(`[QuickAdd] Failed to ensure #quickadd channel in guild ${guild.id}:`, err);
+      throw err; // pozwalamy indeksowi złapać błąd
+    }
+  }
+
+  /**
+   * Tu w przyszłości możemy delegować pozostałą logikę QuickAdd
+   * np. OCR pipeline, preview buffer, walidacje itd.
+   */
+}
