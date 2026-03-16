@@ -12,6 +12,6 @@ export { default as rrAddCommand } from "./rradd";
 export { default as rrAttendCommand } from "./rrattend";
 export { default as RedoCommand } from "./redo";
 
-// Specjalne inicjalizacje i registry, też default export
+// Specjalne inicjalizacje i registry
 export { default as QuickAddChannelInit } from "./QuickAddChannelInit";
 export { default as QuickAddCommandRegistry } from "./QuickAddCommandRegistry";
