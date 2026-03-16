@@ -1,27 +1,39 @@
-import { Command } from "../types/Command";
-import { QuickAddSessionManager } from "../session/SessionManager";
+// src/modules/quickadd/commands/cadd.ts
 
-export const cadd: Command = {
-    name: "cadd",
-    description: "Start a Custom Event session (Add participants)",
-    usage: "!cadd <DDMM>",
-    execute: async (message, args) => {
-        if (!args[0]) {
-            message.reply("❌ Please provide the event date in DDMM format. Example: !cadd 0703");
-            return;
-        }
+import { ChatInputCommandInteraction } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
 
-        const dateArg = args[0];
+export default {
+  name: "cadd",
+  description: "Start a Custom Event session (Add participants)",
+  options: [
+    {
+      name: "date",
+      description: "Event date in DDMM format (example: 0703)",
+      type: 3, // STRING
+      required: true,
+    },
+  ],
 
-        const sessionManager = QuickAddSessionManager.getInstance();
-        if (sessionManager.hasActiveSession()) {
-            message.reply("⚠️ A QuickAdd session is already active. Please wait until it finishes.");
-            return;
-        }
+  async execute(interaction: ChatInputCommandInteraction) {
+    const dateArg = interaction.options.getString("date", true);
 
-        // TODO: Initialize Custom Event Add session
-        // sessionManager.startSession("customEventAdd", dateArg, message.author.id);
+    const sessionManager = SessionManager.getInstance();
 
-        message.reply(`✅ Custom Event Add session started for date ${dateArg}. Please upload screenshots or manual list.`);
+    if (sessionManager.hasActiveSession()) {
+      await interaction.reply({
+        content: "⚠️ A QuickAdd session is already active. Please wait until it finishes.",
+        ephemeral: true,
+      });
+      return;
     }
+
+    // TODO: tutaj docelowo uruchomimy właściwą sesję Custom Event Add
+    // sessionManager.startSession("customEventAdd", dateArg, interaction.user.id);
+
+    await interaction.reply({
+      content: `✅ Custom Event Add session started for date ${dateArg}. Please upload screenshots or manual list.`,
+      ephemeral: true,
+    });
+  },
 };
