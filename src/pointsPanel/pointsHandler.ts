@@ -14,7 +14,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number];
+type ActionType = typeof IDS.ACTIONS[number>;
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -57,7 +57,7 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
         if (module) {
-          // ✅ DeferUpdate w module, nie tutaj
+          // deferUpdate jest w module handleWeekClick
           await module.handleWeekClick(interaction, week);
         } else {
           await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
@@ -106,7 +106,10 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
 // -----------------------------
 // HELPERS
 // -----------------------------
-function safeReply(interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>, payload: any) {
+function safeReply(
+  interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
+  payload: any
+) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
