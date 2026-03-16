@@ -1,10 +1,7 @@
-// src/pointsPanel/pointsButtons/pointsDonations.ts
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
 import * as pointsService from "../pointsService";
 
-// -----------------------------
-// Typ dla pojedynczego wpisu punktów
-// -----------------------------
+// Typ PointsEntry musi mieć user i amount
 export interface PointsEntry {
   user: string;
   amount: number;
@@ -32,12 +29,12 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
 // -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   // ✅ DeferUpdate, żeby Discord nie zgłaszał błędu
-  if (!interaction.deferred) await interaction.deferUpdate();
+  if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
 
   // Pobranie aktualnych punktów
-  const points: PointsEntry[] = await pointsService.getPoints("Donations", week) || [];
+  const points: PointsEntry[] = await pointsService.getPoints("Donations", week);
   const pointsText = points.length > 0 
-    ? points.map((p: PointsEntry) => `${p.user}: ${p.amount}`).join("\n")
+    ? points.map(p => `${p.user}: ${p.amount}`).join("\n")
     : "_No points recorded yet_";
 
   // Przyciski akcji
