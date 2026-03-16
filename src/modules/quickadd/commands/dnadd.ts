@@ -1,7 +1,5 @@
-// src/modules/quickadd/commands/dnadd.ts
-
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager, QuickAddSession } from "../session/QuickAddSession";
 import { DonationsParser } from "../parsers/DonationsParser";
 
 export default {
@@ -19,9 +17,9 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     const dateArg = interaction.options.getString("date", true);
 
-    const sessionManager = SessionManager.getInstance();
+    const manager = QuickAddSessionManager.getInstance();
 
-    if (sessionManager.hasActiveSession()) {
+    if (manager.hasActiveSession()) {
       await interaction.reply({
         content: "⚠️ A QuickAdd session is already active.",
         ephemeral: true,
@@ -30,15 +28,20 @@ export default {
     }
 
     try {
-      const session = sessionManager.createSession({
-        guildId: interaction.guildId!,
-        moderatorId: interaction.user.id,
-        eventType: "Donations",
-        date: dateArg,
-        parser: new DonationsParser(),
-      });
+      // Tworzymy nową sesję
+      const session = new QuickAddSession(
+        `donations-${Date.now()}`,
+        interaction.user.id,
+        interaction.channelId!
+      );
 
-      await session.initChannel();
+      // Tutaj możesz przypisać parser do sesji, jeśli sesja go potrzebuje
+      (session as any).parser = new DonationsParser();
+      (session as any).eventType = "Donations";
+      (session as any).date = dateArg;
+
+      // Rejestrujemy sesję w menedżerze
+      manager.startSession(session);
 
       await interaction.reply({
         content: `🟢 QuickAdd session started for Donations on ${dateArg}`,
