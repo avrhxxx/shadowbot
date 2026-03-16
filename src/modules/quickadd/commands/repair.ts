@@ -1,14 +1,13 @@
-// src/modules/quickadd/commands/repair.ts
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export default {
   name: "repair",
   description: "Pozwala naprawić błędy wykryte przez bota w preview sesji QuickAdd",
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const sessionManager = SessionManager.getInstance();
-    const session = sessionManager.getActiveSession(interaction.guildId!);
+    const manager = QuickAddSessionManager.getInstance();
+    const session = manager.getActiveSession();
 
     if (!session) {
       await interaction.reply({
@@ -38,6 +37,7 @@ export default {
       return;
     }
 
+    // Naprawa błędu w previewBuffer
     const result = session.repairError(errorNumber - 1, correction);
 
     if (result) {
