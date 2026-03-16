@@ -1,75 +1,123 @@
-// src/pointsPanel/pointsButtons/pointsDonations.ts
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
-import * as pointsService from "../pointsService";
+// src/pointsPanel/pointsHandler.ts
+import { Interaction, ButtonInteraction, CacheType, ModalSubmitInteraction } from "discord.js";
+import * as PB from "./pointsButtons";
+import * as PS from "./pointsService";
+import * as Utils from "./pointsButtons/utils";
+
+export const IDS = {
+  BUTTONS: {
+    GUIDE: "points_guide",
+    SETTINGS: "points_settings",
+    POINTS_MANAGEMENT: "points_management",
+    LIST_WEEKS: "points_list_weeks"
+  },
+  ACTIONS: ["add", "remove", "list", "compare"] as const
+};
+
+type ActionType = typeof IDS.ACTIONS[number];
 
 // -----------------------------
-// Render wszystkich tygodni dla kategorii Donations
+// GLOBAL BUTTON HANDLERS
 // -----------------------------
-export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
-  const weeks = await pointsService.getAllWeeks("Donations");
-
-  return weeks.map(week => {
-    const safeWeek = encodeURIComponent(week);
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`points_week_donations_${safeWeek}`)
-        .setLabel(week)
-        .setStyle(ButtonStyle.Primary)
-    );
-  });
-}
+const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
+  [IDS.BUTTONS.GUIDE]: async (i) => { await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true }); },
+  [IDS.BUTTONS.SETTINGS]: async (i) => { await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true }); },
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
+};
 
 // -----------------------------
-// Obsługa kliknięcia przycisku tygodnia
+// GLOBAL INTERACTION HANDLER
 // -----------------------------
-export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
-  // Pobranie aktualnych punktów
-  const points = await pointsService.getPoints("Donations", week);
-  const pointsText = points.length > 0 
-    ? points.map(p => `${p.user}: ${p.amount}`).join("\n")
-    : "_No points recorded yet_";
+export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
+  try {
+    if (interaction.isButton()) {
+      const { customId } = interaction;
 
-  // Przyciski akcji
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`points_add_donations_${encodeURIComponent(week)}`)
-      .setLabel("Add Points")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId(`points_remove_donations_${encodeURIComponent(week)}`)
-      .setLabel("Remove Points")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId(`points_compare_donations_${encodeURIComponent(week)}`)
-      .setLabel("Compare")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId(`points_list_donations_${encodeURIComponent(week)}`)
-      .setLabel("List")
-      .setStyle(ButtonStyle.Primary)
-  );
+      // Global button handlers
+      if (BUTTON_HANDLERS[customId]) {
+        await BUTTON_HANDLERS[customId](interaction);
+        return;
+      }
 
-  // ✅ Sprawdzenie, czy interakcja była już reply/defer
-  if (interaction.deferred || interaction.replied) {
-    await interaction.editReply({
-      content: `📌 Donations – Week ${week}\n\n${pointsText}`,
-      components: [row]
-    });
-  } else {
-    await interaction.reply({
-      content: `📌 Donations – Week ${week}\n\n${pointsText}`,
-      components: [row],
-      ephemeral: true
-    });
+      // Kliknięcie kategorii w Points Management
+      if (customId.startsWith("points_management_category_")) {
+        await PB.pointsManagement.handlePointsManagement(interaction);
+        return;
+      }
+
+      // Create Week
+      if (Utils.isCreateWeek(customId)) {
+        await PB.pointsCreate.handleCreateWeek(interaction);
+        return;
+      }
+
+      // Kliknięcie tygodnia
+      if (Utils.isWeek(customId)) {
+        const { category, week } = Utils.parseWeekId(customId);
+        const module = getCategoryModule(category);
+        if (module) {
+          // ✅ DeferUpdate w module, nie tutaj
+          await module.handleWeekClick(interaction, week);
+        } else {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        }
+        return;
+      }
+
+      // Add / Remove / List / Compare
+      if (Utils.isAction(customId)) {
+        const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
+        const module = getCategoryModule(category);
+        if (!module) {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+          return;
+        }
+
+        switch (action) {
+          case "add": await PS.handleAddPoints(interaction); break;
+          case "remove": await PS.handleRemovePoints(interaction); break;
+          case "list": await PS.handlePointsList(interaction); break;
+          case "compare": await PS.handleCompareWeeks(interaction); break;
+        }
+        return;
+      }
+    }
+
+    // Modal Submit
+    if (interaction.isModalSubmit()) {
+      const { customId } = interaction;
+      if (customId.startsWith("points_create_modal_")) {
+        await PB.pointsCreate.handleCreateWeekSubmit(interaction);
+        return;
+      }
+    }
+
+  } catch (error) {
+    console.error("Error handling points interaction:", error);
+    if (interaction.isRepliable()) {
+      const payload = { content: "❌ An error occurred.", ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+      else await interaction.reply(payload);
+    }
   }
 }
 
 // -----------------------------
-// Przygotowanie przycisku Create Week
+// HELPERS
 // -----------------------------
-export function createWeekButton(category = "donations") {
-  return new ButtonBuilder()
-    .setCustomId(`points_create_week_${category}`)
-    .setLabel("Create Week")
-    .setStyle(ButtonStyle.Success);
+function safeReply(interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>, payload: any) {
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  return interaction.reply(payload);
+}
+
+// -----------------------------
+// CATEGORY MODULE ROUTER
+// -----------------------------
+function getCategoryModule(category: string) {
+  switch (category) {
+    case "donations": return PB.pointsDonations;
+    case "duel": return PB.pointsDuel;
+    default: return null;
+  }
 }
