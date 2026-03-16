@@ -2,18 +2,9 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
 import * as pointsService from "../pointsService";
 
-/* ===========================
-   HELPERS
-=========================== */
-async function safeUpdate(interaction: ButtonInteraction<CacheType>, payload: any) {
-  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
-  return interaction.update(payload);
-}
-
-/* ===========================
-   WEEKS
-=========================== */
-// Render wszystkich tygodni dla kategorii Duel – zwraca ActionRow[]
+// -----------------------------
+// Render wszystkich tygodni dla kategorii Duel
+// -----------------------------
 export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
   const weeks = await pointsService.getAllWeeks("Duel");
 
@@ -27,7 +18,9 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
   );
 }
 
+// -----------------------------
 // Obsługa kliknięcia przycisku tygodnia
+// -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -48,15 +41,15 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary)
   );
 
-  await safeUpdate(interaction, {
+  await interaction.update({
     content: `📌 Duel – Week ${week}`,
     components: [row]
   });
 }
 
-/* ===========================
-   CREATE WEEK BUTTON
-=========================== */
+// -----------------------------
+// Przygotowanie przycisku Create Week
+// -----------------------------
 export function createWeekButton(category = "duel") {
   return new ButtonBuilder()
     .setCustomId(`points_create_week_${category}`)
