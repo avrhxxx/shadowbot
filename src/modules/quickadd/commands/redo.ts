@@ -1,14 +1,13 @@
-// src/modules/quickadd/commands/redo.ts
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export default {
   name: "redo",
   description: "Wycofuje całe preview i restartuje sesję QuickAdd.",
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const sessionManager = SessionManager.getInstance();
-    const session = sessionManager.getActiveSession(interaction.guildId!);
+    const manager = QuickAddSessionManager.getInstance();
+    const session = manager.getActiveSession();
 
     if (!session) {
       await interaction.reply({
@@ -19,7 +18,7 @@ export default {
     }
 
     // Czyścimy preview w sesji
-    session.clearPreview();
+    session.cancel(); // usuwa wszystkie wpisy i ustawia stan CANCELLED
 
     await interaction.reply({
       content: "🔄 Preview zostało wyczyszczone. Możesz rozpocząć ponownie.",
