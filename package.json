@@ -17,7 +17,7 @@
     "uuid": "^9.0.0",
     "luxon": "^3.4.0",
     "googleapis": "^121.0.0",
-    "jimp": "^0.24.0",
+    "jimp": "^0.22.8",
     "tesseract.js": "^4.1.1"
   },
   "devDependencies": {
