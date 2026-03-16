@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
 import * as pointsService from "../pointsService";
+import * as Utils from "./utils";
 
 // Render wszystkich tygodni dla kategorii Donations – zwraca komponenty
 export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
@@ -19,33 +20,34 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`points_add_donations_${week}`)
+      .setCustomId(Utils.makeAddPointsId("donations", week))
       .setLabel("Add Points")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`points_remove_donations_${week}`)
+      .setCustomId(Utils.makeRemovePointsId("donations", week))
       .setLabel("Remove Points")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
-      .setCustomId(`points_compare_donations_${week}`)
+      .setCustomId(Utils.makeComparePointsId("donations", week))
       .setLabel("Compare")
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`points_list_donations_${week}`)
+      .setCustomId(Utils.makeListPointsId("donations", week))
       .setLabel("List")
       .setStyle(ButtonStyle.Primary)
   );
 
-  await interaction.update({
-    content: `📌 Donations – Week ${week}`,
-    components: [row]
-  });
+  await interaction.update({ content: `📌 Donations – Week ${week}`, components: [row] });
 }
 
 // Przygotowanie przycisku Create Week
 export function createWeekButton(category = "donations") {
   return new ButtonBuilder()
-    .setCustomId(`points_create_week_${category}`) // <-- tutaj poprawione
+    .setCustomId(Utils.makeCreateWeekId(category))
     .setLabel("Create Week")
     .setStyle(ButtonStyle.Success);
 }
+
+// Obsługa Create Week
+import { handleCreateWeek } from "./pointsCreate";
+export { handleCreateWeek };
