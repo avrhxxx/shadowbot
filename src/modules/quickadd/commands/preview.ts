@@ -1,15 +1,13 @@
-// src/modules/quickadd/commands/preview.ts
-
 import { ChatInputCommandInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { QuickAddSessionManager } from "../session/QuickAddSession";
 
 export default {
   name: "preview",
   description: "Wyświetla podgląd danych w bieżącej sesji QuickAdd",
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const sessionManager = SessionManager.getInstance();
-    const session = sessionManager.getActiveSession(interaction.guildId!);
+    const manager = QuickAddSessionManager.getInstance();
+    const session = manager.getActiveSession();
 
     if (!session) {
       await interaction.reply({
@@ -19,7 +17,7 @@ export default {
       return;
     }
 
-    const preview = session.getPreviewBuffer();
+    const preview = session.getEntries();
 
     if (!preview || preview.length === 0) {
       await interaction.reply({
@@ -31,7 +29,7 @@ export default {
 
     let previewMessage = "📝 **Preview danych QuickAdd:**\n";
 
-    preview.forEach((entry: any, index: number) => {
+    preview.forEach((entry, index) => {
       previewMessage += `[${index + 1}] ${entry.nickname} – ${entry.value ?? "brak danych"}\n`;
     });
 
