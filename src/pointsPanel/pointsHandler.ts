@@ -1,5 +1,4 @@
 // src/pointsPanel/pointsHandler.ts
-
 import { Interaction, ButtonInteraction, CacheType, ModalSubmitInteraction } from "discord.js";
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
@@ -15,7 +14,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number]; // ✅ poprawione zamknięcie []
+type ActionType = typeof IDS.ACTIONS[number];
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -53,15 +52,20 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       }
 
       // ----- Create Week -----
-      if (customId.startsWith("points_create_")) {
+      if (Utils.isCreateWeek(customId)) {
         await PB.pointsCreate.handleCreateWeek(interaction);
         return;
       }
 
       // ----- Kliknięcie tygodnia -----
       if (Utils.isWeek(customId)) {
-        // ✅ Teraz delegujemy do pointsSelectWeek przez alias PB
-        await PB.pointsSelectWeek.handleSelectWeek(interaction);
+        const { category, week } = Utils.parseWeekId(customId);
+        const module = getCategoryModule(category);
+        if (module) {
+          await module.handleWeekClick(interaction, week);
+        } else {
+          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+        }
         return;
       }
 
