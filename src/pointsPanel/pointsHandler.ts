@@ -5,9 +5,6 @@ import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
 
-// Dodajemy pointsSelectWeek
-import * as pointsSelectWeek from "./pointsButtons/pointsSelectWeek";
-
 export const IDS = {
   BUTTONS: {
     GUIDE: "points_guide",
@@ -18,7 +15,7 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number;
+type ActionType = typeof IDS.ACTIONS[number]; // ✅ poprawione zamknięcie []
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
@@ -63,8 +60,8 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
 
       // ----- Kliknięcie tygodnia -----
       if (Utils.isWeek(customId)) {
-        // Teraz delegujemy do pointsSelectWeek
-        await pointsSelectWeek.handleSelectWeek(interaction);
+        // ✅ Teraz delegujemy do pointsSelectWeek przez alias PB
+        await PB.pointsSelectWeek.handleSelectWeek(interaction);
         return;
       }
 
