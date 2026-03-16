@@ -64,10 +64,10 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
   let createButton: ButtonBuilder;
 
   if (categoryId === "donations") {
-    weekRows = await pointsDonations.renderWeeks(interaction); // teraz przekazujemy interaction
+    weekRows = await pointsDonations.renderWeeks();
     createButton = pointsDonations.createWeekButton("donations");
   } else if (categoryId === "duel") {
-    weekRows = await pointsDuel.renderWeeks(interaction);
+    weekRows = await pointsDuel.renderWeeks();
     createButton = pointsDuel.createWeekButton("duel");
   } else {
     await safeReply(interaction, {
@@ -78,7 +78,7 @@ export async function handlePointsManagement(interaction: ButtonInteraction<Cach
   }
 
   // Dodaj przycisk Create Week jako osobny ActionRow
-  const allRows = [...(weekRows || []), new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
+  const allRows = [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(createButton)];
 
   await safeReply(interaction, {
     content: `📅 ${categoryId === "donations" ? "Donations" : "Duel"} – Select a week or create a new one:`,
