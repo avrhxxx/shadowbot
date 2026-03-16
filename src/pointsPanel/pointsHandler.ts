@@ -9,18 +9,21 @@ export const IDS = {
     GUIDE: "points_guide",
     SETTINGS: "points_settings",
     POINTS_MANAGEMENT: "points_management",
-    LIST_WEEKS: "points_list_weeks"
+    LIST_WEEKS: "points_list_weeks",
   },
-  ACTIONS: ["add", "remove", "list", "compare"] as const
+  ACTIONS: ["add", "remove", "list", "compare"] as const, // poprawione
 };
 
-type ActionType = typeof IDS.ACTIONS[number>;
+type ActionType = typeof IDS.ACTIONS[number];
 
+// -----------------------------
+// GLOBAL BUTTON HANDLERS
+// -----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
   [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
   [IDS.BUTTONS.GUIDE]: async (i) => { await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true }); },
   [IDS.BUTTONS.SETTINGS]: async (i) => { await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true }); },
-  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
+  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i),
 };
 
 // -----------------------------
@@ -31,23 +34,27 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
     if (interaction.isButton()) {
       const { customId } = interaction;
 
+      // Global button handlers
       if (BUTTON_HANDLERS[customId]) { await BUTTON_HANDLERS[customId](interaction); return; }
 
+      // Kliknięcie kategorii w Points Management
       if (customId.startsWith("points_management_category_")) {
         await PB.pointsManagement.handlePointsManagement(interaction);
         return;
       }
 
+      // Create Week
       if (Utils.isCreateWeek(customId)) {
         await PB.pointsCreate.handleCreateWeek(interaction);
         return;
       }
 
+      // Kliknięcie tygodnia
       if (Utils.isWeek(customId)) {
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
         if (module) {
-          // ✅ Tutaj deferUpdate robimy w module, nie w globalnym handlerze
+          // ✅ deferUpdate wykonuje się w module handleWeekClick
           await module.handleWeekClick(interaction, week);
         } else {
           await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
@@ -55,6 +62,7 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
         return;
       }
 
+      // Add / Remove / List / Compare
       if (Utils.isAction(customId)) {
         const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
         const module = getCategoryModule(category);
@@ -70,6 +78,7 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       }
     }
 
+    // Modal Submit
     if (interaction.isModalSubmit()) {
       const { customId } = interaction;
       if (customId.startsWith("points_create_modal_")) {
@@ -88,11 +97,17 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
   }
 }
 
+// -----------------------------
+// HELPERS
+// -----------------------------
 function safeReply(interaction: ButtonInteraction<CacheType>, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   return interaction.reply(payload);
 }
 
+// -----------------------------
+// CATEGORY MODULE ROUTER
+// -----------------------------
 function getCategoryModule(category: string) {
   switch (category) {
     case "donations": return PB.pointsDonations;
