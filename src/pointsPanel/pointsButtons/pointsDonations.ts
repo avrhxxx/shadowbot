@@ -2,9 +2,18 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, CacheType, ButtonStyle } from "discord.js";
 import * as pointsService from "../pointsService";
 
-// -----------------------------
+/* ===========================
+   HELPERS
+=========================== */
+async function safeUpdate(interaction: ButtonInteraction<CacheType>, payload: any) {
+  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  return interaction.update(payload);
+}
+
+/* ===========================
+   WEEKS
+=========================== */
 // Render wszystkich tygodni dla kategorii Donations – zwraca ActionRow[]
-// -----------------------------
 export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
   const weeks = await pointsService.getAllWeeks("Donations");
 
@@ -18,9 +27,7 @@ export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> 
   );
 }
 
-// -----------------------------
 // Obsługa kliknięcia przycisku tygodnia
-// -----------------------------
 export async function handleWeekClick(interaction: ButtonInteraction<CacheType>, week: string) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -41,15 +48,15 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
       .setStyle(ButtonStyle.Primary)
   );
 
-  await interaction.update({
+  await safeUpdate(interaction, {
     content: `📌 Donations – Week ${week}`,
     components: [row]
   });
 }
 
-// -----------------------------
-// Przygotowanie przycisku Create Week
-// -----------------------------
+/* ===========================
+   CREATE WEEK BUTTON
+=========================== */
 export function createWeekButton(category = "donations") {
   return new ButtonBuilder()
     .setCustomId(`points_create_week_${category}`)
