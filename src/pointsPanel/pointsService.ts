@@ -32,16 +32,16 @@ function normalizePointsRows(rows: any[][]): PointsRow[] {
 // ----------------------------
 // WEEKS TAB
 // ----------------------------
-export async function createWeek(weekName: string): Promise<void> {
+export async function createWeek(category: PointsCategory, weekName: string): Promise<void> {
   const rawRows: any[][] = await readSheet("points_weeks");
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const exists = rows.some(r => r[1] === weekName);
+  // Sprawdź, czy tydzień dla tej kategorii już istnieje
+  const exists = rows.some(r => r[0] === category && r[1] === weekName);
   if (exists) return;
 
-  const newRowDonations: PointsRow = ["Donations", weekName, "", ""];
-  const newRowDuel: PointsRow = ["Duel", weekName, "", ""];
-  await writeSheet("points_weeks", [...rows, newRowDonations, newRowDuel]);
+  const newRow: PointsRow = [category, weekName, "", ""];
+  await writeSheet("points_weeks", [...rows, newRow]);
 }
 
 export async function getAllWeeks(category?: PointsCategory): Promise<string[]> {
@@ -58,8 +58,6 @@ export async function getAllWeeks(category?: PointsCategory): Promise<string[]> 
 // ----------------------------
 // ADD / UPDATE POINTS
 // ----------------------------
-
-// Funkcja zapisuje punkt gracza w jednej komórce, nie nadpisując reszty wiersza
 export async function addPoints(entry: PointsEntry): Promise<void> {
   const tab = entry.category === "Donations" ? "points_donations" : "points_duel";
   const rawRows: any[][] = await readSheet(tab);
@@ -68,10 +66,8 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
   const rowIndex = rows.findIndex(r => r[1] === entry.week && r[2] === entry.nick);
 
   if (rowIndex !== -1) {
-    // update punktów po komórce (kolumna D)
     await updateCell(tab, rowIndex + 2, 4, entry.points);
   } else {
-    // dodajemy nowy wiersz po całym wierszu
     const newRow: PointsRow = [entry.category, entry.week, entry.nick, entry.points];
     await writeSheet(tab, [...rows, newRow]);
   }
