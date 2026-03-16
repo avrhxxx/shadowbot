@@ -1,34 +1,55 @@
-import { Command } from "../../types/Command";
-import { QuickAddSessionManager } from "../session/SessionManager";
+// src/modules/quickadd/commands/repair.ts
+import { ChatInputCommandInteraction } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
 
-export const RepairCommand: Command = {
+export default {
   name: "repair",
   description: "Pozwala naprawić błędy wykryte przez bota w preview sesji QuickAdd",
-  execute: async (message, args) => {
-    const session = QuickAddSessionManager.getActiveSession(message.guildId);
+
+  async execute(interaction: ChatInputCommandInteraction) {
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.getActiveSession(interaction.guildId!);
+
     if (!session) {
-      message.reply("❌ Nie ma aktywnej sesji QuickAdd na tym serwerze.");
+      await interaction.reply({
+        content: "❌ Nie ma aktywnej sesji QuickAdd na tym serwerze.",
+        ephemeral: true,
+      });
       return;
     }
 
-    if (args.length < 2) {
-      message.reply("❌ Użycie: !repair <numer_błędu> <poprawka>");
+    const errorNumberStr = interaction.options.getString("errorNumber");
+    const correction = interaction.options.getString("correction");
+
+    if (!errorNumberStr || !correction) {
+      await interaction.reply({
+        content: "❌ Użycie: /repair <numer_błędu> <poprawka>",
+        ephemeral: true,
+      });
       return;
     }
 
-    const errorNumber = parseInt(args[0], 10);
+    const errorNumber = parseInt(errorNumberStr, 10);
     if (isNaN(errorNumber) || errorNumber < 1) {
-      message.reply("❌ Niepoprawny numer błędu.");
+      await interaction.reply({
+        content: "❌ Niepoprawny numer błędu.",
+        ephemeral: true,
+      });
       return;
     }
 
-    const correctedLine = args.slice(1).join(" ");
-    const result = session.repairError(errorNumber - 1, correctedLine);
+    const result = session.repairError(errorNumber - 1, correction);
 
     if (result) {
-      message.reply(`✅ Błąd [${errorNumber}] został naprawiony: ${correctedLine}`);
+      await interaction.reply({
+        content: `✅ Błąd [${errorNumber}] został naprawiony: ${correction}`,
+        ephemeral: true,
+      });
     } else {
-      message.reply(`❌ Nie udało się naprawić błędu [${errorNumber}].`);
+      await interaction.reply({
+        content: `❌ Nie udało się naprawić błędu [${errorNumber}].`,
+        ephemeral: true,
+      });
     }
   },
 };
