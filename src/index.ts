@@ -10,6 +10,11 @@ import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
 import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
 
+// -----------------------------
+// QuickAdd command register
+// -----------------------------
+import { registerQuickAddCommands } from "./modules/quickadd/commands/registerCommands";
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -46,6 +51,13 @@ client.once("ready", async () => {
   }
 
   // -----------------------------
+  // Register QuickAdd commands
+  // -----------------------------
+  for (const guild of client.guilds.cache.values()) {
+    await registerQuickAddCommands(guild, client);
+  }
+
+  // -----------------------------
   // Global interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
@@ -59,6 +71,7 @@ client.once("ready", async () => {
       // Obsługa points panel
       await handlePointsInteraction(interaction);
 
+      // QuickAdd commands handled in registerCommands.ts
     } catch (err) {
       console.error("Error in interactionCreate:", err);
 
