@@ -1,36 +1,17 @@
 // src/modules/quickadd/commands/index.ts
-// Poprawiony indeks dla komend QuickAdd
 
-// 🔹 Komendy typu Command (z export const)
-import { AdjustCommand } from "./adjust";
-import cadd from "./cadd";
-import cattend from "./cattend";
-import { PreviewCommand } from "./preview";
-import { RepairCommand } from "./repair";
-import rrattend from "./rrattend";
+export { default as AdjustCommand } from "./adjust";
+export { default as cadd } from "./cadd";
+export { default as cattend } from "./cattend";
+export { default as ConfirmCommand } from "./confirm";
+export { default as dnAddCommand } from "./dnadd";
+export { default as dpAddCommand } from "./dpadd";
+export { default as PreviewCommand } from "./preview";
+export { default as RepairCommand } from "./repair";
+export { default as rrAddCommand } from "./rradd";
+export { default as rrAttendCommand } from "./rrattend";
+export { default as RedoCommand } from "./redo";
 
-// 🔹 Komendy typu funkcja (z default export lub named export)
-import dnAddCommand from "./dnadd";
-import dpAddCommand from "./dpadd";
-import rrAddCommand from "./rradd";
-import confirmCommand from "./confirm";
-import redoCommand from "./redo";
-import QuickAddChannelInit from "./QuickAddChannelInit";
-import QuickAddCommandRegistry from "./QuickAddCommandRegistry";
-
-// Eksporty – w jednej paczce dla łatwego importu
-export {
-  AdjustCommand,
-  cadd,
-  cattend,
-  PreviewCommand,
-  RepairCommand,
-  rrattend,
-  dnAddCommand,
-  dpAddCommand,
-  rrAddCommand,
-  confirmCommand,
-  redoCommand,
-  QuickAddChannelInit,
-  QuickAddCommandRegistry,
-};
+// Specjalne inicjalizacje i registry, też default export
+export { default as QuickAddChannelInit } from "./QuickAddChannelInit";
+export { default as QuickAddCommandRegistry } from "./QuickAddCommandRegistry";
