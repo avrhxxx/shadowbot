@@ -48,12 +48,13 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
         return;
       }
 
-      // Create Week
-      if (Utils.isCreateWeek(customId)) {
-        const category = Utils.parseCreateWeekId(customId);
-        const module = getCategoryModule(category);
-        if (module) {
-          await module.handleCreateWeek(interaction); // ButtonInteraction
+      // ----- DODANE: Obsługa Create Week -----
+      if (customId.startsWith("points_create_")) {
+        // Pobieramy kategorię z customId np. 'donations' lub 'duel'
+        const category = customId.replace("points_create_", "");
+        // Wywołujemy pointsCreate.handleCreateWeek
+        if (PB.pointsCreate && PB.pointsCreate.handleCreateWeek) {
+          await PB.pointsCreate.handleCreateWeek(interaction);
         } else {
           await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
         }
@@ -96,7 +97,7 @@ export async function handlePointsInteraction(interaction: Interaction<CacheType
       const { customId } = interaction;
 
       if (customId.startsWith("points_create_modal_")) {
-        await PB.pointsCreate.handleCreateWeekSubmit(interaction); // ModalSubmitInteraction
+        await PB.pointsCreate.handleCreateWeekSubmit(interaction);
         return;
       }
     }
