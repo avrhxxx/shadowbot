@@ -11,9 +11,10 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
 
 // -----------------------------
-// QuickAdd command register
+// QuickAdd
 // -----------------------------
-import { registerQuickAddCommands } from "./modules/quickadd/commands/registerCommands";
+import { registerQuickAddCommands } from "./modules/quickadd/commands/QuickAddCommandRegistry";
+import { initQuickAddChannel } from "./modules/quickadd/commands/QuickAddChannelInit";
 
 const client = new Client({
   intents: [
@@ -41,21 +42,17 @@ client.once("ready", async () => {
   // Init event reminders i absence notifications
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
-    // Event reminders
     initEventReminders(guild);
-
-    // Absence notifications (embed + auto cleaner)
     initAbsenceNotifications(guild).catch(err => {
       console.error(`Error initializing absence notifications for guild ${guild.id}:`, err);
     });
   }
 
   // -----------------------------
-  // Register QuickAdd commands
+  // Init QuickAdd channel i komendy
   // -----------------------------
-  for (const guild of client.guilds.cache.values()) {
-    await registerQuickAddCommands(guild, client);
-  }
+  await initQuickAddChannel(client);          // 🔹 tworzy #quickadd jeśli nie istnieje
+  registerQuickAddCommands(client);           // 🔹 rejestruje wszystkie komendy QuickAdd
 
   // -----------------------------
   // Global interaction handler
@@ -71,7 +68,8 @@ client.once("ready", async () => {
       // Obsługa points panel
       await handlePointsInteraction(interaction);
 
-      // QuickAdd commands handled in registerCommands.ts
+      // QuickAdd sesyjne komendy działają tylko w kanale #quickadd
+      // dzięki QuickAddSessionManager (sprawdzi channel.id)
     } catch (err) {
       console.error("Error in interactionCreate:", err);
 
