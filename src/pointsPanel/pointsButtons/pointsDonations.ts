@@ -46,6 +46,6 @@ export async function handleWeekClick(interaction: ButtonInteraction<CacheType>,
 export function createWeekButton(category = "donations") {
   return new ButtonBuilder()
     .setCustomId(`points_create_${category}`)
-    .setLabel("➕ Create Week")
+    .setLabel("Create Week")
     .setStyle(ButtonStyle.Success);
 }
