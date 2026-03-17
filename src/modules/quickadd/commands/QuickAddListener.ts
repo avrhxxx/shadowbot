@@ -1,49 +1,52 @@
+// src/modules/quickadd/commands/QuickAddListener.ts
 import { Client, Message, TextChannel } from "discord.js";
-import { QuickAddSession } from "../session/QuickAddSession";
+import { rraddCommand } from "./rradd";
+import { dpaddCommand } from "./dpadd";
+import { dnaddCommand } from "./dnadd";
+import { SessionManager } from "../session/SessionManager";
+import { createQuickAddChannel } from "../session/createQuickAddChannel";
 
-// Mapowanie prefiksów i pełnych nazw komend na typ sesji
-const COMMAND_MAP: Record<string, string> = {
-  rradd: "ReservoirRaid",
-  reservoiradd: "ReservoirRaid",
-  dpadd: "DuelPoints",
-  duelpointsadd: "DuelPoints",
-  dnadd: "Donations",
-  donationsadd: "Donations",
-};
-
+/**
+ * Listener dla wszystkich komend QuickAdd z prefiksem `!`.
+ * Obsługuje zarówno pełne nazwy, jak i skróty:
+ *  !reservoiradd / !rradd
+ *  !duelpointsadd / !dpadd
+ *  !donationsadd / !dnadd
+ */
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
-    // Ignorujemy wiadomości od botów
     if (message.author.bot) return;
-
-    // Sprawdź prefiks !
     if (!message.content.startsWith("!")) return;
 
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift()?.toLowerCase();
 
-    if (!command || !COMMAND_MAP[command]) return;
-
-    // Wybrany typ sesji
-    const eventType = COMMAND_MAP[command];
-
-    // Sprawdź, czy kanał jest TextChannel
-    if (!(message.channel instanceof TextChannel)) {
-      message.reply("QuickAdd może działać tylko w kanałach tekstowych Discord.");
+    // Sprawdzenie, czy kanał jest dedykowany dla QuickAdd lub kanał jeszcze nie został stworzony
+    const currentSessionChannel: TextChannel | null = SessionManager.getChannel();
+    if (currentSessionChannel && message.channel.id !== currentSessionChannel.id) {
+      await message.reply("⚠️ Komenda QuickAdd może być użyta tylko w kanale sesji QuickAdd.");
       return;
     }
 
-    // Utwórz sesję QuickAdd
-    const session = new QuickAddSession(client, message.channel);
+    switch (command) {
+      case "rradd":
+      case "reservoiradd":
+        await rraddCommand(message, args);
+        break;
 
-    // Na razie logujemy start sesji
-    await message.channel.send(
-      `🟢 QuickAdd sesja uruchomiona dla: ${eventType}. Moderator: ${message.author.username}`
-    );
+      case "dpadd":
+      case "duelpointsadd":
+        await dpaddCommand(message, args);
+        break;
 
-    // Start timeout monitoringu
-    session.startTimeoutMonitor();
+      case "dnadd":
+      case "donationsadd":
+        await dnaddCommand(message, args);
+        break;
 
-    // Możemy tu dopisać dalsze logiki np. dodawanie wpisów, preview itp.
+      default:
+        // inne komendy QuickAdd (np. sesyjne) będą dodawane później
+        break;
+    }
   });
 }
