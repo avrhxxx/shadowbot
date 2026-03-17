@@ -1,12 +1,12 @@
 import { Message } from "discord.js";
-import { SessionManager } from "../sessions/SessionManager";
+import { SessionManager } from "../session/SessionManager";
 
 /**
  * Placeholder dla sesyjnych komend QuickAdd
  * np. !preview, !adjust, !repair, !redo, !confirm, !cancel
  */
 export async function previewCommand(message: Message) {
-  const session = SessionManager.getSession();
+  const session = SessionManager.getChannel();
   if (!session) {
     await message.reply("⚠️ Brak aktywnej sesji QuickAdd.");
     return;
@@ -16,7 +16,7 @@ export async function previewCommand(message: Message) {
 }
 
 export async function adjustCommand(message: Message, args: string[]) {
-  const session = SessionManager.getSession();
+  const session = SessionManager.getChannel();
   if (!session) {
     await message.reply("⚠️ Brak aktywnej sesji QuickAdd.");
     return;
@@ -26,7 +26,7 @@ export async function adjustCommand(message: Message, args: string[]) {
 }
 
 export async function repairCommand(message: Message) {
-  const session = SessionManager.getSession();
+  const session = SessionManager.getChannel();
   if (!session) {
     await message.reply("⚠️ Brak aktywnej sesji QuickAdd.");
     return;
