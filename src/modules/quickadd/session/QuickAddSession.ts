@@ -4,7 +4,6 @@ import { TextChannel, Client } from "discord.js";
 import { TimeoutManager } from "./TimeoutManager";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 import { QuickAddSessionState } from "../types/QuickAddSessionState";
-import { SessionManager } from "./SessionManager";
 
 export class QuickAddSession {
   private client: Client;
@@ -15,9 +14,6 @@ export class QuickAddSession {
   constructor(client: Client, channel: TextChannel) {
     this.client = client;
     this.channel = channel;
-
-    // Zarejestruj kanał w SessionManager od razu przy tworzeniu sesji
-    SessionManager.setChannel(channel);
   }
 
   public addEntry(entry: QuickAddEntry) {
@@ -33,8 +29,8 @@ export class QuickAddSession {
   }
 
   public startTimeoutMonitor() {
-    // Teraz jawnie podajemy kanał sesji
-    TimeoutManager.start(this.channel);
+    // Poprawione wywołanie – przekazujemy kanał i bieżącą sesję
+    TimeoutManager.start(this.channel, this);
   }
 
   public stopTimeoutMonitor() {
@@ -44,8 +40,7 @@ export class QuickAddSession {
   private cleanup() {
     this.stopTimeoutMonitor();
     this.entries = [];
-    SessionManager.clear();
-    // Można tu dopisać dodatkowe logi lub powiadomienia
+    // Dodatkowe cleanup można tu dopisać, np. logi lub powiadomienia
   }
 
   public getEntries(): QuickAddEntry[] {
