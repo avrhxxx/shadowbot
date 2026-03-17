@@ -11,9 +11,10 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
 
 // -----------------------------
-// QuickAdd (placeholder import dla komend)
+// QuickAdd
 // -----------------------------
 import { registerQuickAddCommands } from "./modules/quickadd/commands/QuickAddCommandRegistry";
+import { registerQuickAddListener } from "./modules/quickadd/commands/QuickAddListener";
 import { QuickAddService } from "./modules/quickadd/services/QuickAddService"; // 🔹 serwis obsługujący kanał
 
 const client = new Client({
@@ -57,7 +58,8 @@ client.once("ready", async () => {
     await quickAddService.ensureQuickAddChannel(guild); // 🔹 tworzy #quickadd jeśli nie istnieje
   }
 
-  registerQuickAddCommands(client); // 🔹 rejestruje wszystkie komendy QuickAdd
+  registerQuickAddCommands(client); // 🔹 placeholder
+  registerQuickAddListener(client); // 🔹 faktyczny listener, reaguje na !rradd, !dpadd, !dnadd
 
   // -----------------------------
   // Global interaction handler
