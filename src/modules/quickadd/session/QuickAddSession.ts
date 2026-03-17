@@ -1,27 +1,56 @@
-import { TextChannel, GuildMember } from "discord.js";
+// src/modules/quickadd/session/QuickAddSession.ts
+
+import { TextChannel, Client } from "discord.js";
+import { TimeoutManager } from "./TimeoutManager";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 import { QuickAddSessionState } from "../types/QuickAddSessionState";
 
 export class QuickAddSession {
-    public channel: TextChannel;
-    public entries: QuickAddEntry[] = [];
-    public state: QuickAddSessionState = QuickAddSessionState.INIT;
-    public moderator: GuildMember;
+  private client: Client;
+  private channel: TextChannel;
+  private entries: QuickAddEntry[] = [];
+  private state: QuickAddSessionState = "INIT";
 
-    constructor(channel: TextChannel, moderator: GuildMember) {
-        this.channel = channel;
-        this.moderator = moderator;
-    }
+  constructor(client: Client, channel: TextChannel) {
+    this.client = client;
+    this.channel = channel;
+  }
 
-    addEntry(entry: QuickAddEntry) {
-        this.entries.push(entry);
-    }
+  public addEntry(entry: QuickAddEntry) {
+    this.entries.push(entry);
+  }
 
-    setState(state: QuickAddSessionState) {
-        this.state = state;
-    }
+  public setState(newState: QuickAddSessionState) {
+    this.state = newState;
 
-    clearEntries() {
-        this.entries = [];
+    if (newState === "CANCELLED" || newState === "TIMEOUT") {
+      this.cleanup();
     }
+  }
+
+  public startTimeoutMonitor() {
+    TimeoutManager.start();
+  }
+
+  public stopTimeoutMonitor() {
+    TimeoutManager.clear();
+  }
+
+  private cleanup() {
+    this.stopTimeoutMonitor();
+    this.entries = [];
+    // Dodatkowe cleanup można tu dopisać, np. logi lub powiadomienia
+  }
+
+  public getEntries(): QuickAddEntry[] {
+    return this.entries;
+  }
+
+  public getState(): QuickAddSessionState {
+    return this.state;
+  }
+
+  public getChannel(): TextChannel {
+    return this.channel;
+  }
 }
