@@ -9,7 +9,6 @@ export function registerQuickAddSessionListener(client: Client) {
     if (message.author.bot) return;
     if (!message.content.startsWith("!")) return;
 
-    const session = message.channel; // placeholder, później SessionManager
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift()?.toLowerCase();
 
