@@ -29,8 +29,8 @@ export class QuickAddSession {
   }
 
   public startTimeoutMonitor() {
-    // Poprawione wywołanie – przekazujemy kanał i bieżącą sesję
-    TimeoutManager.start(this.channel, this);
+    // Poprawione: przekazujemy kanał + callback, który ustawia TIMEOUT
+    TimeoutManager.start(this.channel, () => this.setState("TIMEOUT"));
   }
 
   public stopTimeoutMonitor() {
