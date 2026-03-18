@@ -3,18 +3,29 @@ import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
 
 export async function cancel(message: Message) {
-  if (!message.guildId) return;
-
-  const session = SessionManager.getSession(message.guildId);
+  const guildId = message.guildId!;
+  const session = SessionManager.getSession(guildId);
 
   if (!session) {
     await message.reply("❌ Brak aktywnej sesji.");
     return;
   }
 
-  // 🔥 czyścimy wszystko
-  SessionData.clear(message.guildId);
-  SessionManager.endSession(message.guildId);
+  // 🧹 usuń dane sesji
+  SessionData.clearEntries(guildId);
 
-  await message.reply("🛑 Sesja została anulowana.");
+  // 🧠 usuń sesję z managera
+  SessionManager.endSession(guildId);
+
+  await message.reply("❌ Sesja została anulowana.");
+
+  // 🗑️ usuń kanał sesji (opcjonalne, ale polecam)
+  try {
+    const channel = message.guild?.channels.cache.get(session.channelId);
+    if (channel && channel.isTextBased()) {
+      await channel.delete();
+    }
+  } catch (err) {
+    console.error("Error deleting session channel:", err);
+  }
 }
