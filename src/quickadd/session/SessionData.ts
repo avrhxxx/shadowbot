@@ -8,7 +8,20 @@ export class SessionData {
 
   static addEntry(guildId: string, entry: Entry) {
     const current = this.data.get(guildId) || [];
-    current.push(entry);
+
+    // 🔍 szukamy istniejącego nicku (case-insensitive)
+    const existing = current.find(
+      (e) => e.nickname.toLowerCase() === entry.nickname.toLowerCase()
+    );
+
+    if (existing) {
+      // ➕ sumujemy value
+      existing.value += entry.value;
+    } else {
+      // ➕ nowy wpis
+      current.push(entry);
+    }
+
     this.data.set(guildId, current);
   }
 
