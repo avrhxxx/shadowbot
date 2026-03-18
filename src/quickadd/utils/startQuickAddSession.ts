@@ -4,11 +4,24 @@ import {
   PermissionFlagsBits,
   TextChannel,
 } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import { SessionManager, ParserType } from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
 
 type EventType = "rr" | "dn" | "dp";
 type SessionMode = "add" | "attend";
+
+// 🔥 MAPOWANIE DO PARSERÓW
+function resolveParserType(
+  eventType: EventType,
+  mode: SessionMode
+): ParserType {
+  if (eventType === "rr" && mode === "add") return "RR_RAID";
+  if (eventType === "rr" && mode === "attend") return "RR_ATTENDANCE";
+  if (eventType === "dn") return "DONATIONS";
+  if (eventType === "dp") return "DUEL_POINTS";
+
+  throw new Error("Unsupported session type");
+}
 
 export async function startQuickAddSession(
   message: Message,
@@ -43,12 +56,16 @@ export async function startQuickAddSession(
     ],
   });
 
+  // 🔥 KLUCZOWE
+  const parserType = resolveParserType(eventType, mode);
+
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
     eventType,
     mode,
+    parserType, // 🔥 NOWE
   });
 
   await message.reply(`✅ Sesja utworzona: ${channel}`);
