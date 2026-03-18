@@ -11,15 +11,15 @@ export async function cancel(message: Message) {
     return;
   }
 
-  // 🧹 usuń dane sesji
-  SessionData.clearEntries(guildId);
+  // 🧹 usuń dane
+  SessionData.clear(guildId);
 
-  // 🧠 usuń sesję z managera
+  // 🧠 usuń sesję
   SessionManager.endSession(guildId);
 
   await message.reply("❌ Sesja została anulowana.");
 
-  // 🗑️ usuń kanał sesji (opcjonalne, ale polecam)
+  // 🗑️ usuń kanał sesji
   try {
     const channel = message.guild?.channels.cache.get(session.channelId);
     if (channel && channel.isTextBased()) {
