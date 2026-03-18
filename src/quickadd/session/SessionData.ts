@@ -18,9 +18,10 @@ export class SessionData {
     this.data.set(guildId, current);
   }
 
-  // 📥 pobieranie
+  // 📥 pobieranie (zwracamy kopię dla bezpieczeństwa)
   static getEntries(guildId: string): Entry[] {
-    return this.data.get(guildId) || [];
+    const entries = this.data.get(guildId) || [];
+    return [...entries];
   }
 
   // 🧹 czyszczenie
@@ -50,7 +51,7 @@ export class SessionData {
       if (parsed === null) return false;
 
       entry.value = parsed;
-      entry.raw = newValue; // 🔥 zachowujemy dokładnie to co user wpisał
+      entry.raw = newValue; // 🔥 zachowujemy to co user wpisał
       return true;
     }
 
@@ -64,5 +65,46 @@ export class SessionData {
 
     entries.splice(index, 1);
     return true;
+  }
+
+  // 🔗 MERGE (manualny: from → to)
+  static mergeEntries(
+    guildId: string,
+    fromIndex: number,
+    toIndex: number
+  ): boolean {
+    const entries = this.data.get(guildId);
+    if (!entries) return false;
+
+    if (!entries[fromIndex] || !entries[toIndex]) return false;
+    if (fromIndex === toIndex) return false;
+
+    const from = entries[fromIndex];
+    const to = entries[toIndex];
+
+    // 🔥 merge wartości
+    to.value += from.value;
+
+    // 🔥 clean preview (bez śladów merge)
+    to.raw = this.formatValue(to.value);
+
+    // 🗑️ usuń wpis (większy index pierwszy)
+    const first = Math.max(fromIndex, toIndex);
+    entries.splice(first, 1);
+
+    return true;
+  }
+
+  // 🔧 helper do formatowania
+  private static formatValue(value: number): string {
+    if (value >= 1_000_000) {
+      return `${(value / 1_000_000).toFixed(2)}M`;
+    }
+
+    if (value >= 1_000) {
+      return `${(value / 1_000).toFixed(1)}K`;
+    }
+
+    return `${value}`;
   }
 }
