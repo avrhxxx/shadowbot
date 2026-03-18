@@ -33,7 +33,7 @@ export function registerQuickAddListener(client: Client) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
-      // ✅ FIX: bezpieczne sprawdzenie nazwy kanału
+      // ✅ FIX: bezpieczne sprawdzenie kanału
       const isQuickAddChannel =
         message.channel.isTextBased() &&
         "name" in message.channel &&
@@ -113,13 +113,13 @@ export function registerQuickAddListener(client: Client) {
       try {
         const parts = content.split(/\s+/);
 
-        if (parts.length < 2) {
-          await message.react("❌");
-          return;
-        }
+        // 🔥 ignorujemy wszystko co nie jest "nick value"
+        if (parts.length !== 2) return;
 
         const nickname = parts[0];
-        const value = parseValue(parts[1]);
+        const rawValue = parts[1];
+
+        const value = parseValue(rawValue);
 
         if (value === null) {
           await message.react("❌");
@@ -129,6 +129,7 @@ export function registerQuickAddListener(client: Client) {
         SessionData.addEntry(message.guildId, {
           nickname,
           value,
+          raw: rawValue, // 🔥 KLUCZOWE
         });
 
         await message.react("✅");
