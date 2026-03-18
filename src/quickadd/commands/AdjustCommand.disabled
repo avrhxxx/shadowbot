@@ -1,48 +1,52 @@
-// AdjustCommand.ts
-// Komenda do ręcznej edycji pojedynczego wpisu w PreviewBuffer
+import { Message } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
+import { SessionData } from "../session/SessionData";
 
-import { PreviewBuffer } from "../services/PreviewBuffer";
-import { SessionManager } from "../services/SessionManager";
+export async function adjust(message: Message) {
+  const guildId = message.guildId!;
+  const session = SessionManager.getSession(guildId);
 
-export class AdjustCommand {
-  static name = "adjust";
-
-  // Składnia: !adjust <lineId> <field> <value>
-  async execute(lineId: number, field: "nick" | "value", value: string) {
-    if (!SessionManager.hasActiveSession()) {
-      throw new Error("Brak aktywnej sesji QuickAdd.");
-    }
-
-    const entry = PreviewBuffer.getEntry(lineId);
-    if (!entry) {
-      throw new Error(`Nie znaleziono wpisu o lineId ${lineId}.`);
-    }
-
-    if (!["nick", "value"].includes(field)) {
-      throw new Error(`Niepoprawne pole. Dozwolone: nick, value.`);
-    }
-
-    // Walidacja value jeśli field === "value"
-    if (field === "value" && !this.validateValue(value)) {
-      throw new Error("Niepoprawny format wartości.");
-    }
-
-    // Aktualizacja pola
-    entry[field] = value;
-
-    // Usunięcie flag błędów
-    entry.flags = entry.flags.filter(f => !["DUPLICATE", "INVALID", "UNREADABLE"].includes(f));
-
-    // Oznaczenie jako ręcznie edytowane
-    entry.flags.push("MANUALLY_ADJUSTED");
-
-    PreviewBuffer.updateEntry(lineId, entry);
-
-    return `Line ${lineId} updated: ${field} → ${value}`;
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji.");
+    return;
   }
 
-  private validateValue(value: string): boolean {
-    // TODO: dodać reguły walidacji wartości
-    return !!value;
+  const parts = message.content.trim().split(/\s+/);
+
+  if (parts.length < 4) {
+    await message.reply(
+      "❌ Użycie: !adjust [id] [nick/value] [nowaWartość]"
+    );
+    return;
   }
+
+  const index = Number(parts[1]) - 1;
+  const field = parts[2].toLowerCase() as "nick" | "value";
+  const newValue = parts.slice(3).join(" ");
+
+  if (isNaN(index)) {
+    await message.reply("❌ Niepoprawne ID.");
+    return;
+  }
+
+  if (field !== "nick" && field !== "value") {
+    await message.reply("❌ Dozwolone pola: nick, value.");
+    return;
+  }
+
+  const success = SessionData.updateEntry(
+    guildId,
+    index,
+    field,
+    newValue
+  );
+
+  if (!success) {
+    await message.reply("❌ Nie udało się zaktualizować wpisu.");
+    return;
+  }
+
+  await message.reply(
+    `✅ Wpis ${index + 1} zaktualizowany: ${field} → ${newValue}`
+  );
 }
