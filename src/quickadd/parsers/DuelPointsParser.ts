@@ -9,13 +9,11 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 znajdź liczbę + suffix (np. 1.2M / 500K / 123456)
     const valueMatch = line.match(/([\d.,]+)\s*([MK]?)/i);
     if (!valueMatch) continue;
 
     const fullMatch = valueMatch[0];
 
-    // 🔥 upewniamy się że liczba jest na końcu
     if (!line.endsWith(fullMatch)) continue;
 
     const rawNumber = valueMatch[1];
@@ -30,7 +28,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
 
     entries.push({
       nickname,
-      value,
+      value: String(value), // 🔥 FIX
       raw: fullMatch,
     });
   }
@@ -38,7 +36,6 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔹 "1.2M" → 1200000
 function normalizeValue(num: string, suffix: string): number {
   const clean = num.replace(",", ".");
   const number = parseFloat(clean);
@@ -51,7 +48,6 @@ function normalizeValue(num: string, suffix: string): number {
   return parseInt(num.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-// 🔹 czyści nickname z OCR śmieci
 function cleanNickname(name: string): string {
   return name.replace(/[^\w\d_]/g, "").trim();
 }
