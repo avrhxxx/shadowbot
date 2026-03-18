@@ -11,7 +11,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔥 znajdź liczbę (NIE musi być na końcu)
+    // 🔥 znajdź wartość (np. 36.59M / 500K / 123456)
     const valueMatch = line.match(/([\d.,]+)\s*([MK]?)/i);
     if (!valueMatch) continue;
 
@@ -20,11 +20,18 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
 
     const value = normalizeValue(rawNumber, suffix);
 
-    // 🔥 usuń wartość z linii → zostaje nick
-    const nicknameRaw = line.replace(valueMatch[0], "").trim();
+    // 🔥 wyciągnij nickname (usuń value + rank + tagi)
+    let nicknameRaw = line
+      .replace(valueMatch[0], "")         // usuń value
+      .replace(/^\d+\s*/, "")             // usuń rank (np. "9 ")
+      .replace(/#\d+\s*\[.*?\]/, "")      // usuń "#227 [XXX]"
+      .trim();
+
     const nickname = cleanNickname(nicknameRaw);
 
-    if (!nickname || value <= 0) continue;
+    // 🔥 filtr śmieci OCR
+    if (!nickname || nickname.length < 3) continue;
+    if (value <= 0) continue;
 
     entries.push({
       lineId: lineCounter++,
@@ -53,7 +60,10 @@ function normalizeValue(num: string, suffix: string): number {
   return parseInt(num.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-// 🔹 czyści nickname
+// 🔹 czyści nickname z OCR śmieci
 function cleanNickname(name: string): string {
-  return name.replace(/[^\w\d_ ]/g, "").trim();
+  return name
+    .replace(/[^\w\d_ ]/g, "") // usuń dziwne znaki
+    .replace(/\s{2,}/g, " ")   // usuń podwójne spacje
+    .trim();
 }
