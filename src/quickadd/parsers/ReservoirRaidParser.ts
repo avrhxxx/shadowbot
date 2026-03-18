@@ -1,5 +1,7 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
+let lineCounter = 1;
+
 export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -16,21 +18,29 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
 
     if (!match) continue;
 
-    const nicknameRaw = match[1].trim();
-    const nickname = cleanNickname(nicknameRaw);
-
+    const nickname = match[1].trim();
     if (!nickname) continue;
 
-    entries.push({
-      nickname,
-      value: "1", // 🔥 FIX
-      raw: "RAID",
-    });
+    entries.push(createEntry(rawLine, nickname, 1, "RAID"));
   }
 
   return entries;
 }
 
-function cleanNickname(name: string): string {
-  return name.replace(/[^\w\d_]/g, "").trim();
+function createEntry(
+  rawText: string,
+  nickname: string,
+  value: number,
+  raw: string
+): QuickAddEntry {
+  return {
+    lineId: lineCounter++,
+    rawText,
+    nickname,
+    value,
+    raw,
+    status: "OK",
+    confidence: 1,
+    sourceType: "OCR",
+  };
 }
