@@ -5,15 +5,17 @@ export type QuickAddEntryStatus =
   | "UNREADABLE";
 
 export interface QuickAddEntry {
-  lineId?: number; // 🔥 opcjonalne (parsery nie muszą tego dawać)
+  lineId?: number; // opcjonalne (OCR może, manual nie musi)
 
   nickname: string;
 
-  value: number; // 🔥 ZAMIANA string → number
+  value: number; // 🔥 zawsze number (kluczowe dla merge/sum)
 
-  raw: string; // 🔥 ZAMIANA rawText → raw
+  raw: string; // 🔥 to pokazujesz w preview (np. "25.5M", "82,000")
 
-  status?: QuickAddEntryStatus; // 🔥 opcjonalne (na przyszłość)
-  confidence?: number;          // 🔥 opcjonalne
+  rawText?: string; // 🔥 DEBUG OCR (CAŁA linia z obrazka)
+
+  status?: QuickAddEntryStatus;
+  confidence?: number;
   sourceType?: "OCR" | "MANUAL";
 }
