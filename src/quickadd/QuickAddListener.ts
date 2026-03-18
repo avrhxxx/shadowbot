@@ -103,7 +103,6 @@ export function registerQuickAddListener(client: Client) {
     // 🔹 BRAK SESJI
     // -----------------------------
     if (!session) return;
-
     if (message.channel.id !== session.channelId) return;
     if (session.moderatorId !== message.author.id) return;
 
@@ -131,7 +130,9 @@ export function registerQuickAddListener(client: Client) {
         const parser = parserMap[session.parserType];
         if (!parser) return;
 
-        const parsed = parser(text);
+        // 🔥 FIX: parser oczekuje string[]
+        const lines = text.split("\n");
+        const parsed = parser(lines);
 
         // 🔥 DEBUG PARSER
         console.log("=== PARSED OUTPUT ===");
