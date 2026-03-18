@@ -1,5 +1,6 @@
 import { Message } from "discord.js";
+import { startQuickAddSession } from "../utils/startQuickAddSession";
 
 export async function dnadd(message: Message) {
-  await message.reply("⚠️ DN jeszcze nie działa (naprawiamy system)");
+  await startQuickAddSession(message, "dn", "add");
 }
