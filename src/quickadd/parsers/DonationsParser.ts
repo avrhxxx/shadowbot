@@ -5,78 +5,65 @@ let lineCounter = 1;
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i];
+  for (const rawLine of lines) {
     if (!rawLine) continue;
 
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 CASE 1: "1 Nickname"
-    const rankMatch = line.match(/^\d+\s*(.+)/);
+    const lower = line.toLowerCase();
 
-    if (rankMatch) {
-      const nickname = rankMatch[1].trim();
+    // 🔥 musi zawierać "donations"
+    if (!lower.includes("donations")) continue;
 
-      let value = 0;
-      let raw = "";
+    // 🔥 wyciągnij wartość (np. 82,969)
+    const valueMatch = line.match(/donations[:\s]*([\d,]+)/i);
+    if (!valueMatch) continue;
 
-      const nextLine = lines[i + 1]?.trim();
+    const rawNumber = valueMatch[1];
+    const value = parseNumber(rawNumber);
 
-      if (nextLine) {
-        const valueMatch =
-          nextLine.match(/Donations[:\s]*([\d,.\s]+)/i) ||
-          nextLine.match(/([\d,]{3,})/);
+    if (value <= 0) continue;
 
-        if (valueMatch) {
-          raw = valueMatch[1];
-          value = normalizeNumber(raw);
-          i++; // skip next line
-        }
-      }
+    // 🔥 usuń "Donations: xxx"
+    let nicknamePart = line.replace(/donations[:\s]*[\d,]+/i, "");
 
-      if (nickname && value > 0) {
-        entries.push(createEntry(rawLine, nickname, value, raw));
-      }
+    // 🔥 usuń śmieci OCR na początku (np. @, %, itp.)
+    nicknamePart = nicknamePart.replace(/^[^\w\d]+/, "");
 
-      continue;
-    }
+    const nickname = cleanNickname(nicknamePart);
 
-    // 🔥 CASE 2: merged line
-    const mergedMatch = line.match(/^\d+\s*([^\d]+?)\s+.*?([\d,]{3,})/);
+    if (!nickname || nickname.length < 3) continue;
 
-    if (mergedMatch) {
-      const nickname = mergedMatch[1].trim();
-      const raw = mergedMatch[2];
-      const value = normalizeNumber(raw);
-
-      if (nickname && value > 0) {
-        entries.push(createEntry(rawLine, nickname, value, raw));
-      }
-    }
+    entries.push({
+      lineId: lineCounter++,
+      nickname,
+      value,
+      raw: rawNumber,
+      status: "OK",
+      confidence: 1,
+      sourceType: "OCR",
+    });
   }
 
   return entries;
 }
 
-function normalizeNumber(value: string): number {
-  return parseInt(value.replace(/[^\d]/g, ""), 10) || 0;
+// 🔥 "82,969" → 82969
+function parseNumber(num: string): number {
+  const clean = num.replace(/,/g, "");
+  const parsed = parseInt(clean, 10);
+  return isNaN(parsed) ? 0 : parsed;
 }
 
-function createEntry(
-  rawText: string,
-  nickname: string,
-  value: number,
-  raw: string
-): QuickAddEntry {
-  return {
-    lineId: lineCounter++,
-    rawText,
-    nickname,
-    value,
-    raw,
-    status: "OK",
-    confidence: 1,
-    sourceType: "OCR",
-  };
+// 🔥 czyszczenie nicków (ważne przy OCR)
+function cleanNickname(name: string): string {
+  return (
+    name
+      // usuń dziwne znaki OCR
+      .replace(/[^\w\d\s_]/g, "")
+      // usuń wielokrotne spacje
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
