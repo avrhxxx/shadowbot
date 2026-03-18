@@ -1,5 +1,5 @@
 // src/index.ts
-import "./googleSheetsClient"; // 🔹 Google Sheets klient
+import "./googleSheetsClient";
 
 import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
 import { initTranslationModule } from "./modules/TranslationModule";
@@ -8,15 +8,12 @@ import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
 import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
 import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
-import { handlePointsInteraction } from "./pointsPanel/pointsHandler"; // 🔹 obsługa points panel
+import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 
 // -----------------------------
-// QuickAdd
+// ✅ QuickAdd (NOWY SYSTEM)
 // -----------------------------
-import { registerQuickAddCommands } from "./modules/quickadd/commands/QuickAddCommandRegistry";
-import { registerQuickAddListener } from "./modules/quickadd/commands/QuickAddListener";
-import { registerQuickAddSessionListener } from "./modules/quickadd/commands/QuickAddSessionListener"; // 🔹 sesyjne komendy
-import { QuickAddService } from "./modules/quickadd/services/QuickAddService"; // 🔹 serwis obsługujący kanał
+import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 
 const client = new Client({
   intents: [
@@ -41,7 +38,7 @@ client.once("ready", async () => {
   initModeratorPanel(client);
 
   // -----------------------------
-  // Init event reminders i absence notifications
+  // Init reminders / notifications
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
@@ -51,34 +48,18 @@ client.once("ready", async () => {
   }
 
   // -----------------------------
-  // QuickAdd: tworzenie kanału i rejestracja komend
+  // ✅ QuickAdd
   // -----------------------------
-  const quickAddService = new QuickAddService(client);
-
-  for (const guild of client.guilds.cache.values()) {
-    await quickAddService.ensureQuickAddChannel(guild); // 🔹 tworzy #quickadd jeśli nie istnieje
-  }
-
-  registerQuickAddCommands(client);         // 🔹 placeholder
-  registerQuickAddListener(client);         // 🔹 listener dla komend startowych (!rradd, !dpadd, !dnadd)
-  registerQuickAddSessionListener(client);  // 🔹 listener dla komend sesyjnych (!preview, !adjust, !repair, !redo, !confirm, !cancel)
+  registerQuickAddListener(client);
 
   // -----------------------------
   // Global interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
-      // Obsługa eventów
       await handleEventInteraction(interaction);
-
-      // Obsługa absence panel
       await handleAbsenceInteraction(interaction);
-
-      // Obsługa points panel
       await handlePointsInteraction(interaction);
-
-      // QuickAdd sesyjne komendy działają tylko w kanale #quickadd
-      // dzięki QuickAddSessionManager (sprawdzi channel.id)
     } catch (err) {
       console.error("Error in interactionCreate:", err);
 
