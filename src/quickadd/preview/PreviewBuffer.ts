@@ -1,41 +1,119 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 import { normalizeNickname } from "../utils/nicknameNormalizer";
 
+type EntryFlag = "DUPLICATE" | "INVALID";
+
 export class PreviewBuffer {
   private entries: QuickAddEntry[] = [];
   private nextLineId: number = 1;
 
-  addEntry(entry: Omit<QuickAddEntry, "lineId">) {
+  // -----------------------------
+  // ➕ ADD ENTRY
+  // -----------------------------
+  addEntry(entry: Omit<QuickAddEntry, "lineId" | "flags">) {
+    const normalizedNick = normalizeNickname(entry.nickname);
+
     const newEntry: QuickAddEntry = {
       lineId: this.nextLineId++,
-      ...entry
+      nickname: normalizedNick,
+      value: entry.value,
+      flags: []
     };
+
+    // 🔍 WALIDACJA
+    if (!normalizedNick || normalizedNick.length < 2) {
+      newEntry.flags.push("INVALID");
+    }
+
+    if (!entry.value || entry.value <= 0) {
+      newEntry.flags.push("INVALID");
+    }
+
     this.entries.push(newEntry);
+
+    // 🔁 AUTO DUPLICATE CHECK
+    this.recalculateDuplicates();
+
     return newEntry;
   }
 
+  // -----------------------------
+  // 📥 GET
+  // -----------------------------
   getAllEntries(): QuickAddEntry[] {
     return [...this.entries];
   }
 
-  adjustEntry(lineId: number, data: Partial<Pick<QuickAddEntry, "nickname" | "value">>) {
+  // -----------------------------
+  // ✏️ ADJUST
+  // -----------------------------
+  adjustEntry(
+    lineId: number,
+    data: Partial<Pick<QuickAddEntry, "nickname" | "value">>
+  ) {
     const entry = this.entries.find(e => e.lineId === lineId);
     if (!entry) return null;
-    if (data.nickname !== undefined) entry.nickname = data.nickname;
-    if (data.value !== undefined) entry.value = data.value;
+
+    if (data.nickname !== undefined) {
+      entry.nickname = normalizeNickname(data.nickname);
+    }
+
+    if (data.value !== undefined) {
+      entry.value = data.value;
+    }
+
+    // 🔄 reset flag
+    entry.flags = [];
+
+    // 🔍 rewalidacja
+    if (!entry.nickname || entry.nickname.length < 2) {
+      entry.flags.push("INVALID");
+    }
+
+    if (!entry.value || entry.value <= 0) {
+      entry.flags.push("INVALID");
+    }
+
+    // 🔁 ponowne sprawdzenie duplikatów
+    this.recalculateDuplicates();
+
     return entry;
   }
 
-  markDuplicate(lineId: number) {
-    const entry = this.entries.find(e => e.lineId === lineId);
-    if (entry) entry.status = "DUPLICATE";
+  // -----------------------------
+  // 🔁 DUPLICATES
+  // -----------------------------
+  private recalculateDuplicates() {
+    const map = new Map<string, QuickAddEntry[]>();
+
+    for (const entry of this.entries) {
+      const key = entry.nickname;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(entry);
+    }
+
+    for (const group of map.values()) {
+      if (group.length > 1) {
+        for (const entry of group) {
+          if (!entry.flags.includes("DUPLICATE")) {
+            entry.flags.push("DUPLICATE");
+          }
+        }
+      }
+    }
   }
 
+  // -----------------------------
+  // 🧹 RESET
+  // -----------------------------
   reset() {
     this.entries = [];
     this.nextLineId = 1;
   }
 
+  // -----------------------------
+  // ✅ CONFIRM
+  // -----------------------------
   confirm(): QuickAddEntry[] {
     const confirmed = [...this.entries];
     this.reset();
