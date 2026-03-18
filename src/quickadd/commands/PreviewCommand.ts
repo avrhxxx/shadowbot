@@ -18,53 +18,32 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔢 budowanie listy wpisów
+  // 🔢 lista wpisów
   const lines = entries.map((entry, index) => {
     const valueFormatted =
       entry.value >= 1_000_000
         ? `${(entry.value / 1_000_000).toFixed(2)}M`
         : `${(entry.value / 1_000).toFixed(0)}K`;
 
-    return `**[${index + 1}] ${entry.nickname}** – ${valueFormatted}`;
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${valueFormatted}`;
   });
 
-  // 📊 suma
-  const total = entries.reduce((sum, e) => sum + e.value, 0);
-
-  const totalFormatted =
-    total >= 1_000_000
-      ? `${(total / 1_000_000).toFixed(2)}M`
-      : `${(total / 1_000).toFixed(0)}K`;
-
-  // 🎨 embed
   const embed = new EmbedBuilder()
     .setTitle("📊 QuickAdd Preview – Reservoir Raid")
-    .setDescription(lines.join("\n"))
-    .addFields(
-      {
-        name: "👤 Moderator",
-        value: `<@${session.moderatorId}>`,
-        inline: true,
-      },
-      {
-        name: "📦 Entries",
-        value: `${entries.length}`,
-        inline: true,
-      },
-      {
-        name: "💰 Total",
-        value: totalFormatted,
-        inline: true,
-      },
-      {
-        name: "⚙️ Commands",
-        value:
-          "`!preview`\n" +
-          "`!confirm`\n" +
-          "`!cancel`",
-      }
+    .setDescription(
+      `👤 **Session Owner:** <@${session.moderatorId}>\n` +
+      `📦 **Entries:** ${entries.length}\n` +
+      `────────────────\n` +
+      lines.join("\n") +
+      `\n────────────────\n` +
+      `⚙️ **Commands:**\n` +
+      `\`!preview\` – odświeża podgląd\n` +
+      `\`!confirm\` – zapisuje dane i kończy sesję\n` +
+      `\`!cancel\` – usuwa sesję bez zapisu\n` +
+      `\`!adjust [id] [nick] [value]\` – popraw wpis\n` +
+      `\`!repair [id]\` – próbuje naprawić wpis`
     )
-    .setColor(0x00bfff);
+    .setColor(0x5865f2);
 
   await message.reply({ embeds: [embed] });
 }
