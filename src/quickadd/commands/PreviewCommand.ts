@@ -2,6 +2,21 @@ import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
 
+function getTitle(parserType: string) {
+  switch (parserType) {
+    case "RR_RAID":
+      return "Reservoir Raid";
+    case "RR_ATTENDANCE":
+      return "Reservoir Attendance";
+    case "DONATIONS":
+      return "Donations";
+    case "DUEL_POINTS":
+      return "Duel Points";
+    default:
+      return "QuickAdd";
+  }
+}
+
 export async function preview(message: Message) {
   const guildId = message.guildId!;
   const session = SessionManager.getSession(guildId);
@@ -26,19 +41,20 @@ export async function preview(message: Message) {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  // 🔢 lista wpisów (RAW + DUPLICATE DETECTOR)
+  // 🔢 lista wpisów
   const lines = entries.map((entry, index) => {
     const key = entry.nickname.toLowerCase();
     const count = counts.get(key) || 0;
 
-    const duplicateMark =
-      count > 1 ? ` ⚠ x${count}` : "";
+    const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
 
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${entry.raw}${duplicateMark}`;
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${
+      entry.value ?? entry.raw
+    }${duplicateMark}`;
   });
 
   const embed = new EmbedBuilder()
-    .setTitle("📊 QuickAdd Preview – Reservoir Raid")
+    .setTitle(`📊 QuickAdd Preview – ${getTitle(session.parserType)}`)
     .setDescription(
       `👤 **Session Owner:** <@${session.moderatorId}>\n` +
         `📦 **Entries:** ${entries.length}\n` +
