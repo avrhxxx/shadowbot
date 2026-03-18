@@ -22,6 +22,17 @@ import { SessionData } from "./session/SessionData";
 // 🔥 parser (manual input)
 import { parseValue } from "./utils/parseValue";
 
+// 🔥 helper do mapowania OCR → Entry
+function mapEntry(entry: any) {
+  const valueNumber = parseInt(entry.value || "0");
+
+  return {
+    nickname: entry.nickname,
+    value: isNaN(valueNumber) ? 0 : valueNumber,
+    raw: entry.value || entry.rawText || "",
+  };
+}
+
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
     if (message.author.bot) return;
@@ -130,8 +141,12 @@ export function registerQuickAddListener(client: Client) {
         const parser = parserMap[session.parserType];
         if (!parser) return;
 
-        // 🔥 FIX: parser oczekuje string[]
-        const lines = text.split("\n");
+        // 🔥 CLEAN LINES
+        const lines = text
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
+
         const parsed = parser(lines);
 
         // 🔥 DEBUG PARSER
@@ -145,7 +160,7 @@ export function registerQuickAddListener(client: Client) {
         }
 
         for (const entry of parsed) {
-          SessionData.addEntry(message.guildId!, entry);
+          SessionData.addEntry(message.guildId!, mapEntry(entry));
         }
 
         await message.react("✅");
