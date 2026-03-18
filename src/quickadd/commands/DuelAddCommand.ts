@@ -1,5 +1,6 @@
 import { Message } from "discord.js";
+import { startQuickAddSession } from "../utils/startQuickAddSession";
 
 export async function dpadd(message: Message) {
-  await message.reply("⚠️ DP jeszcze nie działa (naprawiamy system)");
+  await startQuickAddSession(message, "dp", "add");
 }
