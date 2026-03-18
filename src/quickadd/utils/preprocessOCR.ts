@@ -1,34 +1,48 @@
+import { ParserType } from "../session/SessionManager";
+
 export function preprocessOCR(
   lines: string[],
-  parserType: string
+  parserType: ParserType
 ): string[] {
-  // 🔥 SPECJALNY FIX tylko dla Duel Points
-  if (parserType === "DUEL_POINTS") {
-    return filterDuelPoints(lines);
-  }
+  switch (parserType) {
+    case "DUEL_POINTS":
+      return preprocessDuelPoints(lines);
 
-  return lines;
+    default:
+      return lines;
+  }
 }
 
-// 🔥 usuwa "zielonego usera"
-function filterDuelPoints(lines: string[]): string[] {
+// 🔥 KLUCZOWA FUNKCJA
+function preprocessDuelPoints(lines: string[]): string[] {
+  // ❗ usuwamy dolny "highlight user"
+  // zakładamy że jest zawsze w dolnej części
+
   const result: string[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
+    const lower = line.toLowerCase();
 
-    // 🔹 wykrycie "Player" sekcji (to jest TEN DÓŁ)
-    if (/player/i.test(line)) {
-      // 🔥 skipujemy kilka linijek po tym
-      i += 5;
+    // 🔥 filtr śmieci OCR
+    if (
+      lower.includes("show my alliance") ||
+      lower.includes("ranking") ||
+      lower.includes("league") ||
+      lower.includes("weekly") ||
+      lower.includes("player")
+    ) {
       continue;
     }
 
-    // 🔹 pomijamy śmieci typu pojedyncze liczby
-    if (/^\d+$/.test(line.trim())) continue;
+    // 🔥 usuń dziwne krótkie linie
+    if (line.length < 5) continue;
 
     result.push(line);
   }
 
-  return result;
+  // 🔥 NAJWAŻNIEJSZE:
+  // obcinamy dolne X linii (tam jest user highlight)
+  const MAX_LINES = 15;
+
+  return result.slice(0, MAX_LINES);
 }
