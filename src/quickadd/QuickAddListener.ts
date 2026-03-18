@@ -1,13 +1,13 @@
 import { Client, Message } from "discord.js";
 import { SessionManager } from "./session/SessionManager";
 
-// komendy startowe
+// 🔹 komendy startowe
 import { rradd } from "./commands/ReservoirAddCommand";
 import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
-// komendy sesyjne (na później — możesz jeszcze nie mieć wszystkich)
+// 🔹 komendy sesyjne
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
 import { preview } from "./commands/PreviewCommand";
@@ -20,12 +20,15 @@ export function registerQuickAddListener(client: Client) {
     if (!message.guildId) return;
 
     const content = message.content.trim();
+    const sessionManager = SessionManager.getInstance();
+    const session = sessionManager.getSession(message.guildId);
+    const isOwner = session && message.author.id === session.moderatorId;
 
     // -----------------------------
     // 🔹 KOMENDY PREFIX (!)
     // -----------------------------
     if (content.startsWith("!")) {
-      const [command, ...args] = content.slice(1).split(" ");
+      const [command, ...args] = content.slice(1).trim().split(/\s+/);
 
       try {
         switch (command.toLowerCase()) {
@@ -47,25 +50,30 @@ export function registerQuickAddListener(client: Client) {
             await rrattend(message, args);
             break;
 
-          // 🔥 KOMENDY SESYJNE
+          // 🔥 KOMENDY SESYJNE (tylko owner)
           case "confirm":
-            await confirm(message);
-            break;
-
           case "cancel":
-            await cancel(message);
+          case "adjust":
+          case "redo":
+            if (!session) {
+              await message.reply("❌ Brak aktywnej sesji.");
+              return;
+            }
+
+            if (!isOwner) {
+              await message.reply("❌ Tylko twórca sesji może używać tej komendy.");
+              return;
+            }
+
+            if (command === "confirm") await confirm(message);
+            if (command === "cancel") await cancel(message);
+            if (command === "adjust") await adjust(message, args);
+            if (command === "redo") await redo(message, args);
             break;
 
+          // 🔥 PREVIEW (może każdy w kanale sesji)
           case "preview":
             await preview(message);
-            break;
-
-          case "adjust":
-            await adjust(message, args);
-            break;
-
-          case "redo":
-            await redo(message);
             break;
 
           default:
@@ -82,22 +90,42 @@ export function registerQuickAddListener(client: Client) {
     // -----------------------------
     // 🔹 OBSŁUGA WIADOMOŚCI W SESJI
     // -----------------------------
-    const sessionManager = SessionManager.getInstance();
-    const session = sessionManager.getSession(message.guildId);
-
     if (!session) return;
 
-    // ❗ ważne: tylko w kanale sesji
+    // ❗ tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
 
-    // 🔥 LOG (na start — później tu parser)
-    console.log("📥 QuickAdd session message:", message.content);
+    // 🔥 odświeżenie aktywności (ważne pod timeouty)
+    sessionManager.touchSession(message.guildId);
 
-    // TODO (następny krok):
-    // if (message.attachments.size > 0) {
-    //   // OCR
-    // } else {
-    //   // parser tekstu
-    // }
+    // -----------------------------
+    // 📸 ZAŁĄCZNIKI (OCR - przyszłość)
+    // -----------------------------
+    if (message.attachments.size > 0) {
+      const attachment = message.attachments.first();
+
+      console.log("📸 Attachment received:", attachment?.url);
+
+      // TODO:
+      // const parsedEntries = await ocrService.process(attachment);
+      // parsedEntries.forEach(e => session.previewBuffer.addEntry(e));
+
+      await message.react("📥");
+      return;
+    }
+
+    // -----------------------------
+    // 📝 TEKST (parser - następny krok)
+    // -----------------------------
+    if (message.content.trim().length > 0) {
+      console.log("📥 QuickAdd text:", message.content);
+
+      // TODO:
+      // const parsed = parser.parse(message.content);
+      // session.previewBuffer.addEntry(parsed);
+
+      await message.react("✅");
+      return;
+    }
   });
 }
