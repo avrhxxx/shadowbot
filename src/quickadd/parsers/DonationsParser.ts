@@ -1,7 +1,5 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-let lineCounter = 1;
-
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -12,13 +10,15 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 CASE 1: standard (linia z rankiem)
+    // 🔹 CASE 1: "1 Nickname"
     const rankMatch = line.match(/^\d+\s*(.+)/);
 
     if (rankMatch) {
-      let nickname = rankMatch[1].trim();
+      const nickname = cleanNickname(rankMatch[1]);
 
-      let value = "";
+      let value = 0;
+      let raw = "";
+
       const nextLine = lines[i + 1]?.trim();
 
       if (nextLine) {
@@ -28,45 +28,49 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
         if (valueMatch) {
           value = normalizeNumber(valueMatch[1]);
+          raw = valueMatch[1];
           i++; // skip next line
         }
       }
 
-      entries.push({
-        lineId: lineCounter++,
-        rawText: rawLine,
-        nickname,
-        value,
-        status: value ? "OK" : "INVALID",
-        confidence: value ? 1 : 0.5,
-        sourceType: "OCR",
-      });
+      if (nickname && value > 0) {
+        entries.push({
+          nickname,
+          value,
+          raw,
+        });
+      }
 
       continue;
     }
 
-    // 🔥 CASE 2: merged line
+    // 🔥 CASE 2: "1 Nickname 123,456"
     const mergedMatch = line.match(/^\d+\s*([^\d]+?)\s+.*?([\d,]{3,})/);
 
     if (mergedMatch) {
-      const nickname = mergedMatch[1].trim();
+      const nickname = cleanNickname(mergedMatch[1]);
       const value = normalizeNumber(mergedMatch[2]);
 
-      entries.push({
-        lineId: lineCounter++,
-        rawText: rawLine,
-        nickname,
-        value,
-        status: "OK",
-        confidence: 0.8,
-        sourceType: "OCR",
-      });
+      if (nickname && value > 0) {
+        entries.push({
+          nickname,
+          value,
+          raw: mergedMatch[2],
+        });
+      }
     }
   }
 
   return entries;
 }
 
-function normalizeNumber(value: string): string {
-  return value.replace(/[^\d]/g, "");
+// 🔹 usuwa śmieci z OCR
+function cleanNickname(name: string): string {
+  return name.replace(/[^\w\d_]/g, "").trim();
+}
+
+// 🔹 zamienia "123,456" → 123456
+function normalizeNumber(value: string): number {
+  const clean = value.replace(/[^\d]/g, "");
+  return parseInt(clean, 10) || 0;
 }
