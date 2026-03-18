@@ -6,7 +6,6 @@ import {
   GatewayIntentBits,
   Partials,
   Interaction,
-  ChannelType,
 } from "discord.js";
 
 import { initTranslationModule } from "./modules/TranslationModule";
@@ -21,6 +20,7 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // ✅ QuickAdd (NOWY SYSTEM)
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
+import { createQuickAddChannel } from "./services/QuickAddChannelService";
 
 const client = new Client({
   intents: [
@@ -39,26 +39,14 @@ client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
   // -----------------------------
-  // 🔥 TWORZENIE #quick-add
+  // 🔥 TWORZENIE #quick-add + embed
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     try {
-      const existing = guild.channels.cache.find(
-        (c) =>
-          c.name === "quick-add" &&
-          c.type === ChannelType.GuildText
-      );
-
-      if (!existing) {
-        await guild.channels.create({
-          name: "quick-add",
-          type: ChannelType.GuildText,
-        });
-
-        console.log(`✅ Created #quick-add in ${guild.name}`);
-      }
+      await createQuickAddChannel(guild);
+      console.log(`✅ QuickAdd ready in ${guild.name}`);
     } catch (err) {
-      console.error(`❌ Error creating quick-add in ${guild.name}:`, err);
+      console.error(`❌ QuickAdd error in ${guild.name}:`, err);
     }
   }
 
@@ -73,13 +61,17 @@ client.once("ready", async () => {
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
-    initAbsenceNotifications(guild).catch(err => {
-      console.error(`Error initializing absence notifications for guild ${guild.id}:`, err);
+
+    initAbsenceNotifications(guild).catch((err) => {
+      console.error(
+        `Error initializing absence notifications for guild ${guild.id}:`,
+        err
+      );
     });
   }
 
   // -----------------------------
-  // ✅ QuickAdd
+  // ✅ QuickAdd listener
   // -----------------------------
   registerQuickAddListener(client);
 
@@ -95,10 +87,12 @@ client.once("ready", async () => {
       console.error("Error in interactionCreate:", err);
 
       if (interaction.isRepliable()) {
-        await interaction.reply({
-          content: "❌ An unexpected error occurred.",
-          ephemeral: true,
-        }).catch(() => null);
+        await interaction
+          .reply({
+            content: "❌ An unexpected error occurred.",
+            ephemeral: true,
+          })
+          .catch(() => null);
       }
     }
   });
