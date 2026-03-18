@@ -2,6 +2,7 @@ import { parseReservoirRaid } from "./ReservoirRaidParser";
 import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
 import { parseDonations } from "./DonationsParser";
 import { parseDuelPoints } from "./DuelPointsParser";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export type QuickAddParserType =
   | "RR_RAID"
@@ -9,7 +10,10 @@ export type QuickAddParserType =
   | "DONATIONS"
   | "DUEL_POINTS";
 
-export const parserMap = {
+// 🔥 KLUCZOWE — typ parsera
+type Parser = (lines: string[]) => QuickAddEntry[];
+
+export const parserMap: Record<QuickAddParserType, Parser> = {
   RR_RAID: parseReservoirRaid,
   RR_ATTENDANCE: parseReservoirAttendance,
   DONATIONS: parseDonations,
