@@ -1,23 +1,32 @@
-// PreviewCommand.ts
-// Komenda do wyświetlenia aktualnego stanu PreviewBuffer
-
-import { PreviewBuffer } from "../services/PreviewBuffer";
+import { Message } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
 import { PreviewFormatter } from "../services/PreviewFormatter";
-import { SessionManager } from "../services/SessionManager";
 
-export class PreviewCommand {
-  static name = "preview";
+export async function preview(message: Message) {
+  const guildId = message.guildId!;
+  const sessionManager = SessionManager.getInstance();
+  const session = sessionManager.getSession(guildId);
 
-  async execute() {
-    if (!SessionManager.hasActiveSession()) {
-      throw new Error("Brak aktywnej sesji QuickAdd.");
-    }
-
-    const entries = PreviewBuffer.getAll();
-    if (entries.length === 0) {
-      throw new Error("PreviewBuffer jest pusty.");
-    }
-
-    return PreviewFormatter.format(entries);
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji QuickAdd.");
+    return;
   }
+
+  // 🔒 tylko kanał sesji
+  if (message.channel.id !== session.channelId) {
+    return;
+  }
+
+  const entries = session.previewBuffer.getAllEntries();
+
+  if (entries.length === 0) {
+    await message.reply("❌ Brak danych w podglądzie.");
+    return;
+  }
+
+  const formatted = PreviewFormatter.format(entries);
+
+  await message.reply({
+    content: formatted,
+  });
 }
