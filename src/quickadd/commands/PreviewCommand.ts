@@ -33,7 +33,7 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔥 COUNT DUPLICATES
+  // 🔥 duplicates
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -41,16 +41,16 @@ export async function preview(message: Message) {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  // 🔢 entries list
   const lines = entries.map((entry, index) => {
     const key = entry.nickname.toLowerCase();
     const count = counts.get(key) || 0;
 
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
+    const warningMark = entry.status === "SUS" ? " ⚠️" : "";
 
     return `\`[${index + 1}]\` **${entry.nickname}** — ${
       entry.value ?? entry.raw
-    }${duplicateMark}`;
+    }${duplicateMark}${warningMark}`;
   });
 
   const embed = new EmbedBuilder()
@@ -61,7 +61,8 @@ export async function preview(message: Message) {
         `━━━━━━━━━━━━━━━━━━\n` +
         lines.join("\n") +
         `\n━━━━━━━━━━━━━━━━━━\n` +
-        `📌 Use \`!help\` to see available commands`
+        `⚠️ Entries marked may contain OCR errors\n` +
+        `📌 Use \`!adjust\` to fix them`
     )
     .setColor(0x5865f2);
 
