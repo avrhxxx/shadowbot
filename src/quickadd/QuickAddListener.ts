@@ -6,10 +6,11 @@ import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
-// 🔹 preview + confirm + cancel
+// 🔹 preview + confirm + cancel + adjust
 import { preview } from "./commands/PreviewCommand";
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
+import { adjust } from "./commands/AdjustCommand";
 
 // 🔹 sesja + dane
 import { SessionManager } from "./session/SessionManager";
@@ -33,7 +34,6 @@ export function registerQuickAddListener(client: Client) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
-      // ✅ FIX: bezpieczne sprawdzenie kanału
       const isQuickAddChannel =
         message.channel.isTextBased() &&
         "name" in message.channel &&
@@ -41,7 +41,7 @@ export function registerQuickAddListener(client: Client) {
 
       try {
         switch (command) {
-          // 🔥 START (tylko #quick-add)
+          // 🔥 START
           case "rradd":
             if (!isQuickAddChannel)
               return message.reply("❌ Tylko w #quick-add.");
@@ -70,11 +70,11 @@ export function registerQuickAddListener(client: Client) {
           case "preview":
           case "confirm":
           case "cancel":
+          case "adjust":
             if (!session || message.channel.id !== session.channelId) {
               return message.reply("❌ Tylko w kanale sesji.");
             }
 
-            // 🔒 OWNER CHECK
             if (session.moderatorId !== message.author.id) {
               return message.reply("❌ To nie Twoja sesja.");
             }
@@ -82,6 +82,7 @@ export function registerQuickAddListener(client: Client) {
             if (command === "preview") await preview(message);
             if (command === "confirm") await confirm(message);
             if (command === "cancel") await cancel(message);
+            if (command === "adjust") await adjust(message);
             break;
 
           default:
@@ -96,14 +97,14 @@ export function registerQuickAddListener(client: Client) {
     }
 
     // -----------------------------
-    // 🔹 BRAK SESJI → ignoruj
+    // 🔹 BRAK SESJI
     // -----------------------------
     if (!session) return;
 
     // 🔹 tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
 
-    // 🔒 OWNER CHECK (TEŻ DLA PARSERA!)
+    // 🔒 OWNER CHECK
     if (session.moderatorId !== message.author.id) return;
 
     // -----------------------------
@@ -113,7 +114,7 @@ export function registerQuickAddListener(client: Client) {
       try {
         const parts = content.split(/\s+/);
 
-        // 🔥 ignorujemy wszystko co nie jest "nick value"
+        // tylko "nick value"
         if (parts.length !== 2) return;
 
         const nickname = parts[0];
@@ -129,7 +130,7 @@ export function registerQuickAddListener(client: Client) {
         SessionData.addEntry(message.guildId, {
           nickname,
           value,
-          raw: rawValue, // 🔥 KLUCZOWE
+          raw: rawValue,
         });
 
         await message.react("✅");
