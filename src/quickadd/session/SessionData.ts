@@ -1,22 +1,31 @@
-interface Entry {
-  nickname: string;
-  value: number;
-}
+import { Message } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
+import { SessionData } from "../session/SessionData";
 
-export class SessionData {
-  private static data = new Map<string, Entry[]>();
+export async function cancel(message: Message) {
+  const guildId = message.guildId!;
+  const session = SessionManager.getSession(guildId);
 
-  static addEntry(guildId: string, entry: Entry) {
-    const current = this.data.get(guildId) || [];
-    current.push(entry);
-    this.data.set(guildId, current);
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji.");
+    return;
   }
 
-  static getEntries(guildId: string): Entry[] {
-    return this.data.get(guildId) || [];
-  }
+  // 🧹 usuń dane
+  SessionData.clear(guildId);
 
-  static clear(guildId: string) {
-    this.data.delete(guildId);
+  // 🧠 usuń sesję
+  SessionManager.endSession(guildId);
+
+  await message.reply("❌ Sesja została anulowana.");
+
+  // 🗑️ usuń kanał sesji
+  try {
+    const channel = message.guild?.channels.cache.get(session.channelId);
+    if (channel && channel.isTextBased()) {
+      await channel.delete();
+    }
+  } catch (err) {
+    console.error("Error deleting session channel:", err);
   }
 }
