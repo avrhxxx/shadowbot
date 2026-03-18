@@ -1,32 +1,20 @@
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
+import { SessionData } from "../session/SessionData";
 
 export async function cancel(message: Message) {
-  const guildId = message.guildId!;
-  const sessionManager = SessionManager.getInstance();
-  const session = sessionManager.getSession(guildId);
+  if (!message.guildId) return;
+
+  const session = SessionManager.getSession(message.guildId);
 
   if (!session) {
-    await message.reply("❌ Brak aktywnej sesji QuickAdd.");
+    await message.reply("❌ Brak aktywnej sesji.");
     return;
   }
 
-  // 🔒 tylko kanał sesji
-  if (message.channel.id !== session.channelId) {
-    return;
-  }
+  // 🔥 czyścimy wszystko
+  SessionData.clear(message.guildId);
+  SessionManager.endSession(message.guildId);
 
-  // 🧹 czyszczenie danych
-  session.previewBuffer.clear();
-
-  // 🗑 usunięcie kanału
-  const channel = message.guild!.channels.cache.get(session.channelId);
-  if (channel && channel.isTextBased()) {
-    await channel.delete().catch(() => null);
-  }
-
-  // ❌ zamknięcie sesji
-  sessionManager.endSession(guildId);
-
-  await message.reply("🛑 Sesja QuickAdd została anulowana.");
+  await message.reply("🛑 Sesja została anulowana.");
 }
