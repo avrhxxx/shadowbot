@@ -6,11 +6,12 @@ import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
-// 🔹 preview + confirm + cancel + adjust
+// 🔹 preview + confirm + cancel + adjust + delete
 import { preview } from "./commands/PreviewCommand";
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
 import { adjust } from "./commands/AdjustCommand";
+import { deleteEntry } from "./commands/DeleteCommand";
 
 // 🔹 sesja + dane
 import { SessionManager } from "./session/SessionManager";
@@ -71,6 +72,7 @@ export function registerQuickAddListener(client: Client) {
           case "confirm":
           case "cancel":
           case "adjust":
+          case "delete":
             if (!session || message.channel.id !== session.channelId) {
               return message.reply("❌ Tylko w kanale sesji.");
             }
@@ -83,6 +85,7 @@ export function registerQuickAddListener(client: Client) {
             if (command === "confirm") await confirm(message);
             if (command === "cancel") await cancel(message);
             if (command === "adjust") await adjust(message);
+            if (command === "delete") await deleteEntry(message);
             break;
 
           default:
@@ -130,7 +133,7 @@ export function registerQuickAddListener(client: Client) {
         SessionData.addEntry(message.guildId, {
           nickname,
           value,
-          raw: rawValue,
+          raw: rawValue, // 🔥 klucz do poprawnego preview
         });
 
         await message.react("✅");
