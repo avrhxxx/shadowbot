@@ -1,11 +1,19 @@
-export type QuickAddEntryStatus = "OK" | "DUPLICATE" | "INVALID" | "UNREADABLE";
+export type QuickAddEntryStatus =
+  | "OK"
+  | "DUPLICATE"
+  | "INVALID"
+  | "UNREADABLE";
 
 export interface QuickAddEntry {
-  lineId: number;
-  rawText: string;
+  lineId?: number; // 🔥 opcjonalne (parsery nie muszą tego dawać)
+
   nickname: string;
-  value: string;
-  status: QuickAddEntryStatus;
-  confidence: number;
+
+  value: number; // 🔥 ZAMIANA string → number
+
+  raw: string; // 🔥 ZAMIANA rawText → raw
+
+  status?: QuickAddEntryStatus; // 🔥 opcjonalne (na przyszłość)
+  confidence?: number;          // 🔥 opcjonalne
   sourceType?: "OCR" | "MANUAL";
 }
