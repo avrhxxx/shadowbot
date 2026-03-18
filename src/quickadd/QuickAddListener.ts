@@ -33,28 +33,36 @@ export function registerQuickAddListener(client: Client) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
-      const isQuickAddChannel = message.channel.name === "quick-add";
+      // ✅ FIX: bezpieczne sprawdzenie nazwy kanału
+      const isQuickAddChannel =
+        message.channel.isTextBased() &&
+        "name" in message.channel &&
+        message.channel.name === "quick-add";
 
       try {
         switch (command) {
           // 🔥 START (tylko #quick-add)
           case "rradd":
-            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            if (!isQuickAddChannel)
+              return message.reply("❌ Tylko w #quick-add.");
             await rradd(message);
             break;
 
           case "dnadd":
-            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            if (!isQuickAddChannel)
+              return message.reply("❌ Tylko w #quick-add.");
             await dnadd(message);
             break;
 
           case "dpadd":
-            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            if (!isQuickAddChannel)
+              return message.reply("❌ Tylko w #quick-add.");
             await dpadd(message);
             break;
 
           case "rrattend":
-            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            if (!isQuickAddChannel)
+              return message.reply("❌ Tylko w #quick-add.");
             await rrattend(message);
             break;
 
