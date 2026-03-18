@@ -1,49 +1,34 @@
 import { parseValue } from "../utils/parseValue";
 
-interface Entry {
+export interface Entry {
   nickname: string;
   value: number;
   raw: string;
 }
 
-function formatValue(value: number): string {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(2)}M`;
-  }
-
-  return `${value}`;
-}
-
 export class SessionData {
   private static data = new Map<string, Entry[]>();
 
+  // ➕ dodawanie wpisu (BEZ MERGE!)
   static addEntry(guildId: string, entry: Entry) {
     const current = this.data.get(guildId) || [];
 
-    const existing = current.find(
-      (e) => e.nickname.toLowerCase() === entry.nickname.toLowerCase()
-    );
-
-    if (existing) {
-      existing.value += entry.value;
-
-      // 🔥 aktualizujemy RAW po merge
-      existing.raw = formatValue(existing.value);
-    } else {
-      current.push(entry);
-    }
+    current.push(entry);
 
     this.data.set(guildId, current);
   }
 
+  // 📥 pobieranie
   static getEntries(guildId: string): Entry[] {
     return this.data.get(guildId) || [];
   }
 
+  // 🧹 czyszczenie
   static clear(guildId: string) {
     this.data.delete(guildId);
   }
 
+  // ✏️ update (adjust)
   static updateEntry(
     guildId: string,
     index: number,
@@ -65,10 +50,19 @@ export class SessionData {
       if (parsed === null) return false;
 
       entry.value = parsed;
-      entry.raw = newValue;
+      entry.raw = newValue; // 🔥 zachowujemy dokładnie to co user wpisał
       return true;
     }
 
     return false;
+  }
+
+  // 🗑️ delete
+  static removeEntry(guildId: string, index: number): boolean {
+    const entries = this.data.get(guildId);
+    if (!entries || !entries[index]) return false;
+
+    entries.splice(index, 1);
+    return true;
   }
 }
