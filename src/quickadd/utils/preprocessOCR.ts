@@ -13,14 +13,14 @@ export function preprocessOCR(
   }
 }
 
-// 🔥 DUEL POINTS FIX (usuniecie zielonego usera + śmieci)
+// 🔥 DUEL POINTS FIX (czyści + usuwa dolny highlight)
 function preprocessDuelPoints(lines: string[]): string[] {
   const result: string[] = [];
 
-  for (const line of lines) {
+  for (let line of lines) {
     const lower = line.toLowerCase();
 
-    // 🔥 filtr UI / śmieci OCR
+    // 🔥 wywal UI śmieci
     if (
       lower.includes("show my alliance") ||
       lower.includes("ranking") ||
@@ -32,16 +32,23 @@ function preprocessDuelPoints(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 wywal totalne śmieci
+    // 🔥 usuń dziwne znaki OCR z początku
+    line = line.replace(/^[^\w\d]+/, "");
+
+    // 🔥 usuń śmieci z końca (np. "I", "|", itd.)
+    line = line.replace(/[^\dMK]+$/i, "");
+
+    // 🔥 linia musi zawierać liczbę
+    if (!/[\d]+/.test(line)) continue;
+
+    // 🔥 minimalna długość
     if (line.length < 6) continue;
 
-    result.push(line);
+    result.push(line.trim());
   }
 
-  // 🔥 NAJWAŻNIEJSZE:
-  // usuwamy dół gdzie jest highlight user (zielony)
-  // sprawdzone — to zawsze dół
+  // 🔥 usuwamy dolne linie (highlight user)
   const CUT_FROM_BOTTOM = 4;
 
-  return result.slice(0, result.length - CUT_FROM_BOTTOM);
+  return result.slice(0, Math.max(0, result.length - CUT_FROM_BOTTOM));
 }
