@@ -1,7 +1,5 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-let lineCounter = 1;
-
 export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -11,11 +9,13 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     const line = rawLine.trim();
     if (!line) continue;
 
+    // 🔹 znajdź liczbę + suffix (np. 1.2M / 500K / 123456)
     const valueMatch = line.match(/([\d.,]+)\s*([MK]?)/i);
     if (!valueMatch) continue;
 
     const fullMatch = valueMatch[0];
 
+    // 🔥 upewniamy się że liczba jest na końcu
     if (!line.endsWith(fullMatch)) continue;
 
     const rawNumber = valueMatch[1];
@@ -23,31 +23,35 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
 
     const value = normalizeValue(rawNumber, suffix);
 
-    const nickname = line.replace(fullMatch, "").trim();
-    if (!nickname) continue;
+    const nicknameRaw = line.replace(fullMatch, "").trim();
+    const nickname = cleanNickname(nicknameRaw);
+
+    if (!nickname || value <= 0) continue;
 
     entries.push({
-      lineId: lineCounter++,
-      rawText: rawLine,
       nickname,
       value,
-      status: "OK",
-      confidence: 1,
-      sourceType: "OCR",
+      raw: fullMatch,
     });
   }
 
   return entries;
 }
 
-function normalizeValue(num: string, suffix: string): string {
-  let clean = num.replace(",", ".");
-
+// 🔹 "1.2M" → 1200000
+function normalizeValue(num: string, suffix: string): number {
+  const clean = num.replace(",", ".");
   const number = parseFloat(clean);
-  if (isNaN(number)) return "";
 
-  if (suffix === "M") return Math.round(number * 1_000_000).toString();
-  if (suffix === "K") return Math.round(number * 1_000).toString();
+  if (isNaN(number)) return 0;
 
-  return num.replace(/[^\d]/g, "");
+  if (suffix === "M") return Math.round(number * 1_000_000);
+  if (suffix === "K") return Math.round(number * 1_000);
+
+  return parseInt(num.replace(/[^\d]/g, ""), 10) || 0;
+}
+
+// 🔹 czyści nickname z OCR śmieci
+function cleanNickname(name: string): string {
+  return name.replace(/[^\w\d_]/g, "").trim();
 }
