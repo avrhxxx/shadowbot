@@ -1,5 +1,7 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
+let lineCounter = 1;
+
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -10,10 +12,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
+    // 🔹 CASE 1: "1 Nickname"
     const rankMatch = line.match(/^\d+\s*(.+)/);
 
     if (rankMatch) {
-      const nickname = cleanNickname(rankMatch[1]);
+      const nickname = rankMatch[1].trim();
 
       let value = 0;
       let raw = "";
@@ -26,35 +29,29 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
           nextLine.match(/([\d,]{3,})/);
 
         if (valueMatch) {
-          value = normalizeNumber(valueMatch[1]);
           raw = valueMatch[1];
-          i++;
+          value = normalizeNumber(raw);
+          i++; // skip next line
         }
       }
 
       if (nickname && value > 0) {
-        entries.push({
-          nickname,
-          value: String(value), // 🔥 FIX
-          raw,
-        });
+        entries.push(createEntry(rawLine, nickname, value, raw));
       }
 
       continue;
     }
 
+    // 🔥 CASE 2: merged line
     const mergedMatch = line.match(/^\d+\s*([^\d]+?)\s+.*?([\d,]{3,})/);
 
     if (mergedMatch) {
-      const nickname = cleanNickname(mergedMatch[1]);
-      const value = normalizeNumber(mergedMatch[2]);
+      const nickname = mergedMatch[1].trim();
+      const raw = mergedMatch[2];
+      const value = normalizeNumber(raw);
 
       if (nickname && value > 0) {
-        entries.push({
-          nickname,
-          value: String(value), // 🔥 FIX
-          raw: mergedMatch[2],
-        });
+        entries.push(createEntry(rawLine, nickname, value, raw));
       }
     }
   }
@@ -62,11 +59,24 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-function cleanNickname(name: string): string {
-  return name.replace(/[^\w\d_]/g, "").trim();
+function normalizeNumber(value: string): number {
+  return parseInt(value.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-function normalizeNumber(value: string): number {
-  const clean = value.replace(/[^\d]/g, "");
-  return parseInt(clean, 10) || 0;
+function createEntry(
+  rawText: string,
+  nickname: string,
+  value: number,
+  raw: string
+): QuickAddEntry {
+  return {
+    lineId: lineCounter++,
+    rawText,
+    nickname,
+    value,
+    raw,
+    status: "OK",
+    confidence: 1,
+    sourceType: "OCR",
+  };
 }
