@@ -1,59 +1,28 @@
-import { QuickAddSession } from "./QuickAddSession";
+type EventType = "rr" | "dn" | "dp";
 
-export type CreateSessionOptions = {
-  eventType: "RR" | "DP" | "DN" | "RR_ATTEND";
-  date?: string;
-  week?: string;
-};
+interface QuickAddSession {
+  guildId: string;
+  channelId: string;
+  moderatorId: string;
+  eventType: EventType;
+}
 
 export class SessionManager {
-  private static instance: SessionManager;
-  private sessions: Map<string, QuickAddSession> = new Map();
+  private static sessions = new Map<string, QuickAddSession>();
 
-  private constructor() {}
-
-  static getInstance(): SessionManager {
-    if (!this.instance) this.instance = new SessionManager();
-    return this.instance;
+  static createSession(session: QuickAddSession) {
+    this.sessions.set(session.guildId, session);
   }
 
-  createSession(
-    guildId: string,
-    moderatorId: string,
-    options: CreateSessionOptions,
-    channelId: string
-  ): QuickAddSession | null {
-    if (this.sessions.has(guildId)) return null; // global lock
-
-    const session = new QuickAddSession(
-      guildId,
-      moderatorId,
-      options,
-      channelId
-    );
-
-    this.sessions.set(guildId, session);
-    return session;
-  }
-
-  getSession(guildId: string): QuickAddSession | undefined {
+  static getSession(guildId: string) {
     return this.sessions.get(guildId);
   }
 
-  hasActiveSession(guildId: string): boolean {
+  static hasSession(guildId: string) {
     return this.sessions.has(guildId);
   }
 
-  endSession(guildId: string) {
+  static endSession(guildId: string) {
     this.sessions.delete(guildId);
-  }
-
-  touchSession(guildId: string) {
-    const session = this.sessions.get(guildId);
-    if (session) session.touch();
-  }
-
-  getAllSessions(): QuickAddSession[] {
-    return Array.from(this.sessions.values());
   }
 }
