@@ -1,0 +1,26 @@
+import { ImagePreprocessor } from "./ImagePreprocessor";
+import { RowDetector, RowBoundingBox } from "./RowDetector";
+import { RowCropper } from "./RowCropper";
+import { OCRRunner, OCRResult } from "./OCRRunner";
+
+export type OCRSegment = string[];
+
+export class OCRService {
+  static async processImage(buffer: Buffer, eventType: "RR" | "DP" | "DN"): Promise<OCRResult[] | OCRSegment[]> {
+    const preprocessed = await ImagePreprocessor.preprocess(buffer);
+
+    // prosta detekcja wierszy, przykładowo 10
+    const boxes: RowBoundingBox[] = RowDetector.detectRows(1000, 10); // wysokość 1000 na potrzeby przykładu
+    const crops: Buffer[] = await RowCropper.crop(preprocessed, boxes);
+
+    const ocrResults = await OCRRunner.runBatch(crops);
+
+    if (eventType === "DN") {
+      // DN → segmenty, każdy wiersz osobno w tablicy
+      return ocrResults.map(r => [r.text]);
+    } else {
+      // RR / DP → OCRResult[]
+      return ocrResults;
+    }
+  }
+}
