@@ -19,10 +19,7 @@ import { help } from "./commands/HelpCommand";
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
 
-// 🔥 parsery
-import { parserMap } from "./parsers/parserMap";
-
-// 🔥 utils
+// 🔥 parser (manual input)
 import { parseValue } from "./utils/parseValue";
 
 export function registerQuickAddListener(client: Client) {
@@ -46,11 +43,13 @@ export function registerQuickAddListener(client: Client) {
       const command = rawCommand.toLowerCase();
 
       try {
+        // 🔥 HELP (działa wszędzie)
         if (command === "help") {
           await help(message);
           return;
         }
 
+        // 🔥 START
         if (
           command === "rradd" ||
           command === "dnadd" ||
@@ -69,6 +68,7 @@ export function registerQuickAddListener(client: Client) {
           return;
         }
 
+        // 🔥 SESJA
         if (
           command === "preview" ||
           command === "confirm" ||
@@ -107,60 +107,59 @@ export function registerQuickAddListener(client: Client) {
     // -----------------------------
     if (!session) return;
 
+    // 🔹 tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
+
+    // 🔒 OWNER CHECK
     if (session.moderatorId !== message.author.id) return;
 
-    // =====================================================
-    // 🔥 NOWE: SCREEN → PARSER
-    // =====================================================
+    // -----------------------------
+    // 🖼️ OCR (SCREENY)
+    // -----------------------------
     if (message.attachments.size > 0) {
-      try {
-        const parser = parserMap[session.parserType];
+      const attachment = message.attachments.first();
 
-        if (!parser) {
-          await message.reply("❌ Brak parsera dla tego typu.");
+      if (!attachment || !attachment.contentType?.startsWith("image/")) {
+        return;
+      }
+
+      try {
+        const { extractTextFromImage } = await import("./utils/ocr");
+        const { parserMap } = await import("./parsers/parserMap");
+
+        const text = await extractTextFromImage(attachment.url);
+
+        const parser = parserMap[session.parserType];
+        if (!parser) return;
+
+        const parsed = parser(text);
+
+        if (!parsed || parsed.length === 0) {
+          await message.react("❌");
           return;
         }
 
-        // 🔥 NA RAZIE: pseudo OCR (docelowo podmienimy)
-        const fakeOCR = content.split("\n");
-
-        const entries = parser(fakeOCR);
-
-        for (const entry of entries) {
-          SessionData.addEntry(message.guildId, {
-            nickname: entry.nickname,
-            value: entry.value ?? (session.mode === "attend" ? 1 : 0),
-            raw: "OCR",
-          });
+        for (const entry of parsed) {
+          SessionData.addEntry(message.guildId!, entry);
         }
 
-        await message.reply(
-          "📋 OCR Preview:\n" +
-            entries
-              .map((e) =>
-                e.value !== undefined
-                  ? `${e.nickname} | ${e.value}`
-                  : `${e.nickname}`
-              )
-              .join("\n")
-        );
-
-        return;
+        await message.react("✅");
       } catch (err) {
-        console.error("OCR parse error:", err);
-        await message.reply("❌ OCR error.");
-        return;
+        console.error("OCR error:", err);
+        await message.react("❌");
       }
+
+      return;
     }
 
-    // =====================================================
-    // 📝 STARY SYSTEM (RĘCZNY)
-    // =====================================================
+    // -----------------------------
+    // 📝 MANUAL INPUT
+    // -----------------------------
     if (content.length > 0) {
       try {
         const parts = content.split(/\s+/);
 
+        // 🔥 TRYB ADD
         if (session.mode === "add") {
           if (parts.length !== 2) return;
 
@@ -184,6 +183,7 @@ export function registerQuickAddListener(client: Client) {
           return;
         }
 
+        // 🔥 TRYB ATTEND
         if (session.mode === "attend") {
           if (parts.length !== 1) return;
 
