@@ -10,7 +10,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 CASE 1: "1 Nickname"
     const rankMatch = line.match(/^\d+\s*(.+)/);
 
     if (rankMatch) {
@@ -29,14 +28,14 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         if (valueMatch) {
           value = normalizeNumber(valueMatch[1]);
           raw = valueMatch[1];
-          i++; // skip next line
+          i++;
         }
       }
 
       if (nickname && value > 0) {
         entries.push({
           nickname,
-          value,
+          value: String(value), // 🔥 FIX
           raw,
         });
       }
@@ -44,7 +43,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 CASE 2: "1 Nickname 123,456"
     const mergedMatch = line.match(/^\d+\s*([^\d]+?)\s+.*?([\d,]{3,})/);
 
     if (mergedMatch) {
@@ -54,7 +52,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       if (nickname && value > 0) {
         entries.push({
           nickname,
-          value,
+          value: String(value), // 🔥 FIX
           raw: mergedMatch[2],
         });
       }
@@ -64,12 +62,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔹 usuwa śmieci z OCR
 function cleanNickname(name: string): string {
   return name.replace(/[^\w\d_]/g, "").trim();
 }
 
-// 🔹 zamienia "123,456" → 123456
 function normalizeNumber(value: string): number {
   const clean = value.replace(/[^\d]/g, "");
   return parseInt(clean, 10) || 0;
