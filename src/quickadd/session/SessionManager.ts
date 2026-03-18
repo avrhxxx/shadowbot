@@ -1,0 +1,41 @@
+import { QuickAddSession } from "./QuickAddSession";
+
+export class SessionManager {
+  private static instance: SessionManager;
+  private sessions: Map<string, QuickAddSession> = new Map();
+
+  private constructor() {}
+
+  static getInstance(): SessionManager {
+    if (!this.instance) this.instance = new SessionManager();
+    return this.instance;
+  }
+
+  createSession(guildId: string, moderatorId: string, eventType: "RR" | "DP" | "DN", eventDate: string): QuickAddSession | null {
+    if (this.sessions.has(guildId)) return null; // global lock
+    const session = new QuickAddSession(guildId, moderatorId, eventType, eventDate);
+    this.sessions.set(guildId, session);
+    return session;
+  }
+
+  getSession(guildId: string): QuickAddSession | undefined {
+    return this.sessions.get(guildId);
+  }
+
+  hasActiveSession(guildId: string): boolean {
+    return this.sessions.has(guildId);
+  }
+
+  endSession(guildId: string) {
+    this.sessions.delete(guildId);
+  }
+
+  touchSession(guildId: string) {
+    const session = this.sessions.get(guildId);
+    if (session) session.touch();
+  }
+
+  getAllSessions(): QuickAddSession[] {
+    return Array.from(this.sessions.values());
+  }
+}
