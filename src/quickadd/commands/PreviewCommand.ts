@@ -18,14 +18,9 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔢 lista wpisów
+  // 🔢 lista wpisów (RAW VALUE)
   const lines = entries.map((entry, index) => {
-    const valueFormatted =
-      entry.value >= 1_000_000
-        ? `${(entry.value / 1_000_000).toFixed(2)}M`
-        : `${(entry.value / 1_000).toFixed(0)}K`;
-
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${valueFormatted}`;
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${entry.raw}`;
   });
 
   const embed = new EmbedBuilder()
@@ -40,8 +35,8 @@ export async function preview(message: Message) {
       `\`!preview\` – odświeża podgląd\n` +
       `\`!confirm\` – zapisuje i kończy sesję\n` +
       `\`!cancel\` – anuluje sesję (bez zapisu)\n` +
-      `\`!adjust [id] nick [nowyNick]\`\n` +
-      `\`!adjust [id] value [nowaWartość]\`\n` +
+      `\`!adjust [id] nick [nowyNick]\` – zmienia nick\n` +
+      `\`!adjust [id] value [nowaWartość]\` – zmienia wartość\n` +
       `📌 Przykład: \`!adjust 3 value 11.87M\``
     )
     .setColor(0x5865f2);
