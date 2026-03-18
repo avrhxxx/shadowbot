@@ -34,11 +34,19 @@ export async function processOCR(
   // 🔥 preprocess linii
   lines = preprocessOCR(lines, parserType as any);
 
-  // 🔥 LEPSZY FILTER (tylko sensowne linie z punktami)
-  lines = lines.filter((line) =>
-    /[\d]+\.\d+\s*[MK]$/i.test(line) ||   // np. 36.59M
-    /[\d]{3,}\s*[MK]$/i.test(line)       // np. 1200K
-  );
+  // 🔥 🔥 🔥 KLUCZOWE: FILTER PER TYPE
+  if (parserType === "DUEL_POINTS") {
+    lines = lines.filter((line) =>
+      /[\d]+\.\d+\s*[MK]$/i.test(line) ||   // 36.59M
+      /[\d]{3,}\s*[MK]$/i.test(line)       // 1200K
+    );
+  }
+
+  if (parserType === "DONATIONS") {
+    lines = lines.filter((line) =>
+      line.toLowerCase().includes("donations")
+    );
+  }
 
   console.log("=== FILTERED LINES ===");
   console.log(lines);
