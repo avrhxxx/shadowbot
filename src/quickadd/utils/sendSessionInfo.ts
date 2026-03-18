@@ -2,27 +2,22 @@ import { TextChannel, EmbedBuilder } from "discord.js";
 
 export async function sendSessionInfo(
   channel: TextChannel,
-  moderatorId: string
+  moderatorId: string,
+  mode: "add" | "attend"
 ) {
+  const description =
+    mode === "add"
+      ? "W tym kanale dodajesz dane do eventu.\n\nFormat:\n`nick 100k`"
+      : "W tym kanale zaznaczasz obecność.\n\nFormat:\n`nick`";
+
   const embed = new EmbedBuilder()
-    .setTitle("🧾 Kanał sesji")
+    .setTitle("📌 Informacja o kanale")
     .setDescription(
       `👤 **Moderator:** <@${moderatorId}>\n\n` +
-
-      `📌 To jest kanał roboczy do wprowadzania danych.\n\n` +
-
-      `✏️ Wpisuj dane w formacie:\n` +
-      `\`nick wartość\`\n\n` +
-
-      `📌 Przykład:\n` +
-      `\`Shadow 12.5M\`\n\n` +
-
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `ℹ️ Użyj \`!help\`, aby zobaczyć dostępne komendy`
+      `${description}\n\n` +
+      `💡 Wpisz \`!help\`, aby zobaczyć dostępne komendy`
     )
-    .setColor(0xf1c40f);
+    .setColor(0x5865f2);
 
-  const msg = await channel.send({ embeds: [embed] });
-
-  await msg.pin().catch(() => {});
+  await channel.send({ embeds: [embed] });
 }
