@@ -30,35 +30,45 @@ export function registerQuickAddListener(client: Client) {
     // 🔹 KOMENDY (!)
     // -----------------------------
     if (content.startsWith("!")) {
-      const [command] = content.slice(1).trim().split(/\s+/);
+      const [rawCommand] = content.slice(1).trim().split(/\s+/);
+      const command = rawCommand.toLowerCase();
 
       const isQuickAddChannel = message.channel.name === "quick-add";
 
       try {
-        switch (command.toLowerCase()) {
+        switch (command) {
           // 🔥 START (tylko #quick-add)
           case "rradd":
-          case "dnadd":
-          case "dpadd":
-          case "rrattend":
-            if (!isQuickAddChannel) {
-              await message.reply("❌ Ta komenda działa tylko w #quick-add.");
-              return;
-            }
-
-            if (command === "rradd") await rradd(message);
-            if (command === "dnadd") await dnadd(message);
-            if (command === "dpadd") await dpadd(message);
-            if (command === "rrattend") await rrattend(message);
+            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            await rradd(message);
             break;
 
-          // 🔥 SESJA (tylko kanał sesji)
+          case "dnadd":
+            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            await dnadd(message);
+            break;
+
+          case "dpadd":
+            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            await dpadd(message);
+            break;
+
+          case "rrattend":
+            if (!isQuickAddChannel) return message.reply("❌ Tylko w #quick-add.");
+            await rrattend(message);
+            break;
+
+          // 🔥 SESJA
           case "preview":
           case "confirm":
           case "cancel":
             if (!session || message.channel.id !== session.channelId) {
-              await message.reply("❌ Ta komenda działa tylko w kanale sesji.");
-              return;
+              return message.reply("❌ Tylko w kanale sesji.");
+            }
+
+            // 🔒 OWNER CHECK
+            if (session.moderatorId !== message.author.id) {
+              return message.reply("❌ To nie Twoja sesja.");
             }
 
             if (command === "preview") await preview(message);
@@ -84,6 +94,9 @@ export function registerQuickAddListener(client: Client) {
 
     // 🔹 tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
+
+    // 🔒 OWNER CHECK (TEŻ DLA PARSERA!)
+    if (session.moderatorId !== message.author.id) return;
 
     // -----------------------------
     // 📝 PARSER
@@ -115,8 +128,6 @@ export function registerQuickAddListener(client: Client) {
         console.error("Parse error:", err);
         await message.react("❌");
       }
-
-      return;
     }
   });
 }
