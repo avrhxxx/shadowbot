@@ -1,86 +1,40 @@
-import {
-  Guild,
-  TextChannel,
-  ChannelType,
-  PermissionFlagsBits,
-  Message,
-} from "discord.js";
+import { Message, TextChannel } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 
-type StartOptions = {
-  guild: Guild;
-  userId: string;
-  reply: (content: string) => Promise<any>;
-  eventType: "RR" | "DN" | "DP" | "RR_ATTEND";
-  date?: string;
-  week?: string;
-};
+type EventType = "rr" | "dn" | "dp";
 
-export async function startQuickAddSession({
-  guild,
-  userId,
-  reply,
-  eventType,
-  date,
-  week,
-}: StartOptions) {
-  const guildId = guild.id;
+export async function startQuickAddSession(
+  message: Message,
+  eventType: EventType
+) {
+  const guild = message.guild;
+  if (!guild) return;
 
-  const sessionManager = SessionManager.getInstance();
-
-  // 🔒 blokada sesji
-  if (sessionManager.hasActiveSession(guildId)) {
-    await reply("⚠️ Na tym serwerze jest już aktywna sesja QuickAdd.");
+  // 🔥 sprawdź czy już jest sesja
+  if (SessionManager.hasSession(guild.id)) {
+    await message.reply("❌ Sesja już trwa.");
     return;
   }
 
-  // 🔥 tworzenie kanału
-  const channel = (await guild.channels.create({
-    name: "quick-add-session",
-    type: ChannelType.GuildText,
-    permissionOverwrites: [
-      {
-        id: guild.roles.everyone,
-        deny: [PermissionFlagsBits.ViewChannel],
-      },
-      {
-        id: userId,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory,
-        ],
-      },
-      {
-        id: guild.members.me!.id,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ManageChannels,
-        ],
-      },
-    ],
-  })) as TextChannel;
+  // 🔥 znajdź / stwórz kanał
+  let channel = guild.channels.cache.find(
+    (c) => c.name === "quickadd" && c.isTextBased()
+  ) as TextChannel;
 
-  // 🔥 tworzenie sesji
-  sessionManager.createSession(
-    guildId,
-    userId,
-    {
-      eventType,
-      date,
-      week,
-    },
-    channel.id
-  );
+  if (!channel) {
+    channel = await guild.channels.create({
+      name: "quickadd",
+      type: 0, // GUILD_TEXT
+    });
+  }
 
-  // ✅ odpowiedź (działa dla message i interaction)
-  await reply(`✅ Sesja utworzona: ${channel}`);
-
-  // 📥 info w kanale
-  await channel.send({
-    content:
-      `📥 **QuickAdd Session (${eventType})**\n` +
-      (date ? `Data: ${date}` : `Zakres: ${week}`),
+  // 🔥 zapisz sesję
+  SessionManager.createSession({
+    guildId: guild.id,
+    channelId: channel.id,
+    moderatorId: message.author.id,
+    eventType,
   });
+
+  await message.reply(`✅ Sesja rozpoczęta w ${channel}`);
 }
