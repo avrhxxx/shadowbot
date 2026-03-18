@@ -6,6 +6,9 @@ import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
+// 🔹 NOWE: preview
+import { preview } from "./commands/PreviewCommand";
+
 // 🔹 sesja + dane
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
@@ -40,6 +43,11 @@ export function registerQuickAddListener(client: Client) {
 
           case "rrattend":
             await rrattend(message);
+            break;
+
+          // 🔥 DODANE
+          case "preview":
+            await preview(message);
             break;
 
           default:
