@@ -1,11 +1,10 @@
 import { parserMap } from "../parsers/parserMap";
 import { extractTextFromImage } from "../utils/ocr";
-import { preprocessOCR } from "../utils/preprocessOCR";
-import { ParserType } from "../session/SessionManager";
+import { preprocessOCR } from "../utils/ocrPreprocess"; // 🔥 NOWE
 
 export async function processOCR(
   imageUrl: string,
-  parserType: ParserType
+  parserType: string
 ) {
   const text = await extractTextFromImage(imageUrl);
 
@@ -13,7 +12,7 @@ export async function processOCR(
   console.log(text);
   console.log("=== OCR TEXT END ===");
 
-  const parser = parserMap[parserType];
+  const parser = parserMap[parserType as keyof typeof parserMap];
   if (!parser) return [];
 
   let lines = text
@@ -21,8 +20,12 @@ export async function processOCR(
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 NOWY KROK
-  lines = preprocessOCR(lines, parserType);
+  // 🔥 TU SIĘ DZIEJE MAGIA
+  lines = preprocessOCR(lines, parserType as any);
+
+  console.log("=== PREPROCESSED LINES ===");
+  console.log(lines);
+  console.log("==========================");
 
   const parsed = parser(lines);
 
