@@ -15,7 +15,7 @@ import { cancel } from "./commands/CancelCommand";
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
 
-// 🔥 NOWY PARSER
+// 🔥 parser
 import { parseValue } from "./utils/parseValue";
 
 export function registerQuickAddListener(client: Client) {
@@ -32,36 +32,38 @@ export function registerQuickAddListener(client: Client) {
     if (content.startsWith("!")) {
       const [command] = content.slice(1).trim().split(/\s+/);
 
+      const isQuickAddChannel = message.channel.name === "quick-add";
+
       try {
         switch (command.toLowerCase()) {
-          // 🔥 start
+          // 🔥 START (tylko #quick-add)
           case "rradd":
-            await rradd(message);
-            break;
-
           case "dnadd":
-            await dnadd(message);
-            break;
-
           case "dpadd":
-            await dpadd(message);
-            break;
-
           case "rrattend":
-            await rrattend(message);
+            if (!isQuickAddChannel) {
+              await message.reply("❌ Ta komenda działa tylko w #quick-add.");
+              return;
+            }
+
+            if (command === "rradd") await rradd(message);
+            if (command === "dnadd") await dnadd(message);
+            if (command === "dpadd") await dpadd(message);
+            if (command === "rrattend") await rrattend(message);
             break;
 
-          // 🔥 sesja
+          // 🔥 SESJA (tylko kanał sesji)
           case "preview":
-            await preview(message);
-            break;
-
           case "confirm":
-            await confirm(message);
-            break;
-
           case "cancel":
-            await cancel(message);
+            if (!session || message.channel.id !== session.channelId) {
+              await message.reply("❌ Ta komenda działa tylko w kanale sesji.");
+              return;
+            }
+
+            if (command === "preview") await preview(message);
+            if (command === "confirm") await confirm(message);
+            if (command === "cancel") await cancel(message);
             break;
 
           default:
@@ -84,7 +86,7 @@ export function registerQuickAddListener(client: Client) {
     if (message.channel.id !== session.channelId) return;
 
     // -----------------------------
-    // 📝 PARSER (k / m / 1.2m)
+    // 📝 PARSER
     // -----------------------------
     if (content.length > 0) {
       try {
