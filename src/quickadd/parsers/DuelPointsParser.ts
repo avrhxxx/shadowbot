@@ -8,30 +8,39 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   for (const rawLine of lines) {
     if (!rawLine) continue;
 
-    const line = rawLine.trim();
+    let line = rawLine.trim();
     if (!line) continue;
 
+    // 🔥 znajdź liczbę (NIE musi być na końcu)
     const valueMatch = line.match(/([\d.,]+)\s*([MK]?)/i);
     if (!valueMatch) continue;
-
-    const fullMatch = valueMatch[0];
-
-    if (!line.endsWith(fullMatch)) continue;
 
     const rawNumber = valueMatch[1];
     const suffix = (valueMatch[2] || "").toUpperCase();
 
     const value = normalizeValue(rawNumber, suffix);
 
-    const nickname = line.replace(fullMatch, "").trim();
+    // 🔥 usuń wartość z linii → zostaje nick
+    const nicknameRaw = line.replace(valueMatch[0], "").trim();
+    const nickname = cleanNickname(nicknameRaw);
+
     if (!nickname || value <= 0) continue;
 
-    entries.push(createEntry(rawLine, nickname, value, fullMatch));
+    entries.push({
+      lineId: lineCounter++,
+      nickname,
+      value,
+      raw: valueMatch[0],
+      status: "OK",
+      confidence: 1,
+      sourceType: "OCR",
+    });
   }
 
   return entries;
 }
 
+// 🔹 "1.2M" → 1200000
 function normalizeValue(num: string, suffix: string): number {
   const clean = num.replace(",", ".");
   const number = parseFloat(clean);
@@ -44,20 +53,7 @@ function normalizeValue(num: string, suffix: string): number {
   return parseInt(num.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-function createEntry(
-  rawText: string,
-  nickname: string,
-  value: number,
-  raw: string
-): QuickAddEntry {
-  return {
-    lineId: lineCounter++,
-    rawText,
-    nickname,
-    value,
-    raw,
-    status: "OK",
-    confidence: 1,
-    sourceType: "OCR",
-  };
+// 🔹 czyści nickname
+function cleanNickname(name: string): string {
+  return name.replace(/[^\w\d_ ]/g, "").trim();
 }
