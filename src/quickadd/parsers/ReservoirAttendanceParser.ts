@@ -1,7 +1,5 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-let lineCounter = 1;
-
 export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -11,25 +9,26 @@ export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // usuń rank
+    // 🔹 usuń rank (np. "1 ")
     line = line.replace(/^\d+\s*/, "");
 
-    // usuń value na końcu
+    // 🔹 usuń liczby na końcu (czasem OCR dorzuca śmieci)
     line = line.replace(/[\d,]+$/, "");
 
-    const nickname = line.trim();
+    const nickname = cleanNickname(line);
     if (!nickname) continue;
 
     entries.push({
-      lineId: lineCounter++,
-      rawText: rawLine,
       nickname,
-      value: "",
-      status: "OK",
-      confidence: 1,
-      sourceType: "OCR",
+      value: 1, // 🔥 attendance = 1
+      raw: "ATTEND",
     });
   }
 
   return entries;
+}
+
+// 🔹 czyści nickname z OCR śmieci
+function cleanNickname(name: string): string {
+  return name.replace(/[^\w\d_]/g, "").trim();
 }
