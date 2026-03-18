@@ -1,27 +1,36 @@
-import { QuickAddEntry } from "../types/QuickAddEntry";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
 import { parseNumber } from "../utils/numberParser";
-
-export type OCRSegment = string[];
+import { ParsedEntry } from "../types/ParsedEntry";
 
 export class DonationsParser {
-  static parseSegment(segment: OCRSegment): QuickAddEntry {
-    const joinedLine = segment.map(l => unicodeCleaner(l)).join(" ");
-    const parts = joinedLine.trim().split(/\s+/);
-    const valueStr = parts.pop() || "0";
-    const nickname = parts.join(" ") || "???";
-    const parsedValue = parseNumber(valueStr);
+  static parseLine(rawLine: string): ParsedEntry {
+    const cleaned = unicodeCleaner(rawLine);
 
-    const status: QuickAddEntry["status"] = parsedValue === null ? "UNREADABLE" : "OK";
+    const match = cleaned.match(/(.+?)\s+([\d.,]+)$/);
+
+    if (!match) {
+      return {
+        rawText: rawLine,
+        nickname: cleaned,
+        value: null
+      };
+    }
+
+    const nickname = match[1].trim();
+    const value = parseNumber(match[2]);
 
     return {
-      lineId: 0,
-      rawText: joinedLine,
+      rawText: rawLine,
       nickname,
-      value: valueStr,
-      confidence: parsedValue !== null ? 1 : 0,
-      status,
-      sourceType: "OCR"
+      value
     };
+  }
+
+  static parseMany(input: string): ParsedEntry[] {
+    return input
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => this.parseLine(line));
   }
 }
