@@ -1,43 +1,28 @@
-import { Message, ChannelType, PermissionFlagsBits } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+type EventType = "rr" | "dn" | "dp";
 
-export async function rradd(message: Message) {
-  const guild = message.guild;
-  if (!guild) return;
+interface QuickAddSession {
+  guildId: string;
+  channelId: string;
+  moderatorId: string;
+  eventType: EventType;
+}
 
-  // 🔥 blokada jeśli sesja istnieje
-  if (SessionManager.hasSession(guild.id)) {
-    await message.reply("❌ Masz już aktywną sesję.");
-    return;
+export class SessionManager {
+  private static sessions = new Map<string, QuickAddSession>();
+
+  static createSession(session: QuickAddSession) {
+    this.sessions.set(session.guildId, session);
   }
 
-  // 🔥 tworzenie kanału (JUŻ Z PERMISJAMI)
-  const channel = await guild.channels.create({
-    name: `rr-session-${message.author.username}`,
-    type: ChannelType.GuildText,
-    permissionOverwrites: [
-      {
-        id: guild.roles.everyone,
-        deny: [PermissionFlagsBits.ViewChannel],
-      },
-      {
-        id: message.author.id,
-        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-      },
-    ],
-  });
+  static getSession(guildId: string) {
+    return this.sessions.get(guildId);
+  }
 
-  // 🔥 zapis sesji
-  SessionManager.createSession({
-    guildId: guild.id,
-    channelId: channel.id,
-    moderatorId: message.author.id,
-    eventType: "rr",
-  });
+  static hasSession(guildId: string) {
+    return this.sessions.has(guildId);
+  }
 
-  await message.reply(`✅ Sesja utworzona: ${channel}`);
-
-  await channel.send(
-    "📥 Wpisuj dane:\n`nick 100k`\n\n!preview żeby zobaczyć\n!confirm żeby zatwierdzić"
-  );
+  static endSession(guildId: string) {
+    this.sessions.delete(guildId);
+  }
 }
