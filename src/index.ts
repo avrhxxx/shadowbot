@@ -20,7 +20,7 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // ✅ QuickAdd (NOWY SYSTEM)
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
-import { createQuickAddChannel } from "./services/QuickAddChannelService";
+import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService"; // ✅ FIX
 
 const client = new Client({
   intents: [
