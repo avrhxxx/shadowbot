@@ -10,8 +10,10 @@ export async function rradd(message: Message, args: string[]) {
   }
 
   await startQuickAddSession({
-    message,
+    guild: message.guild!,
+    userId: message.author.id,
+    reply: (msg) => message.reply(msg),
     eventType: "RR",
-    date: dateArg
+    date: dateArg,
   });
 }
