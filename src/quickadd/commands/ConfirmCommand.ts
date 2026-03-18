@@ -1,30 +1,22 @@
 import { Message } from "discord.js";
-import { SessionData } from "../session/SessionData";
 import { SessionManager } from "../session/SessionManager";
 
 export async function confirm(message: Message) {
-  if (!message.guildId) return;
+  const session = SessionManager.getSession(message.guildId!);
+  if (!session) return;
 
-  const session = SessionManager.getSession(message.guildId);
-  if (!session) {
-    await message.reply("❌ Brak aktywnej sesji.");
-    return;
-  }
+  await message.reply("✅ Zapisano!");
 
-  const entries = SessionData.getEntries(message.guildId);
+  // 🔥 usuń kanał po chwili
+  setTimeout(async () => {
+    try {
+      const channel = await message.guild?.channels.fetch(session.channelId);
+      await channel?.delete();
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  }, 3000);
 
-  if (entries.length === 0) {
-    await message.reply("📭 Brak danych do zatwierdzenia.");
-    return;
-  }
-
-  const lines = entries.map(
-    (e, i) => `${i + 1}. ${e.nickname} - ${e.value}`
-  );
-
-  await message.reply("✅ **Zatwierdzono:**\n" + lines.join("\n"));
-
-  // 🔥 czyścimy dane i zamykamy sesję
-  SessionData.clear(message.guildId);
-  SessionManager.endSession(message.guildId);
+  // 🔥 wyczyść sesję
+  SessionManager.clearSession(message.guildId!);
 }
