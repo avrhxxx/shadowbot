@@ -1,20 +1,32 @@
-// CancelCommand.ts
-// Komenda do anulowania sesji QuickAdd
+import { Message } from "discord.js";
+import { SessionManager } from "../session/SessionManager";
 
-import { SessionManager } from "../services/SessionManager";
-import { PreviewBuffer } from "../services/PreviewBuffer";
+export async function cancel(message: Message) {
+  const guildId = message.guildId!;
+  const sessionManager = SessionManager.getInstance();
+  const session = sessionManager.getSession(guildId);
 
-export class CancelCommand {
-  static name = "cancel";
-
-  async execute() {
-    if (!SessionManager.hasActiveSession()) {
-      throw new Error("Brak aktywnej sesji QuickAdd.");
-    }
-
-    PreviewBuffer.clear();
-    SessionManager.closeSession();
-
-    return "Sesja została anulowana.";
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji QuickAdd.");
+    return;
   }
+
+  // 🔒 tylko kanał sesji
+  if (message.channel.id !== session.channelId) {
+    return;
+  }
+
+  // 🧹 czyszczenie danych
+  session.previewBuffer.clear();
+
+  // 🗑 usunięcie kanału
+  const channel = message.guild!.channels.cache.get(session.channelId);
+  if (channel && channel.isTextBased()) {
+    await channel.delete().catch(() => null);
+  }
+
+  // ❌ zamknięcie sesji
+  sessionManager.endSession(guildId);
+
+  await message.reply("🛑 Sesja QuickAdd została anulowana.");
 }
