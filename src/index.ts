@@ -1,7 +1,14 @@
 // src/index.ts
 import "./googleSheetsClient";
 
-import { Client, GatewayIntentBits, Partials, Interaction } from "discord.js";
+import {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  Interaction,
+  ChannelType,
+} from "discord.js";
+
 import { initTranslationModule } from "./modules/TranslationModule";
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
@@ -30,6 +37,30 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
+
+  // -----------------------------
+  // 🔥 TWORZENIE #quick-add
+  // -----------------------------
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      const existing = guild.channels.cache.find(
+        (c) =>
+          c.name === "quick-add" &&
+          c.type === ChannelType.GuildText
+      );
+
+      if (!existing) {
+        await guild.channels.create({
+          name: "quick-add",
+          type: ChannelType.GuildText,
+        });
+
+        console.log(`✅ Created #quick-add in ${guild.name}`);
+      }
+    } catch (err) {
+      console.error(`❌ Error creating quick-add in ${guild.name}:`, err);
+    }
+  }
 
   // -----------------------------
   // Init modules
