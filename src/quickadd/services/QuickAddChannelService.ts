@@ -2,13 +2,12 @@ import {
   Guild,
   TextChannel,
   ChannelType,
+  EmbedBuilder,
 } from "discord.js";
-import { sendQuickAddInfo } from "../embeds/QuickAddInfoEmbed";
 
 export async function createQuickAddChannel(
   guild: Guild
 ): Promise<TextChannel> {
-  // 🔍 sprawdzamy czy kanał już istnieje
   const existing = guild.channels.cache.find(
     (c) =>
       c.type === ChannelType.GuildText &&
@@ -16,36 +15,63 @@ export async function createQuickAddChannel(
   ) as TextChannel | undefined;
 
   if (existing) {
-    // 🔥 jeśli kanał istnieje — upewnij się że ma embed
     await ensureInfoMessage(existing);
     return existing;
   }
 
-  // 🏗️ tworzymy kanał
   const channel = await guild.channels.create({
     name: "quick-add",
     type: ChannelType.GuildText,
   });
 
-  // 📩 wysyłamy embed startowy
   await sendQuickAddInfo(channel);
 
   return channel;
 }
 
-// 🔒 helper żeby nie spamować embedów
+// 📩 EMBED (w tym samym pliku)
+async function sendQuickAddInfo(channel: TextChannel) {
+  const embed = new EmbedBuilder()
+    .setTitle("⚡ Kanał Quick Add")
+    .setDescription(
+      `To jest kanał startowy do dodawania danych.\n\n` +
+
+      `📌 **Co możesz tutaj zrobić?**\n` +
+      `• Rozpocząć sesję\n` +
+      `• Wybrać typ danych\n\n` +
+
+      `🧠 **Jak to działa?**\n` +
+      `1️⃣ Wpisz komendę (np. \`!rradd\`)\n` +
+      `2️⃣ Bot stworzy kanał sesji\n` +
+      `3️⃣ Tam wpisujesz:\n` +
+      `\`nick wartość\`\n\n` +
+
+      `📌 Przykład:\n` +
+      `\`Shadow 12.5M\`\n\n` +
+
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `ℹ️ \`!help\` – lista komend`
+    )
+    .setColor(0x00b894);
+
+  const msg = await channel.send({ embeds: [embed] });
+
+  await msg.pin().catch(() => {});
+}
+
+// 🔒 żeby nie spamować embedów
 async function ensureInfoMessage(channel: TextChannel) {
   try {
     const messages = await channel.messages.fetch({ limit: 10 });
 
-    const hasBotEmbed = messages.some(
+    const hasEmbed = messages.some(
       (msg) =>
         msg.author.bot &&
         msg.embeds.length > 0 &&
         msg.embeds[0].title?.includes("Quick Add")
     );
 
-    if (!hasBotEmbed) {
+    if (!hasEmbed) {
       await sendQuickAddInfo(channel);
     }
   } catch (err) {
