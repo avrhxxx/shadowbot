@@ -14,8 +14,6 @@ import { rrattend } from "./commands/ReservoirAttendCommand";
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
 import { preview } from "./commands/PreviewCommand";
-import { adjust } from "./commands/AdjustCommand";
-import { redo } from "./commands/RedoCommand";
 
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
@@ -56,8 +54,6 @@ export function registerQuickAddListener(client: Client) {
           // 🔥 KOMENDY SESYJNE (tylko owner)
           case "confirm":
           case "cancel":
-          case "adjust":
-          case "redo":
             if (!session) {
               await message.reply("❌ Brak aktywnej sesji.");
               return;
@@ -70,8 +66,12 @@ export function registerQuickAddListener(client: Client) {
 
             if (command === "confirm") await confirm(message);
             if (command === "cancel") await cancel(message);
-            if (command === "adjust") await adjust(message, args);
-            if (command === "redo") await redo(message, args);
+            break;
+
+          // 🔧 TYMCZASOWO WYŁĄCZONE
+          case "adjust":
+          case "redo":
+            await message.reply("⚠️ Jeszcze nie działa.");
             break;
 
           // 🔥 PREVIEW (może każdy)
@@ -115,7 +115,7 @@ export function registerQuickAddListener(client: Client) {
     }
 
     // -----------------------------
-    // 📝 TEKST (🔥 TU JEST PARSER)
+    // 📝 TEKST (🔥 PARSER)
     // -----------------------------
     if (content.length > 0) {
       try {
@@ -126,7 +126,7 @@ export function registerQuickAddListener(client: Client) {
         for (const entry of parsedEntries) {
           session.previewBuffer.addEntry({
             nickname: entry.nickname,
-            value: entry.value ?? 0
+            value: String(entry.value ?? 0)
           });
         }
 
