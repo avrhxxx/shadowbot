@@ -1,36 +1,35 @@
-import { unicodeCleaner } from "../utils/unicodeCleaner";
-import { parseNumber } from "../utils/numberParser";
-import { ParsedEntry } from "../types/ParsedEntry";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
-export class ReservoirRaidParser {
-  static parseLine(rawLine: string): ParsedEntry {
-    const cleaned = unicodeCleaner(rawLine);
+let lineCounter = 1;
 
-    const match = cleaned.match(/(.+?)\s+([\d.,]+)$/);
+export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
+  const entries: QuickAddEntry[] = [];
 
-    if (!match) {
-      return {
-        rawText: rawLine,
-        nickname: cleaned,
-        value: null
-      };
-    }
+  for (const rawLine of lines) {
+    if (!rawLine) continue;
 
-    const nickname = match[1].replace("(No Team)", "").trim();
-    const value = parseNumber(match[2]);
+    const line = rawLine.trim();
 
-    return {
+    const match =
+      line.match(/\(No\s*Team\)\s*(.+)/i) ||
+      line.match(/\(NoTeam\)\s*(.+)/i) ||
+      line.match(/No\s*Team\)?\s*(.+)/i); // fallback OCR
+
+    if (!match) continue;
+
+    const nickname = match[1].trim();
+    if (!nickname) continue;
+
+    entries.push({
+      lineId: lineCounter++,
       rawText: rawLine,
       nickname,
-      value
-    };
+      value: "",
+      status: "OK",
+      confidence: 1,
+      sourceType: "OCR",
+    });
   }
 
-  static parseMany(input: string): ParsedEntry[] {
-    return input
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => this.parseLine(line));
-  }
+  return entries;
 }
