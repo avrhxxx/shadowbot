@@ -1,0 +1,23 @@
+export interface RowBoundingBox {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+export class RowDetector {
+  static detectRows(height: number, rowCount: number): RowBoundingBox[] {
+    // prosty podział równy dla OCR
+    const rowHeight = Math.floor(height / rowCount);
+    const boxes: RowBoundingBox[] = [];
+    for (let i = 0; i < rowCount; i++) {
+      boxes.push({
+        top: i * rowHeight,
+        bottom: (i + 1) * rowHeight,
+        left: 0,
+        right: 0 // do wypełnienia w RowCropper
+      });
+    }
+    return boxes;
+  }
+}
