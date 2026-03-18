@@ -1,4 +1,9 @@
-import { Message, TextChannel, ChannelType } from "discord.js";
+import {
+  Message,
+  ChannelType,
+  PermissionFlagsBits,
+  TextChannel,
+} from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { sendSessionInfo } from "../utils/sendSessionInfo";
 
@@ -11,19 +16,35 @@ export async function startQuickAddSession(
   const guild = message.guild;
   if (!guild) return;
 
-  // 🔥 czy sesja już istnieje
+  // 🔒 blokada
   if (SessionManager.hasSession(guild.id)) {
-    await message.reply("❌ Sesja już trwa.");
+    await message.reply("❌ Masz już aktywną sesję.");
     return;
   }
 
-  // 🔥 tworzymy kanał SESJI (nie quick-add!)
+  // 🧠 nazwa kanału
+  const channelName = `${eventType}-session-${message.author.username}`;
+
+  // 🔥 tworzenie kanału
   const channel = await guild.channels.create({
-    name: `session-${eventType}`,
+    name: channelName,
     type: ChannelType.GuildText,
+    permissionOverwrites: [
+      {
+        id: guild.roles.everyone,
+        deny: [PermissionFlagsBits.ViewChannel],
+      },
+      {
+        id: message.author.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+        ],
+      },
+    ],
   });
 
-  // 🔥 zapis sesji
+  // 💾 zapis sesji
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
@@ -31,8 +52,8 @@ export async function startQuickAddSession(
     eventType,
   });
 
-  // 🔥 onboarding embed
-  await sendSessionInfo(channel as TextChannel, message.author.id);
+  await message.reply(`✅ Sesja utworzona: ${channel}`);
 
-  await message.reply(`✅ Sesja rozpoczęta: ${channel}`);
+  // 📘 onboarding
+  await sendSessionInfo(channel as TextChannel, message.author.id);
 }
