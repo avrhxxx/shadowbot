@@ -1,3 +1,5 @@
+import { parseValue } from "../utils/parseValue";
+
 interface Entry {
   nickname: string;
   value: number;
@@ -25,7 +27,7 @@ export class SessionData {
     if (existing) {
       existing.value += entry.value;
 
-      // 🔥 po merge generujemy nowy RAW
+      // 🔥 aktualizujemy RAW po merge
       existing.raw = formatValue(existing.value);
     } else {
       current.push(entry);
@@ -40,5 +42,33 @@ export class SessionData {
 
   static clear(guildId: string) {
     this.data.delete(guildId);
+  }
+
+  static updateEntry(
+    guildId: string,
+    index: number,
+    field: "nick" | "value",
+    newValue: string
+  ): boolean {
+    const entries = this.data.get(guildId);
+    if (!entries || !entries[index]) return false;
+
+    const entry = entries[index];
+
+    if (field === "nick") {
+      entry.nickname = newValue;
+      return true;
+    }
+
+    if (field === "value") {
+      const parsed = parseValue(newValue);
+      if (parsed === null) return false;
+
+      entry.value = parsed;
+      entry.raw = newValue;
+      return true;
+    }
+
+    return false;
   }
 }
