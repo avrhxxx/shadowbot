@@ -1,36 +1,72 @@
-import { unicodeCleaner } from "../utils/unicodeCleaner";
-import { parseNumber } from "../utils/numberParser";
-import { ParsedEntry } from "../types/ParsedEntry";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
-export class DonationsParser {
-  static parseLine(rawLine: string): ParsedEntry {
-    const cleaned = unicodeCleaner(rawLine);
+let lineCounter = 1;
 
-    const match = cleaned.match(/(.+?)\s+([\d.,]+)$/);
+export function parseDonations(lines: string[]): QuickAddEntry[] {
+  const entries: QuickAddEntry[] = [];
 
-    if (!match) {
-      return {
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    if (!rawLine) continue;
+
+    let line = rawLine.trim();
+    if (!line) continue;
+
+    // 🔹 CASE 1: standard (linia z rankiem)
+    const rankMatch = line.match(/^\d+\s*(.+)/);
+
+    if (rankMatch) {
+      let nickname = rankMatch[1].trim();
+
+      let value = "";
+      const nextLine = lines[i + 1]?.trim();
+
+      if (nextLine) {
+        const valueMatch =
+          nextLine.match(/Donations[:\s]*([\d,.\s]+)/i) ||
+          nextLine.match(/([\d,]{3,})/);
+
+        if (valueMatch) {
+          value = normalizeNumber(valueMatch[1]);
+          i++; // skip next line
+        }
+      }
+
+      entries.push({
+        lineId: lineCounter++,
         rawText: rawLine,
-        nickname: cleaned,
-        value: null
-      };
+        nickname,
+        value,
+        status: value ? "OK" : "INVALID",
+        confidence: value ? 1 : 0.5,
+        sourceType: "OCR",
+      });
+
+      continue;
     }
 
-    const nickname = match[1].trim();
-    const value = parseNumber(match[2]);
+    // 🔥 CASE 2: merged line
+    const mergedMatch = line.match(/^\d+\s*([^\d]+?)\s+.*?([\d,]{3,})/);
 
-    return {
-      rawText: rawLine,
-      nickname,
-      value
-    };
+    if (mergedMatch) {
+      const nickname = mergedMatch[1].trim();
+      const value = normalizeNumber(mergedMatch[2]);
+
+      entries.push({
+        lineId: lineCounter++,
+        rawText: rawLine,
+        nickname,
+        value,
+        status: "OK",
+        confidence: 0.8,
+        sourceType: "OCR",
+      });
+    }
   }
 
-  static parseMany(input: string): ParsedEntry[] {
-    return input
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => this.parseLine(line));
-  }
+  return entries;
+}
+
+function normalizeNumber(value: string): string {
+  return value.replace(/[^\d]/g, "");
 }
