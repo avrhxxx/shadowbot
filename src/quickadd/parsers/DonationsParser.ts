@@ -11,37 +11,42 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    const lower = line.toLowerCase();
-
     // 🔥 musi zawierać "donations"
-    if (!lower.includes("donations")) continue;
+    if (!line.toLowerCase().includes("donations")) continue;
 
-    // 🔥 wyciągnij wartość (np. 82,969)
-    const valueMatch = line.match(/donations[:\s]*([\d,]+)/i);
+    // 🔥 wyciągnij liczbę (np. 82,969)
+    const valueMatch = line.match(/([\d,]+)/);
     if (!valueMatch) continue;
 
     const rawNumber = valueMatch[1];
-    const value = parseNumber(rawNumber);
-
+    const value = normalizeValue(rawNumber);
     if (value <= 0) continue;
 
-    // 🔥 usuń "Donations: xxx"
-    let nicknamePart = line.replace(/donations[:\s]*[\d,]+/i, "");
+    // 🔥 usuń "Donations: 82,969"
+    let nicknamePart = line
+      .replace(/donations[:\s]*/i, "")
+      .replace(rawNumber, "");
 
-    // 🔥 usuń śmieci OCR na początku (np. @, %, itp.)
-    nicknamePart = nicknamePart.replace(/^[^\w\d]+/, "");
+    // 🔥 usuń śmieci OCR z początku
+    nicknamePart = nicknamePart.replace(/^[^a-zA-Z0-9_]+/, "");
 
-    const nickname = cleanNickname(nicknamePart);
+    const cleaned = cleanNickname(nicknamePart);
 
-    if (!nickname || nickname.length < 3) continue;
+    // 🔥 heurystyka jakości
+    const isWeird =
+      cleaned.length < 3 ||
+      /^[\d\s]+$/.test(cleaned);
+
+    if (!cleaned) continue;
 
     entries.push({
       lineId: lineCounter++,
-      nickname,
+      nickname: cleaned,
       value,
       raw: rawNumber,
-      status: "OK",
-      confidence: 1,
+      rawText: rawLine,
+      status: isWeird ? "UNREADABLE" : "OK",
+      confidence: isWeird ? 0.5 : 1,
       sourceType: "OCR",
     });
   }
@@ -50,20 +55,18 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 // 🔥 "82,969" → 82969
-function parseNumber(num: string): number {
+function normalizeValue(num: string): number {
   const clean = num.replace(/,/g, "");
   const parsed = parseInt(clean, 10);
-  return isNaN(parsed) ? 0 : parsed;
+
+  if (isNaN(parsed)) return 0;
+  return parsed;
 }
 
-// 🔥 czyszczenie nicków (ważne przy OCR)
+// 🔥 czyszczenie nicków
 function cleanNickname(name: string): string {
-  return (
-    name
-      // usuń dziwne znaki OCR
-      .replace(/[^\w\d\s_]/g, "")
-      // usuń wielokrotne spacje
-      .replace(/\s+/g, " ")
-      .trim()
-  );
+  return name
+    .replace(/[^\w\d\s_]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
