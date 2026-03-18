@@ -1,32 +1,19 @@
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { PreviewFormatter } from "../services/PreviewFormatter";
+import { SessionData } from "../session/SessionData";
 
 export async function preview(message: Message) {
-  const guildId = message.guildId!;
-  const sessionManager = SessionManager.getInstance();
-  const session = sessionManager.getSession(guildId);
+  if (!message.guildId) return;
 
-  if (!session) {
-    await message.reply("❌ Brak aktywnej sesji QuickAdd.");
-    return;
-  }
-
-  // 🔒 tylko kanał sesji
-  if (message.channel.id !== session.channelId) {
-    return;
-  }
-
-  const entries = session.previewBuffer.getAllEntries();
+  const entries = SessionData.getEntries(message.guildId);
 
   if (entries.length === 0) {
-    await message.reply("❌ Brak danych w podglądzie.");
+    await message.reply("📭 Brak danych.");
     return;
   }
 
-  const formatted = PreviewFormatter.format(entries);
+  const lines = entries.map(
+    (e, i) => `${i + 1}. ${e.nickname} - ${e.value}`
+  );
 
-  await message.reply({
-    content: formatted,
-  });
+  await message.reply("📊 **Preview:**\n" + lines.join("\n"));
 }
