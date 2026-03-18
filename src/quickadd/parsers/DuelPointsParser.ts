@@ -1,4 +1,5 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
+import { analyzeEntry } from "../utils/ocrWarnings";
 
 let lineCounter = 1;
 
@@ -11,7 +12,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔥 musi mieć wartość typu 36.59M / 120K
+    // 🔥 musi mieć M/K
     const valueMatch = line.match(/([\d.,]+)\s*([MK])/i);
     if (!valueMatch) continue;
 
@@ -22,23 +23,26 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     const value = normalizeValue(rawNumber, suffix);
     if (value <= 0) continue;
 
-    // 🔥 usuń value z linii
+    // 🔥 usuń value
     let nicknamePart = line.replace(fullMatch, "");
 
-    // 🔥 usuń rank (np. "8 ", "10 ")
+    // 🔥 usuń rank
     nicknamePart = nicknamePart.replace(/^\d+\s*/, "");
 
     const nickname = cleanNickname(nicknamePart);
 
     if (!nickname || nickname.length < 3) continue;
 
+    // 🔥 ANALIZA (GLOBALNY HELPER)
+    const analysis = analyzeEntry(nickname, value);
+
     entries.push({
       lineId: lineCounter++,
       nickname,
       value,
       raw: fullMatch,
-      status: "OK",
-      confidence: 1,
+      status: analysis.suspicious ? "SUS" : "OK",
+      confidence: analysis.confidence,
       sourceType: "OCR",
     });
   }
@@ -46,7 +50,9 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔥 "36.59M" → 36590000
+// =========================
+// 🔢 VALUE
+// =========================
 function normalizeValue(num: string, suffix: string): number {
   const clean = num.replace(",", ".");
   const number = parseFloat(clean);
@@ -59,18 +65,16 @@ function normalizeValue(num: string, suffix: string): number {
   return 0;
 }
 
-// 🔥 MEGA ważne czyszczenie nicków
+// =========================
+// 🧼 CLEAN NICK
+// =========================
 function cleanNickname(name: string): string {
   return (
     name
-      // usuń śmieci OCR
       .replace(/[^\w\d\s_]/g, "")
-      // usuń pojedyncze litery na początku (E, m itd.)
-      .replace(/^\b[a-zA-Z]\b\s*/g, "")
-      // usuń liczby na końcu (np. "31")
-      .replace(/\s\d+$/g, "")
-      // usuń podwójne spacje
+      .replace(/^[A-Za-z]\s+/, "") // "E Lady" → "Lady"
       .replace(/\s+/g, " ")
+      .replace(/\b([A-Za-z])\s+([A-Za-z]{1,2})\b/g, "$1$2") // "M oK" → "MoK"
       .trim()
   );
 }
