@@ -1,6 +1,6 @@
 import { parserMap } from "../parsers/parserMap";
 import { extractTextFromImage } from "../utils/ocr";
-import { preprocessOCR } from "../utils/preprocessOCR"; // ✅ POPRAWIONA ŚCIEŻKA
+import { preprocessOCR } from "../utils/preprocessOCR";
 
 export async function processOCR(
   imageUrl: string,
@@ -20,15 +20,17 @@ export async function processOCR(
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 PREPROCESS (usuwanie śmieci + dolnego usera)
-  lines = preprocessOCR(
-    lines,
-    parserType as keyof typeof parserMap // ✅ lepsze typowanie niż any
+  // 🔥 PREPROCESS (clean + crop)
+  lines = preprocessOCR(lines, parserType as any);
+
+  // 🔥 NOWE: zostaw tylko linie z punktami (M/K/liczby)
+  lines = lines.filter((line) =>
+    /[\d]+(\.\d+)?\s*[MK]?$/i.test(line)
   );
 
-  console.log("=== PREPROCESSED LINES ===");
+  console.log("=== FILTERED LINES ===");
   console.log(lines);
-  console.log("==========================");
+  console.log("======================");
 
   const parsed = parser(lines);
 
