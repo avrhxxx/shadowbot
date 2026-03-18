@@ -1,0 +1,21 @@
+import Tesseract from "tesseract.js";
+
+export interface OCRResult {
+  text: string;
+  confidence: number;
+}
+
+export class OCRRunner {
+  static async runOCR(buffer: Buffer): Promise<OCRResult> {
+    const { data } = await Tesseract.recognize(buffer, "eng+rus+ukr", { tessjs_create_pdf: "0" });
+    return { text: data.text.trim(), confidence: data.confidence / 100 };
+  }
+
+  static async runBatch(buffers: Buffer[]): Promise<OCRResult[]> {
+    const results: OCRResult[] = [];
+    for (const buf of buffers) {
+      results.push(await this.runOCR(buf));
+    }
+    return results;
+  }
+}
