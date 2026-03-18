@@ -1,30 +1,41 @@
-// ConfirmCommand.ts
-// Komenda do zatwierdzenia danych z PreviewBuffer
-
-import { PreviewBuffer } from "../services/PreviewBuffer";
-import { SessionManager } from "../services/SessionManager";
-import { PointsService } from "../services/PointsService";
+import { SessionManager } from "../session/SessionManager";
+import { QuickAddService } from "../services/QuickAddService";
 
 export class ConfirmCommand {
   static name = "confirm";
 
-  async execute() {
-    if (!SessionManager.hasActiveSession()) {
+  constructor(private quickAddService: QuickAddService) {}
+
+  async execute(guildId: string): Promise<string> {
+    const sessionManager = SessionManager.getInstance();
+
+    const session = sessionManager.getSession(guildId);
+
+    if (!session) {
       throw new Error("Brak aktywnej sesji QuickAdd.");
     }
 
-    const entries = PreviewBuffer.getAll();
-    const errors = entries.filter(e => e.flags.some(f => ["DUPLICATE", "UNREADABLE", "INVALID"].includes(f)));
+    const entries = session.previewBuffer.getAllEntries();
 
-    if (errors.length > 0) {
-      throw new Error("Nie można zatwierdzić. W PreviewBuffer są błędy.");
+    if (!entries.length) {
+      throw new Error("Brak danych do zatwierdzenia.");
     }
 
-    // TODO: zapis do serwisu docelowego
-    await PointsService.save(entries);
+    const hasErrors = entries.some(e =>
+      e.flags?.some(f =>
+        ["DUPLICATE", "UNREADABLE", "INVALID"].includes(f)
+      )
+    );
 
-    SessionManager.closeSession();
-    PreviewBuffer.clear();
+    if (hasErrors) {
+      throw new Error("Nie można zatwierdzić. W danych są błędy.");
+    }
+
+    // 🔥 KLUCZOWE
+    await this.quickAddService.confirm(session);
+
+    // zamknięcie sesji
+    sessionManager.endSession(guildId);
 
     return "Dane zostały zapisane pomyślnie.";
   }
