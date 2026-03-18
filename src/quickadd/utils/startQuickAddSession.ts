@@ -5,27 +5,26 @@ import {
   TextChannel,
 } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
-import { sendSessionInfo } from "../utils/sendSessionInfo";
+import { sendSessionInfo } from "./sendSessionInfo";
 
 type EventType = "rr" | "dn" | "dp";
+type SessionMode = "add" | "attend";
 
 export async function startQuickAddSession(
   message: Message,
-  eventType: EventType
+  eventType: EventType,
+  mode: SessionMode = "add"
 ) {
   const guild = message.guild;
   if (!guild) return;
 
-  // 🔒 blokada
   if (SessionManager.hasSession(guild.id)) {
     await message.reply("❌ Masz już aktywną sesję.");
     return;
   }
 
-  // 🧠 nazwa kanału
-  const channelName = `${eventType}-session-${message.author.username}`;
+  const channelName = `${eventType}-${mode}-${message.author.username}`;
 
-  // 🔥 tworzenie kanału
   const channel = await guild.channels.create({
     name: channelName,
     type: ChannelType.GuildText,
@@ -44,16 +43,15 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 💾 zapis sesji
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
     eventType,
+    mode,
   });
 
   await message.reply(`✅ Sesja utworzona: ${channel}`);
 
-  // 📘 onboarding
-  await sendSessionInfo(channel as TextChannel, message.author.id);
+  await sendSessionInfo(channel as TextChannel, message.author.id, mode);
 }
