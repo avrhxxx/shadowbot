@@ -6,29 +6,31 @@ export async function preview(message: Message) {
   const guildId = message.guildId!;
   const session = SessionManager.getSession(guildId);
 
-  if (!session) return;
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji.");
+    return;
+  }
 
   const entries = SessionData.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
-    await message.reply("❌ Brak danych.");
+    await message.reply("❌ Brak danych do podglądu.");
     return;
   }
 
-  // 🔢 budowanie listy
+  // 🔢 budowanie listy wpisów
   const lines = entries.map((entry, index) => {
     const valueFormatted =
       entry.value >= 1_000_000
         ? `${(entry.value / 1_000_000).toFixed(2)}M`
         : `${(entry.value / 1_000).toFixed(0)}K`;
 
-    const status = entry.status ?? "OK";
-
-    return `**[${index + 1}] ${entry.nickname}** – ${valueFormatted} | \`${status}\``;
+    return `**[${index + 1}] ${entry.nickname}** – ${valueFormatted}`;
   });
 
   // 📊 suma
   const total = entries.reduce((sum, e) => sum + e.value, 0);
+
   const totalFormatted =
     total >= 1_000_000
       ? `${(total / 1_000_000).toFixed(2)}M`
@@ -57,9 +59,7 @@ export async function preview(message: Message) {
       {
         name: "⚙️ Commands",
         value:
-          "`!adjust [id] [nick] [value]`\n" +
-          "`!repair [id]`\n" +
-          "`!redo`\n" +
+          "`!preview`\n" +
           "`!confirm`\n" +
           "`!cancel`",
       }
