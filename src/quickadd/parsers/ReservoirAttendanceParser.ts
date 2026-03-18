@@ -1,5 +1,7 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
+let lineCounter = 1;
+
 export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -12,19 +14,29 @@ export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
     line = line.replace(/^\d+\s*/, "");
     line = line.replace(/[\d,]+$/, "");
 
-    const nickname = cleanNickname(line);
+    const nickname = line.trim();
     if (!nickname) continue;
 
-    entries.push({
-      nickname,
-      value: "1", // 🔥 FIX
-      raw: "ATTEND",
-    });
+    entries.push(createEntry(rawLine, nickname, 1, "ATTEND"));
   }
 
   return entries;
 }
 
-function cleanNickname(name: string): string {
-  return name.replace(/[^\w\d_]/g, "").trim();
+function createEntry(
+  rawText: string,
+  nickname: string,
+  value: number,
+  raw: string
+): QuickAddEntry {
+  return {
+    lineId: lineCounter++,
+    rawText,
+    nickname,
+    value,
+    raw,
+    status: "OK",
+    confidence: 1,
+    sourceType: "OCR",
+  };
 }
