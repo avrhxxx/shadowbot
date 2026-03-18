@@ -1,49 +1,98 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
-import { PreviewBuffer } from "../preview/PreviewBuffer";
 import { DuplicateDetector } from "../preview/DuplicateDetector";
 import { ValidationService } from "./ValidationService";
 import { ReservoirRaidParser } from "../parsers/ReservoirRaidParser";
 import { DuelPointsParser } from "../parsers/DuelPointsParser";
 import { DonationsParser, OCRSegment } from "../parsers/DonationsParser";
+import { QuickAddSession } from "../session/QuickAddSession";
+import { EventType } from "./QuickAddService"; // jeśli masz osobno, popraw import
 
-export type EventType = "RR" | "DP" | "DN";
+// TODO: podmień na realne serwisy jak będą gotowe
+type EventService = any;
+type PointsService = any;
 
 export class QuickAddService {
-  constructor(private previewBuffer: PreviewBuffer) {}
+  constructor(
+    private eventService: EventService,
+    private pointsService: PointsService
+  ) {}
 
-  // dla line-based RR / DP
-  addLines(rawLines: string[], eventType: EventType) {
-    const parser = eventType === "RR" ? ReservoirRaidParser : DuelPointsParser;
+  // -----------------------------
+  // ADD LINES (RR / DP)
+  // -----------------------------
+  addLines(session: QuickAddSession, rawLines: string[]) {
+    const eventType = session.context.eventType;
+
+    const parser =
+      eventType === "RR"
+        ? ReservoirRaidParser
+        : DuelPointsParser;
+
     const entries = rawLines.map(line => parser.parseLine(line));
-    this.addEntries(entries);
+    this.addEntries(session, entries);
   }
 
-  // dla segment-based DN
-  addSegments(segments: OCRSegment[]) {
+  // -----------------------------
+  // ADD SEGMENTS (DN)
+  // -----------------------------
+  addSegments(session: QuickAddSession, segments: OCRSegment[]) {
     const entries = segments.map(seg => DonationsParser.parseSegment(seg));
-    this.addEntries(entries);
+    this.addEntries(session, entries);
   }
 
-  private addEntries(entries: QuickAddEntry[]) {
-    // dodanie do PreviewBuffer
-    entries.forEach(entry => this.previewBuffer.addEntry(entry));
+  // -----------------------------
+  // CORE PROCESSING
+  // -----------------------------
+  private addEntries(session: QuickAddSession, entries: QuickAddEntry[]) {
+    const buffer = session.previewBuffer;
+
+    // dodanie
+    entries.forEach(entry => buffer.addEntry(entry));
 
     // deduplikacja
-    const allEntries = this.previewBuffer.getAllEntries();
+    const allEntries = buffer.getAllEntries();
     DuplicateDetector.markDuplicates(allEntries);
 
     // walidacja
     const validated = ValidationService.validateEntries(allEntries);
 
-    // nadpisanie w PreviewBuffer
-    this.previewBuffer.reset();
-    validated.forEach(entry => this.previewBuffer.addEntry(entry));
+    // reset + zapis
+    buffer.reset();
+    validated.forEach(entry => buffer.addEntry(entry));
+
+    session.touch();
   }
 
-  confirm(): QuickAddEntry[] {
-    const confirmed = this.previewBuffer.getAllEntries();
-    // Tutaj można dodać integrację z pointsService / eventService
-    this.previewBuffer.clear();
-    return confirmed;
+  // -----------------------------
+  // CONFIRM (FINAL COMMIT)
+  // -----------------------------
+  async confirm(session: QuickAddSession): Promise<void> {
+    const entries = session.previewBuffer.getAllEntries();
+    const context = session.context;
+
+    if (!entries.length) {
+      throw new Error("Brak wpisów do zatwierdzenia.");
+    }
+
+    switch (context.eventType) {
+      case "RR":
+        await this.eventService.addReservoirEntries(context, entries);
+        break;
+
+      case "DN":
+        await this.pointsService.addDonationsEntries(context, entries);
+        break;
+
+      case "DP":
+        await this.pointsService.addDuelEntries(context, entries);
+        break;
+
+      default:
+        throw new Error(`Nieznany eventType: ${context.eventType}`);
+    }
+
+    // cleanup
+    session.previewBuffer.clear();
+    session.touch();
   }
 }
