@@ -18,26 +18,34 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔢 lista wpisów (RAW VALUE)
+  // 🔥 LICZENIE DUPLIKATÓW
+  const counts = new Map<string, number>();
+
+  for (const entry of entries) {
+    const key = entry.nickname.toLowerCase();
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  // 🔢 lista wpisów (RAW + DUPLICATE DETECTOR)
   const lines = entries.map((entry, index) => {
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${entry.raw}`;
+    const key = entry.nickname.toLowerCase();
+    const count = counts.get(key) || 0;
+
+    const duplicateMark =
+      count > 1 ? ` ⚠ x${count}` : "";
+
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${entry.raw}${duplicateMark}`;
   });
 
   const embed = new EmbedBuilder()
     .setTitle("📊 QuickAdd Preview – Reservoir Raid")
     .setDescription(
       `👤 **Session Owner:** <@${session.moderatorId}>\n` +
-      `📦 **Entries:** ${entries.length}\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
-      lines.join("\n") +
-      `\n━━━━━━━━━━━━━━━━━━\n` +
-      `⚙️ **Commands:**\n` +
-      `\`!preview\` – odświeża podgląd\n` +
-      `\`!confirm\` – zapisuje i kończy sesję\n` +
-      `\`!cancel\` – anuluje sesję (bez zapisu)\n` +
-      `\`!adjust [id] nick [nowyNick]\` – zmienia nick\n` +
-      `\`!adjust [id] value [nowaWartość]\` – zmienia wartość\n` +
-      `📌 Przykład: \`!adjust 3 value 11.87M\``
+        `📦 **Entries:** ${entries.length}\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        lines.join("\n") +
+        `\n━━━━━━━━━━━━━━━━━━\n` +
+        `📌 Użyj \`!help\` aby zobaczyć dostępne komendy`
     )
     .setColor(0x5865f2);
 
