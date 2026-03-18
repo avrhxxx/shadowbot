@@ -9,7 +9,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 różne warianty OCR "No Team"
     const match =
       line.match(/\(No\s*Team\)\s*(.+)/i) ||
       line.match(/\(NoTeam\)\s*(.+)/i) ||
@@ -24,7 +23,7 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
 
     entries.push({
       nickname,
-      value: 1, // 🔥 zawsze 1 (jak attendance)
+      value: "1", // 🔥 FIX
       raw: "RAID",
     });
   }
@@ -32,7 +31,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔹 czyści nickname z OCR śmieci
 function cleanNickname(name: string): string {
   return name.replace(/[^\w\d_]/g, "").trim();
 }
