@@ -15,6 +15,9 @@ import { cancel } from "./commands/CancelCommand";
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
 
+// 🔥 NOWY PARSER
+import { parseValue } from "./utils/parseValue";
+
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
     if (message.author.bot) return;
@@ -81,7 +84,7 @@ export function registerQuickAddListener(client: Client) {
     if (message.channel.id !== session.channelId) return;
 
     // -----------------------------
-    // 📝 PROSTY PARSER (tymczasowy)
+    // 📝 PARSER (k / m / 1.2m)
     // -----------------------------
     if (content.length > 0) {
       try {
@@ -93,9 +96,9 @@ export function registerQuickAddListener(client: Client) {
         }
 
         const nickname = parts[0];
-        const value = Number(parts[1]);
+        const value = parseValue(parts[1]);
 
-        if (isNaN(value)) {
+        if (value === null) {
           await message.react("❌");
           return;
         }
