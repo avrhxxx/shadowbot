@@ -1,5 +1,7 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
+let lineCounter = 1;
+
 export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -21,16 +23,10 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
 
     const value = normalizeValue(rawNumber, suffix);
 
-    const nicknameRaw = line.replace(fullMatch, "").trim();
-    const nickname = cleanNickname(nicknameRaw);
-
+    const nickname = line.replace(fullMatch, "").trim();
     if (!nickname || value <= 0) continue;
 
-    entries.push({
-      nickname,
-      value: String(value), // 🔥 FIX
-      raw: fullMatch,
-    });
+    entries.push(createEntry(rawLine, nickname, value, fullMatch));
   }
 
   return entries;
@@ -48,6 +44,20 @@ function normalizeValue(num: string, suffix: string): number {
   return parseInt(num.replace(/[^\d]/g, ""), 10) || 0;
 }
 
-function cleanNickname(name: string): string {
-  return name.replace(/[^\w\d_]/g, "").trim();
+function createEntry(
+  rawText: string,
+  nickname: string,
+  value: number,
+  raw: string
+): QuickAddEntry {
+  return {
+    lineId: lineCounter++,
+    rawText,
+    nickname,
+    value,
+    raw,
+    status: "OK",
+    confidence: 1,
+    sourceType: "OCR",
+  };
 }
