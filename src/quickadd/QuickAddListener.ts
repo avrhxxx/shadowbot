@@ -6,8 +6,9 @@ import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
-// 🔹 NOWE: preview
+// 🔹 preview + confirm
 import { preview } from "./commands/PreviewCommand";
+import { confirm } from "./commands/ConfirmCommand";
 
 // 🔹 sesja + dane
 import { SessionManager } from "./session/SessionManager";
@@ -45,9 +46,13 @@ export function registerQuickAddListener(client: Client) {
             await rrattend(message);
             break;
 
-          // 🔥 DODANE
           case "preview":
             await preview(message);
+            break;
+
+          // 🔥 NOWE
+          case "confirm":
+            await confirm(message);
             break;
 
           default:
