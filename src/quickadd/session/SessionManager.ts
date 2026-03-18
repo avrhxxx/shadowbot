@@ -1,10 +1,12 @@
 type EventType = "rr" | "dn" | "dp";
+type SessionMode = "add" | "attend";
 
 interface QuickAddSession {
   guildId: string;
   channelId: string;
   moderatorId: string;
   eventType: EventType;
+  mode: SessionMode;
 }
 
 export class SessionManager {
