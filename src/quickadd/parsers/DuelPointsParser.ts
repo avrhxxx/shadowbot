@@ -1,36 +1,53 @@
-import { unicodeCleaner } from "../utils/unicodeCleaner";
-import { parseNumber } from "../utils/numberParser";
-import { ParsedEntry } from "../types/ParsedEntry";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
-export class DuelPointsParser {
-  static parseLine(rawLine: string): ParsedEntry {
-    const cleaned = unicodeCleaner(rawLine);
+let lineCounter = 1;
 
-    const match = cleaned.match(/(.+?)\s+([\d.,]+)$/);
+export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
+  const entries: QuickAddEntry[] = [];
 
-    if (!match) {
-      return {
-        rawText: rawLine,
-        nickname: cleaned,
-        value: null
-      };
-    }
+  for (const rawLine of lines) {
+    if (!rawLine) continue;
 
-    const nickname = match[1].trim();
-    const value = parseNumber(match[2]);
+    const line = rawLine.trim();
+    if (!line) continue;
 
-    return {
+    const valueMatch = line.match(/([\d.,]+)\s*([MK]?)/i);
+    if (!valueMatch) continue;
+
+    const fullMatch = valueMatch[0];
+
+    if (!line.endsWith(fullMatch)) continue;
+
+    const rawNumber = valueMatch[1];
+    const suffix = (valueMatch[2] || "").toUpperCase();
+
+    const value = normalizeValue(rawNumber, suffix);
+
+    const nickname = line.replace(fullMatch, "").trim();
+    if (!nickname) continue;
+
+    entries.push({
+      lineId: lineCounter++,
       rawText: rawLine,
       nickname,
-      value
-    };
+      value,
+      status: "OK",
+      confidence: 1,
+      sourceType: "OCR",
+    });
   }
 
-  static parseMany(input: string): ParsedEntry[] {
-    return input
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => this.parseLine(line));
-  }
+  return entries;
+}
+
+function normalizeValue(num: string, suffix: string): string {
+  let clean = num.replace(",", ".");
+
+  const number = parseFloat(clean);
+  if (isNaN(number)) return "";
+
+  if (suffix === "M") return Math.round(number * 1_000_000).toString();
+  if (suffix === "K") return Math.round(number * 1_000).toString();
+
+  return num.replace(/[^\d]/g, "");
 }
