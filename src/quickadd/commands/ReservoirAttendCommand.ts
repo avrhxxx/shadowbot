@@ -1,20 +1,5 @@
-import { CommandInteraction } from "discord.js";
-import { startQuickAddSession } from "./startQuickAddSession";
+import { Message } from "discord.js";
 
-export async function rrattend(interaction: CommandInteraction) {
-  const dateArg = interaction.options.getString("date");
-
-  if (!dateArg || !/^\d{4}$/.test(dateArg)) {
-    await interaction.reply({
-      content: "❌ Podaj datę MMDD.",
-      ephemeral: true
-    });
-    return;
-  }
-
-  await startQuickAddSession({
-    interaction,
-    eventType: "RR_ATTEND",
-    date: dateArg
-  });
+export async function rrattend(message: Message) {
+  await message.reply("⚠️ RR Attend jeszcze nie działa");
 }
