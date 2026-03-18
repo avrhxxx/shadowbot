@@ -1,0 +1,29 @@
+import { QuickAddEntry } from "../types/QuickAddEntry";
+import { parseNumber } from "../utils/numberParser";
+
+export class ValidationService {
+  static validateEntry(entry: QuickAddEntry): QuickAddEntry {
+    let status = entry.status;
+
+    // nickname obowiązkowy
+    if (!entry.nickname || entry.nickname === "???") {
+      status = "INVALID";
+    }
+
+    // value musi być parsowalną liczbą
+    const parsedValue = parseNumber(entry.value);
+    if (parsedValue === null) {
+      status = "UNREADABLE";
+    }
+
+    return {
+      ...entry,
+      status,
+      confidence: parsedValue !== null ? 1 : 0
+    };
+  }
+
+  static validateEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
+    return entries.map(e => this.validateEntry(e));
+  }
+}
