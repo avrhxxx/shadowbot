@@ -1,39 +1,41 @@
 import {
-  CommandInteraction,
+  Guild,
+  TextChannel,
   ChannelType,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  Message,
 } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 
 type StartOptions = {
-  interaction: CommandInteraction;
+  guild: Guild;
+  userId: string;
+  reply: (content: string) => Promise<any>;
   eventType: "RR" | "DN" | "DP" | "RR_ATTEND";
   date?: string;
   week?: string;
 };
 
 export async function startQuickAddSession({
-  interaction,
+  guild,
+  userId,
+  reply,
   eventType,
   date,
-  week
+  week,
 }: StartOptions) {
-  const guild = interaction.guild!;
   const guildId = guild.id;
-  const moderatorId = interaction.user.id;
 
   const sessionManager = SessionManager.getInstance();
 
+  // 🔒 blokada sesji
   if (sessionManager.hasActiveSession(guildId)) {
-    await interaction.reply({
-      content: "⚠️ Na tym serwerze jest już aktywna sesja QuickAdd.",
-      ephemeral: true
-    });
+    await reply("⚠️ Na tym serwerze jest już aktywna sesja QuickAdd.");
     return;
   }
 
-  // 🔥 kanał
-  const channel = await guild.channels.create({
+  // 🔥 tworzenie kanału
+  const channel = (await guild.channels.create({
     name: "quick-add-session",
     type: ChannelType.GuildText,
     permissionOverwrites: [
@@ -42,7 +44,7 @@ export async function startQuickAddSession({
         deny: [PermissionFlagsBits.ViewChannel],
       },
       {
-        id: moderatorId,
+        id: userId,
         allow: [
           PermissionFlagsBits.ViewChannel,
           PermissionFlagsBits.SendMessages,
@@ -58,26 +60,27 @@ export async function startQuickAddSession({
         ],
       },
     ],
-  });
+  })) as TextChannel;
 
-  // 🔥 sesja
+  // 🔥 tworzenie sesji
   sessionManager.createSession(
     guildId,
-    moderatorId,
+    userId,
     {
       eventType,
       date,
-      week
+      week,
     },
     channel.id
   );
 
-  await interaction.reply({
-    content: `✅ Sesja utworzona: ${channel}`,
-    ephemeral: true
-  });
+  // ✅ odpowiedź (działa dla message i interaction)
+  await reply(`✅ Sesja utworzona: ${channel}`);
 
+  // 📥 info w kanale
   await channel.send({
-    content: `📥 **QuickAdd Session (${eventType})**\n${date ? `Data: ${date}` : `Zakres: ${week}`}`
+    content:
+      `📥 **QuickAdd Session (${eventType})**\n` +
+      (date ? `Data: ${date}` : `Zakres: ${week}`),
   });
 }
