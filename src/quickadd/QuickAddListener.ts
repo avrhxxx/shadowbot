@@ -6,13 +6,14 @@ import { dnadd } from "./commands/DonationsAddCommand";
 import { dpadd } from "./commands/DuelAddCommand";
 import { rrattend } from "./commands/ReservoirAttendCommand";
 
-// 🔹 preview + confirm + cancel + adjust + delete + merge
+// 🔹 preview + confirm + cancel + adjust + delete + merge + help
 import { preview } from "./commands/PreviewCommand";
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
 import { adjust } from "./commands/AdjustCommand";
 import { deleteEntry } from "./commands/DeleteCommand";
 import { merge } from "./commands/MergeCommand";
+import { help } from "./commands/HelpCommand";
 
 // 🔹 sesja + dane
 import { SessionManager } from "./session/SessionManager";
@@ -29,6 +30,11 @@ export function registerQuickAddListener(client: Client) {
     const content = message.content.trim();
     const session = SessionManager.getSession(message.guildId);
 
+    const isQuickAddChannel =
+      message.channel.isTextBased() &&
+      "name" in message.channel &&
+      message.channel.name === "quick-add";
+
     // -----------------------------
     // 🔹 KOMENDY (!)
     // -----------------------------
@@ -36,36 +42,26 @@ export function registerQuickAddListener(client: Client) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
-      const isQuickAddChannel =
-        message.channel.isTextBased() &&
-        "name" in message.channel &&
-        message.channel.name === "quick-add";
-
       try {
         switch (command) {
+          // 🔥 HELP (dynamiczny – działa wszędzie)
+          case "help":
+            await help(message);
+            break;
+
           // 🔥 START
           case "rradd":
-            if (!isQuickAddChannel)
-              return message.reply("❌ Tylko w #quick-add.");
-            await rradd(message);
-            break;
-
           case "dnadd":
-            if (!isQuickAddChannel)
-              return message.reply("❌ Tylko w #quick-add.");
-            await dnadd(message);
-            break;
-
           case "dpadd":
-            if (!isQuickAddChannel)
-              return message.reply("❌ Tylko w #quick-add.");
-            await dpadd(message);
-            break;
-
           case "rrattend":
-            if (!isQuickAddChannel)
+            if (!isQuickAddChannel) {
               return message.reply("❌ Tylko w #quick-add.");
-            await rrattend(message);
+            }
+
+            if (command === "rradd") await rradd(message);
+            if (command === "dnadd") await dnadd(message);
+            if (command === "dpadd") await dpadd(message);
+            if (command === "rrattend") await rrattend(message);
             break;
 
           // 🔥 SESJA
@@ -136,7 +132,7 @@ export function registerQuickAddListener(client: Client) {
         SessionData.addEntry(message.guildId, {
           nickname,
           value,
-          raw: rawValue, // 🔥 preview używa tego
+          raw: rawValue,
         });
 
         await message.react("✅");
