@@ -1,0 +1,48 @@
+// AdjustCommand.ts
+// Komenda do ręcznej edycji pojedynczego wpisu w PreviewBuffer
+
+import { PreviewBuffer } from "../services/PreviewBuffer";
+import { SessionManager } from "../services/SessionManager";
+
+export class AdjustCommand {
+  static name = "adjust";
+
+  // Składnia: !adjust <lineId> <field> <value>
+  async execute(lineId: number, field: "nick" | "value", value: string) {
+    if (!SessionManager.hasActiveSession()) {
+      throw new Error("Brak aktywnej sesji QuickAdd.");
+    }
+
+    const entry = PreviewBuffer.getEntry(lineId);
+    if (!entry) {
+      throw new Error(`Nie znaleziono wpisu o lineId ${lineId}.`);
+    }
+
+    if (!["nick", "value"].includes(field)) {
+      throw new Error(`Niepoprawne pole. Dozwolone: nick, value.`);
+    }
+
+    // Walidacja value jeśli field === "value"
+    if (field === "value" && !this.validateValue(value)) {
+      throw new Error("Niepoprawny format wartości.");
+    }
+
+    // Aktualizacja pola
+    entry[field] = value;
+
+    // Usunięcie flag błędów
+    entry.flags = entry.flags.filter(f => !["DUPLICATE", "INVALID", "UNREADABLE"].includes(f));
+
+    // Oznaczenie jako ręcznie edytowane
+    entry.flags.push("MANUALLY_ADJUSTED");
+
+    PreviewBuffer.updateEntry(lineId, entry);
+
+    return `Line ${lineId} updated: ${field} → ${value}`;
+  }
+
+  private validateValue(value: string): boolean {
+    // TODO: dodać reguły walidacji wartości
+    return !!value;
+  }
+}
