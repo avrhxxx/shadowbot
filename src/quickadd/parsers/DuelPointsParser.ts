@@ -11,7 +11,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔥 MUSI zawierać M lub K (punkty)
+    // 🔥 musi mieć wartość typu 36.59M / 120K
     const valueMatch = line.match(/([\d.,]+)\s*([MK])/i);
     if (!valueMatch) continue;
 
@@ -25,19 +25,12 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     // 🔥 usuń value z linii
     let nicknamePart = line.replace(fullMatch, "");
 
-    // 🔥 usuń rank z początku (np. "8 ", "10 ")
+    // 🔥 usuń rank (np. "8 ", "10 ")
     nicknamePart = nicknamePart.replace(/^\d+\s*/, "");
-
-    // 🔥 usuń #227 [XXX] i podobne
-    nicknamePart = nicknamePart.replace(/#\d+.*$/g, "");
-
-    // 🔥 usuń dziwne OCR prefixy (np. "&", "@", itp.)
-    nicknamePart = nicknamePart.replace(/^[^\w\d]+/, "");
 
     const nickname = cleanNickname(nicknamePart);
 
-    // 🔥 filtr jakości
-    if (!isValidNickname(nickname)) continue;
+    if (!nickname || nickname.length < 3) continue;
 
     entries.push({
       lineId: lineCounter++,
@@ -66,26 +59,18 @@ function normalizeValue(num: string, suffix: string): number {
   return 0;
 }
 
-// 🔥 czyszczenie nicków
+// 🔥 MEGA ważne czyszczenie nicków
 function cleanNickname(name: string): string {
-  return name
-    .replace(/[^\w\d\s_]/g, "") // usuń śmieci
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// 🔥 KLUCZOWY filtr jakości
-function isValidNickname(nick: string): boolean {
-  if (!nick) return false;
-
-  // za krótkie
-  if (nick.length < 3) return false;
-
-  // same liczby
-  if (/^\d+$/.test(nick)) return false;
-
-  // zawiera tylko śmieci typu "227"
-  if (nick.includes("227")) return false;
-
-  return true;
+  return (
+    name
+      // usuń śmieci OCR
+      .replace(/[^\w\d\s_]/g, "")
+      // usuń pojedyncze litery na początku (E, m itd.)
+      .replace(/^\b[a-zA-Z]\b\s*/g, "")
+      // usuń liczby na końcu (np. "31")
+      .replace(/\s\d+$/g, "")
+      // usuń podwójne spacje
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
