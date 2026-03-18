@@ -61,7 +61,7 @@ export async function preview(message: Message) {
         `━━━━━━━━━━━━━━━━━━\n` +
         lines.join("\n") +
         `\n━━━━━━━━━━━━━━━━━━\n` +
-        `⚠️ Entries marked may contain OCR errors\n` +
+        `⚠️ Some entries may contain OCR errors\n` +
         `📌 Use \`!adjust\` to fix them`
     )
     .setColor(0x5865f2);
