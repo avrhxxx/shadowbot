@@ -43,52 +43,56 @@ export function registerQuickAddListener(client: Client) {
       const command = rawCommand.toLowerCase();
 
       try {
-        switch (command) {
-          // 🔥 HELP (dynamiczny – działa wszędzie)
-          case "help":
-            await help(message);
-            break;
+        // 🔥 HELP (działa wszędzie)
+        if (command === "help") {
+          await help(message);
+          return;
+        }
 
-          // 🔥 START
-          case "rradd":
-          case "dnadd":
-          case "dpadd":
-          case "rrattend":
-            if (!isQuickAddChannel) {
-              return message.reply("❌ Tylko w #quick-add.");
-            }
+        // 🔥 START
+        if (
+          command === "rradd" ||
+          command === "dnadd" ||
+          command === "dpadd" ||
+          command === "rrattend"
+        ) {
+          if (!isQuickAddChannel) {
+            return message.reply("❌ Tylko w #quick-add.");
+          }
 
-            if (command === "rradd") await rradd(message);
-            if (command === "dnadd") await dnadd(message);
-            if (command === "dpadd") await dpadd(message);
-            if (command === "rrattend") await rrattend(message);
-            break;
+          if (command === "rradd") await rradd(message);
+          if (command === "dnadd") await dnadd(message);
+          if (command === "dpadd") await dpadd(message);
+          if (command === "rrattend") await rrattend(message);
 
-          // 🔥 SESJA
-          case "preview":
-          case "confirm":
-          case "cancel":
-          case "adjust":
-          case "delete":
-          case "merge":
-            if (!session || message.channel.id !== session.channelId) {
-              return message.reply("❌ Tylko w kanale sesji.");
-            }
+          return;
+        }
 
-            if (session.moderatorId !== message.author.id) {
-              return message.reply("❌ To nie Twoja sesja.");
-            }
+        // 🔥 SESJA
+        if (
+          command === "preview" ||
+          command === "confirm" ||
+          command === "cancel" ||
+          command === "adjust" ||
+          command === "delete" ||
+          command === "merge"
+        ) {
+          if (!session || message.channel.id !== session.channelId) {
+            return message.reply("❌ Tylko w kanale sesji.");
+          }
 
-            if (command === "preview") await preview(message);
-            if (command === "confirm") await confirm(message);
-            if (command === "cancel") await cancel(message);
-            if (command === "adjust") await adjust(message);
-            if (command === "delete") await deleteEntry(message);
-            if (command === "merge") await merge(message);
-            break;
+          if (session.moderatorId !== message.author.id) {
+            return message.reply("❌ To nie Twoja sesja.");
+          }
 
-          default:
-            return;
+          if (command === "preview") await preview(message);
+          if (command === "confirm") await confirm(message);
+          if (command === "cancel") await cancel(message);
+          if (command === "adjust") await adjust(message);
+          if (command === "delete") await deleteEntry(message);
+          if (command === "merge") await merge(message);
+
+          return;
         }
       } catch (err) {
         console.error("QuickAdd error:", err);
@@ -116,26 +120,45 @@ export function registerQuickAddListener(client: Client) {
       try {
         const parts = content.split(/\s+/);
 
-        // tylko "nick value"
-        if (parts.length !== 2) return;
+        // 🔥 TRYB ADD
+        if (session.mode === "add") {
+          if (parts.length !== 2) return;
 
-        const nickname = parts[0];
-        const rawValue = parts[1];
+          const nickname = parts[0];
+          const rawValue = parts[1];
 
-        const value = parseValue(rawValue);
+          const value = parseValue(rawValue);
 
-        if (value === null) {
-          await message.react("❌");
+          if (value === null) {
+            await message.react("❌");
+            return;
+          }
+
+          SessionData.addEntry(message.guildId, {
+            nickname,
+            value,
+            raw: rawValue,
+          });
+
+          await message.react("✅");
           return;
         }
 
-        SessionData.addEntry(message.guildId, {
-          nickname,
-          value,
-          raw: rawValue,
-        });
+        // 🔥 TRYB ATTEND
+        if (session.mode === "attend") {
+          if (parts.length !== 1) return;
 
-        await message.react("✅");
+          const nickname = parts[0];
+
+          SessionData.addEntry(message.guildId, {
+            nickname,
+            value: 1,
+            raw: "ATTEND",
+          });
+
+          await message.react("✅");
+          return;
+        }
       } catch (err) {
         console.error("Parse error:", err);
         await message.react("❌");
