@@ -15,12 +15,12 @@ export async function help(message: Message) {
     const embed = new EmbedBuilder()
       .setTitle("📖 QuickAdd – Start")
       .setDescription(
-        `🟦 **START**\n` +
-          `\`!rradd\` – Reservoir Raid\n` +
+        `🟦 **Rozpoczęcie sesji**\n` +
+          `\`!rradd\` – Reservoir Raid (dodawanie danych)\n` +
           `\`!dnadd\` – Donations\n` +
           `\`!dpadd\` – Duel\n` +
-          `\`!rrattend\` – attendance\n\n` +
-          `📌 Użyj jednej z komend aby rozpocząć sesję.`
+          `\`!rrattend\` – attendance (obecność)\n\n` +
+          `📌 Użyj jednej z komend, aby rozpocząć sesję.`
       )
       .setColor(0x5865f2);
 
@@ -29,20 +29,26 @@ export async function help(message: Message) {
 
   // 🟨 SESJA
   if (session && message.channel.id === session.channelId) {
+    const isAttend = session.mode === "attend";
+
     const embed = new EmbedBuilder()
       .setTitle("📖 QuickAdd – Sesja")
       .setDescription(
-        `🟨 **SESJA**\n` +
+        `🟨 **Tryb:** ${isAttend ? "Attendance" : "Dodawanie danych"}\n\n` +
+          `⚙️ **Podstawowe**\n` +
           `\`!preview\` – podgląd\n` +
           `\`!confirm\` – zapis i zakończenie\n` +
           `\`!cancel\` – anulowanie\n\n` +
-          `🟩 **EDYCJA**\n` +
-          `\`!adjust [id] nick [nowyNick]\`\n` +
-          `\`!adjust [id] value [nowaWartość]\`\n` +
-          `\`!delete [id]\`\n` +
-          `\`!merge [fromId] [toId]\`\n\n` +
+          (!isAttend
+            ? `🟩 **Edycja danych**\n` +
+              `\`!adjust [id] nick [nowyNick]\`\n` +
+              `\`!adjust [id] value [nowaWartość]\`\n` +
+              `\`!delete [id]\`\n` +
+              `\`!merge [fromId] [toId]\`\n\n`
+            : `🟩 **Attendance**\n` +
+              `Wpisuj po prostu:\n\`nick\`\n\n`) +
           `📌 Przykład:\n` +
-          `\`!merge 2 1\``
+          (!isAttend ? `\`!merge 2 1\`` : `\`Player123\``)
       )
       .setColor(0x57f287);
 
@@ -50,5 +56,7 @@ export async function help(message: Message) {
   }
 
   // ❌ inne miejsca
-  return message.reply("❌ Użyj `!help` w #quick-add lub w kanale sesji.");
+  return message.reply(
+    "❌ Użyj `!help` w #quick-add lub w kanale sesji."
+  );
 }
