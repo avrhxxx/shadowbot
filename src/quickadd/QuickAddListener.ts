@@ -1,6 +1,9 @@
 import { Client, Message } from "discord.js";
 import { SessionManager } from "./session/SessionManager";
 
+// 🔹 parser
+import { getParser } from "./parsers/getParser";
+
 // 🔹 komendy startowe
 import { rradd } from "./commands/ReservoirAddCommand";
 import { dnadd } from "./commands/DonationsAddCommand";
@@ -71,7 +74,7 @@ export function registerQuickAddListener(client: Client) {
             if (command === "redo") await redo(message, args);
             break;
 
-          // 🔥 PREVIEW (może każdy w kanale sesji)
+          // 🔥 PREVIEW (może każdy)
           case "preview":
             await preview(message);
             break;
@@ -95,7 +98,7 @@ export function registerQuickAddListener(client: Client) {
     // ❗ tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
 
-    // 🔥 odświeżenie aktywności (ważne pod timeouty)
+    // 🔥 odświeżenie aktywności
     sessionManager.touchSession(message.guildId);
 
     // -----------------------------
@@ -106,25 +109,35 @@ export function registerQuickAddListener(client: Client) {
 
       console.log("📸 Attachment received:", attachment?.url);
 
-      // TODO:
-      // const parsedEntries = await ocrService.process(attachment);
-      // parsedEntries.forEach(e => session.previewBuffer.addEntry(e));
-
+      // TODO: OCR później
       await message.react("📥");
       return;
     }
 
     // -----------------------------
-    // 📝 TEKST (parser - następny krok)
+    // 📝 TEKST (🔥 TU JEST PARSER)
     // -----------------------------
-    if (message.content.trim().length > 0) {
-      console.log("📥 QuickAdd text:", message.content);
+    if (content.length > 0) {
+      try {
+        const parser = getParser(session.eventType);
 
-      // TODO:
-      // const parsed = parser.parse(message.content);
-      // session.previewBuffer.addEntry(parsed);
+        const parsedEntries = parser.parseMany(content);
 
-      await message.react("✅");
+        for (const entry of parsedEntries) {
+          session.previewBuffer.addEntry({
+            nickname: entry.nickname,
+            value: entry.value ?? 0
+          });
+        }
+
+        console.log("✅ Parsed entries:", parsedEntries);
+
+        await message.react("✅");
+      } catch (err) {
+        console.error("❌ Parser error:", err);
+        await message.react("❌");
+      }
+
       return;
     }
   });
