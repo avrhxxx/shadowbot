@@ -1,6 +1,6 @@
 import { parserMap } from "../parsers/parserMap";
 import { extractTextFromImage } from "../utils/ocr";
-import { preprocessOCR } from "../utils/ocrPreprocess"; // 🔥 NOWE
+import { preprocessOCR } from "../utils/preprocessOCR"; // ✅ POPRAWIONA ŚCIEŻKA
 
 export async function processOCR(
   imageUrl: string,
@@ -20,8 +20,11 @@ export async function processOCR(
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 TU SIĘ DZIEJE MAGIA
-  lines = preprocessOCR(lines, parserType as any);
+  // 🔥 PREPROCESS (usuwanie śmieci + dolnego usera)
+  lines = preprocessOCR(
+    lines,
+    parserType as keyof typeof parserMap // ✅ lepsze typowanie niż any
+  );
 
   console.log("=== PREPROCESSED LINES ===");
   console.log(lines);
