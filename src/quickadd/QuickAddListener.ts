@@ -22,7 +22,10 @@ import { SessionData } from "./session/SessionData";
 // 🔥 parser (manual input)
 import { parseValue } from "./utils/parseValue";
 
-// 🔥 helper do mapowania OCR → Entry
+// 🔥 OCR service
+import { processOCR } from "./services/OCRService";
+
+// 🔥 mapper OCR → Entry
 function mapEntry(entry: any) {
   const valueNumber = parseInt(entry.value || "0");
 
@@ -128,31 +131,10 @@ export function registerQuickAddListener(client: Client) {
       }
 
       try {
-        const { extractTextFromImage } = await import("./utils/ocr");
-        const { parserMap } = await import("./parsers/parserMap");
-
-        const text = await extractTextFromImage(attachment.url);
-
-        // 🔥 DEBUG OCR
-        console.log("=== OCR TEXT START ===");
-        console.log(text);
-        console.log("=== OCR TEXT END ===");
-
-        const parser = parserMap[session.parserType];
-        if (!parser) return;
-
-        // 🔥 CLEAN LINES
-        const lines = text
-          .split("\n")
-          .map((l) => l.trim())
-          .filter(Boolean);
-
-        const parsed = parser(lines);
-
-        // 🔥 DEBUG PARSER
-        console.log("=== PARSED OUTPUT ===");
-        console.log(parsed);
-        console.log("=====================");
+        const parsed = await processOCR(
+          attachment.url,
+          session.parserType
+        );
 
         if (!parsed || parsed.length === 0) {
           await message.react("❌");
