@@ -1,25 +1,36 @@
-import { QuickAddEntry } from "../types/QuickAddEntry";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
 import { parseNumber } from "../utils/numberParser";
+import { ParsedEntry } from "../types/ParsedEntry";
 
 export class ReservoirRaidParser {
-  static parseLine(rawLine: string): QuickAddEntry {
+  static parseLine(rawLine: string): ParsedEntry {
     const cleaned = unicodeCleaner(rawLine);
-    const parts = cleaned.trim().split(/\s+/);
-    const valueStr = parts.pop() || "0";
-    const nickname = parts.join(" ") || "???";
-    const parsedValue = parseNumber(valueStr);
 
-    const status: QuickAddEntry["status"] = parsedValue === null ? "UNREADABLE" : "OK";
+    const match = cleaned.match(/(.+?)\s+([\d.,]+)$/);
+
+    if (!match) {
+      return {
+        rawText: rawLine,
+        nickname: cleaned,
+        value: null
+      };
+    }
+
+    const nickname = match[1].replace("(No Team)", "").trim();
+    const value = parseNumber(match[2]);
 
     return {
-      lineId: 0, // do nadania w PreviewBuffer
       rawText: rawLine,
       nickname,
-      value: valueStr,
-      confidence: parsedValue !== null ? 1 : 0,
-      status,
-      sourceType: "OCR"
+      value
     };
+  }
+
+  static parseMany(input: string): ParsedEntry[] {
+    return input
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => this.parseLine(line));
   }
 }
