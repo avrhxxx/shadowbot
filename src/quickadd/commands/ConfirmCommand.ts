@@ -1,12 +1,16 @@
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
+import { processQuickAdd } from "../services/QuickAddService";
 
 export async function confirm(message: Message) {
   const guildId = message.guildId!;
   const session = SessionManager.getSession(guildId);
 
-  if (!session) return;
+  if (!session) {
+    await message.reply("❌ Brak aktywnej sesji.");
+    return;
+  }
 
   const entries = SessionData.getEntries(guildId);
 
@@ -15,13 +19,16 @@ export async function confirm(message: Message) {
     return;
   }
 
-  // 🔥 DEBUG (na razie zamiast Google Sheets)
-  console.log("=== CONFIRM DATA ===");
-  console.log(entries);
+  try {
+    // 🔥 delegacja do serwisów
+    await processQuickAdd(session.parserType, entries);
 
-  await message.reply(
-    `✅ Zapisano ${entries.length} wpisów!`
-  );
+    await message.reply(`✅ Zapisano ${entries.length} wpisów!`);
+  } catch (err) {
+    console.error("Confirm error:", err);
+    await message.reply("❌ Błąd podczas zapisu.");
+    return;
+  }
 
   // 🧹 cleanup
   SessionData.clear(guildId);
