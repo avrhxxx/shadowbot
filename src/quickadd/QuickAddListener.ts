@@ -43,13 +43,11 @@ export function registerQuickAddListener(client: Client) {
       const command = rawCommand.toLowerCase();
 
       try {
-        // 🔥 HELP (działa wszędzie)
         if (command === "help") {
           await help(message);
           return;
         }
 
-        // 🔥 START
         if (
           command === "rradd" ||
           command === "dnadd" ||
@@ -68,7 +66,6 @@ export function registerQuickAddListener(client: Client) {
           return;
         }
 
-        // 🔥 SESJA
         if (
           command === "preview" ||
           command === "confirm" ||
@@ -107,10 +104,7 @@ export function registerQuickAddListener(client: Client) {
     // -----------------------------
     if (!session) return;
 
-    // 🔹 tylko kanał sesji
     if (message.channel.id !== session.channelId) return;
-
-    // 🔒 OWNER CHECK
     if (session.moderatorId !== message.author.id) return;
 
     // -----------------------------
@@ -129,10 +123,20 @@ export function registerQuickAddListener(client: Client) {
 
         const text = await extractTextFromImage(attachment.url);
 
+        // 🔥 DEBUG OCR
+        console.log("=== OCR TEXT START ===");
+        console.log(text);
+        console.log("=== OCR TEXT END ===");
+
         const parser = parserMap[session.parserType];
         if (!parser) return;
 
         const parsed = parser(text);
+
+        // 🔥 DEBUG PARSER
+        console.log("=== PARSED OUTPUT ===");
+        console.log(parsed);
+        console.log("=====================");
 
         if (!parsed || parsed.length === 0) {
           await message.react("❌");
@@ -159,7 +163,6 @@ export function registerQuickAddListener(client: Client) {
       try {
         const parts = content.split(/\s+/);
 
-        // 🔥 TRYB ADD
         if (session.mode === "add") {
           if (parts.length !== 2) return;
 
@@ -183,7 +186,6 @@ export function registerQuickAddListener(client: Client) {
           return;
         }
 
-        // 🔥 TRYB ATTEND
         if (session.mode === "attend") {
           if (parts.length !== 1) return;
 
