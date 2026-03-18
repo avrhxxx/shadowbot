@@ -7,32 +7,36 @@ export type ParserType =
   | "DONATIONS"
   | "DUEL_POINTS";
 
+// 🔹 dane pojedynczego wpisu (spójne z parserami)
+export interface SessionEntry {
+  nickname: string;
+  value: number;
+  raw: string;
+}
+
 interface QuickAddSession {
   guildId: string;
   channelId: string;
   moderatorId: string;
 
-  // Twój system (zostaje)
   eventType: EventType;
   mode: SessionMode;
 
-  // 🔥 NOWE - KLUCZ DO PARSERÓW
   parserType: ParserType;
 
-  // 🔥 dane z OCR / parsera
-  entries: {
-    nickname: string;
-    value?: number;
-  }[];
+  entries: SessionEntry[];
 }
 
 export class SessionManager {
   private static sessions = new Map<string, QuickAddSession>();
 
-  static createSession(session: QuickAddSession) {
+  // 🔥 KLUCZOWA ZMIANA
+  static createSession(
+    session: Omit<QuickAddSession, "entries">
+  ) {
     this.sessions.set(session.guildId, {
       ...session,
-      entries: [], // 🔥 zawsze startuje puste
+      entries: [], // zawsze start pusto
     });
   }
 
@@ -44,7 +48,8 @@ export class SessionManager {
     return this.sessions.has(guildId);
   }
 
-  static addEntries(guildId: string, newEntries: any[]) {
+  // 🔥 TYPY zamiast any
+  static addEntries(guildId: string, newEntries: SessionEntry[]) {
     const session = this.sessions.get(guildId);
     if (!session) return;
 
