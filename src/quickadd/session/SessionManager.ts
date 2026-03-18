@@ -1,5 +1,11 @@
 import { QuickAddSession } from "./QuickAddSession";
 
+export type CreateSessionOptions = {
+  eventType: "RR" | "DP" | "DN" | "RR_ATTEND";
+  date?: string;
+  week?: string;
+};
+
 export class SessionManager {
   private static instance: SessionManager;
   private sessions: Map<string, QuickAddSession> = new Map();
@@ -11,9 +17,21 @@ export class SessionManager {
     return this.instance;
   }
 
-  createSession(guildId: string, moderatorId: string, eventType: "RR" | "DP" | "DN", eventDate: string): QuickAddSession | null {
+  createSession(
+    guildId: string,
+    moderatorId: string,
+    options: CreateSessionOptions,
+    channelId: string
+  ): QuickAddSession | null {
     if (this.sessions.has(guildId)) return null; // global lock
-    const session = new QuickAddSession(guildId, moderatorId, eventType, eventDate);
+
+    const session = new QuickAddSession(
+      guildId,
+      moderatorId,
+      options,
+      channelId
+    );
+
     this.sessions.set(guildId, session);
     return session;
   }
