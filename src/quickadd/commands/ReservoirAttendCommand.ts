@@ -1,5 +1,6 @@
 import { Message } from "discord.js";
+import { startQuickAddSession } from "../utils/startQuickAddSession";
 
 export async function rrattend(message: Message) {
-  await message.reply("⚠️ RR Attend jeszcze nie działa");
+  await startQuickAddSession(message, "rr", "attend");
 }
