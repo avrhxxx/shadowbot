@@ -22,18 +22,18 @@ export async function preview(message: Message) {
   const session = SessionManager.getSession(guildId);
 
   if (!session) {
-    await message.reply("❌ Brak aktywnej sesji.");
+    await message.reply("❌ No active session.");
     return;
   }
 
   const entries = SessionData.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
-    await message.reply("❌ Brak danych do podglądu.");
+    await message.reply("❌ No data to preview.");
     return;
   }
 
-  // 🔥 LICZENIE DUPLIKATÓW
+  // 🔥 COUNT DUPLICATES
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -41,7 +41,7 @@ export async function preview(message: Message) {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  // 🔢 lista wpisów
+  // 🔢 entries list
   const lines = entries.map((entry, index) => {
     const key = entry.nickname.toLowerCase();
     const count = counts.get(key) || 0;
@@ -61,7 +61,7 @@ export async function preview(message: Message) {
         `━━━━━━━━━━━━━━━━━━\n` +
         lines.join("\n") +
         `\n━━━━━━━━━━━━━━━━━━\n` +
-        `📌 Użyj \`!help\` aby zobaczyć dostępne komendy`
+        `📌 Use \`!help\` to see available commands`
     )
     .setColor(0x5865f2);
 
