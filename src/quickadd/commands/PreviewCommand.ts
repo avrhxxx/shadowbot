@@ -33,15 +33,16 @@ export async function preview(message: Message) {
     .setDescription(
       `👤 **Session Owner:** <@${session.moderatorId}>\n` +
       `📦 **Entries:** ${entries.length}\n` +
-      `────────────────\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
       lines.join("\n") +
-      `\n────────────────\n` +
+      `\n━━━━━━━━━━━━━━━━━━\n` +
       `⚙️ **Commands:**\n` +
       `\`!preview\` – odświeża podgląd\n` +
-      `\`!confirm\` – zapisuje dane i kończy sesję\n` +
-      `\`!cancel\` – usuwa sesję bez zapisu\n` +
-      `\`!adjust [id] [nick] [value]\` – popraw wpis\n` +
-      `\`!repair [id]\` – próbuje naprawić wpis`
+      `\`!confirm\` – zapisuje i kończy sesję\n` +
+      `\`!cancel\` – anuluje sesję (bez zapisu)\n` +
+      `\`!adjust [id] nick [nowyNick]\`\n` +
+      `\`!adjust [id] value [nowaWartość]\`\n` +
+      `📌 Przykład: \`!adjust 3 value 11.87M\``
     )
     .setColor(0x5865f2);
 
