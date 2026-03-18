@@ -9,10 +9,7 @@ export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔹 usuń rank (np. "1 ")
     line = line.replace(/^\d+\s*/, "");
-
-    // 🔹 usuń liczby na końcu (czasem OCR dorzuca śmieci)
     line = line.replace(/[\d,]+$/, "");
 
     const nickname = cleanNickname(line);
@@ -20,7 +17,7 @@ export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
 
     entries.push({
       nickname,
-      value: 1, // 🔥 attendance = 1
+      value: "1", // 🔥 FIX
       raw: "ATTEND",
     });
   }
@@ -28,7 +25,6 @@ export function parseReservoirAttendance(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔹 czyści nickname z OCR śmieci
 function cleanNickname(name: string): string {
   return name.replace(/[^\w\d_]/g, "").trim();
 }
