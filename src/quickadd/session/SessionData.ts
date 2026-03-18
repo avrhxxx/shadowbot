@@ -1,6 +1,15 @@
 interface Entry {
   nickname: string;
   value: number;
+  raw: string;
+}
+
+function formatValue(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)}M`;
+  }
+
+  return `${value}`;
 }
 
 export class SessionData {
@@ -9,16 +18,16 @@ export class SessionData {
   static addEntry(guildId: string, entry: Entry) {
     const current = this.data.get(guildId) || [];
 
-    // 🔍 szukamy istniejącego nicku (case-insensitive)
     const existing = current.find(
       (e) => e.nickname.toLowerCase() === entry.nickname.toLowerCase()
     );
 
     if (existing) {
-      // ➕ sumujemy value
       existing.value += entry.value;
+
+      // 🔥 po merge generujemy nowy RAW
+      existing.raw = formatValue(existing.value);
     } else {
-      // ➕ nowy wpis
       current.push(entry);
     }
 
