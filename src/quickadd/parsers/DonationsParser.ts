@@ -16,7 +16,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (lower.includes("rewards")) continue;
     if (!lower.includes("donations")) continue;
 
-    // 🔥 value
+    // 🔥 wyciągnięcie wartości
     const valueMatch = line.match(/([\d]{2,3}(?:[,.\s]\d{3})+|\d{4,})/);
     if (!valueMatch) continue;
 
@@ -54,17 +54,30 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     });
   }
 
-  return entries;
+  // 🔥 DEDUPLIKACJA
+  const unique = new Map<string, QuickAddEntry>();
+
+  for (const entry of entries) {
+    const key = `${entry.nickname}_${entry.value}`;
+
+    if (!unique.has(key)) {
+      unique.set(key, entry);
+    }
+  }
+
+  return Array.from(unique.values());
 }
 
-// 🔥 CLEAN (ważne)
+// 🔥 CLEAN NICKNAME (MEGA ważne)
 function cleanNickname(name: string): string {
   return (
     name
-      // usuń OCR śmieci typu ÔÇś
-      .replace(/[^\w\d\s_]/g, "")
-      // 🔥 usuń prefixy typu "g ", "a4 ", "R "
+      // usuń hardcore OCR śmieci
+      .replace(/[^a-zA-Z0-9_\s]/g, "")
+      // usuń prefixy typu "g ", "a4 ", "R "
       .replace(/^[a-zA-Z0-9]{1,3}\s+/i, "")
+      // usuń pojedyncze litery na początku
+      .replace(/^[a-zA-Z]\s+/, "")
       // usuń wielokrotne spacje
       .replace(/\s+/g, " ")
       .trim()
