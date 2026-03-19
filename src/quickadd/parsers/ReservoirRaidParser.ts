@@ -44,9 +44,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     let nickname = match[1];
     if (!nickname) continue;
 
-    // 🔥 usuń końcówki typu "=~"
-    nickname = nickname.replace(/[=~]+$/, "");
-
     // 🔥 CLEAN (Unicode-safe)
     nickname = cleanNickname(nickname);
 
@@ -90,20 +87,23 @@ function createEntry(
 }
 
 // =====================================
-// 🧹 CLEAN NICKNAME (UNICODE SAFE)
+// 🧹 CLEAN NICKNAME (FINAL)
 // =====================================
 function cleanNickname(name: string): string {
   return name
     // usuń śmieci OCR
     .replace(/[ÔÇś@%\\]/g, "")
 
-    // usuń śmieci z początku (obsługa wszystkich alfabetów)
-    .replace(/^[^\p{L}\p{N}]+/u, "")
+    // usuń śmieci z początku (unicode safe)
+    .replace(/^[^\p{L}\p{N}]+/gu, "")
 
-    // usuń śmieci z końca
-    .replace(/[^\p{L}\p{N}]+$/u, "")
+    // usuń końcówki typu "=~"
+    .replace(/[=~]+$/, "")
 
-    // usuń dziwne znaki w środku (zostaw litery, cyfry, spacje, _, |, -)
+    // usuń śmieci z końca (ale zostaw dekoracje)
+    .replace(/[^\p{L}\p{N}_| -]+$/gu, "")
+
+    // usuń dziwne znaki w środku
     .replace(/[^\p{L}\p{N}\s_|-]/gu, "")
 
     // normalizacja spacji
