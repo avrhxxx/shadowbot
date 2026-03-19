@@ -11,27 +11,34 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     const lower = line.toLowerCase();
 
-    // 🔥 szukamy linii z Donations
+    // ❌ skip śmieci systemowe
+    if (lower.includes("at least")) continue;
+    if (lower.includes("rewards")) continue;
     if (!lower.includes("donations")) continue;
 
-    // 🔥 znajdź wartość
+    // 🔥 value
     const valueMatch = line.match(/([\d]{2,3}(?:[,.\s]\d{3})+|\d{4,})/);
     if (!valueMatch) continue;
 
     const raw = valueMatch[0];
     const value = parseInt(raw.replace(/[^\d]/g, ""));
-
     if (!value || value < 1000) continue;
 
-    // 🔥 szukamy nicka NAD linią
+    // 🔥 SZUKANIE NICKA (look-back do 2 linii)
     let nickname = "UNKNOWN";
 
-    const prevLine = lines[i - 1];
-    if (prevLine) {
-      const cleaned = cleanNickname(prevLine);
+    for (let j = 1; j <= 2; j++) {
+      const candidate = lines[i - j];
+      if (!candidate) continue;
 
-      if (cleaned.length >= 3 && !cleaned.toLowerCase().includes("donations")) {
+      const cleaned = cleanNickname(candidate);
+
+      if (
+        cleaned.length >= 3 &&
+        !cleaned.toLowerCase().includes("donations")
+      ) {
         nickname = cleaned;
+        break;
       }
     }
 
@@ -50,11 +57,15 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// 🔥 czyszczenie nicków
+// 🔥 CLEAN (ważne)
 function cleanNickname(name: string): string {
   return (
     name
+      // usuń OCR śmieci typu ÔÇś
       .replace(/[^\w\d\s_]/g, "")
+      // 🔥 usuń prefixy typu "g ", "a4 ", "R "
+      .replace(/^[a-zA-Z0-9]{1,3}\s+/i, "")
+      // usuń wielokrotne spacje
       .replace(/\s+/g, " ")
       .trim()
   );
