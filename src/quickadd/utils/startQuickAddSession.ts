@@ -6,10 +6,11 @@ import {
   PermissionFlagsBits,
   TextChannel,
 } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+import {
+  SessionManager,
+  SessionMode, // 🔥 bierzemy typ stąd (WAŻNE)
+} from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
-
-type SessionMode = "add" | "attend" | "auto";
 
 export async function startQuickAddSession(
   message: Message,
@@ -55,16 +56,27 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 autodetect mode
+  // 🔥 AUTODETECT SESSION
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
+
+    eventType: "rr", // 🔥 placeholder (żeby nie rozwalić typów)
     mode,
     parserType: null, // 🔥 autodetect
+
+    // entries dodaje się automatycznie
   });
 
   await message.reply(`✅ Session created: ${channel}`);
 
-  await sendSessionInfo(channel as TextChannel, message.author.id, mode);
+  // 🔥 FIX: sendSessionInfo NIE zna "auto"
+  const infoMode = mode === "auto" ? "add" : mode;
+
+  await sendSessionInfo(
+    channel as TextChannel,
+    message.author.id,
+    infoMode
+  );
 }
