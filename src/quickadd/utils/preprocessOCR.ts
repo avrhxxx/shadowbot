@@ -25,12 +25,11 @@ function preprocessDonations(lines: string[]): string[] {
   for (let line of lines) {
     if (!line) continue;
 
-    // 🔥 NAJPIERW AGRESYWNY CLEAN
     let cleaned = line
-      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")   // śmieci OCR
-      .replace(/^\d+\s*/, "")              // "4 Jay..." → "Jay..."
-      .replace(/^[^\w]+/, "")              // leading garbage
-      .replace(/[^\w\d]+$/g, "")           // trailing garbage
+      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")   // OCR garbage
+      .replace(/^\d+\s*/, "")              // "4 Nick" → "Nick"
+      .replace(/^[^\w]+/, "")              // leading junk
+      .replace(/[^\w\d]+$/g, "")           // trailing junk
       .replace(/\s+/g, " ")
       .trim();
 
@@ -38,9 +37,7 @@ function preprocessDonations(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
-    // =========================
-    // ❌ WYWAŁ SYSTEM TEXT
-    // =========================
+    // ❌ remove UI/system text
     if (
       lower.includes("at least") ||
       lower.includes("required") ||
@@ -54,22 +51,16 @@ function preprocessDonations(lines: string[]): string[] {
       continue;
     }
 
-    // =========================
-    // 💰 DONATIONS LINE
-    // =========================
+    // 💰 normalize donations
     if (/donations/i.test(cleaned)) {
       const match = cleaned.match(/donations[:\s]*([\d,]+)/i);
-
       if (!match) continue;
 
-      cleaned = `Donations: ${match[1]}`;
-      result.push(cleaned);
+      result.push(`Donations: ${match[1]}`);
       continue;
     }
 
-    // =========================
-    // 🧠 NICKNAME (po CLEAN!)
-    // =========================
+    // 🧠 keep only valid nick candidates
     if (
       cleaned.length >= 3 &&
       /[a-z]/i.test(cleaned) &&
@@ -83,7 +74,7 @@ function preprocessDonations(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 DUEL POINTS (bez zmian)
+// 🔥 DUEL POINTS (unchanged)
 // =====================================
 function preprocessDuelPoints(lines: string[]): string[] {
   const result: string[] = [];
