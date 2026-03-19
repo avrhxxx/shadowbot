@@ -31,21 +31,33 @@ export async function processOCR(
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 preprocess linii
+  // 🔥 preprocess linii (clean + crop)
   lines = preprocessOCR(lines, parserType as any);
 
-  // 🔥 🔥 🔥 KLUCZOWE: FILTER PER TYPE
+  // =====================================================
+  // 🔥 SMART FILTER (różny dla każdego parsera)
+  // =====================================================
+
   if (parserType === "DUEL_POINTS") {
+    // tylko linie z punktami typu 36.59M / 1200K
     lines = lines.filter((line) =>
-      /[\d]+\.\d+\s*[MK]$/i.test(line) ||   // 36.59M
-      /[\d]{3,}\s*[MK]$/i.test(line)       // 1200K
+      /[\d]+\.\d+\s*[MK]$/i.test(line) ||
+      /[\d]{3,}\s*[MK]$/i.test(line)
     );
   }
 
   if (parserType === "DONATIONS") {
-    lines = lines.filter((line) =>
-      line.toLowerCase().includes("donations")
-    );
+    // 🔥 zostaw:
+    // - linie z Donations
+    // - linie wyglądające jak nicki
+    lines = lines.filter((line) => {
+      const lower = line.toLowerCase();
+
+      return (
+        lower.includes("donations") ||
+        /^[a-zA-Z0-9_\s.'-]{3,}$/.test(line)
+      );
+    });
   }
 
   console.log("=== FILTERED LINES ===");
