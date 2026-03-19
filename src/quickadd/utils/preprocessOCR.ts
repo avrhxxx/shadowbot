@@ -1,108 +1,65 @@
-import { ParserType } from "../session/SessionManager";
+import { parserMap } from "../parsers/parserMap";
+import { extractTextFromImage } from "../utils/ocr";
+import { preprocessOCR } from "../utils/preprocessOCR";
+import { preprocessImage } from "../utils/imagePreprocess";
+import { detectParserType } from "../utils/detectParserType";
+import fetch from "node-fetch";
 
-export function preprocessOCR(
-  lines: string[],
-  parserType: ParserType
-): string[] {
-  switch (parserType) {
-    case "DUEL_POINTS":
-      return preprocessDuelPoints(lines);
+export async function processOCR(imageUrl: string) {
+  const response = await fetch(imageUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
 
-    case "DONATIONS":
-      return preprocessDonations(lines);
+  const processedBuffer = await preprocessImage(buffer);
 
-    default:
-      return lines;
-  }
-}
+  const text = await extractTextFromImage(processedBuffer);
 
-// =====================================
-// 🔥 DONATIONS PREPROCESS (FINAL)
-// =====================================
-function preprocessDonations(lines: string[]): string[] {
-  const result: string[] = [];
+  console.log("=== OCR TEXT START ===");
+  console.log(text);
+  console.log("=== OCR TEXT END ===");
 
-  for (let line of lines) {
-    if (!line) continue;
+  let lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
-    let cleaned = line
-      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")   // OCR garbage
-      .replace(/^\d+\s*/, "")              // "4 Nick" → "Nick"
-      .replace(/^[^\w]+/, "")              // leading junk
-      .replace(/[^\w\d]+$/g, "")           // trailing junk
-      .replace(/\s+/g, " ")
-      .trim();
+  // =========================
+  // 🧠 DETECT PARSER TYPE
+  // =========================
+  const parserType = detectParserType(lines);
 
-    if (!cleaned) continue;
+  console.log("=== DETECTED TYPE ===");
+  console.log(parserType);
+  console.log("=====================");
 
-    const lower = cleaned.toLowerCase();
-
-    // ❌ remove UI/system text
-    if (
-      lower.includes("at least") ||
-      lower.includes("required") ||
-      lower.includes("total") ||
-      lower.includes("ranking") ||
-      lower.includes("alliance") ||
-      lower.includes("points") ||
-      lower.includes("contribution") ||
-      lower.includes("reward")
-    ) {
-      continue;
-    }
-
-    // 💰 normalize donations
-    if (/donations/i.test(cleaned)) {
-      const match = cleaned.match(/donations[:\s]*([\d,]+)/i);
-      if (!match) continue;
-
-      result.push(`Donations: ${match[1]}`);
-      continue;
-    }
-
-    // 🧠 keep only valid nick candidates
-    if (
-      cleaned.length >= 3 &&
-      /[a-z]/i.test(cleaned) &&
-      !/donations/i.test(cleaned)
-    ) {
-      result.push(cleaned);
-    }
+  if (parserType === "UNKNOWN") {
+    console.log("❌ Unknown screenshot type – skipping parsing");
+    return [];
   }
 
-  return result;
-}
+  // =========================
+  // 🔧 PREPROCESS
+  // =========================
+  lines = preprocessOCR(lines, parserType as any);
 
-// =====================================
-// 🔥 DUEL POINTS (unchanged)
-// =====================================
-function preprocessDuelPoints(lines: string[]): string[] {
-  const result: string[] = [];
+  console.log("=== FILTERED LINES ===");
+  console.log(lines);
+  console.log("======================");
 
-  for (let line of lines) {
-    const lower = line.toLowerCase();
-
-    if (
-      lower.includes("show my alliance") ||
-      lower.includes("ranking") ||
-      lower.includes("league") ||
-      lower.includes("weekly") ||
-      lower.includes("player") ||
-      lower.includes("rank")
-    ) {
-      continue;
-    }
-
-    line = line.replace(/^[^\w\d]+/, "");
-    line = line.replace(/[^\dMK]+$/i, "");
-
-    if (!/[\d]+/.test(line)) continue;
-    if (line.length < 6) continue;
-
-    result.push(line.trim());
+  // =========================
+  // 🧠 PARSER
+  // =========================
+  const parser = parserMap[parserType];
+  if (!parser) {
+    console.log("❌ No parser found");
+    return [];
   }
 
-  const CUT_FROM_BOTTOM = 4;
+  const parsed = parser(lines);
 
-  return result.slice(0, Math.max(0, result.length - CUT_FROM_BOTTOM));
+  console.log("=== PARSED OUTPUT ===");
+  console.log(parsed);
+  console.log("=====================");
+
+  return parsed;
 }
