@@ -1,10 +1,6 @@
-import { Client, Message } from "discord.js";
+// src/quickadd/QuickAddListener.ts
 
-// 🔹 komendy startowe
-import { rradd } from "./commands/ReservoirAddCommand";
-import { dnadd } from "./commands/DonationsAddCommand";
-import { dpadd } from "./commands/DuelAddCommand";
-import { rrattend } from "./commands/ReservoirAttendCommand";
+import { Client, Message } from "discord.js";
 
 // 🔹 preview + confirm + cancel + adjust + delete + merge + help
 import { preview } from "./commands/PreviewCommand";
@@ -19,11 +15,11 @@ import { help } from "./commands/HelpCommand";
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
 
-// 🔥 parser (manual input)
-import { parseValue } from "./utils/parseValue";
-
-// 🔥 OCR service (NOWY)
+// 🔥 OCR
 import { processOCR } from "./services/OCRService";
+
+// 🔥 parser chain (manual fallback też używa tego)
+import { parseByImageType } from "./parsers/ParserManager";
 
 // 🔥 mapper OCR → Entry
 function mapEntry(entry: any) {
@@ -49,34 +45,34 @@ export function registerQuickAddListener(client: Client) {
       "name" in message.channel &&
       message.channel.name === "quick-add";
 
-    // -----------------------------
-    // 🔹 KOMENDY (!)
-    // -----------------------------
+    // =====================================================
+    // 🔹 KOMENDY
+    // =====================================================
     if (content.startsWith("!")) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
       try {
-        if (command === "help") {
-          await help(message);
-          return;
-        }
-
-        if (
-          command === "rradd" ||
-          command === "dnadd" ||
-          command === "dpadd" ||
-          command === "rrattend"
-        ) {
+        // 🔥 START (NOWY SYSTEM)
+        if (command === "start") {
           if (!isQuickAddChannel) {
             return message.reply("❌ Tylko w #quick-add.");
           }
 
-          if (command === "rradd") await rradd(message);
-          if (command === "dnadd") await dnadd(message);
-          if (command === "dpadd") await dpadd(message);
-          if (command === "rrattend") await rrattend(message);
+          SessionManager.createSession(message.guildId, {
+            moderatorId: message.author.id,
+            channelId: message.channel.id,
+          });
 
+          await message.reply(
+            "📥 Wyślij screenshot lub wpisz dane ręcznie.\n" +
+            "Spróbuję automatycznie rozpoznać typ 👍"
+          );
+          return;
+        }
+
+        if (command === "help") {
+          await help(message);
           return;
         }
 
@@ -113,16 +109,16 @@ export function registerQuickAddListener(client: Client) {
       return;
     }
 
-    // -----------------------------
+    // =====================================================
     // 🔹 BRAK SESJI
-    // -----------------------------
+    // =====================================================
     if (!session) return;
     if (message.channel.id !== session.channelId) return;
     if (session.moderatorId !== message.author.id) return;
 
-    // -----------------------------
+    // =====================================================
     // 🖼️ OCR (SCREENY)
-    // -----------------------------
+    // =====================================================
     if (message.attachments.size > 0) {
       const attachment = message.attachments.first();
 
@@ -131,12 +127,13 @@ export function registerQuickAddListener(client: Client) {
       }
 
       try {
-        // 🔥 NOWE — parser auto-detect
         const parsed = await processOCR(attachment.url);
 
-        // 🔥 anti-crash
         if (!parsed || parsed.length === 0) {
-          await message.react("❌");
+          await message.reply(
+            "❌ Nie rozpoznano danych ze screena.\n" +
+            "Spróbuj inny screen lub wpisz dane ręcznie."
+          );
           return;
         }
 
@@ -153,52 +150,35 @@ export function registerQuickAddListener(client: Client) {
       return;
     }
 
-    // -----------------------------
-    // 📝 MANUAL INPUT
-    // -----------------------------
+    // =====================================================
+    // 📝 MANUAL INPUT (AUTO-DETECT)
+    // =====================================================
     if (content.length > 0) {
       try {
-        const parts = content.split(/\s+/);
+        const lines = content
+          .split("\n")
+          .map(l => l.trim())
+          .filter(Boolean);
 
-        if (session.mode === "add") {
-          if (parts.length !== 2) return;
+        const parsed = parseByImageType(lines);
 
-          const nickname = parts[0];
-          const rawValue = parts[1];
-
-          const value = parseValue(rawValue);
-
-          if (value === null) {
-            await message.react("❌");
-            return;
-          }
-
-          SessionData.addEntry(message.guildId, {
-            nickname,
-            value,
-            raw: rawValue,
-          });
-
-          await message.react("✅");
+        if (!parsed || parsed.length === 0) {
+          await message.reply(
+            "❓ Nie rozpoznano typu danych.\n" +
+            "Spróbuj:\n" +
+            "• wysłać screenshot\n" +
+            "• lub poprawić format danych"
+          );
           return;
         }
 
-        if (session.mode === "attend") {
-          if (parts.length !== 1) return;
-
-          const nickname = parts[0];
-
-          SessionData.addEntry(message.guildId, {
-            nickname,
-            value: 1,
-            raw: "ATTEND",
-          });
-
-          await message.react("✅");
-          return;
+        for (const entry of parsed) {
+          SessionData.addEntry(message.guildId!, mapEntry(entry));
         }
+
+        await message.react("✅");
       } catch (err) {
-        console.error("Parse error:", err);
+        console.error("Manual parse error:", err);
         await message.react("❌");
       }
     }
