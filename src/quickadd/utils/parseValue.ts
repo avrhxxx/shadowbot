@@ -1,8 +1,14 @@
-
 export function parseValue(input: string): number | null {
   if (!input) return null;
 
-  let value = input.toLowerCase().replace(",", ".");
+  let value = input
+    .toLowerCase()
+    .trim() // 🔥 usuń spacje
+    .replace(",", ".") // 🔥 europejskie liczby
+    .replace(/\s+/g, ""); // 🔥 usuń WSZYSTKIE spacje
+
+  // 🔥 usuń śmieci OCR z końca
+  value = value.replace(/[^0-9.km]+$/g, "");
 
   let multiplier = 1;
 
