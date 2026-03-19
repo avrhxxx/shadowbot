@@ -1,42 +1,41 @@
+// src/quickadd/session/startQuickAddSession.ts
+
 import {
   Message,
   ChannelType,
   PermissionFlagsBits,
   TextChannel,
 } from "discord.js";
-import { SessionManager, ParserType } from "../session/SessionManager";
+import { SessionManager } from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
 
-type EventType = "rr" | "dn" | "dp";
 type SessionMode = "add" | "attend";
-
-// 🔥 MAPOWANIE DO PARSERÓW
-function resolveParserType(
-  eventType: EventType,
-  mode: SessionMode
-): ParserType {
-  if (eventType === "rr" && mode === "add") return "RR_RAID";
-  if (eventType === "rr" && mode === "attend") return "RR_ATTENDANCE";
-  if (eventType === "dn") return "DONATIONS";
-  if (eventType === "dp") return "DUEL_POINTS";
-
-  throw new Error("Unsupported session type");
-}
 
 export async function startQuickAddSession(
   message: Message,
-  eventType: EventType,
   mode: SessionMode = "add"
 ) {
   const guild = message.guild;
   if (!guild) return;
 
+  // 🔒 tylko quick-add
+  const isQuickAddChannel =
+    message.channel.isTextBased() &&
+    "name" in message.channel &&
+    message.channel.name === "quick-add";
+
+  if (!isQuickAddChannel) {
+    await message.reply("❌ Użyj tej komendy w #quick-add.");
+    return;
+  }
+
+  // 🔒 jedna sesja na guild
   if (SessionManager.hasSession(guild.id)) {
     await message.reply("❌ Masz już aktywną sesję.");
     return;
   }
 
-  const channelName = `${eventType}-${mode}-${message.author.username}`;
+  const channelName = `qa-${message.author.username}`;
 
   const channel = await guild.channels.create({
     name: channelName,
@@ -56,16 +55,13 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 KLUCZOWE
-  const parserType = resolveParserType(eventType, mode);
-
+  // 🔥 NOWE — parserType = null (autodetect później)
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
-    eventType,
     mode,
-    parserType, // 🔥 NOWE
+    parserType: null, // 🔥 KLUCZ
   });
 
   await message.reply(`✅ Sesja utworzona: ${channel}`);
