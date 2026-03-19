@@ -16,9 +16,12 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     const lower = line.toLowerCase();
 
     // =========================
-    // 🧠 DETECT GROUP
+    // 🧠 DETECT GROUP (OCR SAFE)
     // =========================
-    if (lower.includes("main") && lower.includes("force")) {
+    if (
+      (lower.includes("main") && lower.includes("force")) ||
+      lower.includes("mainforce")
+    ) {
       currentGroup = "MAIN";
       continue;
     }
@@ -41,10 +44,7 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     let nickname = match[1];
     if (!nickname) continue;
 
-    // 🔥 usuń końcówki typu "=~"
     nickname = nickname.replace(/[=~]+$/, "");
-
-    // 🔥 clean OCR
     nickname = cleanNickname(nickname);
 
     if (!nickname || nickname.length < 2) continue;
@@ -53,7 +53,7 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
       createEntry(
         rawLine,
         nickname,
-        0, // 🔥 brak sensownej wartości → 0
+        0,
         "RESERVOIR_RAID",
         currentGroup
       )
@@ -63,9 +63,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// =====================================
-// 🔧 CREATE ENTRY
-// =====================================
 function createEntry(
   rawText: string,
   nickname: string,
@@ -86,24 +83,12 @@ function createEntry(
   };
 }
 
-// =====================================
-// 🧹 CLEAN NICKNAME
-// =====================================
 function cleanNickname(name: string): string {
   return name
-    // usuń śmieci OCR
     .replace(/[ÔÇś@%\\]/g, "")
-
-    // usuń śmieci z początku
     .replace(/^[^a-zA-Z0-9]+/, "")
-
-    // usuń śmieci z końca (najważniejsze)
     .replace(/[^a-zA-Z0-9]+$/, "")
-
-    // usuń dziwne znaki w środku (zostaw _ i spacje)
-    .replace(/[^\w\d\s_|-]/g, "")
-
-    // normalizacja spacji
+    .replace(/[^\w\s|-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
