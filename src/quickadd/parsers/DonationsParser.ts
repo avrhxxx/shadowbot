@@ -8,40 +8,58 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   for (const rawLine of lines) {
     if (!rawLine) continue;
 
-    let line = rawLine.trim();
+    const line = rawLine.trim();
     if (!line) continue;
 
-    // 🔥 musi zawierać "donations"
-    if (!line.toLowerCase().includes("donations")) continue;
+    const lower = line.toLowerCase();
 
-    // 🔥 wyciągnij liczbę (np. 82,969)
-    const valueMatch = line.match(/([\d,]+)/);
+    // ❌ wywal zdania systemowe
+    if (
+      lower.includes("required") ||
+      lower.includes("rewards") ||
+      lower.includes("claim")
+    ) {
+      continue;
+    }
+
+    // 🔥 musi mieć "donations"
+    if (!lower.includes("donations")) continue;
+
+    // 🔥 rozbij na 2 części
+    const parts = line.split(/donations[:\s]*/i);
+
+    if (parts.length < 2) continue;
+
+    const nicknamePart = parts[0];
+    const valuePart = parts[1];
+
+    // 🔥 znajdź liczbę PO donations
+    const valueMatch = valuePart.match(/([\d,]+)/);
     if (!valueMatch) continue;
 
     const rawNumber = valueMatch[1];
     const value = normalizeValue(rawNumber);
+
     if (value <= 0) continue;
 
-    // 🔥 usuń "Donations: 82,969"
-    let nicknamePart = line
-      .replace(/donations[:\s]*/i, "")
-      .replace(rawNumber, "");
+    // 🔥 wyczyść nick (ważne — bierzemy LEWĄ stronę)
+    let nickname = cleanNickname(nicknamePart);
 
-    // 🔥 usuń śmieci OCR z początku
-    nicknamePart = nicknamePart.replace(/^[^a-zA-Z0-9_]+/, "");
+    // usuń rank (np. "4 ", "5 ")
+    nickname = nickname.replace(/^\d+\s*/, "");
 
-    const cleaned = cleanNickname(nicknamePart);
+    // usuń śmieci typu "@ @"
+    nickname = nickname.replace(/^[^a-zA-Z0-9_]+/, "");
 
-    // 🔥 heurystyka jakości
     const isWeird =
-      cleaned.length < 3 ||
-      /^[\d\s]+$/.test(cleaned);
+      nickname.length < 3 ||
+      /^[\d\s]+$/.test(nickname);
 
-    if (!cleaned) continue;
+    if (!nickname) continue;
 
     entries.push({
       lineId: lineCounter++,
-      nickname: cleaned,
+      nickname,
       value,
       raw: rawNumber,
       rawText: rawLine,
