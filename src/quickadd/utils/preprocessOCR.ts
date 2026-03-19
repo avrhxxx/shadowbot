@@ -1,65 +1,37 @@
-import { parserMap } from "../parsers/parserMap";
-import { extractTextFromImage } from "../utils/ocr";
-import { preprocessOCR } from "../utils/preprocessOCR";
-import { preprocessImage } from "../utils/imagePreprocess";
-import { detectParserType } from "../utils/detectParserType";
-import fetch from "node-fetch";
+export function preprocessOCR(lines: string[]): string[] {
+  const result: string[] = [];
 
-export async function processOCR(imageUrl: string) {
-  const response = await fetch(imageUrl);
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  for (let line of lines) {
+    if (!line) continue;
 
-  const processedBuffer = await preprocessImage(buffer);
+    let cleaned = line
+      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
+      .replace(/^\d+\s*/, "")
+      .replace(/^[^\w]+/, "")
+      .replace(/[^\w\d]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-  const text = await extractTextFromImage(processedBuffer);
+    if (!cleaned) continue;
 
-  console.log("=== OCR TEXT START ===");
-  console.log(text);
-  console.log("=== OCR TEXT END ===");
+    const lower = cleaned.toLowerCase();
 
-  let lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+    // ❌ usuń UI śmieci
+    if (
+      lower.includes("at least") ||
+      lower.includes("required") ||
+      lower.includes("total") ||
+      lower.includes("ranking") ||
+      lower.includes("alliance") ||
+      lower.includes("points") ||
+      lower.includes("contribution") ||
+      lower.includes("reward")
+    ) {
+      continue;
+    }
 
-  // =========================
-  // 🧠 DETECT PARSER TYPE
-  // =========================
-  const parserType = detectParserType(lines);
-
-  console.log("=== DETECTED TYPE ===");
-  console.log(parserType);
-  console.log("=====================");
-
-  if (parserType === "UNKNOWN") {
-    console.log("❌ Unknown screenshot type – skipping parsing");
-    return [];
+    result.push(cleaned);
   }
 
-  // =========================
-  // 🔧 PREPROCESS
-  // =========================
-  lines = preprocessOCR(lines, parserType as any);
-
-  console.log("=== FILTERED LINES ===");
-  console.log(lines);
-  console.log("======================");
-
-  // =========================
-  // 🧠 PARSER
-  // =========================
-  const parser = parserMap[parserType];
-  if (!parser) {
-    console.log("❌ No parser found");
-    return [];
-  }
-
-  const parsed = parser(lines);
-
-  console.log("=== PARSED OUTPUT ===");
-  console.log(parsed);
-  console.log("=====================");
-
-  return parsed;
+  return result;
 }
