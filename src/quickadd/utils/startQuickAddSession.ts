@@ -8,7 +8,7 @@ import {
 } from "discord.js";
 import {
   SessionManager,
-  SessionMode, // 🔥 bierzemy typ stąd (WAŻNE)
+  SessionMode,
 } from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
 
@@ -56,22 +56,18 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 AUTODETECT SESSION
+  // 🔥 AUTODETECT SESSION (czyste)
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
-
-    eventType: "rr", // 🔥 placeholder (żeby nie rozwalić typów)
     mode,
-    parserType: null, // 🔥 autodetect
-
-    // entries dodaje się automatycznie
+    parserType: null,
   });
 
   await message.reply(`✅ Session created: ${channel}`);
 
-  // 🔥 FIX: sendSessionInfo NIE zna "auto"
+  // 🔥 sendSessionInfo nie obsługuje "auto"
   const infoMode = mode === "auto" ? "add" : mode;
 
   await sendSessionInfo(
