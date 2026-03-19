@@ -5,17 +5,20 @@ export type QuickAddEntryStatus =
   | "UNREADABLE";
 
 export interface QuickAddEntry {
-  lineId?: number; // opcjonalne (OCR może, manual nie musi)
+  lineId?: number;
 
   nickname: string;
 
-  value: number; // 🔥 zawsze number (kluczowe dla merge/sum)
+  value: number; // zostaje (dla kompatybilności)
 
-  raw: string; // 🔥 to pokazujesz w preview (np. "25.5M", "82,000")
+  raw: string;
 
-  rawText?: string; // 🔥 DEBUG OCR (CAŁA linia z obrazka)
+  rawText?: string;
 
   status?: QuickAddEntryStatus;
   confidence?: number;
   sourceType?: "OCR" | "MANUAL";
+
+  // 🔥 NOWE POLE
+  group?: "MAIN" | "RESERVE";
 }
