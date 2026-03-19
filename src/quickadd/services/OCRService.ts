@@ -23,21 +23,13 @@ export async function processOCR(
   const parser = parserMap[parserType as keyof typeof parserMap];
   if (!parser) return [];
 
-  // =========================
-  // 🔥 SPLIT + CLEAN (WAŻNE)
-  // =========================
   let lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // =========================
-  // 🔥 PREPROCESS (GŁÓWNY FIX)
-  // =========================
+  // 🔥 MAIN FIX
   lines = preprocessOCR(lines, parserType as any);
-
-  // ❌ USUWAMY STARY FILTER DLA DONATIONS
-  // (bo preprocess już robi robotę)
 
   if (parserType === "DUEL_POINTS") {
     lines = lines.filter((line) =>
