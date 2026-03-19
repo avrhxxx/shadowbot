@@ -1,14 +1,12 @@
 import { detectParserType } from "./detectParserType";
-import { parseReservoirRaid } from "./parseReservoirRaid";
-import { parseReservoirAttendance } from "./parseReservoirAttendance";
-import { parseDonations } from "./parseDonations";
-import { parseDuelPoints } from "./parseDuelPoints";
+import { parseReservoirRaid } from "./ReservoirRaidParser";
+import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
+import { parseDonations } from "./DonationsParser";
+import { parseDuelPoints } from "./DuelPointsParser";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-export function parseByType(lines: string[]): QuickAddEntry[] {
+export function parseByImageType(lines: string[]): QuickAddEntry[] {
   const type = detectParserType(lines);
-
-  console.log("📸 Detected parser:", type);
 
   switch (type) {
     case "RR_RAID":
@@ -24,7 +22,6 @@ export function parseByType(lines: string[]): QuickAddEntry[] {
       return parseDuelPoints(lines);
 
     default:
-      console.log("❌ Unknown screenshot — skipped");
       return [];
   }
 }
