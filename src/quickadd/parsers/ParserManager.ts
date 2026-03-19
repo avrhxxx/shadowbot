@@ -1,32 +1,69 @@
-import { parseReservoirRaid } from "./ReservoirRaidParser";
-import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
-import { parseDonations } from "./DonationsParser";
-import { parseDuelPoints } from "./DuelPointsParser";
+import {
+  parseReservoirRaid,
+  canParseReservoirRaid,
+} from "./ReservoirRaidParser";
+
+import {
+  parseReservoirAttendance,
+  canParseReservoirAttendance,
+} from "./ReservoirAttendanceParser";
+
+import {
+  parseDonations,
+  canParseDonations,
+} from "./DonationsParser";
+
+import {
+  parseDuelPoints,
+  canParseDuelPoints,
+} from "./DuelPointsParser";
+
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-type ParserResult = {
-  type: string;
-  entries: QuickAddEntry[];
-};
-
-// 🔥 KOLEJNOŚĆ MA ZNACZENIE
+// 🔥 KOLEJNOŚĆ MA OGROMNE ZNACZENIE
 const parsers = [
-  { type: "DONATIONS", fn: parseDonations },
-  { type: "DUEL_POINTS", fn: parseDuelPoints },
-  { type: "RR_RAID", fn: parseReservoirRaid },
-  { type: "RR_ATTENDANCE", fn: parseReservoirAttendance },
+  {
+    type: "DONATIONS",
+    canParse: canParseDonations,
+    parse: parseDonations,
+  },
+  {
+    type: "DUEL_POINTS",
+    canParse: canParseDuelPoints,
+    parse: parseDuelPoints,
+  },
+  {
+    type: "RR_RAID",
+    canParse: canParseReservoirRaid,
+    parse: parseReservoirRaid,
+  },
+  {
+    type: "RR_ATTENDANCE",
+    canParse: canParseReservoirAttendance,
+    parse: parseReservoirAttendance,
+  },
 ];
 
 export function parseByImageType(lines: string[]): QuickAddEntry[] {
   for (const parser of parsers) {
-    const result = parser.fn(lines);
+    const canParse = parser.canParse(lines);
 
-    console.log(`Trying parser: ${parser.type}, entries: ${result.length}`);
+    console.log(`Trying parser: ${parser.type}, canParse: ${canParse}`);
+
+    if (!canParse) continue;
+
+    const result = parser.parse(lines);
+
+    console.log(
+      `➡️ Parsing with: ${parser.type}, entries: ${result.length}`
+    );
 
     if (result && result.length > 0) {
       console.log(`✅ MATCHED: ${parser.type}`);
       return result;
     }
+
+    console.log(`⚠️ ${parser.type} passed canParse but returned 0 entries`);
   }
 
   console.log("❌ No parser matched");
