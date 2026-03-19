@@ -1,4 +1,3 @@
-// src/index.ts
 import "./googleSheetsClient";
 
 import {
@@ -17,11 +16,11 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 
 // -----------------------------
-// ✅ QuickAdd (NOWY SYSTEM)
+// ✅ QuickAdd
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService";
-import { handleEventSelect } from "./quickadd/interactions/eventSelectHandler"; // 🔥 NOWE
+import { SessionManager } from "./quickadd/session/SessionManager"; // 🔥 DODANE
 
 const client = new Client({
   intents: [
@@ -40,7 +39,7 @@ client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
   // -----------------------------
-  // 🔥 TWORZENIE #quick-add + embed
+  // 🔥 QuickAdd channel setup
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     try {
@@ -50,6 +49,31 @@ client.once("ready", async () => {
       console.error(`❌ QuickAdd error in ${guild.name}:`, err);
     }
   }
+
+  // -----------------------------
+  // 🔥 SESSION TIMEOUT HOOK
+  // -----------------------------
+  SessionManager.setHandlers({
+    sendMessage: async (channelId, content) => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased()) {
+          await channel.send(content);
+        }
+      } catch (err) {
+        console.error("Send message error:", err);
+      }
+    },
+
+    deleteChannel: async (channelId) => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        await channel?.delete();
+      } catch (err) {
+        console.error("Delete channel error:", err);
+      }
+    },
+  });
 
   // -----------------------------
   // Init modules
@@ -77,16 +101,10 @@ client.once("ready", async () => {
   registerQuickAddListener(client);
 
   // -----------------------------
-  // 🌍 Global interaction handler
+  // Global interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
-      // 🔥 QUICKADD SELECT MENU (NAJPIERW)
-      if (interaction.isStringSelectMenu()) {
-        await handleEventSelect(interaction);
-      }
-
-      // pozostałe systemy
       await handleEventInteraction(interaction);
       await handleAbsenceInteraction(interaction);
       await handlePointsInteraction(interaction);
