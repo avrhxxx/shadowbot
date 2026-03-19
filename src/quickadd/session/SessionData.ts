@@ -1,3 +1,5 @@
+// src/quickadd/session/SessionData.ts
+
 import { parseValue } from "../utils/parseValue";
 
 export interface Entry {
@@ -9,27 +11,24 @@ export interface Entry {
 export class SessionData {
   private static data = new Map<string, Entry[]>();
 
-  // ➕ dodawanie wpisu (BEZ MERGE!)
+  // ➕ add
   static addEntry(guildId: string, entry: Entry) {
     const current = this.data.get(guildId) || [];
-
-    current.push(entry);
-
-    this.data.set(guildId, current);
+    this.data.set(guildId, [...current, entry]); // 🔥 immutable
   }
 
-  // 📥 pobieranie (zwracamy kopię dla bezpieczeństwa)
+  // 📥 get
   static getEntries(guildId: string): Entry[] {
     const entries = this.data.get(guildId) || [];
     return [...entries];
   }
 
-  // 🧹 czyszczenie
+  // 🧹 clear
   static clear(guildId: string) {
     this.data.delete(guildId);
   }
 
-  // ✏️ update (adjust)
+  // ✏️ update
   static updateEntry(
     guildId: string,
     index: number,
@@ -42,7 +41,7 @@ export class SessionData {
     const entry = entries[index];
 
     if (field === "nick") {
-      entry.nickname = newValue;
+      entry.nickname = newValue.trim(); // 🔥 fix
       return true;
     }
 
@@ -51,7 +50,7 @@ export class SessionData {
       if (parsed === null) return false;
 
       entry.value = parsed;
-      entry.raw = newValue; // 🔥 zachowujemy to co user wpisał
+      entry.raw = newValue;
       return true;
     }
 
@@ -67,7 +66,7 @@ export class SessionData {
     return true;
   }
 
-  // 🔗 MERGE (manualny: from → to)
+  // 🔗 merge
   static mergeEntries(
     guildId: string,
     fromIndex: number,
@@ -82,20 +81,19 @@ export class SessionData {
     const from = entries[fromIndex];
     const to = entries[toIndex];
 
-    // 🔥 merge wartości
+    // 🔥 merge
     to.value += from.value;
 
-    // 🔥 clean preview (bez śladów merge)
+    // 🔥 clean raw
     to.raw = this.formatValue(to.value);
 
-    // 🗑️ usuń wpis (większy index pierwszy)
-    const first = Math.max(fromIndex, toIndex);
-    entries.splice(first, 1);
+    // 🔥 usuń ZAWSZE from
+    entries.splice(fromIndex, 1);
 
     return true;
   }
 
-  // 🔧 helper do formatowania
+  // 🔧 helper
   private static formatValue(value: number): string {
     if (value >= 1_000_000) {
       return `${(value / 1_000_000).toFixed(2)}M`;
