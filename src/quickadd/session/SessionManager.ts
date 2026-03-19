@@ -1,5 +1,7 @@
+// src/quickadd/session/SessionManager.ts
+
 type EventType = "rr" | "dn" | "dp";
-type SessionMode = "add" | "attend";
+export type SessionMode = "add" | "attend" | "auto"; // 🔥 AUTO DODANE
 
 export type ParserType =
   | "RR_RAID"
@@ -22,7 +24,7 @@ interface QuickAddSession {
   eventType: EventType;
   mode: SessionMode;
 
-  parserType: ParserType;
+  parserType: ParserType | null; // 🔥 AUTO = null
 
   entries: SessionEntry[];
 }
@@ -30,13 +32,13 @@ interface QuickAddSession {
 export class SessionManager {
   private static sessions = new Map<string, QuickAddSession>();
 
-  // 🔥 KLUCZOWA ZMIANA
+  // 🔥 KLUCZOWA ZMIANA (parserType może być null)
   static createSession(
     session: Omit<QuickAddSession, "entries">
   ) {
     this.sessions.set(session.guildId, {
       ...session,
-      entries: [], // zawsze start pusto
+      entries: [],
     });
   }
 
@@ -48,7 +50,6 @@ export class SessionManager {
     return this.sessions.has(guildId);
   }
 
-  // 🔥 TYPY zamiast any
   static addEntries(guildId: string, newEntries: SessionEntry[]) {
     const session = this.sessions.get(guildId);
     if (!session) return;
