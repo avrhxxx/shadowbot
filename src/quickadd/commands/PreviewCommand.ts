@@ -1,9 +1,10 @@
+// src/quickadd/commands/PreviewCommand.ts
 import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-function getTitle(parserType: string) {
+function getTitle(parserType: string | null) {
   switch (parserType) {
     case "RR_RAID":
       return "Reservoir Raid";
@@ -14,15 +15,14 @@ function getTitle(parserType: string) {
     case "DUEL_POINTS":
       return "Duel Points";
     default:
-      return "QuickAdd";
+      return "Auto Detect";
   }
 }
 
-// 🔥 NOWA FUNKCJA – czytelne oznaczenie grupy
 function getGroupLabel(entry: any): string {
   if (entry.group === "MAIN") return "🟢 MAIN";
   if (entry.group === "RESERVE") return "🟡 RESERVE";
-  return ""; // brak → nic nie pokazuj
+  return "";
 }
 
 export async function preview(message: Message) {
@@ -41,7 +41,7 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔥 DUPLIKATY (nickname + parserType zamiast value)
+  // 🔥 DUPLIKATY
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -61,20 +61,29 @@ export async function preview(message: Message) {
 
     const groupLabel = getGroupLabel(entry);
 
-    return `\`[${index + 1}]\` **${entry.nickname}** ${
-      groupLabel ? `— ${groupLabel}` : ""
+    return `\`[${index + 1}]\` **${entry.nickname}**${
+      groupLabel ? ` — ${groupLabel}` : ""
     }${duplicateMark}${statusMark}`;
   });
 
+  // 🔥 LIMIT (bez crasha Discorda)
+  const MAX_LINES = 50;
+  const visibleLines = lines.slice(0, MAX_LINES);
+
+  const truncated =
+    lines.length > MAX_LINES
+      ? `\n… and ${lines.length - MAX_LINES} more`
+      : "";
+
   const embed = new EmbedBuilder()
-    .setTitle(`📊 QuickAdd Preview – ${getTitle(session.parserType)}`)
+    .setTitle(`📊 ${getTitle(session.parserType)} Preview`)
     .setDescription(
-      `👤 **Session Owner:** <@${session.moderatorId}>\n` +
-        `📦 **Entries:** ${entries.length}\n` +
+      `📦 **Entries:** ${entries.length}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        lines.join("\n") +
+        visibleLines.join("\n") +
+        truncated +
         `\n━━━━━━━━━━━━━━━━━━\n` +
-        `📌 Use \`!help\` to see available commands`
+        `💡 \`!confirm\` • \`!adjust\` • \`!delete\` • \`!cancel\``
     )
     .setColor(0x5865f2);
 
