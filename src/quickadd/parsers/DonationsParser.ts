@@ -24,7 +24,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (/donations/i.test(line)) {
       const value = extractValue(line);
 
-      // 🔥 odrzucamy śmieci typu "43"
+      // 🔥 ignoruj śmieci typu "43"
       if (!value || value < 1000) continue;
 
       const nickname = normalizeNickname(lastNickname || "UNKNOWN");
@@ -40,7 +40,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         sourceType: "OCR",
       });
 
-      // 🔥 reset state
+      // 🔥 reset pairing
       lastNickname = null;
     }
   }
@@ -83,13 +83,19 @@ function normalizeNickname(name: string): string {
   cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
   cleaned = cleaned.replace(/^\d+\s+/i, "");
 
-  // 🔥 usuń śmieci typu "<"
+  // 🔥 usuń znaki dekoracyjne OCR
   cleaned = cleaned.replace(/[<>]/g, "");
+
+  // 🔥 usuń leading garbage
+  cleaned = cleaned.replace(/^[^a-zA-Z0-9]+/, "");
 
   // 🔥 usuń końcówki typu " g", " i"
   cleaned = cleaned.replace(/\s+[a-z]$/i, "");
 
-  // 🔥 usuń wszystko poza nickiem
+  // 🔥 usuń typowe OCR końcówki
+  cleaned = cleaned.replace(/(se|si|i)$/i, "");
+
+  // 🔥 final clean (tylko znaki nicka)
   cleaned = cleaned.replace(/[^\w\d_]/g, "");
 
   return cleaned.trim();
