@@ -1,3 +1,5 @@
+// src/quickadd/commands/ConfirmCommand.ts
+
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
@@ -8,25 +10,30 @@ export async function confirm(message: Message) {
   const session = SessionManager.getSession(guildId);
 
   if (!session) {
-    await message.reply("❌ Brak aktywnej sesji.");
+    await message.reply("❌ No active session.");
     return;
   }
 
   const entries = SessionData.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
-    await message.reply("❌ Brak danych do zapisania.");
+    await message.reply("❌ No data to save.");
     return;
   }
 
   try {
-    // 🔥 delegacja do serwisów
-    await processQuickAdd(session.parserType, entries);
+    // 🔥 KLUCZOWA ZMIANA
+    await processQuickAdd({
+      session,
+      entries,
+      guildId,
+    });
 
-    await message.reply(`✅ Zapisano ${entries.length} wpisów!`);
+    await message.reply(`✅ Saved ${entries.length} entries.`);
   } catch (err) {
     console.error("Confirm error:", err);
-    await message.reply("❌ Błąd podczas zapisu.");
+
+    await message.reply("❌ Failed to save data.");
     return;
   }
 
@@ -34,7 +41,7 @@ export async function confirm(message: Message) {
   SessionData.clear(guildId);
   SessionManager.endSession(guildId);
 
-  // 🗑️ usuwanie kanału
+  // 🗑️ delete channel
   setTimeout(async () => {
     try {
       const channel = await message.guild?.channels.fetch(session.channelId);
