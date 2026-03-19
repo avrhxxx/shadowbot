@@ -53,20 +53,30 @@ export function registerQuickAddListener(client: Client) {
       const command = rawCommand.toLowerCase();
 
       try {
-        // 🔥 START (NOWY SYSTEM)
+        // 🔥 START (FIXED)
         if (command === "start") {
           if (!isQuickAddChannel) {
             return message.reply("❌ Tylko w #quick-add.");
           }
 
-          SessionManager.createSession(message.guildId, {
-            moderatorId: message.author.id,
+          if (SessionManager.hasSession(message.guildId)) {
+            return message.reply("❌ Masz już aktywną sesję.");
+          }
+
+          SessionManager.createSession({
+            guildId: message.guildId,
             channelId: message.channel.id,
+            moderatorId: message.author.id,
+
+            // 🔥 required przez typy
+            eventType: "rr", // tymczasowe
+            mode: "auto",
+            parserType: null,
           });
 
           await message.reply(
-            "📥 Wyślij screenshot lub wpisz dane ręcznie.\n" +
-            "Spróbuję automatycznie rozpoznać typ 👍"
+            "🟢 Session started.\n" +
+            "📸 Send a screenshot or paste text — I will detect it automatically."
           );
           return;
         }
@@ -131,8 +141,8 @@ export function registerQuickAddListener(client: Client) {
 
         if (!parsed || parsed.length === 0) {
           await message.reply(
-            "❌ Nie rozpoznano danych ze screena.\n" +
-            "Spróbuj inny screen lub wpisz dane ręcznie."
+            "❌ Couldn't detect data from the screenshot.\n" +
+            "Try another image or enter data manually."
           );
           return;
         }
@@ -157,17 +167,17 @@ export function registerQuickAddListener(client: Client) {
       try {
         const lines = content
           .split("\n")
-          .map(l => l.trim())
+          .map((l) => l.trim())
           .filter(Boolean);
 
         const parsed = parseByImageType(lines);
 
         if (!parsed || parsed.length === 0) {
           await message.reply(
-            "❓ Nie rozpoznano typu danych.\n" +
-            "Spróbuj:\n" +
-            "• wysłać screenshot\n" +
-            "• lub poprawić format danych"
+            "❓ Couldn't detect data type.\n" +
+            "Try:\n" +
+            "• sending a screenshot\n" +
+            "• or correcting the format"
           );
           return;
         }
