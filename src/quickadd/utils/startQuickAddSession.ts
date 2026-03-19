@@ -9,11 +9,11 @@ import {
 import { SessionManager } from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
 
-type SessionMode = "add" | "attend";
+type SessionMode = "add" | "attend" | "auto";
 
 export async function startQuickAddSession(
   message: Message,
-  mode: SessionMode = "add"
+  mode: SessionMode = "auto"
 ) {
   const guild = message.guild;
   if (!guild) return;
@@ -25,17 +25,17 @@ export async function startQuickAddSession(
     message.channel.name === "quick-add";
 
   if (!isQuickAddChannel) {
-    await message.reply("❌ Użyj tej komendy w #quick-add.");
+    await message.reply("❌ Use this command in #quick-add.");
     return;
   }
 
   // 🔒 jedna sesja na guild
   if (SessionManager.hasSession(guild.id)) {
-    await message.reply("❌ Masz już aktywną sesję.");
+    await message.reply("❌ You already have an active session.");
     return;
   }
 
-  const channelName = `qa-${message.author.username}`;
+  const channelName = `session-${message.author.username.toLowerCase()}`;
 
   const channel = await guild.channels.create({
     name: channelName,
@@ -55,16 +55,16 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 NOWE — parserType = null (autodetect później)
+  // 🔥 autodetect mode
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
     mode,
-    parserType: null, // 🔥 KLUCZ
+    parserType: null, // 🔥 autodetect
   });
 
-  await message.reply(`✅ Sesja utworzona: ${channel}`);
+  await message.reply(`✅ Session created: ${channel}`);
 
   await sendSessionInfo(channel as TextChannel, message.author.id, mode);
 }
