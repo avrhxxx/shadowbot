@@ -1,5 +1,4 @@
 // src/quickadd/commands/ConfirmCommand.ts
-
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
@@ -21,19 +20,22 @@ export async function confirm(message: Message) {
     return;
   }
 
-  try {
-    // 🔥 KLUCZOWA ZMIANA
-    await processQuickAdd({
-      session,
-      entries,
-      guildId,
-    });
+  // 🔥 KLUCZOWE — parserType musi być znany
+  if (!session.parserType) {
+    await message.reply(
+      "❌ Couldn't detect data type.\n" +
+      "Send more data or try again."
+    );
+    return;
+  }
 
-    await message.reply(`✅ Saved ${entries.length} entries.`);
+  try {
+    await processQuickAdd(session.parserType, entries);
+
+    await message.reply(`✅ Saved ${entries.length} entries!`);
   } catch (err) {
     console.error("Confirm error:", err);
-
-    await message.reply("❌ Failed to save data.");
+    await message.reply("❌ Error while saving data.");
     return;
   }
 
