@@ -20,7 +20,8 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // ✅ QuickAdd (NOWY SYSTEM)
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
-import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService"; // ✅ FIX
+import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService";
+import { handleEventSelect } from "./quickadd/interactions/eventSelectHandler"; // 🔥 NOWE
 
 const client = new Client({
   intents: [
@@ -76,10 +77,16 @@ client.once("ready", async () => {
   registerQuickAddListener(client);
 
   // -----------------------------
-  // Global interaction handler
+  // 🌍 Global interaction handler
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
+      // 🔥 QUICKADD SELECT MENU (NAJPIERW)
+      if (interaction.isStringSelectMenu()) {
+        await handleEventSelect(interaction);
+      }
+
+      // pozostałe systemy
       await handleEventInteraction(interaction);
       await handleAbsenceInteraction(interaction);
       await handlePointsInteraction(interaction);
