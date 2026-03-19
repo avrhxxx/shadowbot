@@ -2,7 +2,7 @@
 
 import { Client, Message } from "discord.js";
 
-// 🔹 preview + confirm + cancel + adjust + delete + merge + help
+// 🔹 commands
 import { preview } from "./commands/PreviewCommand";
 import { confirm } from "./commands/ConfirmCommand";
 import { cancel } from "./commands/CancelCommand";
@@ -11,17 +11,18 @@ import { deleteEntry } from "./commands/DeleteCommand";
 import { merge } from "./commands/MergeCommand";
 import { help } from "./commands/HelpCommand";
 
-// 🔹 sesja + dane
+// 🔹 session
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
+import { startQuickAddSession } from "./session/startQuickAddSession";
 
 // 🔥 OCR
 import { processOCR } from "./services/OCRService";
 
-// 🔥 parser chain (manual fallback też używa tego)
+// 🔥 parser chain
 import { parseByImageType } from "./parsers/ParserManager";
 
-// 🔥 mapper OCR → Entry
+// 🔥 mapper
 function mapEntry(entry: any) {
   const valueNumber = parseInt(entry.value || "0");
 
@@ -46,39 +47,16 @@ export function registerQuickAddListener(client: Client) {
       message.channel.name === "quick-add";
 
     // =====================================================
-    // 🔹 KOMENDY
+    // 🔹 COMMANDS
     // =====================================================
     if (content.startsWith("!")) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
       try {
-        // 🔥 START (FIXED)
+        // 🔥 START (FINAL FIX)
         if (command === "start") {
-          if (!isQuickAddChannel) {
-            return message.reply("❌ Tylko w #quick-add.");
-          }
-
-          if (SessionManager.hasSession(message.guildId)) {
-            return message.reply("❌ Masz już aktywną sesję.");
-          }
-
-          SessionManager.createSession({
-            guildId: message.guildId,
-            channelId: message.channel.id,
-            moderatorId: message.author.id,
-
-            // 🔥 required przez typy
-            eventType: "rr", // tymczasowe
-            mode: "auto",
-            parserType: null,
-          });
-
-          await message.reply(
-            "🟢 Session started.\n" +
-            "📸 Send a screenshot or paste text — I will detect it automatically."
-          );
-          return;
+          return startQuickAddSession(message, "auto");
         }
 
         if (command === "help") {
@@ -95,11 +73,11 @@ export function registerQuickAddListener(client: Client) {
           command === "merge"
         ) {
           if (!session || message.channel.id !== session.channelId) {
-            return message.reply("❌ Tylko w kanale sesji.");
+            return message.reply("❌ Use this in the session channel.");
           }
 
           if (session.moderatorId !== message.author.id) {
-            return message.reply("❌ To nie Twoja sesja.");
+            return message.reply("❌ This is not your session.");
           }
 
           if (command === "preview") await preview(message);
@@ -113,21 +91,21 @@ export function registerQuickAddListener(client: Client) {
         }
       } catch (err) {
         console.error("QuickAdd error:", err);
-        await message.reply("❌ Błąd.");
+        await message.reply("❌ Error.");
       }
 
       return;
     }
 
     // =====================================================
-    // 🔹 BRAK SESJI
+    // 🔹 NO SESSION
     // =====================================================
     if (!session) return;
     if (message.channel.id !== session.channelId) return;
     if (session.moderatorId !== message.author.id) return;
 
     // =====================================================
-    // 🖼️ OCR (SCREENY)
+    // 🖼️ OCR
     // =====================================================
     if (message.attachments.size > 0) {
       const attachment = message.attachments.first();
@@ -142,7 +120,7 @@ export function registerQuickAddListener(client: Client) {
         if (!parsed || parsed.length === 0) {
           await message.reply(
             "❌ Couldn't detect data from the screenshot.\n" +
-            "Try another image or enter data manually."
+              "Try another image or enter data manually."
           );
           return;
         }
@@ -161,7 +139,7 @@ export function registerQuickAddListener(client: Client) {
     }
 
     // =====================================================
-    // 📝 MANUAL INPUT (AUTO-DETECT)
+    // 📝 MANUAL INPUT (AUTO DETECT)
     // =====================================================
     if (content.length > 0) {
       try {
@@ -175,9 +153,9 @@ export function registerQuickAddListener(client: Client) {
         if (!parsed || parsed.length === 0) {
           await message.reply(
             "❓ Couldn't detect data type.\n" +
-            "Try:\n" +
-            "• sending a screenshot\n" +
-            "• or correcting the format"
+              "Try:\n" +
+              "• sending a screenshot\n" +
+              "• or correcting the format"
           );
           return;
         }
