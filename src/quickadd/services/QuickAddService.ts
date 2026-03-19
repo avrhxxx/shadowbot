@@ -1,42 +1,123 @@
-import { ParserType } from "../session/SessionManager";
+// src/quickadd/services/QuickAddService.ts
 
-export async function processQuickAdd(
-  parserType: ParserType,
-  entries: any[]
-) {
+import {
+  ParserType,
+  SessionEntry,
+} from "../session/SessionManager";
+
+// 🔥 INPUT DO SERWISU (skalowalny)
+interface QuickAddPayload {
+  parserType: ParserType | null;
+  entries: SessionEntry[];
+  guildId: string;
+
+  // 🔮 FUTURE (select menu)
+  targetId?: string; // eventId lub week
+}
+
+export async function processQuickAdd(payload: QuickAddPayload) {
+  const { parserType, entries, guildId, targetId } = payload;
+
+  if (!parserType) {
+    throw new Error("Parser type not detected.");
+  }
+
   switch (parserType) {
     case "RR_RAID":
-      return handleRRRaid(entries);
+      return handleRRRaid(guildId, entries, targetId);
 
     case "RR_ATTENDANCE":
-      return handleRRAttendance(entries);
+      return handleRRAttendance(guildId, entries, targetId);
 
     case "DONATIONS":
-      return handleDonations(entries);
+      return handleDonations(guildId, entries, targetId);
 
     case "DUEL_POINTS":
-      return handleDuelPoints(entries);
+      return handleDuelPoints(guildId, entries, targetId);
+
+    default:
+      throw new Error(`Unsupported parser type: ${parserType}`);
   }
 }
 
 // -----------------------------
+// 🧠 EVENT HANDLERS
+// -----------------------------
 
-async function handleRRRaid(entries: any[]) {
-  console.log("RR RAID", entries);
-  // 👉 EventService.addRaid(entries)
+async function handleRRRaid(
+  guildId: string,
+  entries: SessionEntry[],
+  targetId?: string
+) {
+  console.log("RR RAID", { guildId, entries, targetId });
+
+  const nicknames = entries.map(e => e.nickname);
+
+  // 🔮 FUTURE:
+  // await EventService.addParticipants(guildId, targetId!, nicknames);
+
+  return true;
 }
 
-async function handleRRAttendance(entries: any[]) {
-  console.log("RR ATTEND", entries);
-  // 👉 EventService.addAttendance(entries)
+async function handleRRAttendance(
+  guildId: string,
+  entries: SessionEntry[],
+  targetId?: string
+) {
+  console.log("RR ATTEND", { guildId, entries, targetId });
+
+  const nicknames = entries.map(e => e.nickname);
+
+  // 🔮 FUTURE:
+  // await EventService.addParticipants(guildId, targetId!, nicknames);
+
+  return true;
 }
 
-async function handleDonations(entries: any[]) {
-  console.log("DONATIONS", entries);
-  // 👉 PointsService.addDonations(entries)
+// -----------------------------
+// 💰 POINTS HANDLERS
+// -----------------------------
+
+async function handleDonations(
+  guildId: string,
+  entries: SessionEntry[],
+  targetId?: string
+) {
+  console.log("DONATIONS", { guildId, entries, targetId });
+
+  for (const e of entries) {
+    const payload = {
+      category: "Donations" as const,
+      nick: e.nickname,
+      points: String(e.value),
+      week: targetId ?? "UNKNOWN", // 🔮 później select
+    };
+
+    // 🔮 FUTURE:
+    // await PointsService.addPoints(payload);
+  }
+
+  return true;
 }
 
-async function handleDuelPoints(entries: any[]) {
-  console.log("DUEL", entries);
-  // 👉 PointsService.addDuel(entries)
+async function handleDuelPoints(
+  guildId: string,
+  entries: SessionEntry[],
+  targetId?: string
+) {
+  console.log("DUEL", { guildId, entries, targetId });
+
+  for (const e of entries) {
+    const payload = {
+      category: "Duel" as const,
+      nick: e.nickname,
+      points: String(e.value),
+      week: targetId ?? "UNKNOWN",
+    };
+
+    // 🔮 FUTURE:
+    // await PointsService.addPoints(payload);
+  }
+
+  return true;
 }
