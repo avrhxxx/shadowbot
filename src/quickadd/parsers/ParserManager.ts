@@ -1,3 +1,5 @@
+// src/quickadd/parsers/ParserManager.ts
+
 import {
   parseReservoirRaid,
   canParseReservoirRaid,
@@ -46,26 +48,33 @@ const parsers = [
 
 export function parseByImageType(lines: string[]): QuickAddEntry[] {
   for (const parser of parsers) {
-    const canParse = parser.canParse(lines);
+    try {
+      const canParse = parser.canParse(lines);
 
-    console.log(`Trying parser: ${parser.type}, canParse: ${canParse}`);
+      console.log(`Trying parser: ${parser.type}, canParse: ${canParse}`);
 
-    if (!canParse) continue;
+      if (!canParse) continue;
 
-    const result = parser.parse(lines);
+      const result = parser.parse(lines);
 
-    console.log(
-      `➡️ Parsing with: ${parser.type}, entries: ${result.length}`
-    );
+      console.log(
+        `➡️ Parsing with: ${parser.type}, entries: ${result.length}`
+      );
 
-    if (result && result.length > 0) {
-      console.log(`✅ MATCHED: ${parser.type}`);
-      return result;
+      if (result && result.length > 0) {
+        console.log(`✅ MATCHED: ${parser.type}`);
+        return result;
+      }
+
+      console.log(
+        `⚠️ ${parser.type} passed canParse but returned 0 entries`
+      );
+    } catch (err) {
+      console.error(`❌ Parser crash: ${parser.type}`, err);
+      continue; // 🔥 NIE blokuj reszty parserów
     }
-
-    console.log(`⚠️ ${parser.type} passed canParse but returned 0 entries`);
   }
 
-  console.log("❌ No parser matched");
+  console.log("❌ No parser matched ANY type");
   return [];
 }
