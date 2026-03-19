@@ -8,15 +8,12 @@ export async function processOCR(
   imageUrl: string,
   parserType: string
 ) {
-  // 🔥 pobierz obraz
   const response = await fetch(imageUrl);
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // 🔥 preprocess obrazu (sharp)
   const processedBuffer = await preprocessImage(buffer);
 
-  // 🔥 OCR
   const text = await extractTextFromImage(processedBuffer);
 
   console.log("=== OCR TEXT START ===");
@@ -26,38 +23,27 @@ export async function processOCR(
   const parser = parserMap[parserType as keyof typeof parserMap];
   if (!parser) return [];
 
+  // =========================
+  // 🔥 SPLIT + CLEAN (WAŻNE)
+  // =========================
   let lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 preprocess linii (clean + crop)
+  // =========================
+  // 🔥 PREPROCESS (GŁÓWNY FIX)
+  // =========================
   lines = preprocessOCR(lines, parserType as any);
 
-  // =====================================================
-  // 🔥 SMART FILTER (różny dla każdego parsera)
-  // =====================================================
+  // ❌ USUWAMY STARY FILTER DLA DONATIONS
+  // (bo preprocess już robi robotę)
 
   if (parserType === "DUEL_POINTS") {
-    // tylko linie z punktami typu 36.59M / 1200K
     lines = lines.filter((line) =>
       /[\d]+\.\d+\s*[MK]$/i.test(line) ||
       /[\d]{3,}\s*[MK]$/i.test(line)
     );
-  }
-
-  if (parserType === "DONATIONS") {
-    // 🔥 zostaw:
-    // - linie z Donations
-    // - linie wyglądające jak nicki
-    lines = lines.filter((line) => {
-      const lower = line.toLowerCase();
-
-      return (
-        lower.includes("donations") ||
-        /^[a-zA-Z0-9_\s.'-]{3,}$/.test(line)
-      );
-    });
   }
 
   console.log("=== FILTERED LINES ===");
