@@ -7,79 +7,49 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) continue;
 
-    const lower = line.toLowerCase();
+    // 🔥 interesują nas tylko linie z Donations
+    if (!/Donations/i.test(line)) continue;
 
-    // ❌ skip śmieci systemowe
-    if (lower.includes("at least")) continue;
-    if (lower.includes("rewards")) continue;
-    if (!lower.includes("donations")) continue;
-
-    // 🔥 wyciągnięcie wartości
-    const valueMatch = line.match(/([\d]{2,3}(?:[,.\s]\d{3})+|\d{4,})/);
+    // 🔢 value
+    const valueMatch = line.match(/([\d]{2,3}(?:[, ]\d{3})*)/);
     if (!valueMatch) continue;
 
-    const raw = valueMatch[0];
-    const value = parseInt(raw.replace(/[^\d]/g, ""));
+    const rawNumber = valueMatch[1];
+    const value = parseInt(rawNumber.replace(/[^\d]/g, ""));
+
     if (!value || value < 1000) continue;
 
-    // 🔥 SZUKANIE NICKA (look-back do 2 linii)
-    let nickname = "UNKNOWN";
+    // 🔥 NICK = poprzednia linia
+    const prevLine = lines[i - 1] || "";
 
-    for (let j = 1; j <= 2; j++) {
-      const candidate = lines[i - j];
-      if (!candidate) continue;
+    let nickname = cleanNickname(prevLine);
 
-      const cleaned = cleanNickname(candidate);
-
-      if (
-        cleaned.length >= 3 &&
-        !cleaned.toLowerCase().includes("donations")
-      ) {
-        nickname = cleaned;
-        break;
-      }
+    if (!nickname || nickname.length < 3) {
+      nickname = "UNKNOWN";
     }
+
+    const status =
+      nickname === "UNKNOWN" ? "UNREADABLE" : "OK";
 
     entries.push({
       lineId: lineCounter++,
       nickname,
       value,
-      raw,
-      rawText: line,
-      status: nickname === "UNKNOWN" ? "UNREADABLE" : "OK",
-      confidence: nickname === "UNKNOWN" ? 0.5 : 1,
+      raw: rawNumber,
+      rawText: `${prevLine} | ${line}`,
+      status,
+      confidence: status === "OK" ? 1 : 0.5,
       sourceType: "OCR",
     });
   }
 
-  // 🔥 DEDUPLIKACJA
-  const unique = new Map<string, QuickAddEntry>();
-
-  for (const entry of entries) {
-    const key = `${entry.nickname}_${entry.value}`;
-
-    if (!unique.has(key)) {
-      unique.set(key, entry);
-    }
-  }
-
-  return Array.from(unique.values());
+  return entries;
 }
 
-// 🔥 CLEAN NICKNAME (MEGA ważne)
 function cleanNickname(name: string): string {
-  return (
-    name
-      // usuń hardcore OCR śmieci
-      .replace(/[^a-zA-Z0-9_\s]/g, "")
-      // usuń prefixy typu "g ", "a4 ", "R "
-      .replace(/^[a-zA-Z0-9]{1,3}\s+/i, "")
-      // usuń pojedyncze litery na początku
-      .replace(/^[a-zA-Z]\s+/, "")
-      // usuń wielokrotne spacje
-      .replace(/\s+/g, " ")
-      .trim()
-  );
+  return name
+    .replace(/[^\w\d\s_]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
