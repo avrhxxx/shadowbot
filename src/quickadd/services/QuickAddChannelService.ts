@@ -1,3 +1,5 @@
+// src/quickadd/createQuickAddChannel.ts
+
 import {
   Guild,
   TextChannel,
@@ -29,30 +31,21 @@ export async function createQuickAddChannel(
   return channel;
 }
 
-// 📩 EMBED (w tym samym pliku)
+// 📩 EMBED (UPDATED)
 async function sendQuickAddInfo(channel: TextChannel) {
   const embed = new EmbedBuilder()
-    .setTitle("⚡ Kanał Quick Add")
+    .setTitle("Quick Add")
     .setDescription(
-      `To jest kanał startowy do dodawania danych.\n\n` +
+      `Start a session with \`!start\`.\n\n` +
 
-      `📌 **Co możesz tutaj zrobić?**\n` +
-      `• Rozpocząć sesję\n` +
-      `• Wybrać typ danych\n\n` +
+      `A private session channel will be created where you can send screenshots or type data.\n\n` +
 
-      `🧠 **Jak to działa?**\n` +
-      `1️⃣ Wpisz komendę (np. \`!rradd\`)\n` +
-      `2️⃣ Bot stworzy kanał sesji\n` +
-      `3️⃣ Tam wpisujesz:\n` +
-      `\`nick wartość\`\n\n` +
+      `**Supported data**\n` +
+      `donations • duel points • raid • attendance\n\n` +
 
-      `📌 Przykład:\n` +
-      `\`Shadow 12.5M\`\n\n` +
-
-      `━━━━━━━━━━━━━━━━━━\n` +
-      `ℹ️ \`!help\` – lista komend`
+      `\`!help\``
     )
-    .setColor(0x00b894);
+    .setColor(0x5865f2);
 
   const msg = await channel.send({ embeds: [embed] });
 
