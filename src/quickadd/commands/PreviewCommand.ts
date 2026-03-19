@@ -1,7 +1,6 @@
 import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
-import { QuickAddEntry } from "../types/QuickAddEntry";
 
 function getTitle(parserType: string) {
   switch (parserType) {
@@ -18,21 +17,27 @@ function getTitle(parserType: string) {
   }
 }
 
-// 🔥 FIX: poprawne wyświetlanie RAID (group > value)
+// 🔥 FINAL FIX: display logic (group > value > raw)
 function getDisplayValue(entry: any) {
-  // ✅ najpierw group (najważniejsze)
-  if (entry.group) {
+  // ✅ GROUP MA PRIORYTET
+  if (typeof entry.group === "string" && entry.group.length > 0) {
     if (entry.group === "MAIN") return "🟢 MAIN";
     if (entry.group === "RESERVE") return "🟡 RESERVE";
+
     return entry.group;
   }
 
-  // ✅ value tylko jeśli sensowne (nie 0)
-  if (entry.value && entry.value !== 0) {
+  // ✅ VALUE tylko jeśli > 0
+  if (typeof entry.value === "number" && entry.value > 0) {
     return entry.value;
   }
 
-  return entry.raw;
+  // ❌ fallback tylko jeśli sensowny
+  if (entry.raw && entry.raw !== "RESERVOIR_RAID") {
+    return entry.raw;
+  }
+
+  return "—";
 }
 
 export async function preview(message: Message) {
@@ -51,16 +56,16 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔥 LICZENIE DUPLIKATÓW
+  // 🔥 LICZENIE DUPLIKATÓW (nickname + value)
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
-    const key = `${entry.nickname.toLowerCase()}_${entry.value}`;
+    const key = `${entry.nickname?.toLowerCase()}_${entry.value}`;
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
   const lines = entries.map((entry, index) => {
-    const key = `${entry.nickname.toLowerCase()}_${entry.value}`;
+    const key = `${entry.nickname?.toLowerCase()}_${entry.value}`;
     const count = counts.get(key) || 0;
 
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
