@@ -1,3 +1,5 @@
+// src/quickadd/utils/parseValue.ts
+
 export function parseValue(input: string): number | null {
   if (!input) return null;
 
