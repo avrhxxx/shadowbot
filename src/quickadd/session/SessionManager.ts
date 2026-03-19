@@ -1,7 +1,6 @@
 // src/quickadd/session/SessionManager.ts
 
-type EventType = "rr" | "dn" | "dp";
-export type SessionMode = "add" | "attend" | "auto"; // 🔥 AUTO DODANE
+export type SessionMode = "add" | "attend" | "auto";
 
 export type ParserType =
   | "RR_RAID"
@@ -9,7 +8,7 @@ export type ParserType =
   | "DONATIONS"
   | "DUEL_POINTS";
 
-// 🔹 dane pojedynczego wpisu (spójne z parserami)
+// 🔹 dane pojedynczego wpisu
 export interface SessionEntry {
   nickname: string;
   value: number;
@@ -21,10 +20,14 @@ interface QuickAddSession {
   channelId: string;
   moderatorId: string;
 
-  eventType: EventType;
   mode: SessionMode;
 
-  parserType: ParserType | null; // 🔥 AUTO = null
+  // 🔥 AUTO → nie znamy jeszcze typu
+  parserType: ParserType | null;
+
+  // 🔥 przyszłość (select menu)
+  eventId?: string;
+  week?: string;
 
   entries: SessionEntry[];
 }
@@ -32,7 +35,7 @@ interface QuickAddSession {
 export class SessionManager {
   private static sessions = new Map<string, QuickAddSession>();
 
-  // 🔥 KLUCZOWA ZMIANA (parserType może być null)
+  // 🔥 tworzenie sesji (AUTO kompatybilne)
   static createSession(
     session: Omit<QuickAddSession, "entries">
   ) {
