@@ -1,3 +1,5 @@
+// src/quickadd/session/sendSessionInfo.ts
+
 import { TextChannel, EmbedBuilder } from "discord.js";
 
 export async function sendSessionInfo(
@@ -5,17 +7,22 @@ export async function sendSessionInfo(
   moderatorId: string,
   mode: "add" | "attend"
 ) {
-  const description =
-    mode === "add"
-      ? "W tym kanale dodajesz dane do eventu.\n\nFormat:\n`nick 100k`"
-      : "W tym kanale zaznaczasz obecność.\n\nFormat:\n`nick`";
-
   const embed = new EmbedBuilder()
-    .setTitle("📌 Informacja o kanale")
+    .setTitle("Quick Add")
     .setDescription(
-      `👤 **Moderator:** <@${moderatorId}>\n\n` +
-      `${description}\n\n` +
-      `💡 Wpisz \`!help\`, aby zobaczyć dostępne komendy`
+      `Send a screenshot or type data to add entries.\n\n` +
+
+      `**Auto-detection**\n` +
+      `donations • duel points • raid • attendance\n\n` +
+
+      `**Examples**\n` +
+      `Nick 3000\n` +
+      `Nick 36.5M\n` +
+      `Nick\n\n` +
+
+      `If detection fails, try another screenshot or enter the data manually.\n\n` +
+
+      `\`!preview\` • \`!help\``
     )
     .setColor(0x5865f2);
 
