@@ -1,6 +1,7 @@
 import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
 function getTitle(parserType: string) {
   switch (parserType) {
@@ -26,7 +27,8 @@ export async function preview(message: Message) {
     return;
   }
 
-  const entries = SessionData.getEntries(guildId);
+  // 🔥 FIX TYPE
+  const entries = SessionData.getEntries(guildId) as QuickAddEntry[];
 
   if (!entries || entries.length === 0) {
     await message.reply("❌ No data to preview.");
@@ -48,7 +50,7 @@ export async function preview(message: Message) {
 
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
 
-    // 🔥 status indicator
+    // 🔥 STATUS (już działa, bo mamy QuickAddEntry)
     let statusMark = "";
     if (entry.status === "UNREADABLE") statusMark = " ⚠";
     if (entry.status === "INVALID") statusMark = " ❌";
