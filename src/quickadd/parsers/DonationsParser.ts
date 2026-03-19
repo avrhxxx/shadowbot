@@ -5,6 +5,8 @@ let lineCounter = 1;
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
+  let lastNicknameLine: string | null = null;
+
   for (const rawLine of lines) {
     if (!rawLine) continue;
 
@@ -13,7 +15,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     const lower = line.toLowerCase();
 
-    // ❌ wywal zdania systemowe
+    // ❌ ignoruj śmieci systemowe
     if (
       lower.includes("required") ||
       lower.includes("rewards") ||
@@ -22,19 +24,14 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 musi mieć "donations"
-    if (!lower.includes("donations")) continue;
+    // 🔥 jeśli NIE ma donations → traktuj jako potencjalny nick
+    if (!lower.includes("donations")) {
+      lastNicknameLine = line;
+      continue;
+    }
 
-    // 🔥 rozbij na 2 części
-    const parts = line.split(/donations[:\s]*/i);
-
-    if (parts.length < 2) continue;
-
-    const nicknamePart = parts[0];
-    const valuePart = parts[1];
-
-    // 🔥 znajdź liczbę PO donations
-    const valueMatch = valuePart.match(/([\d,]+)/);
+    // 🔥 mamy linię z Donations → parsujemy value
+    const valueMatch = line.match(/([\d,]+)/);
     if (!valueMatch) continue;
 
     const rawNumber = valueMatch[1];
@@ -42,20 +39,19 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     if (value <= 0) continue;
 
-    // 🔥 wyczyść nick (ważne — bierzemy LEWĄ stronę)
-    let nickname = cleanNickname(nicknamePart);
+    // 🔥 użyj poprzedniej linii jako nicka
+    let nickname = lastNicknameLine
+      ? cleanNickname(lastNicknameLine)
+      : "";
 
-    // usuń rank (np. "4 ", "5 ")
-    nickname = nickname.replace(/^\d+\s*/, "");
-
-    // usuń śmieci typu "@ @"
-    nickname = nickname.replace(/^[^a-zA-Z0-9_]+/, "");
+    // fallback (jak OCR coś rozwalił)
+    if (!nickname || nickname.length < 3) {
+      nickname = "UNKNOWN";
+    }
 
     const isWeird =
       nickname.length < 3 ||
       /^[\d\s]+$/.test(nickname);
-
-    if (!nickname) continue;
 
     entries.push({
       lineId: lineCounter++,
@@ -67,6 +63,9 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       confidence: isWeird ? 0.5 : 1,
       sourceType: "OCR",
     });
+
+    // reset (żeby nie brało tego samego nicka kilka razy)
+    lastNicknameLine = null;
   }
 
   return entries;
