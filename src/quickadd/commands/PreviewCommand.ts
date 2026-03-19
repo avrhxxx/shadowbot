@@ -1,6 +1,7 @@
 import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
+import { QuickAddEntry } from "../types/QuickAddEntry";
 
 function getTitle(parserType: string) {
   switch (parserType) {
@@ -17,27 +18,11 @@ function getTitle(parserType: string) {
   }
 }
 
-// 🔥 FINAL FIX: display logic (group > value > raw)
-function getDisplayValue(entry: any) {
-  // ✅ GROUP MA PRIORYTET
-  if (typeof entry.group === "string" && entry.group.length > 0) {
-    if (entry.group === "MAIN") return "🟢 MAIN";
-    if (entry.group === "RESERVE") return "🟡 RESERVE";
-
-    return entry.group;
-  }
-
-  // ✅ VALUE tylko jeśli > 0
-  if (typeof entry.value === "number" && entry.value > 0) {
-    return entry.value;
-  }
-
-  // ❌ fallback tylko jeśli sensowny
-  if (entry.raw && entry.raw !== "RESERVOIR_RAID") {
-    return entry.raw;
-  }
-
-  return "—";
+// 🔥 NOWA FUNKCJA – czytelne oznaczenie grupy
+function getGroupLabel(entry: any): string {
+  if (entry.group === "MAIN") return "🟢 MAIN";
+  if (entry.group === "RESERVE") return "🟡 RESERVE";
+  return ""; // brak → nic nie pokazuj
 }
 
 export async function preview(message: Message) {
@@ -49,23 +34,23 @@ export async function preview(message: Message) {
     return;
   }
 
-  const entries = SessionData.getEntries(guildId) as any[];
+  const entries = SessionData.getEntries(guildId) as QuickAddEntry[];
 
   if (!entries || entries.length === 0) {
     await message.reply("❌ No data to preview.");
     return;
   }
 
-  // 🔥 LICZENIE DUPLIKATÓW (nickname + value)
+  // 🔥 DUPLIKATY (nickname + parserType zamiast value)
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
-    const key = `${entry.nickname?.toLowerCase()}_${entry.value}`;
+    const key = entry.nickname.toLowerCase();
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
   const lines = entries.map((entry, index) => {
-    const key = `${entry.nickname?.toLowerCase()}_${entry.value}`;
+    const key = entry.nickname.toLowerCase();
     const count = counts.get(key) || 0;
 
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
@@ -74,7 +59,11 @@ export async function preview(message: Message) {
     if (entry.status === "UNREADABLE") statusMark = " ⚠";
     if (entry.status === "INVALID") statusMark = " ❌";
 
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${getDisplayValue(entry)}${duplicateMark}${statusMark}`;
+    const groupLabel = getGroupLabel(entry);
+
+    return `\`[${index + 1}]\` **${entry.nickname}** ${
+      groupLabel ? `— ${groupLabel}` : ""
+    }${duplicateMark}${statusMark}`;
   });
 
   const embed = new EmbedBuilder()
