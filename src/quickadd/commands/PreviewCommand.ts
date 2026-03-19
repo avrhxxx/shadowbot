@@ -18,12 +18,19 @@ function getTitle(parserType: string) {
   }
 }
 
-// 🔥 NOWE: display value (obsługa RAID)
-function getDisplayValue(entry: QuickAddEntry & { group?: string }) {
-  if (entry.group === "MAIN") return "🟢 MAIN";
-  if (entry.group === "RESERVE") return "🟡 RESERVE";
+// 🔥 FIX: poprawne wyświetlanie RAID (group > value)
+function getDisplayValue(entry: any) {
+  // ✅ najpierw group (najważniejsze)
+  if (entry.group) {
+    if (entry.group === "MAIN") return "🟢 MAIN";
+    if (entry.group === "RESERVE") return "🟡 RESERVE";
+    return entry.group;
+  }
 
-  if (entry.value !== undefined) return entry.value;
+  // ✅ value tylko jeśli sensowne (nie 0)
+  if (entry.value && entry.value !== 0) {
+    return entry.value;
+  }
 
   return entry.raw;
 }
@@ -37,9 +44,7 @@ export async function preview(message: Message) {
     return;
   }
 
-  const entries = SessionData.getEntries(guildId) as (QuickAddEntry & {
-    group?: string;
-  })[];
+  const entries = SessionData.getEntries(guildId) as any[];
 
   if (!entries || entries.length === 0) {
     await message.reply("❌ No data to preview.");
@@ -64,9 +69,7 @@ export async function preview(message: Message) {
     if (entry.status === "UNREADABLE") statusMark = " ⚠";
     if (entry.status === "INVALID") statusMark = " ❌";
 
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${getDisplayValue(
-      entry
-    )}${duplicateMark}${statusMark}`;
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${getDisplayValue(entry)}${duplicateMark}${statusMark}`;
   });
 
   const embed = new EmbedBuilder()
