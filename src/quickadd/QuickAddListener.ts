@@ -22,7 +22,7 @@ import { SessionData } from "./session/SessionData";
 // 🔥 parser (manual input)
 import { parseValue } from "./utils/parseValue";
 
-// 🔥 OCR service
+// 🔥 OCR service (NOWY FLOW)
 import { processOCR } from "./services/OCRService";
 
 // 🔥 mapper OCR → Entry
@@ -32,7 +32,8 @@ function mapEntry(entry: any) {
   return {
     nickname: entry.nickname,
     value: isNaN(valueNumber) ? 0 : valueNumber,
-    raw: entry.value || entry.rawText || "",
+    raw: entry.raw || entry.rawText || "",
+    group: entry.group, // 🔥 zachowujemy MAIN / RESERVE
   };
 }
 
@@ -121,7 +122,7 @@ export function registerQuickAddListener(client: Client) {
     if (session.moderatorId !== message.author.id) return;
 
     // -----------------------------
-    // 🖼️ OCR (SCREENY)
+    // 🖼️ OCR (SCREENY) — AUTO DETECT
     // -----------------------------
     if (message.attachments.size > 0) {
       const attachment = message.attachments.first();
@@ -131,10 +132,8 @@ export function registerQuickAddListener(client: Client) {
       }
 
       try {
-        const parsed = await processOCR(
-          attachment.url,
-          session.parserType
-        );
+        // 🔥 KLUCZOWA ZMIANA — bez parserType
+        const parsed = await processOCR(attachment.url);
 
         if (!parsed || parsed.length === 0) {
           await message.react("❌");
