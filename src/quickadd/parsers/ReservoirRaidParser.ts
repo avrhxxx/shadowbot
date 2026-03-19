@@ -44,7 +44,10 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     let nickname = match[1];
     if (!nickname) continue;
 
+    // 🔥 usuń końcówki typu "=~"
     nickname = nickname.replace(/[=~]+$/, "");
+
+    // 🔥 CLEAN (Unicode-safe)
     nickname = cleanNickname(nickname);
 
     if (!nickname || nickname.length < 2) continue;
@@ -63,6 +66,9 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
+// =====================================
+// 🔧 CREATE ENTRY
+// =====================================
 function createEntry(
   rawText: string,
   nickname: string,
@@ -83,12 +89,24 @@ function createEntry(
   };
 }
 
+// =====================================
+// 🧹 CLEAN NICKNAME (UNICODE SAFE)
+// =====================================
 function cleanNickname(name: string): string {
   return name
+    // usuń śmieci OCR
     .replace(/[ÔÇś@%\\]/g, "")
-    .replace(/^[^a-zA-Z0-9]+/, "")
-    .replace(/[^a-zA-Z0-9]+$/, "")
-    .replace(/[^\w\s|-]/g, "")
+
+    // usuń śmieci z początku (obsługa wszystkich alfabetów)
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+
+    // usuń śmieci z końca
+    .replace(/[^\p{L}\p{N}]+$/u, "")
+
+    // usuń dziwne znaki w środku (zostaw litery, cyfry, spacje, _, |, -)
+    .replace(/[^\p{L}\p{N}\s_|-]/gu, "")
+
+    // normalizacja spacji
     .replace(/\s+/g, " ")
     .trim();
 }
