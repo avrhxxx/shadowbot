@@ -1,5 +1,4 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
-import { analyzeEntry } from "../utils/ocrWarnings";
 
 let lineCounter = 1;
 
@@ -12,7 +11,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 🔥 musi mieć M/K
+    // 🔥 musi zawierać wartość typu 36.59M / 1200K
     const valueMatch = line.match(/([\d.,]+)\s*([MK])/i);
     if (!valueMatch) continue;
 
@@ -23,26 +22,31 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
     const value = normalizeValue(rawNumber, suffix);
     if (value <= 0) continue;
 
-    // 🔥 usuń value
+    // 🔥 usuń wartość z linii
     let nicknamePart = line.replace(fullMatch, "");
 
-    // 🔥 usuń rank
+    // 🔥 usuń rank z początku (np. "8 ", "10 ")
     nicknamePart = nicknamePart.replace(/^\d+\s*/, "");
 
-    const nickname = cleanNickname(nicknamePart);
+    // 🔥 czyszczenie nicku
+    const cleaned = cleanNickname(nicknamePart);
 
-    if (!nickname || nickname.length < 3) continue;
+    // 🔥 heurystyka — wykrywanie śmieci OCR
+    const isWeird =
+      cleaned.length < 3 ||
+      /^[\d\s]+$/.test(cleaned) ||
+      cleaned.split(" ").length > 4;
 
-    // 🔥 ANALIZA (GLOBALNY HELPER)
-    const analysis = analyzeEntry(nickname, value);
+    if (!cleaned) continue;
 
     entries.push({
       lineId: lineCounter++,
-      nickname,
+      nickname: cleaned,
       value,
       raw: fullMatch,
-      status: analysis.suspicious ? "SUS" : "OK",
-      confidence: analysis.confidence,
+      rawText: rawLine,
+      status: isWeird ? "UNREADABLE" : "OK", // ✅ FIX (było SUS)
+      confidence: isWeird ? 0.4 : 1,
       sourceType: "OCR",
     });
   }
@@ -50,9 +54,7 @@ export function parseDuelPoints(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// =========================
-// 🔢 VALUE
-// =========================
+// 🔥 "36.59M" → 36590000
 function normalizeValue(num: string, suffix: string): number {
   const clean = num.replace(",", ".");
   const number = parseFloat(clean);
@@ -65,16 +67,10 @@ function normalizeValue(num: string, suffix: string): number {
   return 0;
 }
 
-// =========================
-// 🧼 CLEAN NICK
-// =========================
+// 🔥 czyszczenie nicków
 function cleanNickname(name: string): string {
-  return (
-    name
-      .replace(/[^\w\d\s_]/g, "")
-      .replace(/^[A-Za-z]\s+/, "") // "E Lady" → "Lady"
-      .replace(/\s+/g, " ")
-      .replace(/\b([A-Za-z])\s+([A-Za-z]{1,2})\b/g, "$1$2") // "M oK" → "MoK"
-      .trim()
-  );
+  return name
+    .replace(/[^\w\d\s_]/g, "") // usuwa śmieci OCR
+    .replace(/\s+/g, " ")
+    .trim();
 }
