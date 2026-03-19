@@ -76,26 +76,35 @@ function extractValue(line: string): number | null {
 function normalizeNickname(name: string): string {
   let cleaned = name.trim();
 
-  // 🔥 usuń prefix typu "g ", "R "
-  cleaned = cleaned.replace(/^[a-z]{1}\s+/i, "");
+  // =========================
+  // 🔥 USUŃ PREFIXY OCR
+  // =========================
 
-  // 🔥 usuń prefix typu "a4 ", "S 4 "
+  // g Nick, R Nick
+  cleaned = cleaned.replace(/^[a-z]\s+/i, "");
+
+  // a4 Nick, S 4 Nick
   cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
   cleaned = cleaned.replace(/^\d+\s+/i, "");
 
-  // 🔥 usuń znaki dekoracyjne OCR
+  // =========================
+  // 🔥 USUŃ DEKORACJE
+  // =========================
   cleaned = cleaned.replace(/[<>]/g, "");
 
-  // 🔥 usuń leading garbage
-  cleaned = cleaned.replace(/^[^a-zA-Z0-9]+/, "");
+  // =========================
+  // 🔥 USUŃ LEADING GARBAGE
+  // =========================
+  cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
 
-  // 🔥 usuń końcówki typu " g", " i"
+  // =========================
+  // 🔥 USUŃ KOŃCÓWKI OCR (tylko oddzielone)
+  // =========================
   cleaned = cleaned.replace(/\s+[a-z]$/i, "");
 
-  // 🔥 usuń typowe OCR końcówki
-  cleaned = cleaned.replace(/(se|si|i)$/i, "");
-
-  // 🔥 final clean (tylko znaki nicka)
+  // =========================
+  // 🔥 FINAL CLEAN
+  // =========================
   cleaned = cleaned.replace(/[^\w\d_]/g, "");
 
   return cleaned.trim();
