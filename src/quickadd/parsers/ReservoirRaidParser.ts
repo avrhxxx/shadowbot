@@ -5,28 +5,28 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 let lineCounter = 1;
 
 // =====================================
-// 🧠 CAN PARSE (SCREEN DETECT)
+// 🧠 CAN PARSE (PRECYZYJNY)
 // =====================================
 export function canParseReservoirRaid(lines: string[]): boolean {
   if (!lines || lines.length === 0) return false;
 
   const text = lines.join(" ").toLowerCase();
 
-  // 🔥 typowe słowa z raidu
-  if (
-    text.includes("no team") ||
-    text.includes("noteam") ||
-    text.includes("raid")
-  ) {
-    return true;
-  }
+  // 🔥 musi zawierać "No Team"
+  const hasNoTeam = /no\s*team/i.test(text);
 
-  // 🔥 fallback — kilka wystąpień "No Team"
-  const matches = lines.filter(line =>
+  // 🔥 musi mieć kilka takich wpisów (typowe dla listy raid)
+  const count = lines.filter(line =>
     /no\s*team/i.test(line)
-  );
+  ).length;
 
-  return matches.length >= 2;
+  // 🔥 opcjonalnie group hints
+  const hasGroupHints =
+    text.includes("main force") ||
+    text.includes("mainforce") ||
+    text.includes("reserve");
+
+  return hasNoTeam && (count >= 2 || hasGroupHints);
 }
 
 // =====================================
@@ -46,7 +46,7 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     const lower = line.toLowerCase();
 
     // =========================
-    // 🧠 DETECT GROUP (OCR SAFE)
+    // 🧠 DETECT GROUP
     // =========================
     if (
       (lower.includes("main") && lower.includes("force")) ||
@@ -74,7 +74,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     let nickname = match[1];
     if (!nickname) continue;
 
-    // 🔥 CLEAN (Unicode-safe)
     nickname = cleanNickname(nickname);
 
     if (!nickname || nickname.length < 2) continue;
@@ -117,26 +116,15 @@ function createEntry(
 }
 
 // =====================================
-// 🧹 CLEAN NICKNAME (FINAL)
+// 🧹 CLEAN NICKNAME
 // =====================================
 function cleanNickname(name: string): string {
   return name
-    // usuń śmieci OCR
     .replace(/[ÔÇś@%\\]/g, "")
-
-    // usuń śmieci z początku (unicode safe)
     .replace(/^[^\p{L}\p{N}]+/gu, "")
-
-    // usuń końcówki typu "=~"
     .replace(/[=~]+$/, "")
-
-    // usuń śmieci z końca (ale zostaw dekoracje)
     .replace(/[^\p{L}\p{N}_| -]+$/gu, "")
-
-    // usuń dziwne znaki w środku
     .replace(/[^\p{L}\p{N}\s_|-]/gu, "")
-
-    // normalizacja spacji
     .replace(/\s+/g, " ")
     .trim();
 }
