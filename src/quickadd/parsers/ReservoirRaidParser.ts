@@ -2,6 +2,20 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 
 let lineCounter = 1;
 
+// =====================================
+// 🧠 CAN PARSE (AUTODETECT)
+// =====================================
+export function canParseReservoirRaid(lines: string[]): boolean {
+  const hits = lines.filter(line =>
+    line.toLowerCase().includes("no team")
+  ).length;
+
+  return hits >= 2;
+}
+
+// =====================================
+// 🔥 MAIN PARSER
+// =====================================
 export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   const entries: QuickAddEntry[] = [];
 
@@ -15,9 +29,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
 
     const lower = line.toLowerCase();
 
-    // =========================
-    // 🧠 DETECT GROUP (OCR SAFE)
-    // =========================
     if (
       (lower.includes("main") && lower.includes("force")) ||
       lower.includes("mainforce")
@@ -31,9 +42,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // =========================
-    // 🔍 MATCH NICK
-    // =========================
     const match =
       line.match(/\(No\s*Team\)\s*(.+)/i) ||
       line.match(/\(NoTeam\)\s*(.+)/i) ||
@@ -44,7 +52,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
     let nickname = match[1];
     if (!nickname) continue;
 
-    // 🔥 CLEAN (Unicode-safe)
     nickname = cleanNickname(nickname);
 
     if (!nickname || nickname.length < 2) continue;
@@ -63,9 +70,6 @@ export function parseReservoirRaid(lines: string[]): QuickAddEntry[] {
   return entries;
 }
 
-// =====================================
-// 🔧 CREATE ENTRY
-// =====================================
 function createEntry(
   rawText: string,
   nickname: string,
@@ -86,27 +90,13 @@ function createEntry(
   };
 }
 
-// =====================================
-// 🧹 CLEAN NICKNAME (FINAL)
-// =====================================
 function cleanNickname(name: string): string {
   return name
-    // usuń śmieci OCR
     .replace(/[ÔÇś@%\\]/g, "")
-
-    // usuń śmieci z początku (unicode safe)
     .replace(/^[^\p{L}\p{N}]+/gu, "")
-
-    // usuń końcówki typu "=~"
     .replace(/[=~]+$/, "")
-
-    // usuń śmieci z końca (ale zostaw dekoracje)
     .replace(/[^\p{L}\p{N}_| -]+$/gu, "")
-
-    // usuń dziwne znaki w środku
     .replace(/[^\p{L}\p{N}\s_|-]/gu, "")
-
-    // normalizacja spacji
     .replace(/\s+/g, " ")
     .trim();
 }
