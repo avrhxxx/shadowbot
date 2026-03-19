@@ -10,16 +10,21 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   for (let rawLine of lines) {
     const line = rawLine.trim();
 
-    // 🧠 nickname
+    // =========================
+    // 🧠 DETECT NICKNAME
+    // =========================
     if (isNickname(line)) {
       lastNickname = line;
       continue;
     }
 
-    // 💰 donations
+    // =========================
+    // 💰 DONATIONS LINE
+    // =========================
     if (/donations/i.test(line)) {
       const value = extractValue(line);
 
+      // 🔥 odrzucamy śmieci typu "43"
       if (!value || value < 1000) continue;
 
       const nickname = normalizeNickname(lastNickname || "UNKNOWN");
@@ -35,6 +40,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         sourceType: "OCR",
       });
 
+      // 🔥 reset state
       lastNickname = null;
     }
   }
@@ -43,9 +49,8 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 // =========================
-// helpers
+// 🧠 NICKNAME CHECK
 // =========================
-
 function isNickname(line: string): boolean {
   return (
     line.length >= 3 &&
@@ -54,6 +59,9 @@ function isNickname(line: string): boolean {
   );
 }
 
+// =========================
+// 💰 VALUE EXTRACT
+// =========================
 function extractValue(line: string): number | null {
   const match = line.match(/donations[:\s]*([\d,]+)/i);
   if (!match) return null;
@@ -62,15 +70,27 @@ function extractValue(line: string): number | null {
   return isNaN(value) ? null : value;
 }
 
-// 🔥 FINAL CLEANUP
+// =========================
+// 🔥 FINAL NICKNAME CLEANER
+// =========================
 function normalizeNickname(name: string): string {
-  return name
-    .replace(/^[a-z]\s*/i, "")
-    .replace(/^\d+\s*/, "")
-    .replace(/^[a-z]\d+\s*/i, "")
-    .replace(/^[a-z]\s+/i, "")
-    .replace(/[<>]/g, "")
-    .replace(/\s+[a-z]$/i, "")
-    .replace(/[^\w\d_]/g, "")
-    .trim();
+  let cleaned = name.trim();
+
+  // 🔥 usuń prefix typu "g ", "R "
+  cleaned = cleaned.replace(/^[a-z]{1}\s+/i, "");
+
+  // 🔥 usuń prefix typu "a4 ", "S 4 "
+  cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
+  cleaned = cleaned.replace(/^\d+\s+/i, "");
+
+  // 🔥 usuń śmieci typu "<"
+  cleaned = cleaned.replace(/[<>]/g, "");
+
+  // 🔥 usuń końcówki typu " g", " i"
+  cleaned = cleaned.replace(/\s+[a-z]$/i, "");
+
+  // 🔥 usuń wszystko poza nickiem
+  cleaned = cleaned.replace(/[^\w\d_]/g, "");
+
+  return cleaned.trim();
 }
