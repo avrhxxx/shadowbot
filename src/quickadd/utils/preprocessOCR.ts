@@ -17,20 +17,29 @@ export function preprocessOCR(
 }
 
 // =====================================
-// 🔥 DONATIONS PREPROCESS (NOWE)
+// 🔥 DONATIONS PREPROCESS (FINAL)
 // =====================================
 function preprocessDonations(lines: string[]): string[] {
   const result: string[] = [];
 
   for (let line of lines) {
-    let cleaned = line.trim();
+    if (!line) continue;
+
+    // 🔥 NAJPIERW AGRESYWNY CLEAN
+    let cleaned = line
+      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")   // śmieci OCR
+      .replace(/^\d+\s*/, "")              // "4 Jay..." → "Jay..."
+      .replace(/^[^\w]+/, "")              // leading garbage
+      .replace(/[^\w\d]+$/g, "")           // trailing garbage
+      .replace(/\s+/g, " ")
+      .trim();
 
     if (!cleaned) continue;
 
     const lower = cleaned.toLowerCase();
 
     // =========================
-    // ❌ WYWAŁ SYSTEM / UI TEXT
+    // ❌ WYWAŁ SYSTEM TEXT
     // =========================
     if (
       lower.includes("at least") ||
@@ -39,41 +48,33 @@ function preprocessDonations(lines: string[]): string[] {
       lower.includes("ranking") ||
       lower.includes("alliance") ||
       lower.includes("points") ||
-      lower.includes("contribution")
+      lower.includes("contribution") ||
+      lower.includes("reward")
     ) {
       continue;
     }
 
     // =========================
-    // 🧹 OCR CLEAN
-    // =========================
-    cleaned = cleaned
-      .replace(/[ÔÇś@%]/g, "")      // śmieci OCR
-      .replace(/^\d+\s*/, "")       // "4 Jay..." → "Jay..."
-      .replace(/\s+/g, " ")
-      .trim();
-
-    // =========================
-    // 💰 NORMALIZUJ DONATIONS LINE
+    // 💰 DONATIONS LINE
     // =========================
     if (/donations/i.test(cleaned)) {
-      // usuń wszystko poza "Donations: number"
       const match = cleaned.match(/donations[:\s]*([\d,]+)/i);
 
-      if (match) {
-        cleaned = `Donations: ${match[1]}`;
-      } else {
-        continue;
-      }
+      if (!match) continue;
 
+      cleaned = `Donations: ${match[1]}`;
       result.push(cleaned);
       continue;
     }
 
     // =========================
-    // 🧠 NICKNAME FILTER
+    // 🧠 NICKNAME (po CLEAN!)
     // =========================
-    if (/^[a-z0-9 _.'-]{3,}$/i.test(cleaned) && /[a-z]/i.test(cleaned)) {
+    if (
+      cleaned.length >= 3 &&
+      /[a-z]/i.test(cleaned) &&
+      !/donations/i.test(cleaned)
+    ) {
       result.push(cleaned);
     }
   }
@@ -82,7 +83,7 @@ function preprocessDonations(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 DUEL POINTS (BEZ ZMIAN)
+// 🔥 DUEL POINTS (bez zmian)
 // =====================================
 function preprocessDuelPoints(lines: string[]): string[] {
   const result: string[] = [];
