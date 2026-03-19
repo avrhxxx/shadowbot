@@ -18,6 +18,16 @@ function getTitle(parserType: string) {
   }
 }
 
+// 🔥 NOWE: display value (obsługa RAID)
+function getDisplayValue(entry: QuickAddEntry & { group?: string }) {
+  if (entry.group === "MAIN") return "🟢 MAIN";
+  if (entry.group === "RESERVE") return "🟡 RESERVE";
+
+  if (entry.value !== undefined) return entry.value;
+
+  return entry.raw;
+}
+
 export async function preview(message: Message) {
   const guildId = message.guildId!;
   const session = SessionManager.getSession(guildId);
@@ -27,15 +37,16 @@ export async function preview(message: Message) {
     return;
   }
 
-  // 🔥 FIX TYPE
-  const entries = SessionData.getEntries(guildId) as QuickAddEntry[];
+  const entries = SessionData.getEntries(guildId) as (QuickAddEntry & {
+    group?: string;
+  })[];
 
   if (!entries || entries.length === 0) {
     await message.reply("❌ No data to preview.");
     return;
   }
 
-  // 🔥 LICZENIE DUPLIKATÓW (nickname + value)
+  // 🔥 LICZENIE DUPLIKATÓW
   const counts = new Map<string, number>();
 
   for (const entry of entries) {
@@ -43,21 +54,19 @@ export async function preview(message: Message) {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  // 🔢 lista wpisów
   const lines = entries.map((entry, index) => {
     const key = `${entry.nickname.toLowerCase()}_${entry.value}`;
     const count = counts.get(key) || 0;
 
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
 
-    // 🔥 STATUS (już działa, bo mamy QuickAddEntry)
     let statusMark = "";
     if (entry.status === "UNREADABLE") statusMark = " ⚠";
     if (entry.status === "INVALID") statusMark = " ❌";
 
-    return `\`[${index + 1}]\` **${entry.nickname}** — ${
-      entry.value ?? entry.raw
-    }${duplicateMark}${statusMark}`;
+    return `\`[${index + 1}]\` **${entry.nickname}** — ${getDisplayValue(
+      entry
+    )}${duplicateMark}${statusMark}`;
   });
 
   const embed = new EmbedBuilder()
