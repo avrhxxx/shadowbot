@@ -2,7 +2,7 @@
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
-import { processQuickAdd } from "../services/QuickAddService";
+import { buildEventSelectMenu } from "../ui/eventSelectMenu";
 
 export async function confirm(message: Message) {
   const guildId = message.guildId!;
@@ -20,36 +20,23 @@ export async function confirm(message: Message) {
     return;
   }
 
-  // 🔥 KLUCZOWE — parserType musi być znany
   if (!session.parserType) {
     await message.reply(
-      "❌ Couldn't detect data type.\n" +
-      "Send more data or try again."
+      "❌ Couldn't detect data type.\nSend more data."
     );
     return;
   }
 
-  try {
-    await processQuickAdd(session.parserType, entries);
+  // 🔥 MENU zamiast zapisu
+  const menu = await buildEventSelectMenu(guildId);
 
-    await message.reply(`✅ Saved ${entries.length} entries!`);
-  } catch (err) {
-    console.error("Confirm error:", err);
-    await message.reply("❌ Error while saving data.");
+  if (!menu) {
+    await message.reply("❌ No events available.");
     return;
   }
 
-  // 🧹 cleanup
-  SessionData.clear(guildId);
-  SessionManager.endSession(guildId);
-
-  // 🗑️ delete channel
-  setTimeout(async () => {
-    try {
-      const channel = await message.guild?.channels.fetch(session.channelId);
-      await channel?.delete();
-    } catch (err) {
-      console.error("Delete error:", err);
-    }
-  }, 3000);
+  await message.reply({
+    content: "📅 Select event to assign data:",
+    components: [menu],
+  });
 }
