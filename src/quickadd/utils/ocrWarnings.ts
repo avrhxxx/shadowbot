@@ -1,4 +1,4 @@
-// 🔥 UNIWERSALNY HELPER DO OCR
+// 🔥 UNIWERSALNY HELPER DO OCR (FIXED)
 
 export type OCRAnalysis = {
   suspicious: boolean;
@@ -24,38 +24,30 @@ export function analyzeEntry(
     problems.push("value");
   }
 
-  if (hasOCRNoise(nickname)) {
-    problems.push("ocr_noise");
-  }
-
   const suspicious = problems.length > 0;
 
   return {
     suspicious,
-    confidence: suspicious ? 0.5 : 1,
+    confidence: suspicious ? 0.6 : 1, // 🔥 mniej agresywne
     warning: problems.join(", "),
     suggestion: suggestNickname(nickname),
   };
 }
 
 // =========================
-// ⚠️ RULES
+// ⚠️ RULES (DOSTOSOWANE)
 // =========================
 function isSuspiciousNickname(name: string): boolean {
   return (
     name.length < 3 ||
     /^[0-9]+$/.test(name) ||
-    /^[A-Za-z]\s[A-Za-z]$/.test(name) ||
-    /\d{3,}/.test(name)
+    /^[A-Za-z]\s[A-Za-z]$/.test(name)
   );
 }
 
+// 🔥 KLUCZOWY FIX
 function isSuspiciousValue(value: number): boolean {
-  return value < 1_000_000;
-}
-
-function hasOCRNoise(name: string): boolean {
-  return /[^\w\s_]/.test(name);
+  return value < 1000; // 👈 zamiast 1_000_000
 }
 
 // =========================
