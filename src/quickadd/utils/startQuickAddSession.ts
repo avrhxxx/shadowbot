@@ -1,4 +1,4 @@
-// src/quickadd/session/startQuickAddSession.ts
+// src/quickadd/utils/startQuickAddSession.ts
 
 import {
   Message,
@@ -6,13 +6,13 @@ import {
   PermissionFlagsBits,
   TextChannel,
 } from "discord.js";
+
 import {
   SessionManager,
   SessionMode,
 } from "../session/SessionManager";
-import { sendSessionInfo } from "./sendSessionInfo";
 
-import { startTimeout } from "../session/TimeoutManager";
+import { sendSessionInfo } from "./sendSessionInfo";
 import { SessionData } from "../session/SessionData";
 
 export async function startQuickAddSession(
@@ -22,24 +22,30 @@ export async function startQuickAddSession(
   const guild = message.guild;
   if (!guild) return;
 
-  // 🔒 tylko quick-add
+  console.log("🚀 START SESSION REQUEST");
+
+  // 🔒 tylko #quick-add
   const isQuickAddChannel =
     message.channel.isTextBased() &&
     "name" in message.channel &&
     message.channel.name === "quick-add";
 
   if (!isQuickAddChannel) {
+    console.log("❌ Wrong channel");
     await message.reply("❌ Use this command in #quick-add.");
     return;
   }
 
   // 🔒 jedna sesja na guild
   if (SessionManager.hasSession(guild.id)) {
+    console.log("❌ Session already exists");
     await message.reply("❌ You already have an active session.");
     return;
   }
 
   const channelName = `session-${message.author.username.toLowerCase()}`;
+
+  console.log("📦 Creating session channel:", channelName);
 
   const channel = await guild.channels.create({
     name: channelName,
@@ -59,7 +65,9 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 CREATE SESSION
+  // =====================================
+  // 🧠 CREATE SESSION
+  // =====================================
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
@@ -67,6 +75,8 @@ export async function startQuickAddSession(
     mode,
     parserType: null,
   });
+
+  console.log("✅ Session created:", channel.id);
 
   await message.reply(`✅ Session created: ${channel}`);
 
@@ -78,9 +88,9 @@ export async function startQuickAddSession(
     infoMode
   );
 
-  // =========================
-  // 🔥 SAFE SEND (bez fetch – prostsze i stabilniejsze)
-  // =========================
+  // =====================================
+  // 🔥 SAFE SEND (fallback)
+  // =====================================
   const safeSend = async (msg: string) => {
     try {
       await channel.send(msg);
@@ -89,24 +99,10 @@ export async function startQuickAddSession(
     }
   };
 
-  // =========================
-  // 🔥 TIMEOUT START
-  // =========================
-  startTimeout(
-    guild.id,
-    async () => {
-      await safeSend("⚠️ Session inactive. Closing in 60 seconds.");
-    },
-    async () => {
-      await safeSend("❌ Session closed due to inactivity.");
+  // =====================================
+  // ⏱️ TIMEOUT INFO (tylko log)
+  // =====================================
+  console.log("⏱️ Session timeout handled by SessionManager");
 
-      SessionData.clear(guild.id);
-      SessionManager.endSession(guild.id);
-
-      // 🔥 PROSTO I BEZPIECZNIE
-      await channel.delete().catch(() => {
-        console.warn("⚠️ Channel already deleted");
-      });
-    }
-  );
+  // (timeout już jest w SessionManager.resetTimeout)
 }
