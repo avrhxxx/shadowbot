@@ -12,7 +12,6 @@ export function canParseDonations(lines: string[]): boolean {
     l.toLowerCase().includes("donations")
   ).length;
 
-  // 🔥 musi być więcej niż 1 — żeby uniknąć false positive
   return hits >= 2;
 }
 
@@ -26,13 +25,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
   for (let rawLine of lines) {
     const line = rawLine.trim();
-
     if (!line) continue;
 
     // =========================
-    // ✍️ TRYB TEKSTOWY (manual input)
+    // ✍️ TRYB TEKSTOWY (manual)
     // =========================
-    // np: Nick 3000
     const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
     if (manualMatch) {
       const nickname = normalizeNickname(manualMatch[1]);
@@ -58,7 +55,12 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     // 🧠 DETECT NICK (OCR)
     // =========================
     if (isNickname(line)) {
-      lastNickname = line;
+      const cleanedNick = normalizeNickname(line);
+
+      if (cleanedNick.length >= 3) {
+        lastNickname = cleanedNick;
+      }
+
       continue;
     }
 
@@ -68,13 +70,19 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (/donations/i.test(line)) {
       const value = extractValue(line);
 
-      // 🔥 filtr śmieci
-      if (!value || value < 1000) continue;
+      if (!value || value < 1000) {
+        lastNickname = null;
+        continue;
+      }
 
       const nickname = normalizeNickname(lastNickname || "");
 
-      // ❌ nie dodawaj UNKNOWN (usuwa spam)
-      if (!nickname || nickname.length < 2) {
+      // ❌ zabezpieczenia
+      if (
+        !nickname ||
+        nickname.length < 2 ||
+        nickname.toLowerCase() === "donations"
+      ) {
         lastNickname = null;
         continue;
       }
@@ -98,30 +106,38 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 // =====================================
-// 🧠 NICKNAME CHECK (OCR)
+// 🧠 NICKNAME CHECK (ULEPSZONE)
 // =====================================
 function isNickname(line: string): boolean {
   const lower = line.toLowerCase();
 
-  return (
-    line.length >= 3 &&
-    /[a-z]/i.test(line) &&
-    !lower.includes("donations") &&
-    !lower.includes("ranking") &&
-    !lower.includes("total") &&
-    !lower.includes("alliance") &&
-    !/\d{4,}/.test(line) // ❌ usuń linie z dużymi liczbami
-  );
+  if (
+    lower.includes("donations") ||
+    lower.includes("ranking") ||
+    lower.includes("total") ||
+    lower.includes("alliance")
+  ) return false;
+
+  if (line.length < 3) return false;
+
+  if (!/[a-z]/i.test(line)) return false;
+
+  const digitCount = (line.match(/\d/g) || []).length;
+  if (digitCount > 3) return false;
+
+  if (/^[^a-zA-Z]*$/.test(line)) return false;
+
+  return true;
 }
 
 // =====================================
 // 💰 VALUE EXTRACT
 // =====================================
 function extractValue(line: string): number | null {
-  const match = line.match(/donations[:\s]*([\d,]+)/i);
+  const match = line.match(/donations[:\s]*([\d\s]+)/i);
   if (!match) return null;
 
-  const value = parseInt(match[1].replace(/,/g, ""), 10);
+  const value = parseInt(match[1].replace(/\s/g, ""), 10);
   return isNaN(value) ? null : value;
 }
 
@@ -131,7 +147,10 @@ function extractValue(line: string): number | null {
 function normalizeNickname(name: string): string {
   let cleaned = name.trim();
 
-  // 🔥 prefixy OCR
+  // 🔥 usuń prefixy typu "S 4", "R ", "a4"
+  cleaned = cleaned.replace(/^[A-Za-z]?\s*\d*\s+/, "");
+
+  // 🔥 stare fixy
   cleaned = cleaned.replace(/^[a-z]\s+/i, "");
   cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
   cleaned = cleaned.replace(/^\d+\s+/i, "");
