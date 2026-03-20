@@ -64,7 +64,6 @@ export function parseByImageType(lines: string[]): {
 
     if (result && result.length > 0) {
       console.log(`✅ MATCHED: ${parser.type}`);
-
       return {
         type: parser.type,
         entries: result,
@@ -75,9 +74,5 @@ export function parseByImageType(lines: string[]): {
   }
 
   console.log("❌ No parser matched");
-
-  return {
-    type: null,
-    entries: [],
-  };
+  return { type: null, entries: [] };
 }
