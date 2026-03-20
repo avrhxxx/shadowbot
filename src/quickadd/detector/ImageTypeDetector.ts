@@ -1,4 +1,4 @@
-// src/quickadd/detector/ImageTypeDetector.ts
+
 // src/quickadd/detector/ImageTypeDetector.ts
 import { ParserType } from "../session/SessionManager";
 
