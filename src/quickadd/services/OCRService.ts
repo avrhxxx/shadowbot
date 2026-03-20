@@ -2,7 +2,8 @@
 
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
-import { parseByImageType } from "../parsers/ParserManager";
+import { detectImageType } from "../detector/ImageTypeDetector";
+import { parseByType } from "../parsers/ParserExecutor";
 import fetch from "node-fetch";
 
 export async function processOCR(imageUrl: string) {
@@ -36,7 +37,19 @@ export async function processOCR(imageUrl: string) {
   });
   console.log("==========================");
 
-  const { type, entries } = parseByImageType(lines);
+  // =========================
+  // 🧠 DETECT TYPE
+  // =========================
+  const type = detectImageType(lines);
+
+  console.log("=== DETECTED TYPE ===");
+  console.log(type);
+  console.log("=====================");
+
+  // =========================
+  // 🔥 PARSE
+  // =========================
+  const entries = parseByType(type, lines);
 
   console.log("=== PARSED OUTPUT ===");
   console.log(type, entries);
@@ -45,7 +58,9 @@ export async function processOCR(imageUrl: string) {
   return { type, entries };
 }
 
+// =====================================
 // 🔥 ULEPSZONY PREPROCESS
+// =====================================
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
 
@@ -55,7 +70,7 @@ export function preprocessOCR(lines: string[]): string[] {
     let cleaned = line
       // usuń dziwne znaki OCR
       .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
-      
+
       // usuń numerację (np. "12 Nick")
       .replace(/^\d+\s*/, "")
 
@@ -63,14 +78,14 @@ export function preprocessOCR(lines: string[]): string[] {
       .replace(/^[^\w]+/, "")
       .replace(/[^\w\d]+$/g, "")
 
-      // 🔥 NOWE: usuń "g" (typowe w donations)
+      // 🔥 usuń samotne "g"
       .replace(/\b[gG]\b/g, "")
 
-      // 🔥 NOWE: usuń przecinki z liczb (38,352 → 38352)
+      // 🔥 usuń przecinki z liczb (38,352 → 38352)
       .replace(/(\d),(\d)/g, "$1$2")
 
-      // 🔥 NOWE: usuń wszystko poza sensownymi znakami
-      .replace(/[^\w\s\d]/g, "")
+      // ⚠️ NIE usuwamy kropki (ważne dla 1.2M)
+      .replace(/[^\w\s\d.]/g, "")
 
       // normalize spacje
       .replace(/\s+/g, " ")
@@ -94,7 +109,6 @@ export function preprocessOCR(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 DEBUG – pokaż transformację
     console.log(`RAW: "${line}" → CLEAN: "${cleaned}"`);
 
     result.push(cleaned);
