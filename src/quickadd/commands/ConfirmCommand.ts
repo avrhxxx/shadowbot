@@ -1,3 +1,5 @@
+// src/quickadd/commands/ConfirmCommand.ts
+
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
