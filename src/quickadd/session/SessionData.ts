@@ -11,24 +11,72 @@ export interface Entry {
 export class SessionData {
   private static data = new Map<string, Entry[]>();
 
-  // ➕ add
+  // =====================================
+  // ➕ ADD SINGLE (legacy)
+  // =====================================
   static addEntry(guildId: string, entry: Entry) {
-    const current = this.data.get(guildId) || [];
-    this.data.set(guildId, [...current, entry]); // 🔥 immutable
+    this.addEntries(guildId, [entry]);
   }
 
-  // 📥 get
+  // =====================================
+  // 🔥 ADD BATCH (NOWE - KLUCZOWE)
+  // =====================================
+  static addEntries(guildId: string, newEntries: Entry[]) {
+    const current = this.data.get(guildId) || [];
+
+    console.log("📥 SessionData ADD BATCH");
+    console.log("➡️ incoming:", newEntries.length);
+    console.log("📦 current:", current.length);
+
+    const map = new Map<string, Entry>();
+
+    // 🔹 najpierw wrzuć stare
+    for (const e of current) {
+      map.set(e.nickname.toLowerCase(), { ...e });
+    }
+
+    // 🔹 potem nowe (nadpisują lepsze)
+    for (const e of newEntries) {
+      const key = e.nickname.toLowerCase();
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, { ...e });
+        continue;
+      }
+
+      // 🔥 prefer bigger value
+      if (e.value > existing.value) {
+        map.set(key, { ...e });
+        continue;
+      }
+    }
+
+    const merged = Array.from(map.values());
+
+    console.log("🧠 after merge:", merged.length);
+
+    this.data.set(guildId, merged);
+  }
+
+  // =====================================
+  // 📥 GET
+  // =====================================
   static getEntries(guildId: string): Entry[] {
     const entries = this.data.get(guildId) || [];
     return [...entries];
   }
 
-  // 🧹 clear
+  // =====================================
+  // 🧹 CLEAR
+  // =====================================
   static clear(guildId: string) {
     this.data.delete(guildId);
   }
 
-  // ✏️ update
+  // =====================================
+  // ✏️ UPDATE
+  // =====================================
   static updateEntry(
     guildId: string,
     index: number,
@@ -41,7 +89,7 @@ export class SessionData {
     const entry = entries[index];
 
     if (field === "nick") {
-      entry.nickname = newValue.trim(); // 🔥 fix
+      entry.nickname = newValue.trim();
       return true;
     }
 
@@ -57,7 +105,9 @@ export class SessionData {
     return false;
   }
 
-  // 🗑️ delete
+  // =====================================
+  // 🗑️ DELETE
+  // =====================================
   static removeEntry(guildId: string, index: number): boolean {
     const entries = this.data.get(guildId);
     if (!entries || !entries[index]) return false;
@@ -66,7 +116,9 @@ export class SessionData {
     return true;
   }
 
-  // 🔗 merge
+  // =====================================
+  // 🔗 MERGE (manual)
+  // =====================================
   static mergeEntries(
     guildId: string,
     fromIndex: number,
@@ -81,19 +133,17 @@ export class SessionData {
     const from = entries[fromIndex];
     const to = entries[toIndex];
 
-    // 🔥 merge
     to.value += from.value;
-
-    // 🔥 clean raw
     to.raw = this.formatValue(to.value);
 
-    // 🔥 usuń ZAWSZE from
     entries.splice(fromIndex, 1);
 
     return true;
   }
 
-  // 🔧 helper
+  // =====================================
+  // 🔧 FORMAT
+  // =====================================
   private static formatValue(value: number): string {
     if (value >= 1_000_000) {
       return `${(value / 1_000_000).toFixed(2)}M`;
