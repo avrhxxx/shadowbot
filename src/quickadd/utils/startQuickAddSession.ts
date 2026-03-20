@@ -12,7 +12,6 @@ import {
 } from "../session/SessionManager";
 import { sendSessionInfo } from "./sendSessionInfo";
 
-// 🔥 DODAJ TO
 import { startTimeout } from "../session/TimeoutManager";
 import { SessionData } from "../session/SessionData";
 
@@ -60,7 +59,7 @@ export async function startQuickAddSession(
     ],
   });
 
-  // 🔥 AUTODETECT SESSION
+  // 🔥 CREATE SESSION
   SessionManager.createSession({
     guildId: guild.id,
     channelId: channel.id,
@@ -80,20 +79,42 @@ export async function startQuickAddSession(
   );
 
   // =========================
+  // 🔥 SAFE SEND
+  // =========================
+  const safeSend = async (msg: string) => {
+    try {
+      const fetched = await message.client.channels.fetch(channel.id);
+
+      if (!fetched || !fetched.isTextBased()) return;
+
+      await fetched.send(msg);
+    } catch {
+      console.warn("⚠️ Channel no longer exists (skip send)");
+    }
+  };
+
+  // =========================
   // 🔥 TIMEOUT START
   // =========================
   startTimeout(
     guild.id,
-    () => {
-      channel.send("⚠️ Session inactive. Closing in 60 seconds.");
+    async () => {
+      await safeSend("⚠️ Session inactive. Closing in 60 seconds.");
     },
     async () => {
-      await channel.send("❌ Session closed due to inactivity.");
+      await safeSend("❌ Session closed due to inactivity.");
 
       SessionData.clear(guild.id);
       SessionManager.endSession(guild.id);
 
-      await channel.delete().catch(() => null);
+      try {
+        const fetched = await message.client.channels.fetch(channel.id);
+        if (fetched && fetched.isTextBased()) {
+          await (fetched as TextChannel).delete();
+        }
+      } catch {
+        console.warn("⚠️ Channel already deleted");
+      }
     }
   );
 }
