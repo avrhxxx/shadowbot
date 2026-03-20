@@ -1,9 +1,9 @@
-// src/quickadd/services/QuickAddService.ts
-
 import {
   ParserType,
   SessionEntry,
 } from "../session/SessionManager";
+
+import { saveNickMappings } from "./QuickAddNicknameService";
 
 // =====================================
 // 🔥 INPUT
@@ -40,6 +40,20 @@ export async function processQuickAdd(payload: QuickAddPayload) {
     throw new Error("No entries provided.");
   }
 
+  // =====================================
+  // 🧠 SAVE NICK MAPPINGS (🔥 NOWY KROK)
+  // =====================================
+  try {
+    console.log("🧠 Saving nickname mappings before processing...");
+    await saveNickMappings(entries);
+  } catch (err) {
+    console.error("⚠️ Nick mapping save failed (non-blocking):", err);
+    // 🔥 NIE BLOKUJEMY flow!
+  }
+
+  // =====================================
+  // 🚀 ROUTING
+  // =====================================
   switch (parserType) {
     case "RR_RAID":
       return handleRRRaid(guildId, entries, targetId);
