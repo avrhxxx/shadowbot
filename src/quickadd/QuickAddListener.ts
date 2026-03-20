@@ -14,12 +14,14 @@ import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
 
 import { processOCR } from "./services/OCRService";
-import { parseByImageType } from "./parsers/ParserManager";
+import { detectImageType } from "./detector/ImageTypeDetector";
+import { parseByType } from "./parsers/ParserExecutor";
 
-// ✅ FIX TU
 import { startQuickAddSession } from "./utils/startQuickAddSession";
 
+// =====================================
 // 🔹 mapper
+// =====================================
 function mapEntry(entry: any) {
   const valueNumber = parseInt(entry.value || "0");
 
@@ -30,6 +32,44 @@ function mapEntry(entry: any) {
   };
 }
 
+// =====================================
+// 🔹 wspólna logika dodawania
+// =====================================
+async function handleParsedData(
+  message: Message,
+  session: any,
+  type: any,
+  entries: any[]
+) {
+  // 🔥 AUTO-DETECT + LOCK
+  if (!session.parserType && type) {
+    session.parserType = type;
+    console.log(`🔒 Parser locked: ${type}`);
+  }
+
+  // 🔒 BLOKADA MIXU
+  if (session.parserType && type && session.parserType !== type) {
+    await message.reply(
+      `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
+    );
+    return;
+  }
+
+  if (!entries || entries.length === 0) {
+    await message.reply("❌ Couldn't detect data.");
+    return;
+  }
+
+  for (const entry of entries) {
+    SessionData.addEntry(message.guildId!, mapEntry(entry));
+  }
+
+  await message.react("✅");
+}
+
+// =====================================
+// 🔹 MAIN LISTENER
+// =====================================
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
     if (message.author.bot) return;
@@ -39,23 +79,17 @@ export function registerQuickAddListener(client: Client) {
     const session = SessionManager.getSession(message.guildId);
 
     // =====================================================
-    // 🔥 KOMENDY (NAJWAŻNIEJSZE – MUSZĄ BYĆ NA GÓRZE)
+    // 🔥 KOMENDY
     // =====================================================
     if (content.startsWith("!")) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
 
-      // =========================
-      // 🚀 START
-      // =========================
       if (command === "start") {
         await startQuickAddSession(message, "auto");
         return;
       }
 
-      // =========================
-      // ❌ brak sesji dla reszty komend
-      // =========================
       if (!session) {
         await message.reply("❌ No active session.");
         return;
@@ -71,9 +105,6 @@ export function registerQuickAddListener(client: Client) {
         return;
       }
 
-      // =========================
-      // 📦 KOMENDY SESJI
-      // =========================
       if (command === "preview") return preview(message);
       if (command === "confirm") return confirm(message);
       if (command === "cancel") return cancel(message);
@@ -86,7 +117,7 @@ export function registerQuickAddListener(client: Client) {
     }
 
     // =====================================================
-    // ❌ BRAK SESJI (dopiero po komendach!)
+    // ❌ BRAK SESJI
     // =====================================================
     if (!session) return;
     if (message.channel.id !== session.channelId) return;
@@ -102,30 +133,7 @@ export function registerQuickAddListener(client: Client) {
       try {
         const { type, entries } = await processOCR(attachment.url);
 
-        // 🔥 AUTO-DETECT + LOCK
-        if (!session.parserType && type) {
-          session.parserType = type;
-          console.log(`🔒 Parser locked: ${type}`);
-        }
-
-        // 🔒 BLOKADA MIXU
-        if (session.parserType && type && session.parserType !== type) {
-          await message.reply(
-            `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
-          );
-          return;
-        }
-
-        if (!entries || entries.length === 0) {
-          await message.reply("❌ Couldn't detect data.");
-          return;
-        }
-
-        for (const entry of entries) {
-          SessionData.addEntry(message.guildId!, mapEntry(entry));
-        }
-
-        await message.react("✅");
+        await handleParsedData(message, session, type, entries);
       } catch (err) {
         console.error("OCR error:", err);
         await message.react("❌");
@@ -144,32 +152,11 @@ export function registerQuickAddListener(client: Client) {
           .map((l) => l.trim())
           .filter(Boolean);
 
-        const { type, entries } = parseByImageType(lines);
+        // 🔥 NOWY SYSTEM
+        const type = detectImageType(lines);
+        const entries = parseByType(type, lines);
 
-        // 🔥 AUTO-DETECT + LOCK
-        if (!session.parserType && type) {
-          session.parserType = type;
-          console.log(`🔒 Parser locked: ${type}`);
-        }
-
-        // 🔒 BLOKADA MIXU
-        if (session.parserType && type && session.parserType !== type) {
-          await message.reply(
-            `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
-          );
-          return;
-        }
-
-        if (!entries || entries.length === 0) {
-          await message.reply("❌ Couldn't detect data type.");
-          return;
-        }
-
-        for (const entry of entries) {
-          SessionData.addEntry(message.guildId!, mapEntry(entry));
-        }
-
-        await message.react("✅");
+        await handleParsedData(message, session, type, entries);
       } catch (err) {
         console.error("Manual parse error:", err);
         await message.react("❌");
