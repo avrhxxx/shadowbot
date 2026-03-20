@@ -150,14 +150,17 @@ function mergeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 preferuj większą wartość (ranking donations)
+    // 🔥 preferuj większą wartość
     if (e.value > existing.value) {
       map.set(key, e);
       continue;
     }
 
-    // 🔥 fallback: lepszy confidence
-    if (e.confidence > existing.confidence) {
+    // 🔥 FIX TS + SAFE COMPARE
+    const eConf = e.confidence ?? 0;
+    const exConf = existing.confidence ?? 0;
+
+    if (eConf > exConf) {
       map.set(key, e);
     }
   }
@@ -195,7 +198,6 @@ function tryFallback(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 blokuj "Donations"
     if (nickname.toLowerCase().includes("donat")) {
       console.log("   ❌ Skipped keyword nickname");
       continue;
