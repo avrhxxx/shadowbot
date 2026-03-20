@@ -18,15 +18,17 @@ export function canParseDonations(lines: string[]): boolean {
 }
 
 // =====================================
-// 🔥 MAIN PARSER (V4 - MULTISCREEN READY)
+// 🚀 MAIN PARSER (V5 - MULTISCREEN READY)
 // =====================================
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V4)");
+  console.log("🧠 DonationsParser START (V5)");
   console.log("=================================");
 
   const entries: QuickAddEntry[] = [];
-  let lastNickname: string | null = null;
+
+  // 🔥 zamiast lastNickname
+  let nicknameQueue: string[] = [];
 
   const cleanedLines = dedupeLines(lines);
 
@@ -36,10 +38,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     if (!line) continue;
 
-    line = normalizeLine(line);
+    line = fixSplitNumbers(line);
 
     console.log(`🔎 [${i}] "${line}"`);
-    console.log("   lastNickname:", lastNickname);
+    console.log("   queue:", nicknameQueue);
 
     if (isGarbage(line)) {
       console.log("   ❌ garbage");
@@ -47,33 +49,43 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
 
     // =========================
-    // 💰 DONATIONS (PRIORITY)
+    // 💰 DONATIONS (TOP PRIORITY)
     // =========================
     if (looksLikeDonations(line)) {
       const value = extractValue(line);
 
       console.log("   💰 donations detected, value:", value);
 
-      if (!value || value < 1000 || value > 200000) {
+      if (!value) {
         console.log("   ❌ value rejected");
         continue;
       }
 
-      const nickname = normalizeNickname(lastNickname || "");
+      const nickname = nicknameQueue.shift();
 
-      if (!isValidNickname(nickname)) {
-        console.log("   ❌ invalid nickname");
+      if (!nickname) {
+        console.log("   ❌ no nickname in queue");
         continue;
       }
 
       console.log("   ✅ ENTRY:", nickname, value);
 
-      entries.push(buildEntry(nickname, value, rawLine, lastNickname, line, "OCR", 1));
+      entries.push({
+        lineId: lineCounter++,
+        nickname,
+        value,
+        raw: rawLine,
+        rawText: `${nickname} | ${line}`,
+        status: "OK",
+        confidence: 1,
+        sourceType: "OCR",
+      });
+
       continue;
     }
 
     // =========================
-    // ✍️ MANUAL (STRONG)
+    // ✍️ MANUAL (SAFE)
     // =========================
     const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
     if (manualMatch) {
@@ -87,27 +99,22 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       const nickname = normalizeNickname(rawNick);
       const value = parseInt(manualMatch[2], 10);
 
-      if (!isValidNickname(nickname) || isNaN(value)) continue;
+      if (!nickname || isNaN(value)) continue;
+      if (value < 1000 || value > 200000) continue;
 
       console.log("   ✅ MANUAL:", nickname, value);
 
-      entries.push(buildEntry(nickname, value, rawLine, rawNick, line, "MANUAL", 1));
-      continue;
-    }
+      entries.push({
+        lineId: lineCounter++,
+        nickname,
+        value,
+        raw: rawLine,
+        rawText: rawLine,
+        status: "OK",
+        confidence: 1,
+        sourceType: "MANUAL",
+      });
 
-    // =========================
-    // 🔥 NUMBER FALLBACK (SMART)
-    // =========================
-    const numberOnly = extractValue(line);
-
-    if (numberOnly) {
-      const nickname = normalizeNickname(lastNickname || "");
-
-      if (!isValidNickname(nickname)) continue;
-
-      console.log("   ⚠️ FALLBACK ENTRY:", nickname, numberOnly);
-
-      entries.push(buildEntry(nickname, numberOnly, rawLine, lastNickname, line, "OCR", 0.6));
       continue;
     }
 
@@ -119,84 +126,57 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
       if (isValidNickname(cleanedNick)) {
         console.log("   👤 nickname detected:", cleanedNick);
-        lastNickname = cleanedNick;
+        nicknameQueue.push(cleanedNick);
       }
 
       continue;
     }
   }
 
-  const final = dedupeEntries(entries);
+  const finalEntries = dedupeEntries(entries);
 
   console.log("=================================");
-  console.log("📊 FINAL ENTRIES:", final.length);
+  console.log("📊 FINAL ENTRIES:", finalEntries.length);
   console.log("=================================");
-
-  final.forEach((e, i) => {
+  finalEntries.forEach((e, i) => {
     console.log(`[${i}] ${e.nickname} → ${e.value}`);
   });
 
-  return final;
-}
-
-// =====================================
-// 🔥 ENTRY BUILDER
-// =====================================
-function buildEntry(
-  nickname: string,
-  value: number,
-  raw: string,
-  lastNickname: string | null,
-  line: string,
-  sourceType: "OCR" | "MANUAL",
-  confidence: number
-): QuickAddEntry {
-  return {
-    lineId: lineCounter++,
-    nickname,
-    value,
-    raw,
-    rawText: `${lastNickname ?? "??"} | ${line}`,
-    status: "OK",
-    confidence,
-    sourceType,
-  };
+  return finalEntries;
 }
 
 // =====================================
 // 🔥 HELPERS
 // =====================================
 
-function normalizeLine(line: string): string {
-  let out = line;
-
-  // fix split numbers
-  out = out.replace(/(\d{2,})\s+(\d{2,})/g, "$1$2");
-
-  // fix K format
-  out = out.replace(/(\d+)\s*K/gi, (_, n) => `${n}000`);
-
-  // remove weird chars
-  out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
-
-  return out.trim();
-}
-
 function extractValue(line: string): number | null {
-  const matches = line.match(/\d{3,}/g);
+  let raw = line.toLowerCase();
+
+  // 🔥 K support (43K, 43 0K etc.)
+  const kMatch = raw.match(/(\d{2,})\s*0*\s*k/);
+  if (kMatch) {
+    const val = parseInt(kMatch[1], 10) * 1000;
+    if (val >= 1000 && val <= 200000) return val;
+  }
+
+  // usuń śmieci
+  raw = raw.replace(/[^\d\s]/g, "");
+  raw = fixSplitNumbers(raw);
+
+  const matches = raw.match(/\d{4,6}/g);
   if (!matches) return null;
 
   const values = matches
     .map(n => parseInt(n, 10))
-    .filter(n => !isNaN(n));
+    .filter(n => n >= 1000 && n <= 200000);
 
-  if (!values.length) return null;
+  if (values.length === 0) return null;
 
-  const valid = values.filter(v => v <= 200000);
+  return Math.max(...values);
+}
 
-  if (valid.length) return Math.max(...valid);
-
-  return null;
+function fixSplitNumbers(str: string): string {
+  return str.replace(/(\d{2,})\s+(\d{2,})/g, "$1$2");
 }
 
 function looksLikeDonations(line: string): boolean {
@@ -209,21 +189,22 @@ function isNickname(line: string): boolean {
   if (
     looksLikeDonations(line) ||
     lower.includes("ranking") ||
+    lower.includes("reward") ||
     lower.includes("total")
   ) return false;
 
   if (line.length < 3) return false;
   if (!/[a-z]/i.test(line)) return false;
 
+  const digitCount = (line.match(/\d/g) || []).length;
+  if (digitCount > 3) return false;
+
   return true;
 }
 
 function isValidNickname(nick: string): boolean {
-  if (!nick) return false;
-  if (nick.length < 3) return false;
+  if (!nick || nick.length < 3) return false;
   if (/^\d+$/.test(nick)) return false;
-  if (nick.length > 20) return false;
-
   return true;
 }
 
@@ -237,13 +218,11 @@ function isGarbage(line: string): boolean {
 function normalizeNickname(name: string): string {
   let cleaned = name.trim();
 
-  // remove leading junk
+  // usuń prefixy typu "S 4", "R ", "a4"
   cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
+  cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
 
-  // remove rank prefixes like "R ", "S 4 "
-  cleaned = cleaned.replace(/^[A-Z]\s*\d*\s+/i, "");
-
-  // remove weird chars
+  // usuń śmieci
   cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
 
   return cleaned.trim();
@@ -261,15 +240,12 @@ function dedupeLines(lines: string[]): string[] {
 }
 
 function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
-  const map = new Map<string, QuickAddEntry>();
+  const seen = new Set<string>();
 
-  for (const e of entries) {
-    const key = e.nickname.toLowerCase();
-
-    if (!map.has(key) || map.get(key)!.value < e.value) {
-      map.set(key, e);
-    }
-  }
-
-  return Array.from(map.values());
+  return entries.filter(e => {
+    const key = `${e.nickname}_${e.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
