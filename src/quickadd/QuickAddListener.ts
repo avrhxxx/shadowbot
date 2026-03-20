@@ -11,71 +11,17 @@ import { merge } from "./commands/MergeCommand";
 import { help } from "./commands/HelpCommand";
 
 import { SessionManager } from "./session/SessionManager";
-import { SessionData } from "./session/SessionData";
-
-import { processOCR } from "./services/OCRService";
-import { detectImageType } from "./detector/ImageTypeDetector";
-import { parseByType } from "./parsers/ParserExecutor";
 
 import { startQuickAddSession } from "./utils/startQuickAddSession";
 
-// =====================================
-// 🔹 mapper
-// =====================================
-function mapEntry(entry: any) {
-  const valueNumber = parseInt(entry.value || "0");
-
-  return {
-    nickname: entry.nickname,
-    value: isNaN(valueNumber) ? 0 : valueNumber,
-    raw: entry.raw || entry.rawText || "",
-  };
-}
+// 🔥 NOWY FLOW SERVICE
+import {
+  processImageInput,
+  processTextInput,
+} from "./services/QuickAddFlowService";
 
 // =====================================
-// 🔹 wspólna logika
-// =====================================
-async function handleParsedData(
-  message: Message,
-  session: any,
-  type: any,
-  entries: any[]
-) {
-  console.log("=== HANDLE PARSED DATA ===");
-  console.log("TYPE:", type);
-  console.log("ENTRIES:", entries.length);
-
-  // 🔥 AUTO-DETECT + LOCK
-  if (!session.parserType && type) {
-    session.parserType = type;
-    console.log(`🔒 Parser locked: ${type}`);
-  }
-
-  // 🔒 BLOKADA MIXU
-  if (session.parserType && type && session.parserType !== type) {
-    console.log("❌ TYPE MISMATCH");
-    await message.reply(
-      `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
-    );
-    return;
-  }
-
-  if (!entries || entries.length === 0) {
-    console.log("❌ NO ENTRIES");
-    await message.reply("❌ Couldn't detect data.");
-    return;
-  }
-
-  for (const entry of entries) {
-    console.log("➕ ADD ENTRY:", entry);
-    SessionData.addEntry(message.guildId!, mapEntry(entry));
-  }
-
-  await message.react("✅");
-}
-
-// =====================================
-// 🔹 MAIN LISTENER
+// 🔹 MAIN LISTENER (CZYSTY ROUTER)
 // =====================================
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
@@ -97,16 +43,19 @@ export function registerQuickAddListener(client: Client) {
 
       console.log("COMMAND:", command);
 
+      // 🚀 START (nie wymaga sesji)
       if (command === "start") {
         await startQuickAddSession(message, "auto");
         return;
       }
 
+      // ❌ brak sesji
       if (!session) {
         await message.reply("❌ No active session.");
         return;
       }
 
+      // 🔒 walidacja sesji
       if (message.channel.id !== session.channelId) {
         await message.reply("❌ Use session channel.");
         return;
@@ -117,6 +66,7 @@ export function registerQuickAddListener(client: Client) {
         return;
       }
 
+      // 📦 KOMENDY SESJI
       if (command === "preview") return preview(message);
       if (command === "confirm") return confirm(message);
       if (command === "cancel") return cancel(message);
@@ -125,6 +75,7 @@ export function registerQuickAddListener(client: Client) {
       if (command === "merge") return merge(message);
       if (command === "help") return help(message);
 
+      console.log("❓ Unknown command");
       return;
     }
 
@@ -132,6 +83,8 @@ export function registerQuickAddListener(client: Client) {
     // ❌ BRAK SESJI
     // =====================================================
     if (!session) return;
+
+    // 🔒 walidacja sesji
     if (message.channel.id !== session.channelId) return;
     if (session.moderatorId !== message.author.id) return;
 
@@ -143,18 +96,9 @@ export function registerQuickAddListener(client: Client) {
       if (!attachment || !attachment.contentType?.startsWith("image/")) return;
 
       try {
-        console.log("📸 PROCESSING OCR IMAGE");
+        console.log("📸 ROUTE → IMAGE FLOW");
 
-        const { text, lines } = await processOCR(attachment.url);
-
-        console.log("📄 OCR LINES:", lines.length);
-
-        const type = detectImageType(lines);
-        console.log("🧠 DETECTED TYPE:", type);
-
-        const entries = parseByType(type, lines);
-
-        await handleParsedData(message, session, type, entries);
+        await processImageInput(message, session, attachment.url);
       } catch (err) {
         console.error("OCR error:", err);
         await message.react("❌");
@@ -168,17 +112,9 @@ export function registerQuickAddListener(client: Client) {
     // =====================================================
     if (content.length > 0) {
       try {
-        const lines = content
-          .split("\n")
-          .map((l) => l.trim())
-          .filter(Boolean);
+        console.log("📝 ROUTE → TEXT FLOW");
 
-        console.log("📝 MANUAL INPUT LINES:", lines);
-
-        const type = detectImageType(lines);
-        const entries = parseByType(type, lines);
-
-        await handleParsedData(message, session, type, entries);
+        await processTextInput(message, session, content);
       } catch (err) {
         console.error("Manual parse error:", err);
         await message.react("❌");
