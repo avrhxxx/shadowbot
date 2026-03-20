@@ -1,5 +1,3 @@
-// src/quickadd/parsers/ParserManager.ts
-
 import {
   parseReservoirRaid,
   canParseReservoirRaid,
@@ -21,60 +19,65 @@ import {
 } from "./DuelPointsParser";
 
 import { QuickAddEntry } from "../types/QuickAddEntry";
+import { ParserType } from "../session/SessionManager";
 
 // 🔥 KOLEJNOŚĆ MA OGROMNE ZNACZENIE
 const parsers = [
   {
-    type: "DONATIONS",
+    type: "DONATIONS" as ParserType,
     canParse: canParseDonations,
     parse: parseDonations,
   },
   {
-    type: "DUEL_POINTS",
+    type: "DUEL_POINTS" as ParserType,
     canParse: canParseDuelPoints,
     parse: parseDuelPoints,
   },
   {
-    type: "RR_RAID",
+    type: "RR_RAID" as ParserType,
     canParse: canParseReservoirRaid,
     parse: parseReservoirRaid,
   },
   {
-    type: "RR_ATTENDANCE",
+    type: "RR_ATTENDANCE" as ParserType,
     canParse: canParseReservoirAttendance,
     parse: parseReservoirAttendance,
   },
 ];
 
-export function parseByImageType(lines: string[]): QuickAddEntry[] {
+export function parseByImageType(lines: string[]): {
+  type: ParserType | null;
+  entries: QuickAddEntry[];
+} {
   for (const parser of parsers) {
-    try {
-      const canParse = parser.canParse(lines);
+    const canParse = parser.canParse(lines);
 
-      console.log(`Trying parser: ${parser.type}, canParse: ${canParse}`);
+    console.log(`Trying parser: ${parser.type}, canParse: ${canParse}`);
 
-      if (!canParse) continue;
+    if (!canParse) continue;
 
-      const result = parser.parse(lines);
+    const result = parser.parse(lines);
 
-      console.log(
-        `➡️ Parsing with: ${parser.type}, entries: ${result.length}`
-      );
+    console.log(
+      `➡️ Parsing with: ${parser.type}, entries: ${result.length}`
+    );
 
-      if (result && result.length > 0) {
-        console.log(`✅ MATCHED: ${parser.type}`);
-        return result;
-      }
+    if (result && result.length > 0) {
+      console.log(`✅ MATCHED: ${parser.type}`);
 
-      console.log(
-        `⚠️ ${parser.type} passed canParse but returned 0 entries`
-      );
-    } catch (err) {
-      console.error(`❌ Parser crash: ${parser.type}`, err);
-      continue; // 🔥 NIE blokuj reszty parserów
+      return {
+        type: parser.type,
+        entries: result,
+      };
     }
+
+    console.log(`⚠️ ${parser.type} passed canParse but returned 0 entries`);
   }
 
-  console.log("❌ No parser matched ANY type");
-  return [];
+  console.log("❌ No parser matched");
+
+  return {
+    type: null,
+    entries: [],
+  };
 }
