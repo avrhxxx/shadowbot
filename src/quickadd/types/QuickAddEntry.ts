@@ -1,4 +1,4 @@
-//
+// src/quickadd/types/QuickAddEntry.ts
 
 export type QuickAddEntryStatus =
   | "OK"
