@@ -79,15 +79,11 @@ export async function startQuickAddSession(
   );
 
   // =========================
-  // 🔥 SAFE SEND
+  // 🔥 SAFE SEND (bez fetch – prostsze i stabilniejsze)
   // =========================
   const safeSend = async (msg: string) => {
     try {
-      const fetched = await message.client.channels.fetch(channel.id);
-
-      if (!fetched || !fetched.isTextBased()) return;
-
-      await fetched.send(msg);
+      await channel.send(msg);
     } catch {
       console.warn("⚠️ Channel no longer exists (skip send)");
     }
@@ -107,14 +103,10 @@ export async function startQuickAddSession(
       SessionData.clear(guild.id);
       SessionManager.endSession(guild.id);
 
-      try {
-        const fetched = await message.client.channels.fetch(channel.id);
-        if (fetched && fetched.isTextBased()) {
-          await (fetched as TextChannel).delete();
-        }
-      } catch {
+      // 🔥 PROSTO I BEZPIECZNIE
+      await channel.delete().catch(() => {
         console.warn("⚠️ Channel already deleted");
-      }
+      });
     }
   );
 }
