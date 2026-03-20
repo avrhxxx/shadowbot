@@ -1,3 +1,5 @@
+// src/quickadd/session/SessionManager.ts
+
 export type SessionMode = "add" | "attend" | "auto";
 
 export type ParserType =
