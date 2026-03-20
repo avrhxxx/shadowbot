@@ -22,6 +22,9 @@ const ABSENCE_CONFIG_TAB = "absence_config";
 const TRANSLATE_TAB = "translate";
 const TRANSLATE_CONFIG_TAB = "translate_config";
 
+// 🔥 NEW
+const QUICKADD_TAB = "quickadd";
+
 // --------------------------
 // ENV VALIDATION
 // --------------------------
@@ -89,6 +92,42 @@ async function deleteRow(tab: string, row: number) {
           },
         },
       ],
+    },
+  });
+}
+
+// --------------------------
+// 🔥 QUICKADD STORAGE
+// --------------------------
+export async function ensureQuickAddHeaders() {
+  const rows = await readSheet(QUICKADD_TAB);
+
+  if (!rows || rows.length === 0 || rows[0].length === 0) {
+    const headers = [["type", "ocr", "final", "createdAt"]];
+    await writeSheet(`${QUICKADD_TAB}!A1:D1`, headers);
+  }
+}
+
+export async function appendQuickAddRows(
+  rows: { type: string; ocr: string; final: string }[]
+) {
+  if (!rows.length) return;
+
+  await ensureQuickAddHeaders();
+
+  const values = rows.map(r => [
+    r.type,
+    r.ocr,
+    r.final,
+    Date.now(),
+  ]);
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: QUICKADD_TAB,
+    valueInputOption: "RAW",
+    requestBody: {
+      values,
     },
   });
 }
@@ -261,6 +300,6 @@ function toA1(col: number, row: number): string {
 }
 
 // --------------------------
-// EKSPORT DLA TS / SERWISÓW
+// EKSPORT
 // --------------------------
 export { readSheet, writeSheet, updateCell, deleteRow };
