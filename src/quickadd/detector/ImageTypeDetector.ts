@@ -1,4 +1,3 @@
-
 // src/quickadd/detector/ImageTypeDetector.ts
 import { ParserType } from "../session/SessionManager";
 
@@ -38,7 +37,7 @@ export function detectImageType(
     // 💰 DONATIONS (STRONG SIGNAL)
     // =========================
     if (lower.includes("donations")) {
-      scores.DONATIONS += 5; // 🔥 mocny sygnał
+      scores.DONATIONS += 5;
     }
 
     // OCR błędy
@@ -46,7 +45,6 @@ export function detectImageType(
       scores.DONATIONS += 2;
     }
 
-    // "Ranking rewards" → też donations screen
     if (lower.includes("ranking rewards")) {
       scores.DONATIONS += 2;
     }
@@ -92,7 +90,6 @@ export function detectImageType(
     // ❌ NUMBERS → MINIMAL IMPACT
     // =========================
     if (/\d{4,}/.test(line)) {
-      // tylko lekki hint, nie decyduje
       scores.DONATIONS += 0.2;
     }
   }
@@ -102,7 +99,6 @@ export function detectImageType(
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const [type, score] = sorted[0];
 
-  // 🔥 próg wyższy, żeby uniknąć false positive
   if (score < 3) {
     console.log("❌ Score too low");
     return null;
@@ -115,4 +111,4 @@ export function detectImageType(
 
   console.log(`✅ DETECTED: ${type}`);
   return type as ParserType;
-}}
+}
