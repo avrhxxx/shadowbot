@@ -9,11 +9,11 @@ import { getEvents } from "../../eventsPanel/eventService";
 export async function buildEventSelectMenu(guildId: string) {
   const events = await getEvents(guildId);
 
-  if (!events.length) return null;
+  if (!events || events.length === 0) return null;
 
   const options = events.slice(0, 25).map((event) => ({
     label: `${event.name} (${event.day}.${event.month})`,
-    value: event.id,
+    value: String(event.id), // 🔥 upewniamy się że to string
   }));
 
   const menu = new StringSelectMenuBuilder()
