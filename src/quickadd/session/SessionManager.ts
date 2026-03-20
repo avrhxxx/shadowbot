@@ -8,7 +8,6 @@ export type ParserType =
   | "DONATIONS"
   | "DUEL_POINTS";
 
-// 🔹 dane pojedynczego wpisu
 export interface SessionEntry {
   nickname: string;
   value: number;
@@ -21,17 +20,19 @@ interface QuickAddSession {
   moderatorId: string;
 
   mode: SessionMode;
-
-  // 🔥 AUTO → nie znamy jeszcze typu
   parserType: ParserType | null;
 
-  // 🔥 przyszłość (select menu)
   eventId?: string;
   week?: string;
 
   entries: SessionEntry[];
 
-  // ⏱️ timeout system (blueprint)
+  // 🔥 NOWE: BUFFER
+  buffer: {
+    ocrResults: string[][];
+    timer?: NodeJS.Timeout;
+  };
+
   lastActivity: number;
   timeout?: NodeJS.Timeout;
   warningTimeout?: NodeJS.Timeout;
@@ -40,7 +41,6 @@ interface QuickAddSession {
 export class SessionManager {
   private static sessions = new Map<string, QuickAddSession>();
 
-  // 🔌 handlers (bez zależności od Discorda)
   private static sendMessage: (channelId: string, content: string) => void = () => {};
   private static deleteChannel: (channelId: string) => void = () => {};
 
@@ -52,14 +52,18 @@ export class SessionManager {
     this.deleteChannel = handlers.deleteChannel;
   }
 
-  // 🔥 tworzenie sesji
   static createSession(
-    session: Omit<QuickAddSession, "entries" | "lastActivity">
+    session: Omit<QuickAddSession, "entries" | "lastActivity" | "buffer">
   ) {
     const newSession: QuickAddSession = {
       ...session,
       entries: [],
       lastActivity: Date.now(),
+
+      // 🔥 INIT BUFFER
+      buffer: {
+        ocrResults: [],
+      },
     };
 
     this.sessions.set(session.guildId, newSession);
@@ -90,7 +94,6 @@ export class SessionManager {
     session.entries = [];
   }
 
-  // 🔁 reset aktywności
   static touch(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
@@ -99,7 +102,6 @@ export class SessionManager {
     this.resetTimeout(guildId);
   }
 
-  // ⏱️ timeout logic (2min warning / 3min kill)
   static resetTimeout(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
@@ -107,7 +109,6 @@ export class SessionManager {
     if (session.timeout) clearTimeout(session.timeout);
     if (session.warningTimeout) clearTimeout(session.warningTimeout);
 
-    // ⚠️ warning
     session.warningTimeout = setTimeout(() => {
       this.sendMessage(
         session.channelId,
@@ -115,7 +116,6 @@ export class SessionManager {
       );
     }, 2 * 60 * 1000);
 
-    // 🔴 kill
     session.timeout = setTimeout(() => {
       this.sendMessage(
         session.channelId,
@@ -127,7 +127,6 @@ export class SessionManager {
     }, 3 * 60 * 1000);
   }
 
-  // 🧹 cleanup
   static endSession(guildId: string) {
     const session = this.sessions.get(guildId);
 
