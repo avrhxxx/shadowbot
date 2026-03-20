@@ -1,18 +1,22 @@
-// src/quickadd/services/OCRService.ts
-
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
-import { detectImageType } from "../detector/ImageTypeDetector";
-import { parseByType } from "../parsers/ParserExecutor";
 import fetch from "node-fetch";
 
-export async function processOCR(imageUrl: string) {
+// 🔥 OCR RESULT (CZYSTY – BEZ PARSOWANIA)
+export interface OCRResult {
+  text: string;
+  lines: string[];
+}
+
+export async function processOCR(imageUrl: string): Promise<OCRResult> {
   const response = await fetch(imageUrl);
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
+  // 🧠 preprocess obrazu
   const processedBuffer = await preprocessImage(buffer);
 
+  // 🔤 OCR
   const text = await extractTextFromImage(processedBuffer);
 
   console.log("=== OCR TEXT START ===");
@@ -30,36 +34,18 @@ export async function processOCR(imageUrl: string) {
   console.log(lines);
   console.log("======================");
 
-  // 🔥 DEBUG – zobacz co parser dostaje
-  console.log("=== PARSER INPUT DEBUG ===");
+  // 🔥 DEBUG
+  console.log("=== OCR FINAL INPUT ===");
   lines.forEach((line, i) => {
     console.log(`[${i}] "${line}"`);
   });
-  console.log("==========================");
+  console.log("========================");
 
-  // =========================
-  // 🧠 DETECT TYPE
-  // =========================
-  const type = detectImageType(lines);
-
-  console.log("=== DETECTED TYPE ===");
-  console.log(type);
-  console.log("=====================");
-
-  // =========================
-  // 🔥 PARSE
-  // =========================
-  const entries = parseByType(type, lines);
-
-  console.log("=== PARSED OUTPUT ===");
-  console.log(type, entries);
-  console.log("=====================");
-
-  return { type, entries };
+  return { text, lines };
 }
 
 // =====================================
-// 🔥 ULEPSZONY PREPROCESS
+// 🔥 PREPROCESS LINES
 // =====================================
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -68,7 +54,7 @@ export function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      // usuń dziwne znaki OCR
+      // usuń śmieci OCR
       .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
 
       // usuń numerację (np. "12 Nick")
@@ -78,14 +64,14 @@ export function preprocessOCR(lines: string[]): string[] {
       .replace(/^[^\w]+/, "")
       .replace(/[^\w\d]+$/g, "")
 
-      // 🔥 usuń samotne "g"
+      // 🔥 usuń "g" (donations bug)
       .replace(/\b[gG]\b/g, "")
 
-      // 🔥 usuń przecinki z liczb (38,352 → 38352)
+      // 🔥 usuń przecinki z liczb
       .replace(/(\d),(\d)/g, "$1$2")
 
-      // ⚠️ NIE usuwamy kropki (ważne dla 1.2M)
-      .replace(/[^\w\s\d.]/g, "")
+      // 🔥 zostaw tylko sensowne znaki
+      .replace(/[^\w\s\d]/g, "")
 
       // normalize spacje
       .replace(/\s+/g, " ")
@@ -95,7 +81,7 @@ export function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
-    // ❌ usuń UI śmieci
+    // ❌ UI śmieci
     if (
       lower.includes("at least") ||
       lower.includes("required") ||
