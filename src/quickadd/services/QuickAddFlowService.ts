@@ -75,7 +75,14 @@ export async function processImageInput(
 
   console.log("📄 OCR lines:", lines.length);
 
-  const type = detectImageType(lines);
+  // 🔥 FIX: używamy session.parserType + fallback
+  let type = detectImageType(lines, session.parserType);
+
+  if (!type && session.parserType) {
+    console.log("🔒 Fallback to locked parser:", session.parserType);
+    type = session.parserType;
+  }
+
   console.log("🧠 DETECTED TYPE:", type);
 
   const entries = parseByType(type, lines);
@@ -100,10 +107,5 @@ export async function processTextInput(
 
   console.log("LINES:", lines);
 
-  const type = detectImageType(lines);
-  console.log("🧠 DETECTED TYPE:", type);
-
-  const entries = parseByType(type, lines);
-
-  await handleParsedData(message, session, type, entries);
-}
+  // 🔥 FIX: używamy session.parserType + fallback
+  let type = detectImageType(lines, session.parserType);
