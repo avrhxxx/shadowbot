@@ -1,5 +1,3 @@
-// src/quickadd/services/OCRService.ts
-
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessOCR } from "../utils/preprocessOCR";
 import { preprocessImage } from "../utils/imagePreprocess";
@@ -30,7 +28,7 @@ export async function processOCR(imageUrl: string) {
   console.log(lines);
   console.log("======================");
 
-  // 🔥 KLUCZOWE
+  // 🔥 TYPE + ENTRIES
   const { type, entries } = parseByImageType(lines);
 
   console.log("=== PARSED OUTPUT ===");
