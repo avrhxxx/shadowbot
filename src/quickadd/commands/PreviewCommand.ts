@@ -72,7 +72,7 @@ export async function preview(message: Message) {
   });
 
   // =====================================
-  // 🔥 DUPLICATE DETECTION
+  // 🔁 DUPLICATE DETECTION
   // =====================================
   const counts = new Map<string, number>();
 
@@ -106,7 +106,13 @@ export async function preview(message: Message) {
 
     const groupLabel = getGroupLabel(entry);
 
-    return `\`[${index + 1}]\` **${entry.nickname}**${
+    // 🔥 FORMAT VALUE
+    const formattedValue =
+      typeof entry.value === "number"
+        ? entry.value.toLocaleString("en-US")
+        : entry.value ?? "—";
+
+    return `\`[${index + 1}]\` **${entry.nickname}** → ${formattedValue}${
       groupLabel ? ` — ${groupLabel}` : ""
     }${duplicateMark}${statusMark}`;
   });
