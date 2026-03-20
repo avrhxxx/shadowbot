@@ -1,5 +1,3 @@
-// src/quickadd/parsers/DonationsParser.ts
-
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 let lineCounter = 1;
@@ -18,20 +16,17 @@ export function canParseDonations(lines: string[]): boolean {
 }
 
 // =====================================
-// 🔥 MAIN PARSER (V2 - MULTISCREEN SAFE)
+// 🔥 MAIN PARSER (V3 - FIXED)
 // =====================================
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START");
+  console.log("🧠 DonationsParser START (V3)");
   console.log("=================================");
 
   const entries: QuickAddEntry[] = [];
-
   let lastNickname: string | null = null;
 
   const cleanedLines = dedupeLines(lines);
-
-  console.log("📥 Lines after dedupe:", cleanedLines.length);
 
   for (let i = 0; i < cleanedLines.length; i++) {
     const rawLine = cleanedLines[i];
@@ -50,40 +45,14 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
 
     // =========================
-    // ✍️ MANUAL
-    // =========================
-    const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
-    if (manualMatch) {
-      const nickname = normalizeNickname(manualMatch[1]);
-      const value = parseInt(manualMatch[2], 10);
-
-      if (!nickname || isNaN(value)) continue;
-
-      console.log("   ✅ MANUAL:", nickname, value);
-
-      entries.push({
-        lineId: lineCounter++,
-        nickname,
-        value,
-        raw: rawLine,
-        rawText: rawLine,
-        status: "OK",
-        confidence: 1,
-        sourceType: "MANUAL",
-      });
-
-      continue;
-    }
-
-    // =========================
-    // 💰 DONATIONS LINE
+    // 💰 DONATIONS (PRIORITY!)
     // =========================
     if (looksLikeDonations(line)) {
       const value = extractValue(line);
 
       console.log("   💰 donations detected, value:", value);
 
-      if (!value || value < 1000 || value > 1000000) {
+      if (!value || value < 1000 || value > 200000) {
         console.log("   ❌ value rejected");
         continue;
       }
@@ -108,7 +77,40 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         sourceType: "OCR",
       });
 
-      // 🔥 NIE resetujemy agresywnie (multiscreen fix)
+      continue;
+    }
+
+    // =========================
+    // ✍️ MANUAL (SAFE)
+    // =========================
+    const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
+    if (manualMatch) {
+      const rawNick = manualMatch[1];
+
+      // 🔥 BLOCK "Donations"
+      if (looksLikeDonations(rawNick)) {
+        console.log("   ❌ manual rejected (donation keyword)");
+        continue;
+      }
+
+      const nickname = normalizeNickname(rawNick);
+      const value = parseInt(manualMatch[2], 10);
+
+      if (!nickname || isNaN(value)) continue;
+
+      console.log("   ✅ MANUAL:", nickname, value);
+
+      entries.push({
+        lineId: lineCounter++,
+        nickname,
+        value,
+        raw: rawLine,
+        rawText: rawLine,
+        status: "OK",
+        confidence: 1,
+        sourceType: "MANUAL",
+      });
+
       continue;
     }
 
@@ -119,15 +121,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (numberOnly) {
       const value = parseInt(numberOnly[1], 10);
 
-      if (!value || value < 1000 || value > 1000000) {
-        continue;
-      }
+      if (!value || value < 1000 || value > 200000) continue;
 
       const nickname = normalizeNickname(lastNickname || "");
 
-      if (!nickname || nickname.length < 2) {
-        continue;
-      }
+      if (!nickname || nickname.length < 2) continue;
 
       console.log("   ⚠️ FALLBACK ENTRY:", nickname, value);
 
@@ -146,7 +144,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
 
     // =========================
-    // 🧠 NICKNAME DETECTION
+    // 🧠 NICKNAME
     // =========================
     if (isNickname(line)) {
       const cleanedNick = normalizeNickname(line);
@@ -160,21 +158,84 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
-  const finalEntries = dedupeEntries(entries);
-
-  console.log("=================================");
-  console.log("📊 FINAL ENTRIES:", finalEntries.length);
-  finalEntries.forEach((e, i) => {
-    console.log(`[${i}] ${e.nickname} → ${e.value}`);
-  });
-  console.log("=================================");
-
-  return finalEntries;
+  return dedupeEntries(entries);
 }
 
 // =====================================
 // 🔥 HELPERS
 // =====================================
+
+function extractValue(line: string): number | null {
+  let cleaned = line
+    .replace(/[^\d\sKk]/g, "")
+    .replace(/K/gi, "000");
+
+  cleaned = fixSplitNumbers(cleaned);
+
+  const numbers = cleaned.match(/\d{3,}/g);
+  if (!numbers) return null;
+
+  const values = numbers
+    .map(n => parseInt(n, 10))
+    .filter(n => !isNaN(n));
+
+  if (values.length === 0) return null;
+
+  // 🔥 FIX: realistic filter
+  const valid = values.filter(v => v <= 200000);
+
+  if (valid.length > 0) {
+    return Math.max(...valid);
+  }
+
+  const max = Math.max(...values);
+  if (max > 1000000) return null;
+
+  return max;
+}
+
+function fixSplitNumbers(str: string): string {
+  return str.replace(/(\d{2,})\s+(\d{2,})/g, "$1$2");
+}
+
+function looksLikeDonations(line: string): boolean {
+  return /donat|ionat|dona|tion/i.test(line);
+}
+
+function isNickname(line: string): boolean {
+  const lower = line.toLowerCase();
+
+  if (
+    looksLikeDonations(line) ||
+    lower.includes("ranking") ||
+    lower.includes("total")
+  ) return false;
+
+  if (line.length < 3) return false;
+  if (!/[a-z]/i.test(line)) return false;
+
+  const digitCount = (line.match(/\d/g) || []).length;
+  if (digitCount > 3) return false;
+
+  return true;
+}
+
+function isGarbage(line: string): boolean {
+  if (line.length < 3) return true;
+  if (/^\d{9,}$/.test(line)) return true;
+  if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
+  return false;
+}
+
+function normalizeNickname(name: string): string {
+  let cleaned = name.trim();
+
+  cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
+  cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
+  cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
+
+  return cleaned.trim();
+}
 
 function dedupeLines(lines: string[]): string[] {
   const seen = new Set<string>();
@@ -196,85 +257,4 @@ function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
     seen.add(key);
     return true;
   });
-}
-
-function looksLikeDonations(line: string): boolean {
-  return /donat|ionat|dona|tion/i.test(line);
-}
-
-function isNickname(line: string): boolean {
-  const lower = line.toLowerCase();
-
-  if (
-    looksLikeDonations(line) ||
-    lower.includes("ranking") ||
-    lower.includes("total") ||
-    lower.includes("alliance")
-  ) return false;
-
-  if (line.length < 3) return false;
-
-  if (!/[a-z]/i.test(line)) return false;
-
-  const digitCount = (line.match(/\d/g) || []).length;
-  if (digitCount > 3) return false;
-
-  if (/^\d+$/.test(line)) return false;
-
-  return true;
-}
-
-// 🔥 NAJWAŻNIEJSZY FIX
-function extractValue(line: string): number | null {
-  let cleaned = line
-    .replace(/[^\d\sKk]/g, "")
-    .replace(/K/gi, "000");
-
-  cleaned = fixSplitNumbers(cleaned);
-
-  const numbers = cleaned.match(/\d{3,}/g);
-  if (!numbers) return null;
-
-  const values = numbers
-    .map(n => parseInt(n, 10))
-    .filter(n => !isNaN(n));
-
-  if (values.length === 0) return null;
-
-  const max = Math.max(...values);
-
-  if (max > 1000000) return null;
-
-  return max;
-}
-
-function fixSplitNumbers(str: string): string {
-  return str.replace(/(\d{2,})\s+(\d{2,})/g, "$1$2");
-}
-
-function isGarbage(line: string): boolean {
-  if (line.length < 3) return true;
-
-  if (/^\d{9,}$/.test(line)) return true;
-
-  if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
-
-  if (/^[A-Z]{1,2}$/.test(line)) return true;
-
-  return false;
-}
-
-// 🔥 LEPSZY CLEANER
-function normalizeNickname(name: string): string {
-  let cleaned = name.trim();
-
-  cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
-  cleaned = cleaned.replace(/^[A-Za-z]\s*\d+\s+/, "");
-  cleaned = cleaned.replace(/^[a-z]\s+/i, "");
-
-  cleaned = cleaned.replace(/\s+[a-z]$/i, "");
-
-  cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
-
-  return cleaned.trim();
 }
