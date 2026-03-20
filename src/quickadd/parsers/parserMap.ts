@@ -1,3 +1,4 @@
+// src/quickadd/parsers/parserMap.ts
 import { parseReservoirRaid } from "./ReservoirRaidParser";
 import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
 import { parseDonations } from "./DonationsParser";
