@@ -5,21 +5,39 @@ import {
   SessionEntry,
 } from "../session/SessionManager";
 
-// 🔥 INPUT DO SERWISU (skalowalny)
+// =====================================
+// 🔥 INPUT
+// =====================================
 interface QuickAddPayload {
   parserType: ParserType | null;
   entries: SessionEntry[];
   guildId: string;
 
-  // 🔮 FUTURE (select menu)
-  targetId?: string; // eventId lub week
+  // 🔮 FUTURE
+  targetId?: string;
 }
 
+// =====================================
+// 🚀 MAIN ENTRY POINT
+// =====================================
 export async function processQuickAdd(payload: QuickAddPayload) {
   const { parserType, entries, guildId, targetId } = payload;
 
+  console.log("=== QUICK ADD START ===");
+  console.log("Guild:", guildId);
+  console.log("ParserType:", parserType);
+  console.log("Entries:", entries.length);
+  console.log("Target:", targetId);
+  console.log("=======================");
+
   if (!parserType) {
+    console.log("❌ Missing parserType");
     throw new Error("Parser type not detected.");
+  }
+
+  if (!entries || entries.length === 0) {
+    console.log("❌ No entries to process");
+    throw new Error("No entries provided.");
   }
 
   switch (parserType) {
@@ -36,25 +54,31 @@ export async function processQuickAdd(payload: QuickAddPayload) {
       return handleDuelPoints(guildId, entries, targetId);
 
     default:
+      console.log("❌ Unsupported parser type:", parserType);
       throw new Error(`Unsupported parser type: ${parserType}`);
   }
 }
 
-// -----------------------------
+// =====================================
 // 🧠 EVENT HANDLERS
-// -----------------------------
-
+// =====================================
 async function handleRRRaid(
   guildId: string,
   entries: SessionEntry[],
   targetId?: string
 ) {
-  console.log("RR RAID", { guildId, entries, targetId });
+  console.log("=== HANDLE RR RAID ===");
+  console.log("Guild:", guildId);
+  console.log("Entries:", entries.length);
 
   const nicknames = entries.map(e => e.nickname);
 
+  console.log("Nicknames:", nicknames);
+
   // 🔮 FUTURE:
   // await EventService.addParticipants(guildId, targetId!, nicknames);
+
+  console.log("✅ RR RAID DONE");
 
   return true;
 }
@@ -64,38 +88,49 @@ async function handleRRAttendance(
   entries: SessionEntry[],
   targetId?: string
 ) {
-  console.log("RR ATTEND", { guildId, entries, targetId });
+  console.log("=== HANDLE RR ATTENDANCE ===");
+  console.log("Guild:", guildId);
+  console.log("Entries:", entries.length);
 
   const nicknames = entries.map(e => e.nickname);
+
+  console.log("Nicknames:", nicknames);
 
   // 🔮 FUTURE:
   // await EventService.addParticipants(guildId, targetId!, nicknames);
 
+  console.log("✅ RR ATTENDANCE DONE");
+
   return true;
 }
 
-// -----------------------------
+// =====================================
 // 💰 POINTS HANDLERS
-// -----------------------------
-
+// =====================================
 async function handleDonations(
   guildId: string,
   entries: SessionEntry[],
   targetId?: string
 ) {
-  console.log("DONATIONS", { guildId, entries, targetId });
+  console.log("=== HANDLE DONATIONS ===");
+  console.log("Guild:", guildId);
+  console.log("Entries:", entries.length);
 
   for (const e of entries) {
     const payload = {
       category: "Donations" as const,
       nick: e.nickname,
       points: String(e.value),
-      week: targetId ?? "UNKNOWN", // 🔮 później select
+      week: targetId ?? "UNKNOWN",
     };
+
+    console.log("💰 ADD DONATION:", payload);
 
     // 🔮 FUTURE:
     // await PointsService.addPoints(payload);
   }
+
+  console.log("✅ DONATIONS DONE");
 
   return true;
 }
@@ -105,7 +140,9 @@ async function handleDuelPoints(
   entries: SessionEntry[],
   targetId?: string
 ) {
-  console.log("DUEL", { guildId, entries, targetId });
+  console.log("=== HANDLE DUEL POINTS ===");
+  console.log("Guild:", guildId);
+  console.log("Entries:", entries.length);
 
   for (const e of entries) {
     const payload = {
@@ -115,9 +152,13 @@ async function handleDuelPoints(
       week: targetId ?? "UNKNOWN",
     };
 
+    console.log("⚔️ ADD DUEL:", payload);
+
     // 🔮 FUTURE:
     // await PointsService.addPoints(payload);
   }
+
+  console.log("✅ DUEL POINTS DONE");
 
   return true;
 }
