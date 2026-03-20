@@ -1,5 +1,3 @@
-// src/quickadd/QuickAddListener.ts
-
 import { Client, Message } from "discord.js";
 
 // 🔹 commands
@@ -14,12 +12,11 @@ import { help } from "./commands/HelpCommand";
 // 🔹 session
 import { SessionManager } from "./session/SessionManager";
 import { SessionData } from "./session/SessionData";
-import { startQuickAddSession } from "./session/startQuickAddSession";
 
 // 🔥 OCR
 import { processOCR } from "./services/OCRService";
 
-// 🔥 parser chain
+// 🔥 parser
 import { parseByImageType } from "./parsers/ParserManager";
 
 // 🔥 mapper
@@ -41,6 +38,11 @@ export function registerQuickAddListener(client: Client) {
     const content = message.content.trim();
     const session = SessionManager.getSession(message.guildId);
 
+    // 🔥 reset timeout
+    if (session) {
+      SessionManager.touch(message.guildId);
+    }
+
     const isQuickAddChannel =
       message.channel.isTextBased() &&
       "name" in message.channel &&
@@ -54,9 +56,28 @@ export function registerQuickAddListener(client: Client) {
       const command = rawCommand.toLowerCase();
 
       try {
-        // 🔥 START (FINAL FIX)
         if (command === "start") {
-          return startQuickAddSession(message, "auto");
+          if (!isQuickAddChannel) {
+            return message.reply("❌ Tylko w #quick-add.");
+          }
+
+          if (SessionManager.hasSession(message.guildId)) {
+            return message.reply("❌ Masz już aktywną sesję.");
+          }
+
+          SessionManager.createSession({
+            guildId: message.guildId,
+            channelId: message.channel.id,
+            moderatorId: message.author.id,
+            mode: "auto",
+            parserType: null,
+          });
+
+          await message.reply(
+            "🟢 Session started.\n" +
+            "📸 Send screenshot or paste text — auto-detect enabled."
+          );
+          return;
         }
 
         if (command === "help") {
@@ -73,11 +94,11 @@ export function registerQuickAddListener(client: Client) {
           command === "merge"
         ) {
           if (!session || message.channel.id !== session.channelId) {
-            return message.reply("❌ Use this in the session channel.");
+            return message.reply("❌ Tylko w kanale sesji.");
           }
 
           if (session.moderatorId !== message.author.id) {
-            return message.reply("❌ This is not your session.");
+            return message.reply("❌ To nie Twoja sesja.");
           }
 
           if (command === "preview") await preview(message);
@@ -91,7 +112,7 @@ export function registerQuickAddListener(client: Client) {
         }
       } catch (err) {
         console.error("QuickAdd error:", err);
-        await message.reply("❌ Error.");
+        await message.reply("❌ Błąd.");
       }
 
       return;
@@ -118,13 +139,11 @@ export function registerQuickAddListener(client: Client) {
         const parsed = await processOCR(attachment.url);
 
         if (!parsed || parsed.length === 0) {
-          await message.reply(
-            "❌ Couldn't detect data from the screenshot.\n" +
-              "Try another image or enter data manually."
-          );
+          await message.reply("❌ Couldn't detect data.");
           return;
         }
 
+        // ⚠️ zakładamy że OCR już zwraca poprawny typ
         for (const entry of parsed) {
           SessionData.addEntry(message.guildId!, mapEntry(entry));
         }
@@ -139,7 +158,7 @@ export function registerQuickAddListener(client: Client) {
     }
 
     // =====================================================
-    // 📝 MANUAL INPUT (AUTO DETECT)
+    // 📝 MANUAL INPUT (AUTO-DETECT + LOCK)
     // =====================================================
     if (content.length > 0) {
       try {
@@ -148,14 +167,26 @@ export function registerQuickAddListener(client: Client) {
           .map((l) => l.trim())
           .filter(Boolean);
 
-        const parsed = parseByImageType(lines);
+        const { type, entries: parsed } = parseByImageType(lines);
 
-        if (!parsed || parsed.length === 0) {
+        if (!parsed || parsed.length === 0 || !type) {
           await message.reply(
             "❓ Couldn't detect data type.\n" +
-              "Try:\n" +
-              "• sending a screenshot\n" +
-              "• or correcting the format"
+            "Try:\n" +
+            "• sending a screenshot\n" +
+            "• or correcting the format"
+          );
+          return;
+        }
+
+        // 🔒 AUTO-DETECT + LOCK
+        if (!session.parserType) {
+          session.parserType = type;
+          console.log(`🔒 Parser locked: ${type}`);
+        } else if (session.parserType !== type) {
+          await message.reply(
+            `❌ Mixed data types detected.\n` +
+            `Session locked to: **${session.parserType}**`
           );
           return;
         }
