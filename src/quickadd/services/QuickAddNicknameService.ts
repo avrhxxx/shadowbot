@@ -7,11 +7,12 @@ const TYPE = "nickname";
 interface NickMapping {
   ocr: string;
   final: string;
+  override?: string;
   createdAt: number;
 }
 
 // =====================================
-// 🧠 INTERNAL CACHE (optional boost)
+// 🧠 INTERNAL CACHE
 // =====================================
 let cache: NickMapping[] | null = null;
 
@@ -34,12 +35,14 @@ async function loadMappings(): Promise<NickMapping[]> {
       type: r[0],
       ocr: r[1],
       final: r[2],
-      createdAt: Number(r[3]),
+      override: r[3],
+      createdAt: Number(r[4]),
     }))
-    .filter((r) => r.type === TYPE && r.ocr && r.final)
+    .filter((r) => r.type === TYPE && r.ocr)
     .map((r) => ({
       ocr: r.ocr.trim(),
-      final: r.final.trim(),
+      final: r.final?.trim() || "",
+      override: r.override?.trim() || "",
       createdAt: r.createdAt || 0,
     }));
 
@@ -55,7 +58,15 @@ export async function saveNickMappings(
 ) {
   console.log("🧠 [NickService] Saving mappings...");
 
-  const rowsToAppend: { type: string; ocr: string; final: string }[] = [];
+  const rowsToAppend: {
+    type: string;
+    ocr: string;
+    final: string;
+    override: string;
+    createdAt: number;
+  }[] = [];
+
+  const now = Date.now();
 
   for (const e of entries) {
     const raw = e.raw?.trim();
@@ -72,6 +83,8 @@ export async function saveNickMappings(
       type: TYPE,
       ocr: raw,
       final,
+      override: "", // 🔥 ręczna kolumna – pusta na start
+      createdAt: now,
     });
   }
 
@@ -89,7 +102,7 @@ export async function saveNickMappings(
 }
 
 // =====================================
-// 🔍 EXACT MATCH
+// 🔍 RESOLVE (OVERRIDE FIRST)
 // =====================================
 export async function resolveNickname(raw: string): Promise<string> {
   const mappings = await loadMappings();
@@ -99,15 +112,22 @@ export async function resolveNickname(raw: string): Promise<string> {
   );
 
   if (found) {
-    console.log(`🎯 RESOLVE: ${raw} → ${found.final}`);
-    return found.final;
+    if (found.override) {
+      console.log(`🧠 OVERRIDE: ${raw} → ${found.override}`);
+      return found.override;
+    }
+
+    if (found.final) {
+      console.log(`🎯 RESOLVE: ${raw} → ${found.final}`);
+      return found.final;
+    }
   }
 
   return raw;
 }
 
 // =====================================
-// 🔍 FUZZY MATCH (basic)
+// 🔍 FUZZY MATCH (z override)
 // =====================================
 export async function resolveNicknameFuzzy(raw: string): Promise<string> {
   const mappings = await loadMappings();
@@ -118,9 +138,13 @@ export async function resolveNicknameFuzzy(raw: string): Promise<string> {
     const score = similarity(raw, m.ocr);
 
     if (score > 0.8 && (!best || score > best.score)) {
+      const value = m.override || m.final;
+
+      if (!value) continue;
+
       best = {
         score,
-        value: m.final,
+        value,
       };
     }
   }
