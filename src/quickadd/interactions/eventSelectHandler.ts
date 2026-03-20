@@ -24,18 +24,54 @@ export async function handleEventSelect(
   const eventId = interaction.values[0];
   const entries = SessionData.getEntries(guildId);
 
+  if (!entries || entries.length === 0) {
+    await interaction.reply({
+      content: "❌ No data to save.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!session.parserType) {
+    await interaction.reply({
+      content: "❌ Parser type not detected.",
+      ephemeral: true,
+    });
+    return;
+  }
+
   try {
-    // 🔥 TU będzie później realna integracja
-    await processQuickAdd(session.parserType!, entries);
+    // ✅ NOWY SYSTEM (payload)
+    await processQuickAdd({
+      parserType: session.parserType,
+      entries,
+      guildId,
+      targetId: eventId, // 🔥 kluczowe
+    });
 
     await interaction.reply({
-      content: `✅ Data assigned to event (ID: ${eventId})`,
+      content: `✅ Data assigned to event.`,
       ephemeral: true,
     });
 
     // 🧹 cleanup
     SessionData.clear(guildId);
     SessionManager.endSession(guildId);
+
+    // 🗑️ delete channel
+    setTimeout(async () => {
+      try {
+        const channel = await interaction.guild?.channels.fetch(
+          session.channelId
+        );
+
+        if (channel && "delete" in channel) {
+          await channel.delete();
+        }
+      } catch (err) {
+        console.error("Delete error:", err);
+      }
+    }, 2000);
 
   } catch (err) {
     console.error(err);
