@@ -1,5 +1,3 @@
-// src/quickadd/parsers/ParserExecutor.ts
-
 import { ParserType } from "../session/SessionManager";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
@@ -83,6 +81,11 @@ export function parseByType(
       return false;
     }
 
+    if (e.nickname.toLowerCase() === "donations") {
+      console.log(`❌ Removed [${i}] – keyword nickname`);
+      return false;
+    }
+
     if (typeof e.value === "number" && e.value < 0) {
       console.log(`❌ Removed [${i}] – negative value`);
       return false;
@@ -96,9 +99,9 @@ export function parseByType(
   console.log("=================================");
 
   // =====================================
-  // 🔥 FALLBACK (jeśli parser padł)
+  // 🔥 FALLBACK (skip for DONATIONS)
   // =====================================
-  if (cleaned.length === 0) {
+  if (cleaned.length === 0 && type !== "DONATIONS") {
     console.log("⚠️ Parser returned 0 entries");
     console.log("🆘 Running fallback parser...");
 
@@ -115,8 +118,51 @@ export function parseByType(
     return fallback;
   }
 
+  // =====================================
+  // 🔥 MERGE (MULTISCREEN FIX)
+  // =====================================
+  const merged = mergeEntries(cleaned);
+
+  console.log("=================================");
+  console.log(`🧠 After merge: ${merged.length}`);
+  console.log("=================================");
+
+  merged.forEach((e, i) => {
+    console.log(`[${i}] ${e.nickname} → ${e.value}`);
+  });
+
   console.log("🎉 PARSER EXECUTOR SUCCESS");
-  return cleaned;
+  return merged;
+}
+
+// =====================================
+// 🔥 MERGE ENTRIES (BY NICKNAME)
+// =====================================
+function mergeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
+  const map = new Map<string, QuickAddEntry>();
+
+  for (const e of entries) {
+    const key = e.nickname.toLowerCase();
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, e);
+      continue;
+    }
+
+    // 🔥 preferuj większą wartość (ranking donations)
+    if (e.value > existing.value) {
+      map.set(key, e);
+      continue;
+    }
+
+    // 🔥 fallback: lepszy confidence
+    if (e.confidence > existing.confidence) {
+      map.set(key, e);
+    }
+  }
+
+  return Array.from(map.values());
 }
 
 // =====================================
@@ -146,6 +192,12 @@ function tryFallback(lines: string[]): QuickAddEntry[] {
 
     if (!nickname || isNaN(value)) {
       console.log("   ❌ Invalid parsed data");
+      continue;
+    }
+
+    // 🔥 blokuj "Donations"
+    if (nickname.toLowerCase().includes("donat")) {
+      console.log("   ❌ Skipped keyword nickname");
       continue;
     }
 
