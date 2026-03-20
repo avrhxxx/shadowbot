@@ -1,3 +1,5 @@
+// src/quickadd/parsers/DonationsParser.ts
+
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 let lineCounter = 1;
