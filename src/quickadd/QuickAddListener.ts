@@ -15,7 +15,9 @@ import { SessionData } from "./session/SessionData";
 
 import { processOCR } from "./services/OCRService";
 import { parseByImageType } from "./parsers/ParserManager";
-import { startQuickAddSession } from "./session/startQuickAddSession";
+
+// ✅ FIX TU
+import { startQuickAddSession } from "./utils/startQuickAddSession";
 
 // 🔹 mapper
 function mapEntry(entry: any) {
