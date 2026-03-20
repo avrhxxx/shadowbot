@@ -6,7 +6,7 @@ import {
   GatewayIntentBits,
   Partials,
   Interaction,
-  TextBasedChannel,
+  TextChannel,
 } from "discord.js";
 
 import { initTranslationModule } from "./modules/TranslationModule";
@@ -60,8 +60,12 @@ client.once("ready", async () => {
       try {
         const channel = await client.channels.fetch(channelId);
 
-        if (channel && channel.isTextBased()) {
-          await (channel as TextBasedChannel).send(content);
+        if (
+          channel &&
+          channel.isTextBased() &&
+          channel instanceof TextChannel
+        ) {
+          await channel.send(content);
         }
       } catch (err) {
         console.error("Send message error:", err);
