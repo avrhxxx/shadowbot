@@ -33,7 +33,7 @@ function mapEntry(entry: any) {
 }
 
 // =====================================
-// 🔹 wspólna logika dodawania
+// 🔹 wspólna logika
 // =====================================
 async function handleParsedData(
   message: Message,
@@ -41,6 +41,10 @@ async function handleParsedData(
   type: any,
   entries: any[]
 ) {
+  console.log("=== HANDLE PARSED DATA ===");
+  console.log("TYPE:", type);
+  console.log("ENTRIES:", entries.length);
+
   // 🔥 AUTO-DETECT + LOCK
   if (!session.parserType && type) {
     session.parserType = type;
@@ -49,6 +53,7 @@ async function handleParsedData(
 
   // 🔒 BLOKADA MIXU
   if (session.parserType && type && session.parserType !== type) {
+    console.log("❌ TYPE MISMATCH");
     await message.reply(
       `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
     );
@@ -56,11 +61,13 @@ async function handleParsedData(
   }
 
   if (!entries || entries.length === 0) {
+    console.log("❌ NO ENTRIES");
     await message.reply("❌ Couldn't detect data.");
     return;
   }
 
   for (const entry of entries) {
+    console.log("➕ ADD ENTRY:", entry);
     SessionData.addEntry(message.guildId!, mapEntry(entry));
   }
 
@@ -78,12 +85,17 @@ export function registerQuickAddListener(client: Client) {
     const content = message.content.trim();
     const session = SessionManager.getSession(message.guildId);
 
+    console.log("=== NEW MESSAGE ===");
+    console.log("Content:", content);
+
     // =====================================================
     // 🔥 KOMENDY
     // =====================================================
     if (content.startsWith("!")) {
       const [rawCommand] = content.slice(1).trim().split(/\s+/);
       const command = rawCommand.toLowerCase();
+
+      console.log("COMMAND:", command);
 
       if (command === "start") {
         await startQuickAddSession(message, "auto");
@@ -131,7 +143,16 @@ export function registerQuickAddListener(client: Client) {
       if (!attachment || !attachment.contentType?.startsWith("image/")) return;
 
       try {
-        const { type, entries } = await processOCR(attachment.url);
+        console.log("📸 PROCESSING OCR IMAGE");
+
+        const { text, lines } = await processOCR(attachment.url);
+
+        console.log("📄 OCR LINES:", lines.length);
+
+        const type = detectImageType(lines);
+        console.log("🧠 DETECTED TYPE:", type);
+
+        const entries = parseByType(type, lines);
 
         await handleParsedData(message, session, type, entries);
       } catch (err) {
@@ -152,7 +173,8 @@ export function registerQuickAddListener(client: Client) {
           .map((l) => l.trim())
           .filter(Boolean);
 
-        // 🔥 NOWY SYSTEM
+        console.log("📝 MANUAL INPUT LINES:", lines);
+
         const type = detectImageType(lines);
         const entries = parseByType(type, lines);
 
