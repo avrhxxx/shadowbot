@@ -53,16 +53,43 @@ async function handleParsedData(
     return;
   }
 
-  for (const entry of entries) {
-    console.log("➕ ADD ENTRY:", entry);
-    SessionData.addEntry(message.guildId!, mapEntry(entry));
-  }
+  // 🔥 JEDEN zapis batcha
+  const mapped = entries.map(mapEntry);
+
+  SessionData.addEntries(message.guildId!, mapped);
 
   await message.react("✅");
 }
 
 // =====================================
-// 🖼️ OCR FLOW
+// 🔥 BATCH PROCESSOR (NOWE)
+// =====================================
+async function processBatch(message: Message, session: any) {
+  console.log("🔥 PROCESSING BATCH");
+
+  const allLines = session.buffer.ocrResults.flat();
+
+  console.log("📄 TOTAL LINES:", allLines.length);
+
+  let type = detectImageType(allLines, session.parserType);
+
+  if (!type && session.parserType) {
+    console.log("🔒 Fallback to locked parser:", session.parserType);
+    type = session.parserType;
+  }
+
+  console.log("🧠 FINAL TYPE:", type);
+
+  const entries = parseByType(type, allLines);
+
+  await handleParsedData(message, session, type, entries);
+
+  // 🧹 reset buffer
+  session.buffer.ocrResults = [];
+}
+
+// =====================================
+// 🖼️ OCR FLOW (POPRAWIONE)
 // =====================================
 export async function processImageInput(
   message: Message,
@@ -71,27 +98,26 @@ export async function processImageInput(
 ) {
   console.log("📸 FLOW: IMAGE INPUT");
 
-  const { text, lines } = await processOCR(imageUrl);
+  const { lines } = await processOCR(imageUrl);
 
   console.log("📄 OCR lines:", lines.length);
 
-  // 🔥 FIX: używamy session.parserType + fallback
-  let type = detectImageType(lines, session.parserType);
+  // 🔥 tylko zbieramy dane
+  session.buffer.ocrResults.push(lines);
 
-  if (!type && session.parserType) {
-    console.log("🔒 Fallback to locked parser:", session.parserType);
-    type = session.parserType;
+  // 🔁 reset timera
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
   }
 
-  console.log("🧠 DETECTED TYPE:", type);
-
-  const entries = parseByType(type, lines);
-
-  await handleParsedData(message, session, type, entries);
+  // ⏱️ batch delay
+  session.buffer.timer = setTimeout(async () => {
+    await processBatch(message, session);
+  }, 800);
 }
 
 // =====================================
-// 📝 TEXT FLOW
+// 📝 TEXT FLOW (opcjonalnie też batch)
 // =====================================
 export async function processTextInput(
   message: Message,
@@ -105,7 +131,13 @@ export async function processTextInput(
     .map((l) => l.trim())
     .filter(Boolean);
 
-  console.log("LINES:", lines);
+  session.buffer.ocrResults.push(lines);
 
-  // 🔥 FIX: używamy session.parserType + fallback
-  let type = detectImageType(lines, session.parserType);
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
+
+  session.buffer.timer = setTimeout(async () => {
+    await processBatch(message, session);
+  }, 500);
+}
