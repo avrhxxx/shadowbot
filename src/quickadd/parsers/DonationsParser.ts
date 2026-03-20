@@ -12,25 +12,25 @@ export function canParseDonations(lines: string[]): boolean {
     looksLikeDonations(l)
   ).length;
 
-  if (donationLike >= 2) return true;
+  if (donationLike >= 1) return true; // 🔥 ważne dla multiscreena
 
   const numbers = lines.filter(l => /\d{4,}/.test(l)).length;
 
-  return numbers >= 5;
+  return numbers >= 3; // 🔥 mniej restrykcyjne
 }
 
 // =====================================
 // 🔥 MAIN PARSER
 // =====================================
 export function parseDonations(lines: string[]): QuickAddEntry[] {
-  // 🔥 reset licznika per sesja
-  lineCounter = 1;
-
-  const rawEntries: QuickAddEntry[] = [];
+  const entries: QuickAddEntry[] = [];
 
   let lastNickname: string | null = null;
 
-  for (let rawLine of lines) {
+  // 🔥 MULTISCREEN: usuń duplikaty i garbage upfront
+  const cleanedLines = dedupeLines(lines);
+
+  for (let rawLine of cleanedLines) {
     let line = rawLine.trim();
     if (!line) continue;
 
@@ -45,14 +45,13 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (manualMatch) {
       const nickname = normalizeNickname(manualMatch[1]);
 
-      // 🔥 FIX: blokuj "Donations" jako nick
       if (/^donat/i.test(nickname)) continue;
 
       const value = parseInt(manualMatch[2], 10);
 
       if (!nickname || isNaN(value)) continue;
 
-      rawEntries.push({
+      entries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -85,8 +84,8 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (looksLikeDonations(line)) {
       const value = extractValue(line);
 
-      if (!value || value < 1000) {
-        continue;
+      if (!value || value < 1000 || value > 1000000) {
+        continue; // 🔥 NIE resetuj nicka
       }
 
       const nickname = normalizeNickname(lastNickname || "");
@@ -96,11 +95,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         nickname.length < 2 ||
         nickname.toLowerCase() === "donations"
       ) {
-        lastNickname = null;
-        continue;
+        continue; // 🔥 nie kasuj nicka przez OCR śmieci
       }
 
-      rawEntries.push({
+      entries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -127,11 +125,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       const nickname = normalizeNickname(lastNickname || "");
 
       if (!nickname || nickname.length < 2) {
-        lastNickname = null;
         continue;
       }
 
-      rawEntries.push({
+      entries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -146,38 +143,35 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
-  // =====================================
-  // 🔥 MULTISCREEN MERGE + DEDUPE
-  // =====================================
-  const mergedMap = new Map<string, QuickAddEntry>();
+  return dedupeEntries(entries); // 🔥 klucz do multiscreena
+}
 
-  for (const entry of rawEntries) {
-    const key = entry.nickname.toLowerCase();
+// =====================================
+// 🔥 MULTISCREEN: USUŃ DUPLIKATY LINII
+// =====================================
+function dedupeLines(lines: string[]): string[] {
+  const seen = new Set<string>();
 
-    if (!mergedMap.has(key)) {
-      mergedMap.set(key, entry);
-      continue;
-    }
+  return lines.filter(l => {
+    const key = l.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
-    const existing = mergedMap.get(key)!;
+// =====================================
+// 🔥 MULTISCREEN: USUŃ DUPLIKATY ENTRY
+// =====================================
+function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
+  const seen = new Set<string>();
 
-    // 🔥 bierz większą wartość (ważne przy OCR błędach)
-    if (entry.value > existing.value) {
-      mergedMap.set(key, entry);
-    }
-  }
-
-  // =====================================
-  // 🔥 SORT (ranking jak w grze)
-  // =====================================
-  const finalEntries = Array.from(mergedMap.values())
-    .sort((a, b) => b.value - a.value)
-    .map((entry, index) => ({
-      ...entry,
-      lineId: index + 1
-    }));
-
-  return finalEntries;
+  return entries.filter(e => {
+    const key = `${e.nickname}_${e.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // =====================================
@@ -188,7 +182,7 @@ function looksLikeDonations(line: string): boolean {
 }
 
 // =====================================
-// 🧠 NICKNAME CHECK
+// 🧠 NICKNAME CHECK (ULTRA FIX)
 // =====================================
 function isNickname(line: string): boolean {
   const lower = line.toLowerCase();
@@ -207,23 +201,31 @@ function isNickname(line: string): boolean {
   const digitCount = (line.match(/\d/g) || []).length;
   if (digitCount > 3) return false;
 
+  if (/^\d+$/.test(line)) return false;
+
   if (/^[^a-zA-Z]*$/.test(line)) return false;
 
   return true;
 }
 
 // =====================================
-// 💰 VALUE EXTRACT (FIXED)
+// 💰 VALUE EXTRACT (ULTRA FIX)
 // =====================================
 function extractValue(line: string): number | null {
-  const cleaned = line
+  let cleaned = line
     .replace(/[^\d\sKk]/g, "")
     .replace(/K/i, "000");
 
-  const match = cleaned.match(/(\d{2,})/);
+  cleaned = fixSplitNumbers(cleaned);
+
+  const match = cleaned.match(/(\d{4,})/);
   if (!match) return null;
 
-  return parseInt(match[1].replace(/\s/g, ""), 10);
+  const value = parseInt(match[1], 10);
+
+  if (value > 1000000) return null; // 🔥 blok timestampów
+
+  return value;
 }
 
 // =====================================
@@ -234,7 +236,7 @@ function fixSplitNumbers(str: string): string {
 }
 
 // =====================================
-// 🧹 GARBAGE FILTER (FIXED)
+// 🧹 GARBAGE FILTER (ULTRA)
 // =====================================
 function isGarbage(line: string): boolean {
   if (line.length < 3) return true;
@@ -242,6 +244,8 @@ function isGarbage(line: string): boolean {
   if (/^\d{9,}$/.test(line)) return true;
 
   if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
+
+  if (/^[A-Z]{1,2}$/.test(line)) return true;
 
   return false;
 }
