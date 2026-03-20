@@ -1,3 +1,4 @@
+// src/index.ts
 import "./googleSheetsClient";
 
 import {
@@ -5,6 +6,7 @@ import {
   GatewayIntentBits,
   Partials,
   Interaction,
+  TextBasedChannel,
 } from "discord.js";
 
 import { initTranslationModule } from "./modules/TranslationModule";
@@ -20,7 +22,7 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService";
-import { SessionManager } from "./quickadd/session/SessionManager"; // 🔥 DODANE
+import { SessionManager } from "./quickadd/session/SessionManager";
 
 const client = new Client({
   intents: [
@@ -57,8 +59,9 @@ client.once("ready", async () => {
     sendMessage: async (channelId, content) => {
       try {
         const channel = await client.channels.fetch(channelId);
-        if (channel?.isTextBased()) {
-          await channel.send(content);
+
+        if (channel && channel.isTextBased()) {
+          await (channel as TextBasedChannel).send(content);
         }
       } catch (err) {
         console.error("Send message error:", err);
@@ -68,7 +71,10 @@ client.once("ready", async () => {
     deleteChannel: async (channelId) => {
       try {
         const channel = await client.channels.fetch(channelId);
-        await channel?.delete();
+
+        if (channel && "delete" in channel) {
+          await channel.delete();
+        }
       } catch (err) {
         console.error("Delete channel error:", err);
       }
