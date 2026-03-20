@@ -12,10 +12,8 @@ export function canParseDonations(lines: string[]): boolean {
     looksLikeDonations(l)
   ).length;
 
-  // klasyczny przypadek
   if (donationLike >= 2) return true;
 
-  // 🔥 fallback – ranking bez słowa "donations"
   const numbers = lines.filter(l => /\d{4,}/.test(l)).length;
 
   return numbers >= 5;
@@ -25,7 +23,10 @@ export function canParseDonations(lines: string[]): boolean {
 // 🔥 MAIN PARSER
 // =====================================
 export function parseDonations(lines: string[]): QuickAddEntry[] {
-  const entries: QuickAddEntry[] = [];
+  // 🔥 reset licznika per sesja
+  lineCounter = 1;
+
+  const rawEntries: QuickAddEntry[] = [];
 
   let lastNickname: string | null = null;
 
@@ -43,11 +44,15 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
     if (manualMatch) {
       const nickname = normalizeNickname(manualMatch[1]);
+
+      // 🔥 FIX: blokuj "Donations" jako nick
+      if (/^donat/i.test(nickname)) continue;
+
       const value = parseInt(manualMatch[2], 10);
 
       if (!nickname || isNaN(value)) continue;
 
-      entries.push({
+      rawEntries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -81,7 +86,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       const value = extractValue(line);
 
       if (!value || value < 1000) {
-        lastNickname = null;
         continue;
       }
 
@@ -96,7 +100,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         continue;
       }
 
-      entries.push({
+      rawEntries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -118,7 +122,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (numberOnly) {
       const value = parseInt(numberOnly[1], 10);
 
-      if (!value || value < 1000) continue;
+      if (!value || value < 1000 || value > 1000000) continue;
 
       const nickname = normalizeNickname(lastNickname || "");
 
@@ -127,7 +131,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         continue;
       }
 
-      entries.push({
+      rawEntries.push({
         lineId: lineCounter++,
         nickname,
         value,
@@ -142,7 +146,38 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
-  return entries;
+  // =====================================
+  // 🔥 MULTISCREEN MERGE + DEDUPE
+  // =====================================
+  const mergedMap = new Map<string, QuickAddEntry>();
+
+  for (const entry of rawEntries) {
+    const key = entry.nickname.toLowerCase();
+
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, entry);
+      continue;
+    }
+
+    const existing = mergedMap.get(key)!;
+
+    // 🔥 bierz większą wartość (ważne przy OCR błędach)
+    if (entry.value > existing.value) {
+      mergedMap.set(key, entry);
+    }
+  }
+
+  // =====================================
+  // 🔥 SORT (ranking jak w grze)
+  // =====================================
+  const finalEntries = Array.from(mergedMap.values())
+    .sort((a, b) => b.value - a.value)
+    .map((entry, index) => ({
+      ...entry,
+      lineId: index + 1
+    }));
+
+  return finalEntries;
 }
 
 // =====================================
@@ -178,14 +213,17 @@ function isNickname(line: string): boolean {
 }
 
 // =====================================
-// 💰 VALUE EXTRACT (ODPORNY)
+// 💰 VALUE EXTRACT (FIXED)
 // =====================================
 function extractValue(line: string): number | null {
-  const match = line.match(/([\d\s]{4,})/);
+  const cleaned = line
+    .replace(/[^\d\sKk]/g, "")
+    .replace(/K/i, "000");
+
+  const match = cleaned.match(/(\d{2,})/);
   if (!match) return null;
 
-  const value = parseInt(match[1].replace(/\s/g, ""), 10);
-  return isNaN(value) ? null : value;
+  return parseInt(match[1].replace(/\s/g, ""), 10);
 }
 
 // =====================================
@@ -196,11 +234,15 @@ function fixSplitNumbers(str: string): string {
 }
 
 // =====================================
-// 🧹 GARBAGE FILTER
+// 🧹 GARBAGE FILTER (FIXED)
 // =====================================
 function isGarbage(line: string): boolean {
   if (line.length < 3) return true;
+
+  if (/^\d{9,}$/.test(line)) return true;
+
   if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
+
   return false;
 }
 
