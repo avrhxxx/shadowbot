@@ -1,3 +1,4 @@
+// src/quickadd/parsers/ParserManager.ts
 import {
   parseReservoirRaid,
   canParseReservoirRaid,
