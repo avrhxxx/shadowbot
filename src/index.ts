@@ -1,5 +1,7 @@
 // src/index.ts
-import "./googleSheetsClient";
+
+// 🔥 FIX: poprawiona ścieżka
+import "./google/googleSheetsClient";
 
 import {
   Client,
@@ -34,11 +36,14 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN not defined");
+if (!process.env.BOT_TOKEN) {
+  throw new Error("❌ BOT_TOKEN not defined");
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 client.once("ready", async () => {
-  console.log(`Logged in as ${client.user?.tag}`);
+  console.log(`✅ Logged in as ${client.user?.tag}`);
 
   // -----------------------------
   // 🔥 QuickAdd channel setup
@@ -56,7 +61,7 @@ client.once("ready", async () => {
   // 🔥 SESSION TIMEOUT HOOK
   // -----------------------------
   SessionManager.setHandlers({
-    sendMessage: async (channelId, content) => {
+    sendMessage: async (channelId: string, content: string) => {
       try {
         const channel = await client.channels.fetch(channelId);
 
@@ -68,11 +73,11 @@ client.once("ready", async () => {
           await channel.send(content);
         }
       } catch (err) {
-        console.error("Send message error:", err);
+        console.error("❌ Send message error:", err);
       }
     },
 
-    deleteChannel: async (channelId) => {
+    deleteChannel: async (channelId: string) => {
       try {
         const channel = await client.channels.fetch(channelId);
 
@@ -80,7 +85,7 @@ client.once("ready", async () => {
           await channel.delete();
         }
       } catch (err) {
-        console.error("Delete channel error:", err);
+        console.error("❌ Delete channel error:", err);
       }
     },
   });
@@ -97,9 +102,9 @@ client.once("ready", async () => {
   for (const guild of client.guilds.cache.values()) {
     initEventReminders(guild);
 
-    initAbsenceNotifications(guild).catch((err) => {
+    initAbsenceNotifications(guild).catch((err: any) => {
       console.error(
-        `Error initializing absence notifications for guild ${guild.id}:`,
+        `❌ Error initializing absence notifications for guild ${guild.id}:`,
         err
       );
     });
@@ -119,7 +124,7 @@ client.once("ready", async () => {
       await handleAbsenceInteraction(interaction);
       await handlePointsInteraction(interaction);
     } catch (err) {
-      console.error("Error in interactionCreate:", err);
+      console.error("❌ interactionCreate error:", err);
 
       if (interaction.isRepliable()) {
         await interaction
