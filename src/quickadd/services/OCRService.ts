@@ -22,6 +22,11 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📄 OCR RAW LENGTH:", text.length);
 
+  // 🔥 NAJWAŻNIEJSZY DEBUG
+  console.log("🧪 RAW OCR START");
+  console.log(text);
+  console.log("🧪 RAW OCR END");
+
   let lines = text
     .split("\n")
     .map((l) => unicodeCleaner(l))
@@ -33,6 +38,10 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("=== FINAL LINES ===");
   console.log(lines);
+
+  lines.forEach((line, i) => {
+    console.log(`[${i}] "${line}"`);
+  });
 
   return { text, lines };
 }
@@ -58,7 +67,6 @@ export function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
-    // 🔥 NIE usuwamy "points"
     if (
       lower.includes("at least") ||
       lower.includes("required") ||
