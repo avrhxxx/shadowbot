@@ -41,8 +41,8 @@ interface QuickAddSession {
   timeout?: NodeJS.Timeout;
   warningTimeout?: NodeJS.Timeout;
 
-  // 🔥 TOKEN (anty race condition)
-  activityToken?: number;
+  // 🔥 WATCHDOG
+  watchdogInterval?: NodeJS.Timeout;
 }
 
 export class SessionManager {
@@ -51,11 +51,7 @@ export class SessionManager {
   private static sendMessage: (channelId: string, content: string) => void = () => {};
   private static deleteChannel: (channelId: string) => void = () => {};
 
-  // 🔥 KONFIG (łatwo zmienić)
-  private static WARNING_TIME = 2 * 60 * 1000; // 2 min
-  private static TIMEOUT_TIME = 3 * 60 * 1000; // 3 min
-  private static EXTEND_STEP = 60 * 1000; // +1 min za aktywność
-  private static MAX_TIME = 10 * 60 * 1000; // max 10 min
+  private static DEBUG = true;
 
   static setHandlers(handlers: {
     sendMessage: (channelId: string, content: string) => void;
@@ -65,6 +61,9 @@ export class SessionManager {
     this.deleteChannel = handlers.deleteChannel;
   }
 
+  // =====================================
+  // 🚀 CREATE SESSION
+  // =====================================
   static createSession(
     session: Omit<QuickAddSession, "entries" | "lastActivity" | "buffer">
   ) {
@@ -72,7 +71,6 @@ export class SessionManager {
       ...session,
       entries: [],
       lastActivity: Date.now(),
-      activityToken: Date.now(),
 
       buffer: {
         ocrResults: [],
@@ -81,13 +79,12 @@ export class SessionManager {
 
     this.sessions.set(session.guildId, newSession);
 
-    this.resetTimeout(session.guildId, true);
+    this.startWatchdog(session.guildId); // 🔥 WATCHDOG START
+    this.resetTimeout(session.guildId);
   }
 
   static getSession(guildId: string) {
-    const session = this.sessions.get(guildId);
-    if (session) this.touch(guildId); // 🔥 auto extend
-    return session;
+    return this.sessions.get(guildId);
   }
 
   static hasSession(guildId: string) {
@@ -107,83 +104,122 @@ export class SessionManager {
     if (!session) return;
 
     session.entries = [];
-    this.touch(guildId);
   }
 
+  // =====================================
+  // 🔥 TOUCH (CENTRALNY RESET)
+  // =====================================
   static touch(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
 
     session.lastActivity = Date.now();
-    session.activityToken = session.lastActivity;
+
+    if (this.DEBUG) {
+      console.log(`🟢 [WATCHDOG] touch → ${guildId}`);
+    }
 
     this.resetTimeout(guildId);
   }
 
   // =====================================
-  // 🔥 CLEANUP
+  // 🧠 WATCHDOG SYSTEM
+  // =====================================
+  private static startWatchdog(guildId: string) {
+    const session = this.sessions.get(guildId);
+    if (!session) return;
+
+    session.watchdogInterval = setInterval(() => {
+      const now = Date.now();
+      const diff = now - session.lastActivity;
+
+      if (this.DEBUG) {
+        console.log(
+          `🐶 [WATCHDOG] ${guildId} | inactive: ${Math.floor(diff / 1000)}s`
+        );
+      }
+
+      // 🔥 HARD SAFETY (np. jak timeout padnie)
+      if (diff > 10 * 60 * 1000) {
+        console.log(`💀 [WATCHDOG] FORCE CLOSE ${guildId}`);
+
+        this.sendMessage(
+          session.channelId,
+          "💀 Session force-closed (watchdog safety)."
+        );
+
+        this.cleanupSession(session);
+        this.deleteChannel(session.channelId);
+        this.sessions.delete(guildId);
+      }
+    }, 30 * 1000); // co 30s
+  }
+
+  // =====================================
+  // 🧹 CLEANUP
   // =====================================
   private static cleanupSession(session: QuickAddSession) {
     if (session.timeout) clearTimeout(session.timeout);
     if (session.warningTimeout) clearTimeout(session.warningTimeout);
     if (session.buffer.timer) clearTimeout(session.buffer.timer);
+    if (session.watchdogInterval) clearInterval(session.watchdogInterval);
 
     session.buffer.ocrResults = [];
   }
 
   // =====================================
-  // 🔥 AUTO-EXTEND TIMEOUT SYSTEM
+  // ⏱️ TIMEOUT SYSTEM (AUTO-EXTEND)
   // =====================================
-  static resetTimeout(guildId: string, initial = false) {
+  static resetTimeout(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
+
+    const INACTIVITY_LIMIT = 3 * 60 * 1000;
 
     if (session.timeout) clearTimeout(session.timeout);
     if (session.warningTimeout) clearTimeout(session.warningTimeout);
 
-    // 🔥 dynamiczne wydłużanie
-    let timeoutTime = this.TIMEOUT_TIME;
-
-    if (!initial) {
-      const elapsed = Date.now() - session.lastActivity;
-
-      timeoutTime = Math.min(
-        this.TIMEOUT_TIME + this.EXTEND_STEP,
-        this.MAX_TIME
-      );
-    }
-
-    const warningTime = timeoutTime - 60 * 1000;
-
-    const token = session.activityToken;
-
     // ⚠️ WARNING
     session.warningTimeout = setTimeout(() => {
-      const s = this.sessions.get(guildId);
-      if (!s || s.activityToken !== token) return;
+      const now = Date.now();
+      const diff = now - session.lastActivity;
+
+      if (diff < 2 * 60 * 1000) return;
 
       this.sendMessage(
-        s.channelId,
+        session.channelId,
         "⚠️ Session inactive. Closing in 60 seconds."
       );
-    }, warningTime);
+    }, 2 * 60 * 1000);
 
-    // ❌ FINAL CLOSE
+    // ❌ CLOSE / AUTO-EXTEND
     session.timeout = setTimeout(() => {
-      const s = this.sessions.get(guildId);
-      if (!s || s.activityToken !== token) return;
+      const now = Date.now();
+      const diff = now - session.lastActivity;
+
+      // 🔁 AUTO-EXTEND
+      if (diff < INACTIVITY_LIMIT) {
+        if (this.DEBUG) {
+          console.log(`🔁 [WATCHDOG] auto-extend ${guildId}`);
+        }
+        this.resetTimeout(guildId);
+        return;
+      }
 
       this.sendMessage(
-        s.channelId,
+        session.channelId,
         "❌ Session closed due to inactivity."
       );
 
-      this.cleanupSession(s);
-      this.deleteChannel(s.channelId);
+      this.cleanupSession(session);
+      this.deleteChannel(session.channelId);
       this.sessions.delete(guildId);
-    }, timeoutTime);
+    }, INACTIVITY_LIMIT);
   }
 
+  // =====================================
+  // 🛑 END SESSION
+  // =====================================
   static endSession(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
