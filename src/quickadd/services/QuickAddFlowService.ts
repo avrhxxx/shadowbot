@@ -53,71 +53,24 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
-async function handleParsedData(
-  message: Message,
-  session: any,
-  type: any,
-  entries: any[]
-) {
-  debug("FLOW", "TYPE:", type);
-  debug("FLOW", "ENTRIES COUNT:", entries.length);
-
-  if (!session.parserType && entries.length >= 2) {
-    session.parserType = type;
-    debug("FLOW", `🔒 Parser locked: ${type}`);
-  }
-
-  if (session.parserType && type && session.parserType !== type) {
-    await message.reply(
-      `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
-    );
-    return;
-  }
-
-  if (!entries.length) {
-    await message.reply("❌ Couldn't detect data.");
-    return;
-  }
-
-  const mapped = [];
-  for (const e of entries) {
-    mapped.push(await mapEntry(e));
-  }
-
-  SessionData.addEntries(message.guildId!, mapped);
-
-  await message.react("✅");
-}
-
-// =====================================
 async function processBatch(message: Message, session: any) {
-  debug("BATCH", "🔥 START");
+  debug("BATCH", "🔥 FINAL PROCESS START");
 
-  if (!session || !session.buffer) {
-    debug("BATCH", "❌ SESSION DEAD");
-    return;
-  }
-
-  // 🔥 BLOKADA – żeby nie odpalić 2x
-  if (session.processing) {
-    debug("BATCH", "⛔ ALREADY PROCESSING");
-    return;
-  }
-
-  session.processing = true;
+  if (!session || !session.buffer) return;
 
   const flat = session.buffer.ocrResults;
 
+  if (!flat.length) {
+    debug("BATCH", "❌ EMPTY BUFFER");
+    return;
+  }
+
+  // 🔥 1. merge wszystkich screenów
   const allLines = flat.map((x: any) => x.lines).flat();
 
   debug("BATCH", "📄 TOTAL LINES:", allLines.length);
 
-  if (!allLines.length) {
-    await message.reply("❌ No OCR data collected.");
-    session.processing = false;
-    return;
-  }
-
+  // 🔥 2. detect type
   let type = detectImageType(allLines, session.parserType);
 
   if (!type) {
@@ -131,38 +84,52 @@ async function processBatch(message: Message, session: any) {
 
   if (!type) {
     await message.reply("❌ Could not detect data type.");
-    session.processing = false;
     return;
   }
 
+  // 🔥 3. parse CAŁOŚCI
   let entries: any[] = [];
 
   try {
     entries = parseByType(type, allLines);
   } catch (err) {
+    debug("BATCH", "❌ PARSER ERROR:", err);
     await message.reply("❌ Parser error.");
-    session.processing = false;
     return;
   }
 
   if (!entries.length) {
     await message.reply("❌ No valid entries parsed.");
-    session.processing = false;
     return;
   }
 
-  await handleParsedData(message, session, type, entries);
+  // 🔥 4. map
+  const mapped = [];
+  for (const e of entries) {
+    mapped.push(await mapEntry(e));
+  }
 
-  // 🔥 RESET SESJI
+  // 🔥 5. wrzucenie DO SESSION (tu się robi merge!)
+  SessionData.addEntries(message.guildId!, mapped);
+
+  // 🔥 6. clear buffer (ale NIE session data!)
   session.buffer.ocrResults = [];
   session.buffer.timer = undefined;
-  session.processing = false;
 
   debug("BATCH", "✅ DONE");
 }
 
 // =====================================
-const IDLE_TIMEOUT = 10000; // ⬅️ 10 sekund
+function resetBatchTimer(message: Message, session: any) {
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
+
+  // 🔥 KLUCZOWE: czekamy aż user przestanie wysyłać screeny
+  session.buffer.timer = setTimeout(async () => {
+    await processBatch(message, session);
+  }, 10000); // ⬅️ 10 sekund
+}
 
 // =====================================
 export async function processImageInput(
@@ -172,30 +139,23 @@ export async function processImageInput(
 ) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "📸 IMAGE INPUT", imageUrl);
+  debug(traceId, "📸 IMAGE INPUT");
 
   const { lines } = await processOCR(imageUrl);
 
   debug(traceId, "📄 OCR LINES:", lines.length);
 
+  // 🔥 dodajemy do bufora (NIE parsujemy jeszcze)
   session.buffer.ocrResults.push({
     lines,
     traceId,
   });
 
-  // ✅ FEEDBACK
+  // 🔥 reset timer
+  resetBatchTimer(message, session);
+
+  // ✅ feedback dla usera
   await message.react("✅");
-
-  // 🔥 RESET TIMERA
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
-
-  // 🔥 CZEKA AŻ USER SKOŃCZY WYSYŁAĆ
-  session.buffer.timer = setTimeout(async () => {
-    debug("TIMER", "⏳ IDLE → PROCESS");
-    await processBatch(message, session);
-  }, IDLE_TIMEOUT);
 }
 
 // =====================================
@@ -216,13 +176,7 @@ export async function processTextInput(
     traceId,
   });
 
+  resetBatchTimer(message, session);
+
   await message.react("✅");
-
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
-
-  session.buffer.timer = setTimeout(async () => {
-    await processBatch(message, session);
-  }, IDLE_TIMEOUT);
 }
