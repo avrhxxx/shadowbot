@@ -2,12 +2,12 @@
 
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
-let lineCounter = 1;
-
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V9 FIXED)");
+  console.log("🧠 DonationsParser START (V10)");
   console.log("=================================");
+
+  let lineId = 1; // 🔥 LOCAL (FIX)
 
   const entries: QuickAddEntry[] = [];
   const cleanedLines = dedupeLines(lines);
@@ -20,7 +20,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     console.log(`🔎 [${i}] "${line}"`);
 
-    // 🔥 FIX 1 — skip timestampy
     if (isTimestamp(line)) {
       console.log("   ⛔ timestamp skipped");
       continue;
@@ -28,9 +27,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     if (isGarbage(line)) continue;
 
-    // =========================
-    // 💰 VALUE LINE
-    // =========================
     if (looksLikeDonations(line) || hasBigNumber(line)) {
       const value = extractValue(line);
 
@@ -48,7 +44,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       console.log("   ✅ ENTRY:", nickData.clean, value);
 
       entries.push({
-        lineId: lineCounter++,
+        lineId: lineId++, // 🔥 FIX
         nickname: nickData.clean,
         value,
         raw: nickData.raw,
@@ -66,14 +62,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("📊 FINAL ENTRIES:", finalEntries.length);
   console.log("=================================");
 
-  finalEntries.forEach((e, i) => {
-    console.log(`[${i}] ${e.nickname} → ${e.value}`);
-  });
-
   return finalEntries;
 }
 
-// ================= 🔥 LOOKBACK =================
+// ================= LOOKBACK =================
 
 function findNicknameAbove(
   lines: string[],
@@ -88,24 +80,18 @@ function findNicknameAbove(
     if (!isNickname(line)) continue;
 
     const clean = normalizeNickname(line);
-
     if (!isValidNickname(clean)) continue;
 
     const confidence = 1 - (i - 1) * 0.2;
 
-    return {
-      raw: line,
-      clean,
-      confidence,
-    };
+    return { raw: line, clean, confidence };
   }
 
   return null;
 }
 
-// ================= 🔥 HELPERS =================
+// ================= HELPERS =================
 
-// 🔥 FIX 1 — timestamp detector
 function isTimestamp(line: string): boolean {
   return /\d{8,}/.test(line);
 }
@@ -114,45 +100,42 @@ function hasBigNumber(line: string): boolean {
   return /\d{4,}/.test(line);
 }
 
-// 🔥 FIX 2 — poprawione value extraction
+// 🔥 LEPSZE EXTRACT
 function extractValue(line: string): number | null {
   let raw = line.toLowerCase();
 
-  // 🔥 43 30K → 43300
-  raw = raw.replace(/(\d{2,})\s+(\d{2,})\s*k/, (_, a, b) => {
-    return String(parseInt(a + b, 10) * 1000);
-  });
+  // 43 300 → 43300 (tylko jeśli wygląda jak split number)
+  raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
 
-  // 🔥 klasyczny K
-  const kMatch = raw.match(/(\d{2,})\s*k/);
+  // K
+  const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
   if (kMatch) {
-    return parseInt(kMatch[1], 10) * 1000;
+    return Math.round(parseFloat(kMatch[1]) * 1000);
   }
 
   raw = raw.replace(/[^\d\s]/g, "");
-  raw = fixSplitNumbers(raw);
 
-  const matches = raw.match(/\d{4,6}/g);
+  const matches = raw.match(/\d{2,6}/g);
   if (!matches) return null;
 
   const values = matches
     .map(n => parseInt(n, 10))
-    .filter(n => n >= 1000 && n <= 200000);
+    .filter(n => n >= 100); // 🔥 niższy próg
 
   if (!values.length) return null;
 
   return Math.max(...values);
 }
 
+// 🔥 mniej agresywne
 function fixSplitNumbers(str: string): string {
-  return str.replace(/(\d{2,})\s+(\d{2,})/g, "$1$2");
+  return str.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
 }
 
 function looksLikeDonations(line: string): boolean {
   return /donat|ionat|dona|tion/i.test(line);
 }
 
-// 🔥 FIX 3 — lepszy nickname filter
 function isNickname(line: string): boolean {
   const lower = line.toLowerCase();
 
@@ -164,14 +147,11 @@ function isNickname(line: string): boolean {
 
   if (line.length < 3) return false;
 
-  // 🔥 musi mieć min 2 litery obok siebie
   if (!/[a-z]{2,}/i.test(line)) return false;
 
-  // 🔥 max 3 cyfry
   const digitCount = (line.match(/\d/g) || []).length;
   if (digitCount > 3) return false;
 
-  // 🔥 eliminacja śmieci typu "T v"
   if (line.split(" ").length > 3) return false;
 
   return true;
@@ -191,12 +171,11 @@ function isGarbage(line: string): boolean {
 }
 
 function normalizeNickname(name: string): string {
-  let cleaned = name.trim();
-
-  cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
-  cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
-
-  return cleaned.trim();
+  return name
+    .trim()
+    .replace(/^[^a-zA-Z]+/, "")
+    .replace(/[^\p{L}\p{N}_]/gu, "")
+    .trim();
 }
 
 function dedupeLines(lines: string[]): string[] {
@@ -215,7 +194,6 @@ function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
 
   for (const e of entries) {
     const key = e.nickname.toLowerCase();
-
     const existing = map.get(key);
 
     if (!existing || e.value > existing.value) {
