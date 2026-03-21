@@ -4,132 +4,53 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 
 let lineCounter = 1;
 
-export function canParseDonations(lines: string[]): boolean {
-  const donationLike = lines.filter(l => looksLikeDonations(l)).length;
-
-  if (donationLike >= 1) return true;
-
-  const numbers = lines.filter(l => /\d{4,}/.test(l)).length;
-
-  return numbers >= 3;
-}
-
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V6)");
+  console.log("🧠 DonationsParser START (V7 ULTRA)");
   console.log("=================================");
 
   const entries: QuickAddEntry[] = [];
-
-  // 🔥 FIX: przechowujemy RAW + CLEAN
-  let nicknameQueue: { raw: string; clean: string }[] = [];
-
   const cleanedLines = dedupeLines(lines);
 
   for (let i = 0; i < cleanedLines.length; i++) {
-    const rawLine = cleanedLines[i];
-    let line = rawLine.trim();
-
+    let line = cleanedLines[i].trim();
     if (!line) continue;
 
     line = fixSplitNumbers(line);
 
     console.log(`🔎 [${i}] "${line}"`);
-    console.log("   queue:", nicknameQueue);
 
-    if (isGarbage(line)) {
-      console.log("   ❌ garbage");
-      continue;
-    }
+    if (isGarbage(line)) continue;
 
     // =========================
-    // 💰 DONATIONS
+    // 💰 VALUE LINE
     // =========================
-    if (looksLikeDonations(line)) {
+    if (looksLikeDonations(line) || hasBigNumber(line)) {
       const value = extractValue(line);
 
-      console.log("   💰 donations detected, value:", value);
+      console.log("   💰 value detected:", value);
 
-      if (!value) {
-        console.log("   ❌ value rejected");
+      if (!value) continue;
+
+      const nickData = findNicknameAbove(cleanedLines, i);
+
+      if (!nickData) {
+        console.log("   ❌ no nickname found above");
         continue;
       }
 
-      const nickObj = nicknameQueue.shift();
-
-      if (!nickObj) {
-        console.log("   ❌ no nickname in queue");
-        continue;
-      }
-
-      const nickname = nickObj.clean;
-      const rawNick = nickObj.raw;
-
-      console.log("   ✅ ENTRY:", nickname, value);
+      console.log("   ✅ ENTRY:", nickData.clean, value);
 
       entries.push({
         lineId: lineCounter++,
-        nickname,
+        nickname: nickData.clean,
         value,
-
-        // 🔥 NAJWAŻNIEJSZY FIX
-        raw: rawNick,
-
-        rawText: `${rawNick} | ${line}`,
-
+        raw: nickData.raw,
+        rawText: `${nickData.raw} | ${line}`,
         status: "OK",
-        confidence: 1,
+        confidence: nickData.confidence,
         sourceType: "OCR",
       });
-
-      continue;
-    }
-
-    // =========================
-    // ✍️ MANUAL
-    // =========================
-    const manualMatch = line.match(/^(.+?)\s+(\d{3,})$/);
-    if (manualMatch) {
-      const rawNick = manualMatch[1];
-
-      if (looksLikeDonations(rawNick)) continue;
-
-      const nickname = normalizeNickname(rawNick);
-      const value = parseInt(manualMatch[2], 10);
-
-      if (!nickname || isNaN(value)) continue;
-      if (value < 1000 || value > 200000) continue;
-
-      entries.push({
-        lineId: lineCounter++,
-        nickname,
-        value,
-        raw: rawNick,
-        rawText: rawLine,
-        status: "OK",
-        confidence: 1,
-        sourceType: "MANUAL",
-      });
-
-      continue;
-    }
-
-    // =========================
-    // 👤 NICKNAME
-    // =========================
-    if (isNickname(line)) {
-      const cleanedNick = normalizeNickname(line);
-
-      if (isValidNickname(cleanedNick)) {
-        console.log("   👤 nickname detected:", cleanedNick);
-
-        nicknameQueue.push({
-          raw: line,            // 🔥 OCR RAW
-          clean: cleanedNick,  // 🔥 CLEAN
-        });
-      }
-
-      continue;
     }
   }
 
@@ -138,6 +59,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
   console.log("📊 FINAL ENTRIES:", finalEntries.length);
   console.log("=================================");
+
   finalEntries.forEach((e, i) => {
     console.log(`[${i}] ${e.nickname} → ${e.value}`);
   });
@@ -145,15 +67,49 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   return finalEntries;
 }
 
+// ================= 🔥 LOOKBACK =================
+
+function findNicknameAbove(
+  lines: string[],
+  index: number
+): { raw: string; clean: string; confidence: number } | null {
+  const MAX_LOOKBACK = 3;
+
+  for (let i = 1; i <= MAX_LOOKBACK; i++) {
+    const line = lines[index - i];
+    if (!line) continue;
+
+    if (!isNickname(line)) continue;
+
+    const clean = normalizeNickname(line);
+
+    if (!isValidNickname(clean)) continue;
+
+    const confidence = 1 - (i - 1) * 0.2;
+
+    return {
+      raw: line,
+      clean,
+      confidence,
+    };
+  }
+
+  return null;
+}
+
 // ================= HELPERS =================
+
+function hasBigNumber(line: string): boolean {
+  return /\d{4,}/.test(line);
+}
 
 function extractValue(line: string): number | null {
   let raw = line.toLowerCase();
 
-  const kMatch = raw.match(/(\d{2,})\s*0*\s*k/);
+  // 🔥 K FORMAT (43K → 43000)
+  const kMatch = raw.match(/(\d{2,})\s*k/);
   if (kMatch) {
-    const val = parseInt(kMatch[1], 10) * 1000;
-    if (val >= 1000 && val <= 200000) return val;
+    return parseInt(kMatch[1], 10) * 1000;
   }
 
   raw = raw.replace(/[^\d\s]/g, "");
@@ -214,7 +170,6 @@ function normalizeNickname(name: string): string {
   let cleaned = name.trim();
 
   cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
-  cleaned = cleaned.replace(/^[a-z]\d+\s+/i, "");
   cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
 
   return cleaned.trim();
@@ -232,12 +187,17 @@ function dedupeLines(lines: string[]): string[] {
 }
 
 function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
-  const seen = new Set<string>();
+  const map = new Map<string, QuickAddEntry>();
 
-  return entries.filter(e => {
-    const key = `${e.nickname}_${e.value}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  for (const e of entries) {
+    const key = e.nickname.toLowerCase();
+
+    const existing = map.get(key);
+
+    if (!existing || e.value > existing.value) {
+      map.set(key, e);
+    }
+  }
+
+  return Array.from(map.values());
 }
