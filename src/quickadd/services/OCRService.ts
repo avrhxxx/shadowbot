@@ -1,10 +1,8 @@
 // src/quickadd/services/OCRService.ts
-
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
 import fetch from "node-fetch";
 
-// 🔥 OCR RESULT (CZYSTY – BEZ PARSOWANIA)
 export interface OCRResult {
   text: string;
   lines: string[];
@@ -15,11 +13,13 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  // 🧠 preprocess obrazu
+  console.log("📸 IMAGE SIZE:", buffer.length);
+
   const processedBuffer = await preprocessImage(buffer);
 
-  // 🔤 OCR
   const text = await extractTextFromImage(processedBuffer);
+
+  console.log("📄 OCR RAW LENGTH:", text.length);
 
   console.log("=== OCR TEXT START ===");
   console.log(text);
@@ -36,18 +36,13 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
   console.log(lines);
   console.log("======================");
 
-  // 🔥 DEBUG
-  console.log("=== OCR FINAL INPUT ===");
   lines.forEach((line, i) => {
     console.log(`[${i}] "${line}"`);
   });
-  console.log("========================");
 
   return { text, lines };
 }
 
-// =====================================
-// 🔥 PREPROCESS LINES
 // =====================================
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -56,26 +51,13 @@ export function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      // usuń śmieci OCR
       .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
-
-      // usuń numerację (np. "12 Nick")
       .replace(/^\d+\s*/, "")
-
-      // usuń śmieci na początku/końcu
       .replace(/^[^\w]+/, "")
       .replace(/[^\w\d]+$/g, "")
-
-      // 🔥 usuń "g" (donations bug)
       .replace(/\b[gG]\b/g, "")
-
-      // 🔥 usuń przecinki z liczb
       .replace(/(\d),(\d)/g, "$1$2")
-
-      // 🔥 zostaw tylko sensowne znaki
       .replace(/[^\w\s\d]/g, "")
-
-      // normalize spacje
       .replace(/\s+/g, " ")
       .trim();
 
@@ -83,7 +65,6 @@ export function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
-    // ❌ UI śmieci
     if (
       lower.includes("at least") ||
       lower.includes("required") ||
