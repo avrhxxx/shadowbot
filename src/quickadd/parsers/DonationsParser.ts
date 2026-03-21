@@ -4,7 +4,7 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V12)");
+  console.log("🧠 DonationsParser START (V13)");
   console.log("=================================");
 
   let lineId = 1;
@@ -19,13 +19,43 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     console.log(`\n🔎 [${i}] "${line}"`);
 
-    if (isTimestamp(line) || isGarbage(line)) {
+    if (isTimestamp(line) || isGarbage(line) || isSystemLine(line)) {
       console.log("   ⛔ skipped");
       continue;
     }
 
     // =========================
-    // 🔥 1. INLINE PARSE (KLUCZOWE)
+    // 🔥 1. DONATIONS LINE (KLUCZOWE)
+    // =========================
+    if (isDonationsLine(line)) {
+      const value = extractValue(line);
+      if (!value) continue;
+
+      const nickData = findNicknameAboveSmart(cleanedLines, i);
+
+      if (!nickData) {
+        console.log("   ⚠️ no nickname found");
+        continue;
+      }
+
+      console.log("   ✅ DONATION ENTRY:", nickData.clean, value);
+
+      entries.push({
+        lineId: lineId++,
+        nickname: nickData.clean,
+        value,
+        raw: nickData.raw,
+        rawText: `${nickData.raw} | ${line}`,
+        status: "OK",
+        confidence: nickData.confidence,
+        sourceType: "OCR",
+      });
+
+      continue;
+    }
+
+    // =========================
+    // ⚡ 2. INLINE PARSE (fallback)
     // =========================
     const inline = parseInline(line);
     if (inline) {
@@ -38,52 +68,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         raw: line,
         rawText: line,
         status: "OK",
-        confidence: 1,
+        confidence: 0.8,
         sourceType: "OCR",
       });
 
       continue;
-    }
-
-    // =========================
-    // 💰 2. NORMAL VALUE PARSE
-    // =========================
-    if (hasBigNumber(line)) {
-      const value = extractValue(line);
-
-      if (!value) continue;
-
-      const nickData = findNicknameAboveSmart(cleanedLines, i);
-
-      if (!nickData) {
-        console.log("   ⚠️ orphan → creating UNKNOWN");
-
-        entries.push({
-          lineId: lineId++,
-          nickname: `UNKNOWN_${lineId}`,
-          value,
-          raw: line,
-          rawText: line,
-          status: "ORPHAN",
-          confidence: 0.3,
-          sourceType: "OCR",
-        });
-
-        continue;
-      }
-
-      console.log("   ✅ ENTRY:", nickData.clean, value);
-
-      entries.push({
-        lineId: lineId++,
-        nickname: nickData.clean,
-        value,
-        raw: nickData.raw,
-        rawText: `${nickData.raw} | ${line}`,
-        status: "OK",
-        confidence: nickData.confidence,
-        sourceType: "OCR",
-      });
     }
   }
 
@@ -97,22 +86,36 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 //
+// ================= CORE DETECTION =================
+//
+
+function isDonationsLine(line: string): boolean {
+  return /donations/i.test(line);
+}
+
+function isSystemLine(line: string): boolean {
+  return (
+    /at least/i.test(line) ||
+    /required/i.test(line) ||
+    /rewards/i.test(line) ||
+    /ranking/i.test(line)
+  );
+}
+
+//
 // ================= INLINE PARSER =================
 //
 
 function parseInline(line: string): { nick: string; value: number } | null {
   const fixed = fixSplitNumbers(line);
 
-  // np: "Elc;natlonSZ 33276 g"
   const match = fixed.match(/([^\d]{3,}?)\s*(\d{4,6})/);
-
   if (!match) return null;
 
   const rawNick = match[1];
   const value = parseInt(match[2], 10);
 
   const clean = normalizeNickname(rawNick);
-
   if (!isValidNickname(clean)) return null;
 
   return { nick: clean, value };
@@ -128,22 +131,19 @@ function findNicknameAboveSmart(
 ): { raw: string; clean: string; confidence: number } | null {
   console.log("🔍 SMART LOOKBACK");
 
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 5; i++) {
     const line = lines[index - i];
     if (!line) continue;
 
-    // ❗ stop jeśli trafimy na inną wartość
-    if (hasBigNumber(line)) {
-      console.log("   ⛔ hit another value → STOP");
-      break;
-    }
+    if (isDonationsLine(line)) continue;
+    if (isSystemLine(line)) continue;
 
     if (!isNickname(line)) continue;
 
     const clean = normalizeNickname(line);
     if (!isValidNickname(clean)) continue;
 
-    const confidence = 1 - i * 0.15;
+    const confidence = 1 - i * 0.1;
 
     console.log("   ✅ FOUND:", clean);
 
@@ -165,10 +165,6 @@ function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
 }
 
-function hasBigNumber(line: string): boolean {
-  return /\d{4,}/.test(line);
-}
-
 function extractValue(line: string): number | null {
   let raw = line.toLowerCase();
 
@@ -177,12 +173,11 @@ function extractValue(line: string): number | null {
   const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
   if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
 
-  raw = raw.replace(/[^\d\s]/g, "");
+  raw = raw.replace(/[^\d]/g, "");
 
-  const matches = raw.match(/\d{4,6}/g);
-  if (!matches) return null;
+  if (raw.length < 4) return null;
 
-  return Math.max(...matches.map(n => parseInt(n, 10)));
+  return parseInt(raw, 10);
 }
 
 function fixSplitNumbers(str: string): string {
@@ -190,9 +185,9 @@ function fixSplitNumbers(str: string): string {
 }
 
 function isNickname(line: string): boolean {
-  if (hasBigNumber(line)) return false;
   if (line.length < 3) return false;
   if (!/[a-zA-Z]/.test(line)) return false;
+  if (/\d{4,}/.test(line)) return false;
   return true;
 }
 
@@ -213,7 +208,7 @@ function normalizeNickname(name: string): string {
     .trim()
     .replace(/^[^a-zA-Z0-9]+/, "")
     .replace(/[^\p{L}\p{N}_]/gu, "")
-    .replace(/g$/, "") // 🔥 usuwa OCR śmieci typu "katzg"
+    .replace(/g$/, "")
     .trim();
 }
 
