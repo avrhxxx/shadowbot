@@ -1,6 +1,6 @@
 // src/pointsPanel/pointsService.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import { readSheet, writeSheet, updateCell } from "../googleSheetsStorage";
+import { readSheet, writeSheet, updateCell } from "../google/googleSheetsStorage";
 
 // ----------------------------
 // TYPES
@@ -21,7 +21,7 @@ type PointsRow = [string, string, string, string];
 // HELPERS
 // ----------------------------
 function normalizePointsRows(rows: any[][]): PointsRow[] {
-  return rows.map(r => [
+  return rows.map((r: any[]) => [
     r[0] ?? "",
     r[1] ?? "",
     r[2] ?? "",
@@ -36,8 +36,7 @@ export async function createWeek(category: PointsCategory, weekName: string): Pr
   const rawRows: any[][] = await readSheet("points_weeks");
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  // Sprawdź, czy tydzień dla tej kategorii już istnieje
-  const exists = rows.some(r => r[0] === category && r[1] === weekName);
+  const exists = rows.some((r: PointsRow) => r[0] === category && r[1] === weekName);
   if (exists) return;
 
   const newRow: PointsRow = [category, weekName, "", ""];
@@ -49,9 +48,10 @@ export async function getAllWeeks(category?: PointsCategory): Promise<string[]> 
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
   const weeksSet = new Set<string>();
-  rows.forEach(r => {
+  rows.forEach((r: PointsRow) => {
     if (!category || r[0] === category) weeksSet.add(r[1]);
   });
+
   return Array.from(weeksSet);
 }
 
@@ -63,7 +63,7 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
   const rawRows: any[][] = await readSheet(tab);
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const rowIndex = rows.findIndex(r => r[1] === entry.week && r[2] === entry.nick);
+  const rowIndex = rows.findIndex((r: PointsRow) => r[1] === entry.week && r[2] === entry.nick);
 
   if (rowIndex !== -1) {
     await updateCell(tab, rowIndex + 2, 4, entry.points);
@@ -79,8 +79,8 @@ export async function getPoints(category: PointsCategory, week?: string): Promis
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
   return rows
-    .filter(r => (!week || r[1] === week))
-    .map(r => ({
+    .filter((r: PointsRow) => (!week || r[1] === week))
+    .map((r: PointsRow) => ({
       category: r[0] as PointsCategory,
       week: r[1],
       nick: r[2],
@@ -96,13 +96,13 @@ export async function compareWeeks(category: PointsCategory, week1: string, week
   const rawRows: any[][] = await readSheet(tab);
   const rows: PointsRow[] = normalizePointsRows(rawRows);
 
-  const week1Rows = rows.filter(r => r[1] === week1);
-  const week2Rows = rows.filter(r => r[1] === week2);
+  const week1Rows = rows.filter((r: PointsRow) => r[1] === week1);
+  const week2Rows = rows.filter((r: PointsRow) => r[1] === week2);
 
   const week2Map = new Map<string, string>();
-  week2Rows.forEach(r => week2Map.set(r[2], r[3]));
+  week2Rows.forEach((r: PointsRow) => week2Map.set(r[2], r[3]));
 
-  return week1Rows.map(r => ({
+  return week1Rows.map((r: PointsRow) => ({
     nick: r[2],
     week1Points: r[3],
     week2Points: week2Map.get(r[2]) || "0"
@@ -110,7 +110,7 @@ export async function compareWeeks(category: PointsCategory, week1: string, week
 }
 
 // ----------------------------
-// HANDLERY BUTTONÓW (ephemeral placeholders)
+// HANDLERY BUTTONÓW
 // ----------------------------
 export async function handleAddPoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
   await interaction.reply({
