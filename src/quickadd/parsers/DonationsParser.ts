@@ -6,7 +6,7 @@ let lineCounter = 1;
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V8 GOD MODE)");
+  console.log("🧠 DonationsParser START (V9 FIXED)");
   console.log("=================================");
 
   const entries: QuickAddEntry[] = [];
@@ -20,8 +20,17 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     console.log(`🔎 [${i}] "${line}"`);
 
+    // 🔥 FIX 1 — skip timestampy
+    if (isTimestamp(line)) {
+      console.log("   ⛔ timestamp skipped");
+      continue;
+    }
+
     if (isGarbage(line)) continue;
 
+    // =========================
+    // 💰 VALUE LINE
+    // =========================
     if (looksLikeDonations(line) || hasBigNumber(line)) {
       const value = extractValue(line);
 
@@ -29,24 +38,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
       if (!value) continue;
 
-      // 🔥 1. próbuj znaleźć nick wyżej
-      let nickData = findNicknameAbove(cleanedLines, i);
-
-      // 🔥 2. fallback: nick w tej samej linii
-      if (!nickData) {
-        const inlineNick = extractInlineNickname(line);
-
-        if (inlineNick) {
-          nickData = {
-            raw: line,
-            clean: inlineNick,
-            confidence: 0.6,
-          };
-        }
-      }
+      const nickData = findNicknameAbove(cleanedLines, i);
 
       if (!nickData) {
-        console.log("   ❌ no nickname found");
+        console.log("   ❌ no nickname found above");
         continue;
       }
 
@@ -65,7 +60,17 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
-  return dedupeEntries(entries);
+  const finalEntries = dedupeEntries(entries);
+
+  console.log("=================================");
+  console.log("📊 FINAL ENTRIES:", finalEntries.length);
+  console.log("=================================");
+
+  finalEntries.forEach((e, i) => {
+    console.log(`[${i}] ${e.nickname} → ${e.value}`);
+  });
+
+  return finalEntries;
 }
 
 // ================= 🔥 LOOKBACK =================
@@ -74,7 +79,7 @@ function findNicknameAbove(
   lines: string[],
   index: number
 ): { raw: string; clean: string; confidence: number } | null {
-  const MAX_LOOKBACK = 5; // 🔥 było 3
+  const MAX_LOOKBACK = 3;
 
   for (let i = 1; i <= MAX_LOOKBACK; i++) {
     const line = lines[index - i];
@@ -83,11 +88,16 @@ function findNicknameAbove(
     if (!isNickname(line)) continue;
 
     const clean = normalizeNickname(line);
+
     if (!isValidNickname(clean)) continue;
 
-    const confidence = 1 - (i - 1) * 0.15;
+    const confidence = 1 - (i - 1) * 0.2;
 
-    return { raw: line, clean, confidence };
+    return {
+      raw: line,
+      clean,
+      confidence,
+    };
   }
 
   return null;
@@ -95,20 +105,29 @@ function findNicknameAbove(
 
 // ================= 🔥 HELPERS =================
 
-function extractInlineNickname(line: string): string | null {
-  const match = line.match(/^([a-z0-9\-_]{3,})/i);
-  return match ? match[1] : null;
+// 🔥 FIX 1 — timestamp detector
+function isTimestamp(line: string): boolean {
+  return /\d{8,}/.test(line);
 }
 
 function hasBigNumber(line: string): boolean {
   return /\d{4,}/.test(line);
 }
 
+// 🔥 FIX 2 — poprawione value extraction
 function extractValue(line: string): number | null {
   let raw = line.toLowerCase();
 
+  // 🔥 43 30K → 43300
+  raw = raw.replace(/(\d{2,})\s+(\d{2,})\s*k/, (_, a, b) => {
+    return String(parseInt(a + b, 10) * 1000);
+  });
+
+  // 🔥 klasyczny K
   const kMatch = raw.match(/(\d{2,})\s*k/);
-  if (kMatch) return parseInt(kMatch[1], 10) * 1000;
+  if (kMatch) {
+    return parseInt(kMatch[1], 10) * 1000;
+  }
 
   raw = raw.replace(/[^\d\s]/g, "");
   raw = fixSplitNumbers(raw);
@@ -116,9 +135,13 @@ function extractValue(line: string): number | null {
   const matches = raw.match(/\d{4,6}/g);
   if (!matches) return null;
 
-  const values = matches.map(Number).filter(n => n >= 1000 && n <= 200000);
+  const values = matches
+    .map(n => parseInt(n, 10))
+    .filter(n => n >= 1000 && n <= 200000);
 
-  return values.length ? Math.max(...values) : null;
+  if (!values.length) return null;
+
+  return Math.max(...values);
 }
 
 function fixSplitNumbers(str: string): string {
@@ -129,15 +152,27 @@ function looksLikeDonations(line: string): boolean {
   return /donat|ionat|dona|tion/i.test(line);
 }
 
+// 🔥 FIX 3 — lepszy nickname filter
 function isNickname(line: string): boolean {
+  const lower = line.toLowerCase();
+
+  if (
+    looksLikeDonations(line) ||
+    lower.includes("ranking") ||
+    lower.includes("reward")
+  ) return false;
+
   if (line.length < 3) return false;
-  if (!/[a-z]/i.test(line)) return false;
 
-  // 🔥 pozwalamy na WG1-14 itd
-  if (/^[a-z0-9\-_]+$/i.test(line)) return true;
+  // 🔥 musi mieć min 2 litery obok siebie
+  if (!/[a-z]{2,}/i.test(line)) return false;
 
+  // 🔥 max 3 cyfry
   const digitCount = (line.match(/\d/g) || []).length;
-  if (digitCount > 5) return false;
+  if (digitCount > 3) return false;
+
+  // 🔥 eliminacja śmieci typu "T v"
+  if (line.split(" ").length > 3) return false;
 
   return true;
 }
@@ -156,10 +191,12 @@ function isGarbage(line: string): boolean {
 }
 
 function normalizeNickname(name: string): string {
-  return name
-    .replace(/^[^a-zA-Z0-9]+/, "")
-    .replace(/[^\p{L}\p{N}_\-]/gu, "")
-    .trim();
+  let cleaned = name.trim();
+
+  cleaned = cleaned.replace(/^[^a-zA-Z]+/, "");
+  cleaned = cleaned.replace(/[^\p{L}\p{N}_]/gu, "");
+
+  return cleaned.trim();
 }
 
 function dedupeLines(lines: string[]): string[] {
@@ -178,6 +215,7 @@ function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
 
   for (const e of entries) {
     const key = e.nickname.toLowerCase();
+
     const existing = map.get(key);
 
     if (!existing || e.value > existing.value) {
