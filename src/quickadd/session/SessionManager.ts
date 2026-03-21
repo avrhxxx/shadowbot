@@ -14,6 +14,12 @@ export interface SessionEntry {
   raw: string;
 }
 
+// 🔥 NOWY TYP (KLUCZOWY)
+export interface OCRBatchItem {
+  lines: string[];
+  traceId: string;
+}
+
 interface QuickAddSession {
   guildId: string;
   channelId: string;
@@ -27,9 +33,9 @@ interface QuickAddSession {
 
   entries: SessionEntry[];
 
-  // 🔥 NOWE: BUFFER
+  // 🔥 FIXED BUFFER
   buffer: {
-    ocrResults: string[][];
+    ocrResults: OCRBatchItem[];
     timer?: NodeJS.Timeout;
   };
 
@@ -60,7 +66,6 @@ export class SessionManager {
       entries: [],
       lastActivity: Date.now(),
 
-      // 🔥 INIT BUFFER
       buffer: {
         ocrResults: [],
       },
@@ -102,6 +107,17 @@ export class SessionManager {
     this.resetTimeout(guildId);
   }
 
+  // =====================================
+  // 🔥 FULL CLEANUP (NOWE)
+  // =====================================
+  private static cleanupSession(session: QuickAddSession) {
+    if (session.timeout) clearTimeout(session.timeout);
+    if (session.warningTimeout) clearTimeout(session.warningTimeout);
+    if (session.buffer.timer) clearTimeout(session.buffer.timer);
+
+    session.buffer.ocrResults = [];
+  }
+
   static resetTimeout(guildId: string) {
     const session = this.sessions.get(guildId);
     if (!session) return;
@@ -122,6 +138,7 @@ export class SessionManager {
         "❌ Session closed due to inactivity."
       );
 
+      this.cleanupSession(session); // 🔥 FIX
       this.deleteChannel(session.channelId);
       this.sessions.delete(guildId);
     }, 3 * 60 * 1000);
@@ -129,10 +146,9 @@ export class SessionManager {
 
   static endSession(guildId: string) {
     const session = this.sessions.get(guildId);
+    if (!session) return;
 
-    if (session?.timeout) clearTimeout(session.timeout);
-    if (session?.warningTimeout) clearTimeout(session.warningTimeout);
-
+    this.cleanupSession(session); // 🔥 FIX
     this.sessions.delete(guildId);
   }
 }
