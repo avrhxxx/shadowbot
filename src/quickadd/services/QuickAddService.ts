@@ -1,3 +1,5 @@
+// src/quickadd/services/QuickAddService.ts
+
 import {
   ParserType,
   SessionEntry,
