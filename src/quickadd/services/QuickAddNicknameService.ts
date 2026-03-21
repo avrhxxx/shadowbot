@@ -1,5 +1,3 @@
-// src/quickadd/services/QuickAddNicknameService.ts
-
 import { readSheet, appendQuickAddRows } from "../../googleSheetsStorage";
 
 const TYPE = "nickname";
@@ -71,12 +69,18 @@ export async function saveNickMappings(
 
     if (!raw || !final) continue;
 
-    // 🔥 FILTRY (KLUCZOWE)
+    // =====================================
+    // 🔥 ULTRA FILTER (LEPSZY)
+    // =====================================
     if (raw.length < 3) continue;
+    if (!/[a-z]/i.test(raw)) continue;
     if (/donat/i.test(raw)) continue;
     if (/^\d+$/.test(raw)) continue;
 
-    if (raw.toLowerCase() === final.toLowerCase()) continue;
+    // 🔥 USUNIĘTY WARUNEK:
+    // if (raw.toLowerCase() === final.toLowerCase()) continue;
+
+    // 👉 zapisujemy wszystko (ważne dla fuzzy i przyszłych korekt)
 
     console.log(`➕ ${raw} → ${final}`);
 
@@ -84,7 +88,7 @@ export async function saveNickMappings(
       type: TYPE,
       ocr: raw,
       final,
-      override: "", // 🔥 tylko ręcznie w sheet
+      override: "", // ręczne nadpisanie tylko w sheet
       createdAt: now,
     });
   }
@@ -96,6 +100,7 @@ export async function saveNickMappings(
 
   await appendQuickAddRows(rowsToAppend);
 
+  // 🔥 reset cache żeby nowe mappingi działały od razu
   cache = null;
 
   console.log(`✅ Saved ${rowsToAppend.length} mappings`);
