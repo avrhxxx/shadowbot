@@ -1,6 +1,6 @@
 // src/quickadd/services/OCRService.ts
 
-import { extractTextFromImage } from "../utils/ocr";
+import { extractTextGoogle } from "../../google/GoogleVisionService";
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
 import fetch from "node-fetch";
@@ -17,10 +17,17 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
+  // 🔥 nadal robimy preprocess (Vision też zyskuje na tym!)
   const processedBuffer = await preprocessImage(buffer);
-  const text = await extractTextFromImage(processedBuffer);
 
-  console.log("📄 OCR RAW LENGTH:", text.length);
+  // 🔥 TU ZMIANA: Google Vision zamiast Tesseract
+  const text = await extractTextGoogle(processedBuffer);
+
+  console.log("🧠 OCR (VISION) LENGTH:", text.length);
+
+  if (!text || text.length < 10) {
+    console.log("⚠️ OCR returned very small text");
+  }
 
   let lines = text
     .split("\n")
@@ -28,6 +35,7 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     .map((l) => l.trim())
     .filter(Boolean);
 
+  // 🔥 pipeline zostaje — to jest DOBRE
   lines = preprocessOCR(lines);
   lines = mergeBrokenLines(lines);
   lines = normalizeLines(lines);
@@ -40,7 +48,9 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
   return { text, lines };
 }
 
-// 🔥 CLEAN (mniej agresywny)
+// =====================================
+// 🔥 CLEAN (lekki, bo Vision jest lepszy)
+// =====================================
 function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
 
@@ -70,7 +80,9 @@ function preprocessOCR(lines: string[]): string[] {
   return result;
 }
 
-// 🔥 MERGE — MNIEJ AGRESYWNY
+// =====================================
+// 🔥 MERGE (minimalny — Vision już dobrze składa)
+// =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
 
@@ -83,7 +95,7 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // tylko liczby
+    // 🔥 tylko liczby (bez zgadywania nicków!)
     if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
       merged.push(current + next);
       i++;
@@ -96,7 +108,9 @@ function mergeBrokenLines(lines: string[]): string[] {
   return merged;
 }
 
+// =====================================
 // 🔥 NORMALIZE
+// =====================================
 function normalizeLines(lines: string[]): string[] {
   return lines.map((line) =>
     line
