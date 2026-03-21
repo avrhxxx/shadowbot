@@ -3,10 +3,6 @@
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
-  console.log("=================================");
-  console.log("🧠 DonationsParser START (V15)");
-  console.log("=================================");
-
   let lineId = 1;
   const entries: QuickAddEntry[] = [];
   const cleanedLines = dedupeLines(lines);
@@ -17,16 +13,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     line = fixSplitNumbers(line);
 
-    console.log(`\n🔎 [${i}] "${line}"`);
-
     if (isTimestamp(line) || isGarbage(line) || isSystemLine(line)) {
-      console.log("   ⛔ skipped");
       continue;
     }
 
-    // =========================
-    // 🔥 DONATIONS LINE
-    // =========================
+    // 🔥 NORMAL donations
     if (isDonationsLine(line)) {
       const value = extractValueSafe(line);
       if (!value) continue;
@@ -34,23 +25,23 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       const nickData = findNicknameAboveSmart(cleanedLines, i);
       if (!nickData) continue;
 
-      entries.push({
-        lineId: lineId++,
-        nickname: nickData.clean,
-        value,
-        raw: nickData.raw,
-        rawText: `${nickData.raw} | ${line}`,
-        status: "OK",
-        confidence: nickData.confidence,
-        sourceType: "OCR",
-      });
-
+      entries.push(buildEntry(lineId++, nickData, value, line, 1));
       continue;
     }
 
-    // =========================
-    // ⚡ INLINE PARSE (STRONGER)
-    // =========================
+    // 🔥 FALLBACK (BEZ "Donations")
+    if (/\d{4,6}/.test(line)) {
+      const value = extractValueSafe(line);
+      if (!value) continue;
+
+      const nickData = findNicknameAboveSmart(cleanedLines, i);
+      if (!nickData) continue;
+
+      entries.push(buildEntry(lineId++, nickData, value, line, 0.6));
+      continue;
+    }
+
+    // inline
     const inline = parseInlineStrong(line);
     if (inline) {
       entries.push({
@@ -63,79 +54,63 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         confidence: 0.75,
         sourceType: "OCR",
       });
-
-      continue;
     }
   }
 
   return dedupeEntries(entries);
 }
 
-//
-// ================= CORE =================
-//
+function buildEntry(id: number, nickData: any, value: number, line: string, conf: number): QuickAddEntry {
+  return {
+    lineId: id,
+    nickname: nickData.clean,
+    value,
+    raw: nickData.raw,
+    rawText: `${nickData.raw} | ${line}`,
+    status: "OK",
+    confidence: conf,
+    sourceType: "OCR",
+  };
+}
 
+// 🔥 FUZZY DONATIONS
 function isDonationsLine(line: string): boolean {
-  return /donations/i.test(line);
+  const l = line.toLowerCase();
+
+  return (
+    /donations/.test(l) ||
+    /donat/.test(l) ||
+    /d0nat/.test(l) ||
+    /donat1/.test(l) ||
+    /e.?st.?ons/.test(l)
+  );
 }
 
 function isSystemLine(line: string): boolean {
   return /at least|required|rewards|ranking/i.test(line);
 }
 
-//
-// ================= VALUE FIX (🔥 KLUCZ) =================
-//
-
+// 🔥 VALUE
 function extractValueSafe(line: string): number | null {
   let raw = line.toLowerCase();
 
-  // FIX: "37,224 A0" → "37,224"
   raw = raw.replace(/([0-9][0-9,.\s]*)[a-z]+\d*$/i, "$1");
-
-  // FIX: split numbers
   raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
 
-  // K format
   const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
   if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
 
-  // extract biggest number (not concat everything!)
   const matches = raw.match(/\d{2,6}(?:,\d{3})*/g);
   if (!matches) return null;
 
-  const best = matches
+  return matches
     .map(v => parseInt(v.replace(/,/g, ""), 10))
     .sort((a, b) => b - a)[0];
-
-  return best || null;
 }
 
-//
-// ================= INLINE =================
-//
-
-function parseInlineStrong(line: string): { nick: string; value: number } | null {
-  const match = line.match(/^([^\d]{3,}?)\s*(\d{4,6})$/);
-  if (!match) return null;
-
-  const nick = normalizeNickname(match[1]);
-  const value = parseInt(match[2], 10);
-
-  if (!isValidNickname(nick)) return null;
-
-  return { nick, value };
-}
-
-//
-// ================= SMART LOOKBACK =================
-//
-
-function findNicknameAboveSmart(
-  lines: string[],
-  index: number
-): { raw: string; clean: string; confidence: number } | null {
-  for (let i = 1; i <= 5; i++) {
+// 🔥 LOOKBACK = 8
+function findNicknameAboveSmart(lines: string[], index: number) {
+  for (let i = 1; i <= 8; i++) {
     const line = lines[index - i];
     if (!line) continue;
 
@@ -151,35 +126,27 @@ function findNicknameAboveSmart(
       confidence: 1 - i * 0.1,
     };
   }
-
   return null;
 }
 
-//
-// ================= NICK CLEANING (🔥 DUŻY BOOST) =================
-//
-
+// 🔥 MNIEJ AGRESYWNY NICK CLEAN
 function normalizeNickname(name: string): string {
-  let n = name
+  return name
     .trim()
     .replace(/^[^a-zA-Z0-9]+/, "")
     .replace(/[^\p{L}\p{N}_]/gu, "");
-
-  // remove OCR garbage prefixes
-  n = n.replace(/^(pr|yo|y|a|o)+/i, "");
-
-  // remove trailing garbage letters (częsty OCR bug)
-  n = n.replace(/[a-z]{1,2}$/i, match => {
-    if (match.length <= 2) return "";
-    return match;
-  });
-
-  return n.trim();
 }
 
-//
-// ================= HELPERS =================
-//
+// reszta bez zmian
+function parseInlineStrong(line: string) {
+  const match = line.match(/^([^\d]{3,}?)\s*(\d{4,6})$/);
+  if (!match) return null;
+
+  return {
+    nick: normalizeNickname(match[1]),
+    value: parseInt(match[2], 10),
+  };
+}
 
 function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
@@ -190,32 +157,28 @@ function fixSplitNumbers(str: string): string {
 }
 
 function isNickname(line: string): boolean {
-  if (line.length < 3) return false;
-  if (!/[a-zA-Z]/.test(line)) return false;
-  if (/\d{4,}/.test(line)) return false;
-  return true;
+  return line.length >= 3 && /[a-zA-Z]/.test(line);
 }
 
 function isValidNickname(nick: string): boolean {
-  return nick.length >= 3 && !/^\d+$/.test(nick);
+  return nick.length >= 3;
 }
 
 function isGarbage(line: string): boolean {
-  return line.length < 2 || /^[^a-zA-Z0-9]+$/.test(line);
+  return line.length < 2;
 }
 
 function dedupeLines(lines: string[]): string[] {
   const seen = new Set<string>();
-
   return lines.filter(l => {
-    const key = l.trim().toLowerCase();
+    const key = l.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
-function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
+function dedupeEntries(entries: QuickAddEntry[]) {
   const map = new Map<string, QuickAddEntry>();
 
   for (const e of entries) {
