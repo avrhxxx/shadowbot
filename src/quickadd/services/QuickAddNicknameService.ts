@@ -1,9 +1,17 @@
 // src/quickadd/services/QuickAddNicknameService.ts
-import { readSheet, appendQuickAddRows } from "../../googleSheetsStorage";
+import * as GS from "../../googleSheetsStorage";
 
 const TYPE = "nickname";
 
 interface NickMapping {
+  ocr: string;
+  final: string;
+  override?: string;
+  createdAt: number;
+}
+
+interface RawRow {
+  type: string;
   ocr: string;
   final: string;
   override?: string;
@@ -18,7 +26,7 @@ let cache: NickMapping[] | null = null;
 async function loadMappings(): Promise<NickMapping[]> {
   if (cache) return cache;
 
-  const rows = await readSheet("quickadd");
+  const rows = await GS.readSheet("quickadd");
 
   if (!rows || rows.length <= 1) {
     cache = [];
@@ -27,15 +35,15 @@ async function loadMappings(): Promise<NickMapping[]> {
 
   const parsed: NickMapping[] = rows
     .slice(1)
-    .map((r) => ({
-      type: r[0],
-      ocr: r[1],
-      final: r[2],
-      override: r[3],
-      createdAt: Number(r[4]),
+    .map((r: unknown[]): RawRow => ({
+      type: String(r[0] ?? ""),
+      ocr: String(r[1] ?? ""),
+      final: String(r[2] ?? ""),
+      override: String(r[3] ?? ""),
+      createdAt: Number(r[4] ?? 0),
     }))
-    .filter((r) => r.type === TYPE && r.ocr)
-    .map((r) => ({
+    .filter((r: RawRow) => r.type === TYPE && r.ocr)
+    .map((r: RawRow) => ({
       ocr: r.ocr.trim(),
       final: r.final?.trim() || "",
       override: r.override?.trim() || "",
@@ -70,18 +78,11 @@ export async function saveNickMappings(
 
     if (!raw || !final) continue;
 
-    // =====================================
-    // 🔥 ULTRA FILTER (LEPSZY)
-    // =====================================
+    // 🔥 FILTRY
     if (raw.length < 3) continue;
     if (!/[a-z]/i.test(raw)) continue;
     if (/donat/i.test(raw)) continue;
     if (/^\d+$/.test(raw)) continue;
-
-    // 🔥 USUNIĘTY WARUNEK:
-    // if (raw.toLowerCase() === final.toLowerCase()) continue;
-
-    // 👉 zapisujemy wszystko (ważne dla fuzzy i przyszłych korekt)
 
     console.log(`➕ ${raw} → ${final}`);
 
@@ -89,7 +90,7 @@ export async function saveNickMappings(
       type: TYPE,
       ocr: raw,
       final,
-      override: "", // ręczne nadpisanie tylko w sheet
+      override: "",
       createdAt: now,
     });
   }
@@ -99,9 +100,8 @@ export async function saveNickMappings(
     return;
   }
 
-  await appendQuickAddRows(rowsToAppend);
+  await GS.appendQuickAddRows(rowsToAppend);
 
-  // 🔥 reset cache żeby nowe mappingi działały od razu
   cache = null;
 
   console.log(`✅ Saved ${rowsToAppend.length} mappings`);
@@ -114,17 +114,15 @@ export async function resolveNickname(raw: string): Promise<string> {
   const mappings = await loadMappings();
 
   const found = mappings.find(
-    (m) => m.ocr.toLowerCase() === raw.toLowerCase()
+    (m: NickMapping) => m.ocr.toLowerCase() === raw.toLowerCase()
   );
 
   if (found) {
-    // 🔥 PRIORYTET 1: override (ręczny)
     if (found.override) {
       console.log(`🧠 OVERRIDE: ${raw} → ${found.override}`);
       return found.override;
     }
 
-    // 🔥 PRIORYTET 2: final (z confirm)
     if (found.final) {
       console.log(`🎯 RESOLVE: ${raw} → ${found.final}`);
       return found.final;
