@@ -1,6 +1,6 @@
 // src/quickadd/services/OCRService.ts
 import { extractTextFromImage } from "../utils/ocr";
-import { preprocessImage } from "../utils/imagePreprocess";
+import { preprocessImage, splitIntoRows } from "../utils/imagePreprocess";
 import fetch from "node-fetch";
 
 export interface OCRResult {
@@ -15,22 +15,39 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
-  const processedBuffer = await preprocessImage(buffer);
+  // =====================================
+  // ✂️ SPLIT NA WIERSZE
+  // =====================================
+  const rows = await splitIntoRows(buffer);
 
-  const text = await extractTextFromImage(processedBuffer);
+  const allRawLines: string[] = [];
 
-  console.log("📄 OCR RAW LENGTH:", text.length);
+  // =====================================
+  // 🔍 OCR PER ROW (GAME CHANGER)
+  // =====================================
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
 
-  console.log("=== OCR TEXT START ===");
-  console.log(text);
-  console.log("=== OCR TEXT END ===");
+    const processedRow = await preprocessImage(row);
+    const text = await extractTextFromImage(processedRow);
 
-  let lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+    console.log(`🧩 ROW [${i}] RAW OCR:`);
+    console.log(text);
 
-  lines = preprocessOCR(lines);
+    const rowLines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    allRawLines.push(...rowLines);
+  }
+
+  console.log("📄 TOTAL RAW LINES:", allRawLines.length);
+
+  // =====================================
+  // 🧼 CLEANING
+  // =====================================
+  let lines = preprocessOCR(allRawLines);
 
   console.log("=== FILTERED LINES ===");
   console.log(lines);
@@ -40,9 +57,14 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     console.log(`[${i}] "${line}"`);
   });
 
-  return { text, lines };
+  return {
+    text: allRawLines.join("\n"),
+    lines,
+  };
 }
 
+// =====================================
+// 🧼 OCR CLEANER (FIXED - unicode safe)
 // =====================================
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -53,11 +75,11 @@ export function preprocessOCR(lines: string[]): string[] {
     let cleaned = line
       .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
       .replace(/^\d+\s*/, "")
-      .replace(/^[^\w]+/, "")
-      .replace(/[^\w\d]+$/g, "")
+      .replace(/^[^\p{L}\p{N}]+/gu, "")     // 🔥 unicode-safe
+      .replace(/[^\p{L}\p{N}]+$/gu, "")     // 🔥 unicode-safe
       .replace(/\b[gG]\b/g, "")
       .replace(/(\d),(\d)/g, "$1$2")
-      .replace(/[^\w\s\d]/g, "")
+      .replace(/[^\p{L}\p{N}\s]/gu, "")     // 🔥 NAJWAŻNIEJSZY FIX
       .replace(/\s+/g, " ")
       .trim();
 
