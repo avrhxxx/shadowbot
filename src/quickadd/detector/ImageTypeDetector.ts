@@ -1,18 +1,15 @@
 // src/quickadd/detector/ImageTypeDetector.ts
 import { ParserType } from "../session/SessionManager";
 
-// =====================================
-// 🔍 IMAGE TYPE DETECTOR (V3 - FIXED REAL DATA)
-// =====================================
 export function detectImageType(
   lines: string[],
   lockedType?: ParserType | null
 ): ParserType | null {
   console.log("=================================");
-  console.log("🧠 DETECTOR START (V3)");
+  console.log("🧠 DETECTOR START (V4)");
   console.log("=================================");
 
-  // 🔒 MULTISCREEN FIX
+  // 🔒 LOCK
   if (lockedType) {
     console.log("🔒 Using locked parser:", lockedType);
     return lockedType;
@@ -30,17 +27,40 @@ export function detectImageType(
     RR_ATTENDANCE: 0,
   };
 
+  let strongRaid = false;
+  let strongAttendance = false;
+
   for (const line of lines) {
     const lower = line.toLowerCase();
 
     // =========================
-    // 💰 DONATIONS (STRONG SIGNAL)
+    // 🏹 STRONG RAID
+    // =========================
+    if (lower.includes("no team")) {
+      strongRaid = true;
+      scores.RR_RAID += 5;
+    }
+
+    if (lower.includes("raid score")) {
+      strongRaid = true;
+      scores.RR_RAID += 5;
+    }
+
+    // =========================
+    // 📅 STRONG ATTEND
+    // =========================
+    if (lower.includes("attend")) {
+      strongAttendance = true;
+      scores.RR_ATTENDANCE += 5;
+    }
+
+    // =========================
+    // 💰 DONATIONS
     // =========================
     if (lower.includes("donations")) {
       scores.DONATIONS += 5;
     }
 
-    // OCR błędy
     if (/donat|ionat|dona|tion/i.test(line)) {
       scores.DONATIONS += 2;
     }
@@ -50,44 +70,33 @@ export function detectImageType(
     }
 
     // =========================
-    // ⚔️ DUEL POINTS
+    // ⚔️ DUEL (LEPSZY)
     // =========================
     if (/[\d]+[\.,]?\d*\s*[mk]/i.test(line)) {
       scores.DUEL_POINTS += 3;
     }
 
-    if (lower.includes("points")) {
-      scores.DUEL_POINTS += 1;
+    // 🔥 tylko jeśli nie wygląda jak donations
+    if (lower.includes("points") && !lower.includes("donat")) {
+      scores.DUEL_POINTS += 2;
     }
 
     // =========================
-    // 🏹 RAID
+    // RAID LIGHT
     // =========================
-    if (lower.includes("no team")) {
-      scores.RR_RAID += 4;
-    }
-
-    if (lower.includes("raid score")) {
-      scores.RR_RAID += 4;
-    }
-
     if (lower.includes("guild")) {
       scores.RR_RAID += 1;
     }
 
     // =========================
-    // 📅 ATTENDANCE
+    // ATTEND LIGHT
     // =========================
-    if (lower.includes("attend")) {
-      scores.RR_ATTENDANCE += 4;
-    }
-
     if (lower.includes("present")) {
       scores.RR_ATTENDANCE += 1;
     }
 
     // =========================
-    // ❌ NUMBERS → MINIMAL IMPACT
+    // NUMBERS (LOW WEIGHT)
     // =========================
     if (/\d{4,}/.test(line)) {
       scores.DONATIONS += 0.2;
@@ -96,19 +105,51 @@ export function detectImageType(
 
   console.log("📊 SCORES:", scores);
 
-  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  const [type, score] = sorted[0];
+  // 🔥 STRONG OVERRIDE
+  if (strongRaid) {
+    console.log("🔥 STRONG RAID DETECTED");
+    return "RR_RAID";
+  }
 
-  if (score < 3) {
+  if (strongAttendance) {
+    console.log("🔥 STRONG ATTENDANCE DETECTED");
+    return "RR_ATTENDANCE";
+  }
+
+  // =========================
+  // 🧠 SORT
+  // =========================
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+
+  const [topType, topScore] = sorted[0];
+  const secondScore = sorted[1]?.[1] ?? 0;
+
+  // =========================
+  // ❌ TOO LOW
+  // =========================
+  if (topScore < 3) {
     console.log("❌ Score too low");
     return null;
   }
 
-  if (sorted[1] && sorted[1][1] === score) {
-    console.log("⚠️ Tie → null");
-    return null;
+  // =========================
+  // 🔥 TIE BREAKER (FIX)
+  // =========================
+  const diff = topScore - secondScore;
+
+  if (diff < 1) {
+    console.log("⚠️ Weak difference, applying fallback logic");
+
+    // 🔥 prefer duel over donations if M/K present
+    if (scores.DUEL_POINTS >= scores.DONATIONS) {
+      console.log("🧠 Tie → DUEL_POINTS");
+      return "DUEL_POINTS";
+    }
+
+    console.log("🧠 Tie → DONATIONS");
+    return "DONATIONS";
   }
 
-  console.log(`✅ DETECTED: ${type}`);
-  return type as ParserType;
+  console.log(`✅ DETECTED: ${topType}`);
+  return topType as ParserType;
 }
