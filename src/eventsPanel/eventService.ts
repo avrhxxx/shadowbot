@@ -1,5 +1,5 @@
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
-import * as GS from "../googleSheetsStorage";
+import * as GS from "../google/googleSheetsStorage";
 
 export interface EventObject {
   id: string;
@@ -68,7 +68,7 @@ export async function loadEvents(guildId: string): Promise<EventObject[]> {
         lastBirthdayYear: toNumber(obj.lastBirthdayYear ?? 0)
       } as EventObject;
     })
-    .filter(e => e.guildId === guildId);
+    .filter((e: EventObject) => e.guildId === guildId);
 }
 
 export async function getEvents(guildId: string): Promise<EventObject[]> {
@@ -77,7 +77,7 @@ export async function getEvents(guildId: string): Promise<EventObject[]> {
 
 export async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
   const events = await loadEvents(guildId);
-  return events.find(e => e.id === eventId) || null;
+  return events.find((e: EventObject) => e.id === eventId) || null;
 }
 
 // -----------------------------
@@ -122,7 +122,7 @@ export async function checkAndSetReminder(eventId: string, reminderValue: boolea
     await GS.updateEventCell(rowIndex + 1, reminderIndex + 1, "true");
   }
 
-  return !currentValue; // true jeśli reminder jeszcze nie był wysłany
+  return !currentValue;
 }
 
 export async function deleteEventRow(eventId: string) {
@@ -152,7 +152,7 @@ export async function addParticipants(guildId: string, eventId: string, nickname
 
   for (const nick of nicknames) {
     if (!event.participants.includes(nick)) event.participants.push(nick);
-    event.absent = event.absent.filter(n => n !== nick);
+    event.absent = event.absent.filter((n: string) => n !== nick);
   }
 
   await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
@@ -165,8 +165,8 @@ export async function removeParticipants(guildId: string, eventId: string, nickn
   const event = await getEventById(guildId, eventId);
   if (!event) throw new Error("Event not found");
 
-  event.participants = event.participants.filter(n => !nicknames.includes(n));
-  event.absent = event.absent.filter(n => !nicknames.includes(n));
+  event.participants = event.participants.filter((n: string) => !nicknames.includes(n));
+  event.absent = event.absent.filter((n: string) => !nicknames.includes(n));
 
   await updateEventCell(eventId, "participants", JSON.stringify(event.participants));
   await updateEventCell(eventId, "absent", JSON.stringify(event.absent));
@@ -180,7 +180,7 @@ export async function markAbsent(guildId: string, eventId: string, nicknames: st
 
   for (const nick of nicknames) {
     if (!event.participants.includes(nick)) continue;
-    event.participants = event.participants.filter(n => n !== nick);
+    event.participants = event.participants.filter((n: string) => n !== nick);
     if (!event.absent.includes(nick)) event.absent.push(nick);
   }
 
@@ -213,11 +213,11 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
     "participants","absent","status","createdAt","reminderSent","started","reminderBefore","lastBirthdayYear"
   ];
 
-  ["eventType","participants","absent","lastBirthdayYear"].forEach(col => {
+  ["eventType","participants","absent","lastBirthdayYear"].forEach((col: string) => {
     if (!headers.includes(col)) headers.push(col);
   });
 
-  const newRow = headers.map(h => {
+  const newRow = headers.map((h: string) => {
     if (h === "participants") return JSON.stringify(data.participants || []);
     if (h === "absent") return JSON.stringify(data.absent || []);
     if (h === "reminderSent") return data.reminderSent ? "true" : "false";
@@ -247,33 +247,34 @@ export async function saveEvents(guildId: string, events: EventObject[]) {
 // CONFIG HELPERS
 // -----------------------------
 export async function getConfig(guildId: string): Promise<EventConfig> {
-  const rows = await GS.readConfigSheet();
+  const rows: any[][] = await GS.readConfigSheet();
   if (!rows.length) return {};
-  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   const dataRows = rows.slice(1);
   const guildIndex = headers.indexOf("guildId");
   if (guildIndex === -1) return {};
-  const row = dataRows.find(r => r[guildIndex] === guildId);
+  const row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   if (!row) return {};
   const config: EventConfig = {};
-  headers.forEach((h, i) => config[h] = row[i] ?? null);
+  headers.forEach((h: string, i: number) => config[h] = row[i] ?? null);
   return config;
 }
 
 export async function setConfig(guildId: string, key: string, value: any) {
-  const rows = await GS.readConfigSheet();
-  const headers = rows[0] || ["guildId","notificationChannel","downloadChannel"];
+  const rows: any[][] = await GS.readConfigSheet();
+  const headers: string[] = rows[0] || ["guildId","notificationChannel","downloadChannel"];
   const dataRows = rows.slice(1);
 
   if (!headers.includes(key)) {
     headers.push(key);
-    for (const r of dataRows) while(r.length < headers.length) r.push("");
+    for (const r of dataRows) while (r.length < headers.length) r.push("");
   }
 
   const guildIndex = headers.indexOf("guildId");
   const keyIndex = headers.indexOf(key);
-  let row = dataRows.find(r => r[guildIndex] === guildId);
+  let row = dataRows.find((r: any[]) => r[guildIndex] === guildId);
   let rowIndex: number;
+
   if (!row) {
     row = new Array(headers.length).fill("");
     row[guildIndex] = guildId;
