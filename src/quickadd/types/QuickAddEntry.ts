@@ -4,7 +4,8 @@ export type QuickAddEntryStatus =
   | "OK"
   | "DUPLICATE"
   | "INVALID"
-  | "UNREADABLE";
+  | "UNREADABLE"
+  | "ORPHAN"; // 🔥 brakujący status (value bez nicku)
 
 export interface QuickAddEntry {
   lineId?: number;
