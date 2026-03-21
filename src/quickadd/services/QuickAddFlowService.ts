@@ -29,9 +29,7 @@ function debug(tag: string, ...args: any[]) {
 }
 
 // =====================================
-// 🔥 CONFIG
-// =====================================
-const BATCH_DELAY = 10000; // 10 sekund ciszy = start parsowania
+const BATCH_DELAY = 10000;
 
 // =====================================
 function fallbackDetect(lines: string[]): any {
@@ -72,7 +70,8 @@ async function handleParsedData(
     return;
   }
 
-  if (!session.parserType && entries.length >= 2) {
+  // 🔥 ustaw parserType od razu (pierwszy poprawny batch)
+  if (!session.parserType) {
     session.parserType = type;
   }
 
@@ -96,56 +95,70 @@ async function handleParsedData(
 }
 
 // =====================================
-// 🔥 NAJWAŻNIEJSZE — FULL BATCH
+// 🔥 NOWY CORE — PARSE PER SCREEN
 // =====================================
 async function processBatch(message: Message, session: any) {
-  debug("BATCH", "🔥 START FULL MERGE");
+  debug("BATCH", "🔥 START PER-SCREEN PARSE");
 
   if (!session?.buffer?.ocrResults?.length) {
     debug("BATCH", "❌ EMPTY BUFFER");
     return;
   }
 
-  const allLines = session.buffer.ocrResults
-    .map((x: any) => x.lines)
-    .flat();
+  let allEntries: any[] = [];
+  let finalType: any = session.parserType || null;
 
-  debug("BATCH", "📄 TOTAL LINES:", allLines.length);
+  for (const batch of session.buffer.ocrResults) {
+    const lines = batch.lines;
 
-  let type = detectImageType(allLines, session.parserType);
+    debug(batch.traceId, "📄 LINES:", lines.length);
 
-  if (!type) {
-    type = fallbackDetect(allLines);
+    let type = detectImageType(lines, session.parserType);
+
+    if (!type) {
+      type = fallbackDetect(lines);
+    }
+
+    if (!type && session.parserType) {
+      type = session.parserType;
+    }
+
+    if (!type) {
+      debug(batch.traceId, "❌ TYPE NOT DETECTED");
+      continue;
+    }
+
+    debug(batch.traceId, "🧠 TYPE:", type);
+
+    try {
+      const parsed = parseByType(type, lines);
+
+      debug(batch.traceId, "📥 PARSED:", parsed.length);
+
+      if (parsed.length) {
+        finalType = type;
+        allEntries.push(...parsed);
+      }
+
+    } catch (err) {
+      console.error("💥 PARSER ERROR:", err);
+    }
   }
 
-  if (!type && session.parserType) {
-    type = session.parserType;
-  }
+  debug("BATCH", "📊 TOTAL ENTRIES:", allEntries.length);
 
-  if (!type) {
-    await message.reply("❌ Could not detect data type.");
+  if (!allEntries.length) {
+    await message.reply("❌ No valid entries parsed from batch.");
     return;
   }
 
-  let entries: any[] = [];
+  await handleParsedData(message, session, finalType, allEntries);
 
-  try {
-    entries = parseByType(type, allLines);
-  } catch (err) {
-    console.error("💥 PARSER ERROR:", err);
-    await message.reply("❌ Parser error.");
-    return;
-  }
-
-  await handleParsedData(message, session, type, entries);
-
-  // 🔥 RESET BUFFER (ale NIE session data!)
+  // 🔥 reset buffer
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
 }
 
-// =====================================
-// 🔥 IMAGE INPUT (POPRAWIONE)
 // =====================================
 export async function processImageInput(
   message: Message,
@@ -165,15 +178,12 @@ export async function processImageInput(
 
   debug(traceId, "📦 BUFFER SIZE:", session.buffer.ocrResults.length);
 
-  // 🔥 REAKCJA = OK SCREEN
   await message.react("✅");
 
-  // 🔥 RESET TIMER
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
 
-  // 🔥 START LICZENIA CISZY
   session.buffer.timer = setTimeout(async () => {
     await processBatch(message, session);
   }, BATCH_DELAY);
