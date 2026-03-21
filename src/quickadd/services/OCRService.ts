@@ -22,10 +22,6 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📄 OCR RAW LENGTH:", text.length);
 
-  console.log("=== OCR TEXT START ===");
-  console.log(text);
-  console.log("=== OCR TEXT END ===");
-
   let lines = text
     .split("\n")
     .map((l) => unicodeCleaner(l))
@@ -33,14 +29,10 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     .filter(Boolean);
 
   lines = preprocessOCR(lines);
-  lines = mergeBrokenLines(lines); // 🔥 NOWE
+  lines = mergeBrokenLines(lines);
 
   console.log("=== FINAL LINES ===");
   console.log(lines);
-
-  lines.forEach((line, i) => {
-    console.log(`[${i}] "${line}"`);
-  });
 
   return { text, lines };
 }
@@ -54,12 +46,11 @@ export function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
+      .replace(/[ÔÇś@%*_=~`"'\\]/g, "") // 🔥 NIE usuwamy _ | -
       .replace(/^\d+\s*/, "")
-      .replace(/^[^\w]+/, "")
-      .replace(/[^\w\d]+$/g, "")
+      .replace(/^[^\p{L}\p{N}]+/gu, "")
+      .replace(/[^\p{L}\p{N}_|\s-]+$/gu, "") // 🔥 zachowujemy sensowne znaki
       .replace(/(\d),(\d)/g, "$1$2")
-      .replace(/[^\w\s\d]/g, "")
       .replace(/\s+/g, " ")
       .trim();
 
@@ -67,20 +58,18 @@ export function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
+    // 🔥 NIE usuwamy "points"
     if (
       lower.includes("at least") ||
       lower.includes("required") ||
       lower.includes("total") ||
       lower.includes("ranking") ||
       lower.includes("alliance") ||
-      lower.includes("points") ||
       lower.includes("contribution") ||
       lower.includes("reward")
     ) {
       continue;
     }
-
-    console.log(`RAW: "${line}" → CLEAN: "${cleaned}"`);
 
     result.push(cleaned);
   }
@@ -88,12 +77,14 @@ export function preprocessOCR(lines: string[]): string[] {
   return result;
 }
 
-// 🔥 KLUCZOWE — naprawia split nicków i wartości
+// =====================================
+// 🔥 SMART MERGE (DUŻO BEZPIECZNIEJSZY)
+// =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    let current = lines[i];
+    const current = lines[i];
     const next = lines[i + 1];
 
     if (!next) {
@@ -101,9 +92,9 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 przypadek: nick rozbity na 2 linie
+    // 🔥 VERY SHORT OCR SPLIT (np. "xX" + "Dark")
     if (
-      current.length <= 6 &&
+      current.length <= 3 &&
       next.length <= 6 &&
       /^[a-z0-9]+$/i.test(current) &&
       /^[a-z0-9]+$/i.test(next)
@@ -113,8 +104,8 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 przypadek: liczba rozbita (np. 43 + 000)
-    if (/^\d{2,}$/.test(current) && /^\d{2,}$/.test(next)) {
+    // 🔥 liczba split (bezpieczne)
+    if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
       merged.push(current + next);
       i++;
       continue;
