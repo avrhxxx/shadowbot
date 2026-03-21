@@ -29,6 +29,11 @@ function debug(tag: string, ...args: any[]) {
 }
 
 // =====================================
+// 🔥 CONFIG
+// =====================================
+const BATCH_DELAY = 10000; // 10 sekund ciszy = start parsowania
+
+// =====================================
 function fallbackDetect(lines: string[]): any {
   if (canParseDuelPoints(lines)) return "DUEL_POINTS";
   if (canParseReservoirAttendance(lines)) return "RR_ATTENDANCE";
@@ -53,29 +58,64 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
+async function handleParsedData(
+  message: Message,
+  session: any,
+  type: any,
+  entries: any[]
+) {
+  debug("FLOW", "TYPE:", type);
+  debug("FLOW", "ENTRIES:", entries.length);
+
+  if (!entries.length) {
+    await message.reply("❌ No valid entries parsed.");
+    return;
+  }
+
+  if (!session.parserType && entries.length >= 2) {
+    session.parserType = type;
+  }
+
+  if (session.parserType && type !== session.parserType) {
+    await message.reply(
+      `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
+    );
+    return;
+  }
+
+  const mapped = [];
+  for (const e of entries) {
+    mapped.push(await mapEntry(e));
+  }
+
+  SessionData.addEntries(message.guildId!, mapped);
+
+  await message.reply(
+    `✅ Parsed ${mapped.length} entries from batch.`
+  );
+}
+
+// =====================================
+// 🔥 NAJWAŻNIEJSZE — FULL BATCH
+// =====================================
 async function processBatch(message: Message, session: any) {
-  debug("BATCH", "🔥 FINAL PROCESS START");
+  debug("BATCH", "🔥 START FULL MERGE");
 
-  if (!session || !session.buffer) return;
-
-  const flat = session.buffer.ocrResults;
-
-  if (!flat.length) {
+  if (!session?.buffer?.ocrResults?.length) {
     debug("BATCH", "❌ EMPTY BUFFER");
     return;
   }
 
-  // 🔥 1. merge wszystkich screenów
-  const allLines = flat.map((x: any) => x.lines).flat();
+  const allLines = session.buffer.ocrResults
+    .map((x: any) => x.lines)
+    .flat();
 
   debug("BATCH", "📄 TOTAL LINES:", allLines.length);
 
-  // 🔥 2. detect type
   let type = detectImageType(allLines, session.parserType);
 
   if (!type) {
-    const fallback = fallbackDetect(allLines);
-    if (fallback) type = fallback;
+    type = fallbackDetect(allLines);
   }
 
   if (!type && session.parserType) {
@@ -87,50 +127,25 @@ async function processBatch(message: Message, session: any) {
     return;
   }
 
-  // 🔥 3. parse CAŁOŚCI
   let entries: any[] = [];
 
   try {
     entries = parseByType(type, allLines);
   } catch (err) {
-    debug("BATCH", "❌ PARSER ERROR:", err);
+    console.error("💥 PARSER ERROR:", err);
     await message.reply("❌ Parser error.");
     return;
   }
 
-  if (!entries.length) {
-    await message.reply("❌ No valid entries parsed.");
-    return;
-  }
+  await handleParsedData(message, session, type, entries);
 
-  // 🔥 4. map
-  const mapped = [];
-  for (const e of entries) {
-    mapped.push(await mapEntry(e));
-  }
-
-  // 🔥 5. wrzucenie DO SESSION (tu się robi merge!)
-  SessionData.addEntries(message.guildId!, mapped);
-
-  // 🔥 6. clear buffer (ale NIE session data!)
+  // 🔥 RESET BUFFER (ale NIE session data!)
   session.buffer.ocrResults = [];
-  session.buffer.timer = undefined;
-
-  debug("BATCH", "✅ DONE");
+  session.buffer.timer = null;
 }
 
 // =====================================
-function resetBatchTimer(message: Message, session: any) {
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
-
-  // 🔥 KLUCZOWE: czekamy aż user przestanie wysyłać screeny
-  session.buffer.timer = setTimeout(async () => {
-    await processBatch(message, session);
-  }, 10000); // ⬅️ 10 sekund
-}
-
+// 🔥 IMAGE INPUT (POPRAWIONE)
 // =====================================
 export async function processImageInput(
   message: Message,
@@ -143,19 +158,25 @@ export async function processImageInput(
 
   const { lines } = await processOCR(imageUrl);
 
-  debug(traceId, "📄 OCR LINES:", lines.length);
-
-  // 🔥 dodajemy do bufora (NIE parsujemy jeszcze)
   session.buffer.ocrResults.push({
     lines,
     traceId,
   });
 
-  // 🔥 reset timer
-  resetBatchTimer(message, session);
+  debug(traceId, "📦 BUFFER SIZE:", session.buffer.ocrResults.length);
 
-  // ✅ feedback dla usera
+  // 🔥 REAKCJA = OK SCREEN
   await message.react("✅");
+
+  // 🔥 RESET TIMER
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
+
+  // 🔥 START LICZENIA CISZY
+  session.buffer.timer = setTimeout(async () => {
+    await processBatch(message, session);
+  }, BATCH_DELAY);
 }
 
 // =====================================
@@ -164,8 +185,6 @@ export async function processTextInput(
   session: any,
   content: string
 ) {
-  const traceId = Date.now().toString().slice(-5);
-
   const lines = content
     .split("\n")
     .map((l) => l.trim())
@@ -173,10 +192,14 @@ export async function processTextInput(
 
   session.buffer.ocrResults.push({
     lines,
-    traceId,
+    traceId: "text",
   });
 
-  resetBatchTimer(message, session);
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
 
-  await message.react("✅");
+  session.buffer.timer = setTimeout(async () => {
+    await processBatch(message, session);
+  }, 5000);
 }
