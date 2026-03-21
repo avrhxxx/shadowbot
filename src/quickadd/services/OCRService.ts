@@ -1,6 +1,7 @@
 // src/quickadd/services/OCRService.ts
 import { extractTextFromImage } from "../utils/ocr";
-import { preprocessImage, splitIntoRows } from "../utils/imagePreprocess";
+import { preprocessImage } from "../utils/imagePreprocess";
+import { unicodeCleaner } from "../utils/unicodeCleaner";
 import fetch from "node-fetch";
 
 export interface OCRResult {
@@ -15,57 +16,37 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
-  // =====================================
-  // ✂️ SPLIT NA WIERSZE
-  // =====================================
-  const rows = await splitIntoRows(buffer);
+  const processedBuffer = await preprocessImage(buffer);
 
-  const allRawLines: string[] = [];
+  const text = await extractTextFromImage(processedBuffer);
 
-  // =====================================
-  // 🔍 OCR PER ROW (GAME CHANGER)
-  // =====================================
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+  console.log("📄 OCR RAW LENGTH:", text.length);
 
-    const processedRow = await preprocessImage(row);
-    const text = await extractTextFromImage(processedRow);
+  console.log("=== OCR TEXT START ===");
+  console.log(text);
+  console.log("=== OCR TEXT END ===");
 
-    console.log(`🧩 ROW [${i}] RAW OCR:`);
-    console.log(text);
+  let lines = text
+    .split("\n")
+    .map((l) => unicodeCleaner(l))
+    .map((l) => l.trim())
+    .filter(Boolean);
 
-    const rowLines = text
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
+  lines = preprocessOCR(lines);
+  lines = mergeBrokenLines(lines); // 🔥 NOWE
 
-    allRawLines.push(...rowLines);
-  }
-
-  console.log("📄 TOTAL RAW LINES:", allRawLines.length);
-
-  // =====================================
-  // 🧼 CLEANING
-  // =====================================
-  let lines = preprocessOCR(allRawLines);
-
-  console.log("=== FILTERED LINES ===");
+  console.log("=== FINAL LINES ===");
   console.log(lines);
-  console.log("======================");
 
   lines.forEach((line, i) => {
     console.log(`[${i}] "${line}"`);
   });
 
-  return {
-    text: allRawLines.join("\n"),
-    lines,
-  };
+  return { text, lines };
 }
 
 // =====================================
-// 🧼 OCR CLEANER (FIXED - unicode safe)
-// =====================================
+
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
 
@@ -75,11 +56,10 @@ export function preprocessOCR(lines: string[]): string[] {
     let cleaned = line
       .replace(/[ÔÇś@%*_=~`"'|\\]/g, "")
       .replace(/^\d+\s*/, "")
-      .replace(/^[^\p{L}\p{N}]+/gu, "")     // 🔥 unicode-safe
-      .replace(/[^\p{L}\p{N}]+$/gu, "")     // 🔥 unicode-safe
-      .replace(/\b[gG]\b/g, "")
+      .replace(/^[^\w]+/, "")
+      .replace(/[^\w\d]+$/g, "")
       .replace(/(\d),(\d)/g, "$1$2")
-      .replace(/[^\p{L}\p{N}\s]/gu, "")     // 🔥 NAJWAŻNIEJSZY FIX
+      .replace(/[^\w\s\d]/g, "")
       .replace(/\s+/g, " ")
       .trim();
 
@@ -106,4 +86,42 @@ export function preprocessOCR(lines: string[]): string[] {
   }
 
   return result;
+}
+
+// 🔥 KLUCZOWE — naprawia split nicków i wartości
+function mergeBrokenLines(lines: string[]): string[] {
+  const merged: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    let current = lines[i];
+    const next = lines[i + 1];
+
+    if (!next) {
+      merged.push(current);
+      continue;
+    }
+
+    // 🔥 przypadek: nick rozbity na 2 linie
+    if (
+      current.length <= 6 &&
+      next.length <= 6 &&
+      /^[a-z0-9]+$/i.test(current) &&
+      /^[a-z0-9]+$/i.test(next)
+    ) {
+      merged.push(current + next);
+      i++;
+      continue;
+    }
+
+    // 🔥 przypadek: liczba rozbita (np. 43 + 000)
+    if (/^\d{2,}$/.test(current) && /^\d{2,}$/.test(next)) {
+      merged.push(current + next);
+      i++;
+      continue;
+    }
+
+    merged.push(current);
+  }
+
+  return merged;
 }
