@@ -1,3 +1,4 @@
+// src/moderatorPanel/moderatorPanel.ts
 import {
   Client,
   TextChannel,
@@ -7,7 +8,8 @@ import {
   Interaction,
   EmbedBuilder,
   Message,
-  Guild
+  Guild,
+  ChannelType
 } from "discord.js";
 
 import { handleModeratorHelp } from "./moderatorButtons/moderatorHelp";
@@ -15,17 +17,13 @@ import { handleEventMenu } from "./moderatorButtons/eventMenu";
 import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
 import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
-import {
-  saveModeratorPanelInfo,
-  updateModeratorPanelColumn,
-  getModeratorPanelInfo,
-  readModeratorConfig,
-  ensureModeratorConfigHeaders
-} from "../googleSheetsStorage";
 
-// ---- helper do embedu z formatami dat ----
+import * as GS from "../googleSheetsStorage";
+
+// ---- EMBED ----
 function renderDateFormatsEmbed(): EmbedBuilder {
   const unixTimestamp = Math.floor(Date.now() / 1000);
+
   return new EmbedBuilder()
     .setTitle("📅 Accepted Date & Time Formats")
     .setDescription(
@@ -46,33 +44,17 @@ function renderDateFormatsEmbed(): EmbedBuilder {
     .setColor("Blue");
 }
 
-// --- helper do renderu hubu / root panel ---
+// ---- HUB ----
 function renderModeratorHubRow(): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("moderator_event_menu")
-      .setLabel("Event Menu")
-      .setStyle(ButtonStyle.Primary), // niebieski
-    new ButtonBuilder()
-      .setCustomId("moderator_points_menu")
-      .setLabel("Points Menu")
-      .setStyle(ButtonStyle.Primary), // niebieski
-    new ButtonBuilder()
-      .setCustomId("moderator_absence_menu")
-      .setLabel("Absence Menu")
-      .setStyle(ButtonStyle.Primary), // niebieski
-    new ButtonBuilder()
-      .setCustomId("moderator_translate_menu")
-      .setLabel("Translate Menu")
-      .setStyle(ButtonStyle.Primary), // niebieski
-    new ButtonBuilder()
-      .setCustomId("moderator_help")
-      .setLabel("Help")
-      .setStyle(ButtonStyle.Success) // zielony
+    new ButtonBuilder().setCustomId("moderator_event_menu").setLabel("Event Menu").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("moderator_points_menu").setLabel("Points Menu").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("moderator_absence_menu").setLabel("Absence Menu").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("moderator_translate_menu").setLabel("Translate Menu").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("moderator_help").setLabel("Help").setStyle(ButtonStyle.Success)
   );
 }
 
-// --- pomocnicza funkcja do formatowania wersji numerowej ---
 function formatVersion(num: number): string {
   const major = Math.floor(num / 100);
   const minor = Math.floor((num % 100) / 10);
@@ -80,57 +62,51 @@ function formatVersion(num: number): string {
   return `${major}.${minor}.${patch}`;
 }
 
-// --- Funkcja do automatycznego rollbacku panelu ---
+// ---- SYNC ----
 async function syncModeratorPanel(modChannel: TextChannel, messages: Map<string, Message>) {
-  const dateEmbedMessage = messages.get("dateEmbed");
-  const hubMessage = messages.get("hubMessage");
-
-  // Embed daty
-  if (!dateEmbedMessage) {
-    const newEmbedMsg = await modChannel.send({ embeds: [renderDateFormatsEmbed()] });
-    await updateModeratorPanelColumn("dateEmbedId", newEmbedMsg.id);
+  if (!messages.get("dateEmbed")) {
+    const msg = await modChannel.send({ embeds: [renderDateFormatsEmbed()] });
+    await GS.updateModeratorPanelColumn("dateEmbedId", msg.id);
   }
 
-  // Hub
-  if (!hubMessage) {
-    const newHubMsg = await modChannel.send({
+  if (!messages.get("hubMessage")) {
+    const msg = await modChannel.send({
       content: "📌 **Moderator Panel**",
       components: [renderModeratorHubRow()]
     });
-    await updateModeratorPanelColumn("hubMessageId", newHubMsg.id);
+    await GS.updateModeratorPanelColumn("hubMessageId", msg.id);
   }
 }
 
-// --- Usuwanie ID z Google Sheets, jeśli kanał nie istnieje ---
-async function cleanupDeletedChannels(guild: Guild, modChannelId: string, updateChannelId: string) {
-  const modChannel = guild.channels.cache.get(modChannelId);
-  const updatesChannel = guild.channels.cache.get(updateChannelId);
-
-  if (!modChannel) {
-    await updateModeratorPanelColumn("modChannelId", "");
-    await updateModeratorPanelColumn("dateEmbedId", "");
-    await updateModeratorPanelColumn("hubMessageId", "");
+// ---- CLEANUP ----
+async function cleanupDeletedChannels(guild: Guild, modChannelId?: string, updateChannelId?: string) {
+  if (modChannelId && !guild.channels.cache.get(modChannelId)) {
+    await GS.updateModeratorPanelColumn("modChannelId", "");
+    await GS.updateModeratorPanelColumn("dateEmbedId", "");
+    await GS.updateModeratorPanelColumn("hubMessageId", "");
   }
 
-  if (!updatesChannel) {
-    await updateModeratorPanelColumn("updateChannelId", "");
+  if (updateChannelId && !guild.channels.cache.get(updateChannelId)) {
+    await GS.updateModeratorPanelColumn("updateChannelId", "");
   }
 }
 
-// --- Inicjalizacja panelu moderatora ---
+// ---- INIT ----
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
-    // --- Szukamy kanału moderator-panel ---
-    let modChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "moderator-panel") as TextChannel;
-    let updatesChannel = guild.channels.cache.find(c => c.type === 0 && c.name === "bot-updates") as TextChannel;
+    await GS.ensureModeratorConfigHeaders();
+    const panelInfo = await GS.getModeratorPanelInfo();
 
-    // --- Tworzymy nagłówki w Google Sheets jeśli nie istnieją ---
-    await ensureModeratorConfigHeaders();
-    const panelInfo = await getModeratorPanelInfo();
+    let modChannel = guild.channels.cache.find(
+      (c) => c.type === ChannelType.GuildText && c.name === "moderator-panel"
+    ) as TextChannel | undefined;
 
-    // --- Sprawdzenie czy kanały istnieją, jeśli nie usuń ID ---
+    let updatesChannel = guild.channels.cache.find(
+      (c) => c.type === ChannelType.GuildText && c.name === "bot-updates"
+    ) as TextChannel | undefined;
+
     if (panelInfo) {
       await cleanupDeletedChannels(guild, panelInfo.modChannelId, panelInfo.updateChannelId);
     }
@@ -138,89 +114,90 @@ export async function initModeratorPanel(client: Client) {
     if (!modChannel) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
-        type: 0,
-        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
+        type: ChannelType.GuildText
       });
-      await updateModeratorPanelColumn("modChannelId", modChannel.id);
+      await GS.updateModeratorPanelColumn("modChannelId", modChannel.id);
     }
 
     if (!updatesChannel) {
       updatesChannel = await guild.channels.create({
         name: "bot-updates",
-        type: 0,
-        permissionOverwrites: [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }]
+        type: ChannelType.GuildText
       });
-      await updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
+      await GS.updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
     }
 
-    // --- Fetch wiadomości z moderator-panel ---
-    const fetchedMessages = await modChannel.messages.fetch({ limit: 50 });
-    const messagesMap = new Map<string, Message>();
-    const dateEmbedMsg = fetchedMessages.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
-    const hubMsg = fetchedMessages.find(m => m.content === "📌 **Moderator Panel**");
-    if (dateEmbedMsg) messagesMap.set("dateEmbed", dateEmbedMsg);
-    if (hubMsg) messagesMap.set("hubMessage", hubMsg);
+    const fetched = await modChannel.messages.fetch({ limit: 50 });
 
-    let embedUpdated = false;
-    let hubUpdated = false;
+    const map = new Map<string, Message>();
 
-    if (dateEmbedMsg) {
-      await dateEmbedMsg.edit({ embeds: [renderDateFormatsEmbed()] });
-      embedUpdated = true;
+    const dateMsg = fetched.find(
+      (m: Message) => m.embeds[0]?.title === "📅 Accepted Date & Time Formats"
+    );
+
+    const hubMsg = fetched.find(
+      (m: Message) => m.content === "📌 **Moderator Panel**"
+    );
+
+    if (dateMsg) map.set("dateEmbed", dateMsg);
+    if (hubMsg) map.set("hubMessage", hubMsg);
+
+    let updated = false;
+
+    if (dateMsg) {
+      await dateMsg.edit({ embeds: [renderDateFormatsEmbed()] });
+      updated = true;
     }
 
     if (hubMsg) {
       await hubMsg.edit({ components: [renderModeratorHubRow()] });
-      hubUpdated = true;
+      updated = true;
     }
 
-    // --- Automatyczny rollback brakujących wiadomości ---
-    await syncModeratorPanel(modChannel, messagesMap);
+    await syncModeratorPanel(modChannel, map);
 
-    // --- Pobierz wersję i timestamp z Google Sheets ---
-    const currentInfo = await getModeratorPanelInfo();
-    let currentVersionNum = currentInfo?.version
-      ? Number(currentInfo.version.split('.').join(''))
-      : 100; // 1.0.0
-    let newVersionNum = currentVersionNum;
+    const currentInfo = await GS.getModeratorPanelInfo();
 
-    if (embedUpdated || hubUpdated) {
-      newVersionNum = currentVersionNum + 1;
-      const unixTimestamp = Math.floor(Date.now() / 1000);
+    let versionNum = currentInfo?.version
+      ? Number(currentInfo.version.split(".").join(""))
+      : 100;
+
+    if (updated) {
+      versionNum++;
+      const unix = Math.floor(Date.now() / 1000);
+
       await updatesChannel.send({
-        content: `Shadow Bot has been updated! Bot version: v${formatVersion(newVersionNum)}\n<t:${unixTimestamp}:F>`
+        content: `Shadow Bot updated → v${formatVersion(versionNum)}\n<t:${unix}:F>`
       });
-      await updateModeratorPanelColumn("version", formatVersion(newVersionNum));
-      await updateModeratorPanelColumn("lastUpdated", unixTimestamp);
+
+      await GS.updateModeratorPanelColumn("version", formatVersion(versionNum));
+      await GS.updateModeratorPanelColumn("lastUpdated", unix);
     }
 
-    // --- Interwał automatycznego sprawdzania rollbacku co minutę ---
     setInterval(async () => {
-      const fetched = await modChannel.messages.fetch({ limit: 50 });
-      const map = new Map<string, Message>();
-      const dateMsg = fetched.find(m => m.embeds.length > 0 && m.embeds[0].title === "📅 Accepted Date & Time Formats");
-      const hub = fetched.find(m => m.content === "📌 **Moderator Panel**");
-      if (dateMsg) map.set("dateEmbed", dateMsg);
-      if (hub) map.set("hubMessage", hub);
-      await syncModeratorPanel(modChannel, map);
+      const fetched = await modChannel!.messages.fetch({ limit: 50 });
 
-      // --- Sprawdzenie czy kanały nadal istnieją ---
-      if (panelInfo) {
-        await cleanupDeletedChannels(guild, panelInfo.modChannelId, panelInfo.updateChannelId);
-      }
-    }, 60_000);
+      const map = new Map<string, Message>();
+
+      const dateMsg = fetched.find((m: Message) => m.embeds[0]?.title);
+      const hubMsg = fetched.find((m: Message) => m.content === "📌 **Moderator Panel**");
+
+      if (dateMsg) map.set("dateEmbed", dateMsg);
+      if (hubMsg) map.set("hubMessage", hubMsg);
+
+      await syncModeratorPanel(modChannel!, map);
+    }, 60000);
   }
 
-  // --- Globalny listener przycisków ---
   client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isButton()) return;
 
     switch (interaction.customId) {
-      case "moderator_event_menu": await handleEventMenu(interaction); break;
-      case "moderator_points_menu": await handlePointsMenu(interaction); break;
-      case "moderator_translate_menu": await handleTranslateMenu(interaction); break;
-      case "moderator_absence_menu": await handleAbsenceMenu(interaction); break;
-      case "moderator_help": await handleModeratorHelp(interaction); break;
+      case "moderator_event_menu": return handleEventMenu(interaction);
+      case "moderator_points_menu": return handlePointsMenu(interaction);
+      case "moderator_translate_menu": return handleTranslateMenu(interaction);
+      case "moderator_absence_menu": return handleAbsenceMenu(interaction);
+      case "moderator_help": return handleModeratorHelp(interaction);
     }
   });
 }
