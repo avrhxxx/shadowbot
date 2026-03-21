@@ -1,4 +1,5 @@
 // src/quickadd/services/OCRService.ts
+
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
@@ -22,7 +23,6 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📄 OCR RAW LENGTH:", text.length);
 
-  // 🔥 NAJWAŻNIEJSZY DEBUG
   console.log("🧪 RAW OCR START");
   console.log(text);
   console.log("🧪 RAW OCR END");
@@ -33,12 +33,12 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     .map((l) => l.trim())
     .filter(Boolean);
 
+  // 🔥 NOWY PIPELINE
   lines = preprocessOCR(lines);
   lines = mergeBrokenLines(lines);
+  lines = normalizeLines(lines);
 
   console.log("=== FINAL LINES ===");
-  console.log(lines);
-
   lines.forEach((line, i) => {
     console.log(`[${i}] "${line}"`);
   });
@@ -47,7 +47,8 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 }
 
 // =====================================
-
+// 🔥 MNIEJ AGRESYWNE CZYSZCZENIE
+// =====================================
 export function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
 
@@ -55,11 +56,9 @@ export function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      .replace(/[ÔÇś@%*_=~`"'\\]/g, "") // 🔥 NIE usuwamy _ | -
-      .replace(/^\d+\s*/, "")
-      .replace(/^[^\p{L}\p{N}]+/gu, "")
-      .replace(/[^\p{L}\p{N}_|\s-]+$/gu, "") // 🔥 zachowujemy sensowne znaki
-      .replace(/(\d),(\d)/g, "$1$2")
+      // ❌ NIE usuwamy _ | - (ważne dla nicków)
+      .replace(/[ÔÇś@%*=~`"'\\]/g, "")
+      .replace(/^\d+\s*/, "") // usuń numer linii
       .replace(/\s+/g, " ")
       .trim();
 
@@ -67,14 +66,12 @@ export function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
+    // 🔥 TYLKO OCZYWISTY UI GARBAGE
     if (
-      lower.includes("at least") ||
-      lower.includes("required") ||
-      lower.includes("total") ||
-      lower.includes("ranking") ||
-      lower.includes("alliance") ||
-      lower.includes("contribution") ||
-      lower.includes("reward")
+      lower.includes("tap to") ||
+      lower.includes("share") ||
+      lower.includes("copy") ||
+      lower === "ok"
     ) {
       continue;
     }
@@ -86,7 +83,7 @@ export function preprocessOCR(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 SMART MERGE (DUŻO BEZPIECZNIEJSZY)
+// 🔥 INTELIGENTNE ŁĄCZENIE LINII
 // =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
@@ -100,21 +97,31 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 VERY SHORT OCR SPLIT (np. "xX" + "Dark")
+    // 🔥 nick split (np. "xX" + "Dark")
     if (
-      current.length <= 3 &&
-      next.length <= 6 &&
-      /^[a-z0-9]+$/i.test(current) &&
-      /^[a-z0-9]+$/i.test(next)
+      current.length <= 4 &&
+      next.length <= 10 &&
+      /^[a-z0-9_]+$/i.test(current) &&
+      /^[a-z0-9_]+$/i.test(next)
     ) {
       merged.push(current + next);
       i++;
       continue;
     }
 
-    // 🔥 liczba split (bezpieczne)
+    // 🔥 liczba split (43 + 300)
     if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
       merged.push(current + next);
+      i++;
+      continue;
+    }
+
+    // 🔥 nick + value split (Banan + 43000)
+    if (
+      /^[a-z0-9_]{3,}$/i.test(current) &&
+      /^\d{3,}$/.test(next)
+    ) {
+      merged.push(current + " " + next);
       i++;
       continue;
     }
@@ -123,4 +130,16 @@ function mergeBrokenLines(lines: string[]): string[] {
   }
 
   return merged;
+}
+
+// =====================================
+// 🔥 NORMALIZACJA POD PARSER
+// =====================================
+function normalizeLines(lines: string[]): string[] {
+  return lines.map((line) => {
+    return line
+      .replace(/(\d)\s+(\d{3})/g, "$1$2") // 43 300 → 43300
+      .replace(/\s+/g, " ")
+      .trim();
+  });
 }
