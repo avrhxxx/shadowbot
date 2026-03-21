@@ -1,3 +1,4 @@
+// src/quickadd/utils/unicodeCleaner.ts
 export function unicodeCleaner(input: string): string {
   return input
     .normalize("NFC")
