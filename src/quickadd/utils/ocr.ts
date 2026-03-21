@@ -1,3 +1,4 @@
+// src/quickadd/utils/ocr.ts
 import Tesseract from "tesseract.js";
 
 export async function extractTextFromImage(image: Buffer): Promise<string> {
