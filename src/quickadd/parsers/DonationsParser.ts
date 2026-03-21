@@ -4,7 +4,7 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V13)");
+  console.log("🧠 DonationsParser START (V14)");
   console.log("=================================");
 
   let lineId = 1;
@@ -16,6 +16,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     if (!line) continue;
 
     line = fixSplitNumbers(line);
+    line = removeOcrNoise(line); // 🔥 NEW
 
     console.log(`\n🔎 [${i}] "${line}"`);
 
@@ -25,10 +26,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
 
     // =========================
-    // 🔥 1. DONATIONS LINE (KLUCZOWE)
+    // 🔥 1. DONATIONS LINE
     // =========================
     if (isDonationsLine(line)) {
-      const value = extractValue(line);
+      const value = extractValueSafe(line); // 🔥 FIXED
       if (!value) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
@@ -55,7 +56,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
 
     // =========================
-    // ⚡ 2. INLINE PARSE (fallback)
+    // ⚡ 2. INLINE PARSE (lepszy)
     // =========================
     const inline = parseInline(line);
     if (inline) {
@@ -68,7 +69,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         raw: line,
         rawText: line,
         status: "OK",
-        confidence: 0.8,
+        confidence: 0.7,
         sourceType: "OCR",
       });
 
@@ -76,7 +77,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
-  const finalEntries = dedupeEntries(entries);
+  const finalEntries = sanitizeEntries(dedupeEntries(entries)); // 🔥 NEW
 
   console.log("=================================");
   console.log("📊 FINAL ENTRIES:", finalEntries.length);
@@ -107,13 +108,13 @@ function isSystemLine(line: string): boolean {
 //
 
 function parseInline(line: string): { nick: string; value: number } | null {
-  const fixed = fixSplitNumbers(line);
+  const fixed = fixSplitNumbers(removeOcrNoise(line));
 
-  const match = fixed.match(/([^\d]{3,}?)\s*(\d{4,6})/);
+  const match = fixed.match(/([^\d]{3,}?)\s*(\d{4,7})/);
   if (!match) return null;
 
   const rawNick = match[1];
-  const value = parseInt(match[2], 10);
+  const value = normalizeValue(parseInt(match[2], 10));
 
   const clean = normalizeNickname(rawNick);
   if (!isValidNickname(clean)) return null;
@@ -137,6 +138,7 @@ function findNicknameAboveSmart(
 
     if (isDonationsLine(line)) continue;
     if (isSystemLine(line)) continue;
+    if (isGarbage(line)) continue;
 
     if (!isNickname(line)) continue;
 
@@ -165,19 +167,37 @@ function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
 }
 
-function extractValue(line: string): number | null {
-  let raw = line.toLowerCase();
+// 🔥 GŁÓWNY FIX LICZB
+function extractValueSafe(line: string): number | null {
+  let raw = removeOcrNoise(line.toLowerCase());
 
-  raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
-
+  // K / M support
   const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
   if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
 
-  raw = raw.replace(/[^\d]/g, "");
+  const mMatch = raw.match(/(\d+(?:\.\d+)?)\s*m/);
+  if (mMatch) return Math.round(parseFloat(mMatch[1]) * 1_000_000);
 
+  raw = raw.replace(/[^\d]/g, "");
   if (raw.length < 4) return null;
 
-  return parseInt(raw, 10);
+  return normalizeValue(parseInt(raw, 10));
+}
+
+// 🔥 NORMALIZACJA (usuwa x10 OCR bug)
+function normalizeValue(num: number): number {
+  if (num > 1_000_000) return Math.floor(num / 100);
+  if (num > 500_000) return Math.floor(num / 10);
+  return num;
+}
+
+// 🔥 USUWANIE OCR ŚMIECI
+function removeOcrNoise(str: string): string {
+  return str
+    .replace(/\(\d+\s*[A-Za-z]*\)/g, "") // (20 Qg)
+    .replace(/[^\x00-\x7F]/g, "") // dziwne znaki
+    .replace(/[_~`]/g, "")
+    .trim();
 }
 
 function fixSplitNumbers(str: string): string {
@@ -203,12 +223,14 @@ function isGarbage(line: string): boolean {
   return false;
 }
 
+// 🔥 LEPSZY CLEAN NICKA
 function normalizeNickname(name: string): string {
   return name
     .trim()
     .replace(/^[^a-zA-Z0-9]+/, "")
-    .replace(/[^\p{L}\p{N}_]/gu, "")
-    .replace(/g$/, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .replace(/^[0-9]+/, "") // usuń rank
+    .replace(/g$/, "") // OCR tail
     .trim();
 }
 
@@ -237,4 +259,14 @@ function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
   }
 
   return Array.from(map.values());
+}
+
+// 🔥 FINAL FILTER
+function sanitizeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
+  return entries.filter(e => {
+    if (!e.value) return false;
+    if (e.value < 1000) return false;
+    if (e.value > 1_000_000) return false;
+    return true;
+  });
 }
