@@ -6,28 +6,59 @@ import { detectImageType } from "../detector/ImageTypeDetector";
 import { parseByType } from "../parsers/ParserExecutor";
 import { SessionData } from "../session/SessionData";
 
-// =====================================
-// 🔥 DEBUG HELPER
+import {
+  resolveNickname,
+  resolveNicknameFuzzy,
+} from "./QuickAddNicknameService";
+
+import {
+  canParseDuelPoints,
+} from "../parsers/DuelPointsParser";
+
+import {
+  canParseReservoirAttendance,
+} from "../parsers/ReservoirAttendanceParser";
+
+import {
+  canParseReservoirRaid,
+} from "../parsers/ReservoirRaidParser";
+
 // =====================================
 function debug(tag: string, ...args: any[]) {
   console.log(`[QA:${tag}]`, ...args);
 }
 
 // =====================================
-// 🔹 mapper
+// 🔥 SMART TYPE FALLBACK
 // =====================================
-function mapEntry(entry: any) {
+function fallbackDetect(lines: string[]): any {
+  if (canParseDuelPoints(lines)) return "DUEL_POINTS";
+  if (canParseReservoirAttendance(lines)) return "RR_ATTENDANCE";
+  if (canParseReservoirRaid(lines)) return "RR_RAID";
+  return null;
+}
+
+// =====================================
+// 🔹 mapper + nickname resolve
+// =====================================
+async function mapEntry(entry: any) {
+  let nickname = entry.nickname;
+
+  // 🔥 EXACT MATCH
+  nickname = await resolveNickname(nickname);
+
+  // 🔥 FUZZY fallback
+  nickname = await resolveNicknameFuzzy(nickname);
+
   const valueNumber = parseInt(entry.value || "0");
 
   return {
-    nickname: entry.nickname,
+    nickname,
     value: isNaN(valueNumber) ? 0 : valueNumber,
     raw: entry.raw || entry.rawText || "",
   };
 }
 
-// =====================================
-// 🔹 CORE LOGIC
 // =====================================
 async function handleParsedData(
   message: Message,
@@ -36,32 +67,31 @@ async function handleParsedData(
   entries: any[]
 ) {
   debug("FLOW", "TYPE:", type);
-  debug("FLOW", "ENTRIES COUNT:", entries.length);
+  debug("FLOW", "ENTRIES:", entries.length);
 
-  entries.slice(0, 5).forEach((e, i) => {
-    debug("FLOW", `ENTRY[${i}]`, e);
-  });
-
-  if (!session.parserType && type) {
+  // 🔥 LOCK tylko gdy mamy sensowny wynik
+  if (!session.parserType && entries.length >= 2) {
     session.parserType = type;
     debug("FLOW", `🔒 Parser locked: ${type}`);
   }
 
   if (session.parserType && type && session.parserType !== type) {
-    debug("FLOW", "❌ TYPE MISMATCH");
     await message.reply(
       `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
     );
     return;
   }
 
-  if (!entries || entries.length === 0) {
-    debug("FLOW", "❌ NO ENTRIES");
+  if (!entries.length) {
     await message.reply("❌ Couldn't detect data.");
     return;
   }
 
-  const mapped = entries.map(mapEntry);
+  // 🔥 ASYNC MAP
+  const mapped = [];
+  for (const e of entries) {
+    mapped.push(await mapEntry(e));
+  }
 
   SessionData.addEntries(message.guildId!, mapped);
 
@@ -69,36 +99,42 @@ async function handleParsedData(
 }
 
 // =====================================
-// 🔥 BATCH PROCESSOR (FIXED)
-// =====================================
 async function processBatch(message: Message, session: any) {
   debug("BATCH", "🔥 START");
+
+  // 🔥 SAFETY — sesja mogła umrzeć
+  if (!session || !session.buffer) {
+    debug("BATCH", "❌ SESSION DEAD");
+    return;
+  }
 
   const flat = session.buffer.ocrResults;
 
   const allLines = flat.map((x: any) => x.lines).flat();
-  const traces = flat.map((x: any) => x.traceId);
 
-  debug("BATCH", "📄 TOTAL LINES:", allLines.length);
-  debug("BATCH", "🧵 TRACE IDS:", traces);
+  debug("BATCH", "📄 LINES:", allLines.length);
 
-  if (allLines.length === 0) {
-    debug("BATCH", "❌ EMPTY INPUT");
+  if (!allLines.length) {
     await message.reply("❌ No OCR data collected.");
     return;
   }
 
   let type = detectImageType(allLines, session.parserType);
 
-  debug("BATCH", "🧠 DETECTED TYPE:", type);
+  // 🔥 fallback layer
+  if (!type) {
+    const fallback = fallbackDetect(allLines);
+    if (fallback) {
+      debug("BATCH", "🧠 FALLBACK TYPE:", fallback);
+      type = fallback;
+    }
+  }
 
   if (!type && session.parserType) {
-    debug("BATCH", "🔒 FALLBACK TYPE:", session.parserType);
     type = session.parserType;
   }
 
   if (!type) {
-    debug("BATCH", "❌ TYPE NOT DETECTED");
     await message.reply("❌ Could not detect data type.");
     return;
   }
@@ -107,7 +143,6 @@ async function processBatch(message: Message, session: any) {
 
   try {
     entries = parseByType(type, allLines);
-    debug("BATCH", "📦 PARSED ENTRIES:", entries.length);
   } catch (err) {
     debug("BATCH", "❌ PARSER CRASH:", err);
     await message.reply("❌ Parser error.");
@@ -115,19 +150,17 @@ async function processBatch(message: Message, session: any) {
   }
 
   if (!entries.length) {
-    debug("BATCH", "❌ EMPTY PARSE RESULT");
     await message.reply("❌ No valid entries parsed.");
     return;
   }
 
   await handleParsedData(message, session, type, entries);
 
-  // 🧹 reset
+  // 🔥 FULL RESET
   session.buffer.ocrResults = [];
+  session.buffer.timer = undefined;
 }
 
-// =====================================
-// 🖼️ OCR FLOW
 // =====================================
 export async function processImageInput(
   message: Message,
@@ -136,11 +169,7 @@ export async function processImageInput(
 ) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "📸 IMAGE INPUT", imageUrl);
-
   const { lines } = await processOCR(imageUrl);
-
-  debug(traceId, "📄 OCR lines:", lines.length);
 
   session.buffer.ocrResults.push({
     lines,
@@ -157,16 +186,12 @@ export async function processImageInput(
 }
 
 // =====================================
-// 📝 TEXT FLOW
-// =====================================
 export async function processTextInput(
   message: Message,
   session: any,
   content: string
 ) {
   const traceId = Date.now().toString().slice(-5);
-
-  debug(traceId, "📝 TEXT INPUT");
 
   const lines = content
     .split("\n")
