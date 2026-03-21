@@ -1,5 +1,3 @@
-// src/quickadd/parsers/ParserExecutor.ts
-
 import { ParserType } from "../session/SessionManager";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
@@ -8,6 +6,9 @@ import { parseDuelPoints } from "./DuelPointsParser";
 import { parseReservoirRaid } from "./ReservoirRaidParser";
 import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
 
+// =====================================
+// 🔥 MAIN EXECUTOR
+// =====================================
 export function parseByType(
   type: ParserType | null,
   lines: string[]
@@ -35,15 +36,19 @@ export function parseByType(
       case "DONATIONS":
         entries = parseDonations(lines);
         break;
+
       case "DUEL_POINTS":
         entries = parseDuelPoints(lines);
         break;
+
       case "RR_RAID":
         entries = parseReservoirRaid(lines);
         break;
+
       case "RR_ATTENDANCE":
         entries = parseReservoirAttendance(lines);
         break;
+
       default:
         console.log("❌ Unknown parser type");
         return [];
@@ -59,6 +64,9 @@ export function parseByType(
     console.log("💀 PARSER RETURNED 0 ENTRIES");
   }
 
+  // =====================================
+  // 🧹 CLEAN
+  // =====================================
   const cleaned = entries.filter((e) => {
     if (!e.nickname || e.nickname.length < 2) return false;
     if (e.nickname.toLowerCase() === "donations") return false;
@@ -66,6 +74,9 @@ export function parseByType(
     return true;
   });
 
+  // =====================================
+  // 🔥 MERGE
+  // =====================================
   const merged = mergeEntries(cleaned);
 
   console.log(`🧠 After merge: ${merged.length}`);
@@ -73,6 +84,8 @@ export function parseByType(
   return merged;
 }
 
+// =====================================
+// 🔥 MERGE ENTRIES
 // =====================================
 function mergeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
   const map = new Map<string, QuickAddEntry>();
@@ -100,4 +113,4 @@ function mergeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
   }
 
   return Array.from(map.values());
-}}
+}
