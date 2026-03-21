@@ -4,13 +4,18 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🧠 DonationsParser START (V10)");
+  console.log("🧠 DonationsParser START (V11 DEBUG)");
   console.log("=================================");
 
-  let lineId = 1; // 🔥 LOCAL (FIX)
+  let lineId = 1;
 
   const entries: QuickAddEntry[] = [];
   const cleanedLines = dedupeLines(lines);
+
+  console.log("🧾 CLEANED LINES:");
+  cleanedLines.forEach((l, i) => {
+    console.log(`[${i}]`, l);
+  });
 
   for (let i = 0; i < cleanedLines.length; i++) {
     let line = cleanedLines[i].trim();
@@ -18,21 +23,27 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 
     line = fixSplitNumbers(line);
 
-    console.log(`🔎 [${i}] "${line}"`);
+    console.log(`\n🔎 [${i}] "${line}"`);
 
     if (isTimestamp(line)) {
       console.log("   ⛔ timestamp skipped");
       continue;
     }
 
-    if (isGarbage(line)) continue;
+    if (isGarbage(line)) {
+      console.log("   🗑️ garbage skipped");
+      continue;
+    }
 
     if (looksLikeDonations(line) || hasBigNumber(line)) {
       const value = extractValue(line);
 
       console.log("   💰 value detected:", value);
 
-      if (!value) continue;
+      if (!value) {
+        console.log("   ❌ value = null");
+        continue;
+      }
 
       const nickData = findNicknameAbove(cleanedLines, i);
 
@@ -44,7 +55,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       console.log("   ✅ ENTRY:", nickData.clean, value);
 
       entries.push({
-        lineId: lineId++, // 🔥 FIX
+        lineId: lineId++,
         nickname: nickData.clean,
         value,
         raw: nickData.raw,
@@ -53,6 +64,8 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
         confidence: nickData.confidence,
         sourceType: "OCR",
       });
+    } else {
+      console.log("   ⏭️ not a value line");
     }
   }
 
@@ -61,6 +74,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
   console.log("=================================");
   console.log("📊 FINAL ENTRIES:", finalEntries.length);
   console.log("=================================");
+
+  finalEntries.forEach((e, i) => {
+    console.log(`[${i}] ${e.nickname} → ${e.value}`);
+  });
 
   return finalEntries;
 }
@@ -73,19 +90,41 @@ function findNicknameAbove(
 ): { raw: string; clean: string; confidence: number } | null {
   const MAX_LOOKBACK = 3;
 
+  console.log("🔍 LOOKBACK START from index:", index);
+
   for (let i = 1; i <= MAX_LOOKBACK; i++) {
     const line = lines[index - i];
+
+    console.log(`   checking [${index - i}]:`, line);
+
     if (!line) continue;
 
-    if (!isNickname(line)) continue;
+    if (!isNickname(line)) {
+      console.log("   ❌ not nickname");
+      continue;
+    }
 
     const clean = normalizeNickname(line);
-    if (!isValidNickname(clean)) continue;
+
+    console.log("   🧼 cleaned:", clean);
+
+    if (!isValidNickname(clean)) {
+      console.log("   ❌ invalid nickname");
+      continue;
+    }
 
     const confidence = 1 - (i - 1) * 0.2;
 
-    return { raw: line, clean, confidence };
+    console.log("   ✅ MATCH FOUND:", clean, "confidence:", confidence);
+
+    return {
+      raw: line,
+      clean,
+      confidence,
+    };
   }
+
+  console.log("   ❌ LOOKBACK FAILED");
 
   return null;
 }
@@ -100,34 +139,49 @@ function hasBigNumber(line: string): boolean {
   return /\d{4,}/.test(line);
 }
 
-// 🔥 LEPSZE EXTRACT
+// 🔥 LEPSZE EXTRACT + DEBUG
 function extractValue(line: string): number | null {
+  console.log("💰 EXTRACT RAW:", line);
+
   let raw = line.toLowerCase();
 
-  // 43 300 → 43300 (tylko jeśli wygląda jak split number)
+  // 43 300 → 43300
   raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
+
+  console.log("💰 AFTER SPLIT FIX:", raw);
 
   // K
   const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
   if (kMatch) {
-    return Math.round(parseFloat(kMatch[1]) * 1000);
+    const val = Math.round(parseFloat(kMatch[1]) * 1000);
+    console.log("💰 K DETECTED:", val);
+    return val;
   }
 
   raw = raw.replace(/[^\d\s]/g, "");
 
+  console.log("💰 DIGITS ONLY:", raw);
+
   const matches = raw.match(/\d{2,6}/g);
+  console.log("💰 MATCHES:", matches);
+
   if (!matches) return null;
 
   const values = matches
     .map(n => parseInt(n, 10))
-    .filter(n => n >= 100); // 🔥 niższy próg
+    .filter(n => n >= 100);
+
+  console.log("💰 FILTERED VALUES:", values);
 
   if (!values.length) return null;
 
-  return Math.max(...values);
+  const final = Math.max(...values);
+
+  console.log("💰 FINAL VALUE:", final);
+
+  return final;
 }
 
-// 🔥 mniej agresywne
 function fixSplitNumbers(str: string): string {
   return str.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
 }
@@ -197,6 +251,7 @@ function dedupeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
     const existing = map.get(key);
 
     if (!existing || e.value > existing.value) {
+      console.log("🔁 MERGE:", e.nickname, existing?.value, "→", e.value);
       map.set(key, e);
     }
   }
