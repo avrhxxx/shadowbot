@@ -185,4 +185,4 @@ export async function processTextInput(
   session.buffer.timer = setTimeout(async () => {
     await processBatch(message, session);
   }, 500);
-}}
+}
