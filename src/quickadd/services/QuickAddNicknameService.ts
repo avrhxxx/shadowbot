@@ -1,3 +1,4 @@
+// src/quickadd/services/QuickAddNicknameService.ts
 import { readSheet, appendQuickAddRows } from "../../googleSheetsStorage";
 
 const TYPE = "nickname";
