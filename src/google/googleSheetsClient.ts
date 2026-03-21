@@ -7,13 +7,16 @@ if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
 
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-// 🔥 wspólny auth (możesz użyć też w innych API)
+// 🔥 WSPÓLNY AUTH (Sheets + Vision + wszystko z Google Cloud)
 export const googleAuth = new google.auth.GoogleAuth({
   credentials,
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  scopes: [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/cloud-platform", // 🔥 DODAJ TO
+  ],
 });
 
-// 🔥 klient Sheets
+// 🔥 Sheets client
 export const sheetsClient = google.sheets({
   version: "v4",
   auth: googleAuth,
