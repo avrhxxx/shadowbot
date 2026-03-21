@@ -7,6 +7,13 @@ import { parseByType } from "../parsers/ParserExecutor";
 import { SessionData } from "../session/SessionData";
 
 // =====================================
+// 🔥 DEBUG HELPER
+// =====================================
+function debug(tag: string, ...args: any[]) {
+  console.log(`[QA:${tag}]`, ...args);
+}
+
+// =====================================
 // 🔹 mapper
 // =====================================
 function mapEntry(entry: any) {
@@ -28,19 +35,20 @@ async function handleParsedData(
   type: any,
   entries: any[]
 ) {
-  console.log("=== FLOW: HANDLE PARSED DATA ===");
-  console.log("TYPE:", type);
-  console.log("ENTRIES:", entries.length);
+  debug("FLOW", "TYPE:", type);
+  debug("FLOW", "ENTRIES COUNT:", entries.length);
 
-  // 🔒 AUTO LOCK
+  entries.slice(0, 5).forEach((e, i) => {
+    debug("FLOW", `ENTRY[${i}]`, e);
+  });
+
   if (!session.parserType && type) {
     session.parserType = type;
-    console.log(`🔒 Parser locked: ${type}`);
+    debug("FLOW", `🔒 Parser locked: ${type}`);
   }
 
-  // ❌ MIX BLOCK
   if (session.parserType && type && session.parserType !== type) {
-    console.log("❌ TYPE MISMATCH");
+    debug("FLOW", "❌ TYPE MISMATCH");
     await message.reply(
       `❌ Wrong data type.\nExpected: ${session.parserType}, got: ${type}`
     );
@@ -48,12 +56,11 @@ async function handleParsedData(
   }
 
   if (!entries || entries.length === 0) {
-    console.log("❌ NO ENTRIES");
+    debug("FLOW", "❌ NO ENTRIES");
     await message.reply("❌ Couldn't detect data.");
     return;
   }
 
-  // 🔥 JEDEN zapis batcha
   const mapped = entries.map(mapEntry);
 
   SessionData.addEntries(message.guildId!, mapped);
@@ -62,76 +69,114 @@ async function handleParsedData(
 }
 
 // =====================================
-// 🔥 BATCH PROCESSOR (NOWE)
+// 🔥 BATCH PROCESSOR (FIXED)
 // =====================================
 async function processBatch(message: Message, session: any) {
-  console.log("🔥 PROCESSING BATCH");
+  debug("BATCH", "🔥 START");
 
-  const allLines = session.buffer.ocrResults.flat();
+  const flat = session.buffer.ocrResults;
 
-  console.log("📄 TOTAL LINES:", allLines.length);
+  const allLines = flat.map((x: any) => x.lines).flat();
+  const traces = flat.map((x: any) => x.traceId);
+
+  debug("BATCH", "📄 TOTAL LINES:", allLines.length);
+  debug("BATCH", "🧵 TRACE IDS:", traces);
+
+  if (allLines.length === 0) {
+    debug("BATCH", "❌ EMPTY INPUT");
+    await message.reply("❌ No OCR data collected.");
+    return;
+  }
 
   let type = detectImageType(allLines, session.parserType);
 
+  debug("BATCH", "🧠 DETECTED TYPE:", type);
+
   if (!type && session.parserType) {
-    console.log("🔒 Fallback to locked parser:", session.parserType);
+    debug("BATCH", "🔒 FALLBACK TYPE:", session.parserType);
     type = session.parserType;
   }
 
-  console.log("🧠 FINAL TYPE:", type);
+  if (!type) {
+    debug("BATCH", "❌ TYPE NOT DETECTED");
+    await message.reply("❌ Could not detect data type.");
+    return;
+  }
 
-  const entries = parseByType(type, allLines);
+  let entries: any[] = [];
+
+  try {
+    entries = parseByType(type, allLines);
+    debug("BATCH", "📦 PARSED ENTRIES:", entries.length);
+  } catch (err) {
+    debug("BATCH", "❌ PARSER CRASH:", err);
+    await message.reply("❌ Parser error.");
+    return;
+  }
+
+  if (!entries.length) {
+    debug("BATCH", "❌ EMPTY PARSE RESULT");
+    await message.reply("❌ No valid entries parsed.");
+    return;
+  }
 
   await handleParsedData(message, session, type, entries);
 
-  // 🧹 reset buffer
+  // 🧹 reset
   session.buffer.ocrResults = [];
 }
 
 // =====================================
-// 🖼️ OCR FLOW (POPRAWIONE)
+// 🖼️ OCR FLOW
 // =====================================
 export async function processImageInput(
   message: Message,
   session: any,
   imageUrl: string
 ) {
-  console.log("📸 FLOW: IMAGE INPUT");
+  const traceId = Date.now().toString().slice(-5);
+
+  debug(traceId, "📸 IMAGE INPUT", imageUrl);
 
   const { lines } = await processOCR(imageUrl);
 
-  console.log("📄 OCR lines:", lines.length);
+  debug(traceId, "📄 OCR lines:", lines.length);
 
-  // 🔥 tylko zbieramy dane
-  session.buffer.ocrResults.push(lines);
+  session.buffer.ocrResults.push({
+    lines,
+    traceId,
+  });
 
-  // 🔁 reset timera
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
 
-  // ⏱️ batch delay
   session.buffer.timer = setTimeout(async () => {
     await processBatch(message, session);
   }, 800);
 }
 
 // =====================================
-// 📝 TEXT FLOW (opcjonalnie też batch)
+// 📝 TEXT FLOW
 // =====================================
 export async function processTextInput(
   message: Message,
   session: any,
   content: string
 ) {
-  console.log("📝 FLOW: TEXT INPUT");
+  const traceId = Date.now().toString().slice(-5);
+
+  debug(traceId, "📝 TEXT INPUT");
 
   const lines = content
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 
-  session.buffer.ocrResults.push(lines);
+  session.buffer.ocrResults.push({
+    lines,
+    traceId,
+  });
 
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
@@ -140,4 +185,4 @@ export async function processTextInput(
   session.buffer.timer = setTimeout(async () => {
     await processBatch(message, session);
   }, 500);
-}
+}}
