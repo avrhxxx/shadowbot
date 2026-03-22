@@ -1,6 +1,6 @@
 // src/index.ts
 
-// 🔥 FIX: poprawiona ścieżka
+// 🔥 INIT GOOGLE CLIENT
 import "./google/googleSheetsClient";
 
 import {
@@ -17,6 +17,18 @@ import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
 import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
 import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
+
+// =============================
+// 🔥 QUICKADD (NEW)
+// =============================
+import {
+  quickAddCommand,
+  handleQuickAddCommand,
+} from "./quickadd/commands/quickadd.command";
+
+import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
+
+// =============================
 
 const client = new Client({
   intents: [
@@ -37,6 +49,19 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
 
+  // =============================
+  // 🔥 REGISTER SLASH COMMANDS
+  // =============================
+  try {
+    await client.application?.commands.set([
+      quickAddCommand.toJSON(),
+    ]);
+
+    console.log("✅ Slash commands registered");
+  } catch (err) {
+    console.error("❌ Slash command registration failed:", err);
+  }
+
   // -----------------------------
   // Init modules
   // -----------------------------
@@ -47,6 +72,14 @@ client.once("ready", async () => {
   // Init reminders / notifications
   // -----------------------------
   for (const guild of client.guilds.cache.values()) {
+    // 🔥 QUICKADD CHANNEL INIT
+    try {
+      await ensureQuickAddChannel(guild);
+      console.log(`✅ QuickAdd channel ready in ${guild.name}`);
+    } catch (err) {
+      console.error(`❌ QuickAdd channel error in ${guild.name}:`, err);
+    }
+
     initEventReminders(guild);
 
     initAbsenceNotifications(guild).catch((err: any) => {
@@ -62,9 +95,23 @@ client.once("ready", async () => {
   // -----------------------------
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
+      // =============================
+      // 🔥 QUICKADD HANDLER FIRST
+      // =============================
+      if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === "quickadd") {
+          await handleQuickAddCommand(interaction);
+          return;
+        }
+      }
+
+      // -----------------------------
+      // EXISTING SYSTEMS
+      // -----------------------------
       await handleEventInteraction(interaction);
       await handleAbsenceInteraction(interaction);
       await handlePointsInteraction(interaction);
+
     } catch (err) {
       console.error("❌ interactionCreate error:", err);
 
