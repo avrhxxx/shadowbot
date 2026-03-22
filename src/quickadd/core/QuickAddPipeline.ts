@@ -1,14 +1,20 @@
 // src/quickadd/core/QuickAddPipeline.ts
 
-import { debug } from "../debug/DebugLogger";
-import { ParsedScreen } from "./QuickAddTypes";
+import { Message } from "discord.js";
+import { debugTrace } from "../debug/DebugLogger";
 
-export async function processScreens(
-  screens: ParsedScreen[]
+const SCOPE = "PIPELINE";
+
+export async function processImageInput(
+  message: Message,
+  session: any,
+  imageUrl: string,
+  traceId: string
 ) {
-  debug("PIPELINE", "START", screens.length);
+  debugTrace(SCOPE, "IMAGE_RECEIVED", traceId, {
+    user: message.author.id,
+    url: imageUrl,
+  });
 
-  // 🔥 placeholder – tu będzie logika merge + mapping + integracje
-
-  return [];
+  // 🔥 NA RAZIE NIC NIE ROBIMY (TEST FLOW)
 }
