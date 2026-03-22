@@ -2,7 +2,7 @@
 // 📁 src/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-import { Message } from "discord.js";
+import { Message, AttachmentBuilder } from "discord.js";
 import { debugTrace } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing"; // 🔥 NEW
@@ -34,11 +34,39 @@ export async function processImageInput(
     debugTrace(SCOPE, "OCR_RESULT", traceId, ocrResult);
 
     // =============================
-    // 🔥 PARSING (NOWY ETAP)
+    // 🔥 PARSING
     // =============================
-    const parsed = parseOCR(ocrResult.lines, traceId); // ✅ FIX
+    const parsed = parseOCR(ocrResult.lines, traceId);
 
     debugTrace(SCOPE, "PARSED_RESULT", traceId, parsed);
+
+    // =============================
+    // 📤 DEBUG → WYŚLIJ NA PRIV
+    // =============================
+    try {
+      const content = `
+TRACE ID: ${traceId}
+
+=== OCR TEXT ===
+${ocrResult.text}
+
+=== PARSED ===
+${JSON.stringify(parsed, null, 2)}
+      `.trim();
+
+      const buffer = Buffer.from(content, "utf-8");
+
+      const file = new AttachmentBuilder(buffer, {
+        name: `quickadd_${traceId}.txt`,
+      });
+
+      await message.author.send({
+        content: `📄 QuickAdd debug (${traceId})`,
+        files: [file],
+      });
+    } catch (err) {
+      console.error("❌ Failed to send DM debug:", err);
+    }
 
     // =============================
     // 🔜 NEXT (później)
