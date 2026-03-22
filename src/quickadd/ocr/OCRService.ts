@@ -1,22 +1,18 @@
-// src/quickadd/ocr/OCRService.ts
+// =====================================
+// 📁 src/quickadd/ocr/OCRService.ts
+// =====================================
 
-import { preprocessImage } from "./OCRPreprocess";
-import { runOCR } from "./OCRRunner";
-import { mergeOCR } from "./OCRMerge";
+import { runFullImageOCR } from "./OCRRunner";
 import { debug } from "../debug/DebugLogger";
 
-export async function extractTextFromImage(
-  buffer: Buffer
-): Promise<string> {
-  debug("OCR", "START");
+const SCOPE = "OCR";
 
-  const processed = await preprocessImage(buffer);
+export async function runOCR(imageUrl: string) {
+  debug(SCOPE, "OCR_START", imageUrl);
 
-  const results = await runOCR(processed);
+  const result = await runFullImageOCR(imageUrl);
 
-  const merged = mergeOCR(results);
+  debug(SCOPE, "OCR_DONE", result);
 
-  debug("OCR", "DONE", merged.length);
-
-  return merged;
+  return result;
 }
