@@ -16,8 +16,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
+    // =============================
+    // 🎯 PRIMARY (Donations line)
+    // =============================
     if (isDonationsLine(line)) {
-      const value = extractValueSafe(line);
+      const value = extractValueFromBlock(cleanedLines, i);
       if (!value) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
@@ -27,9 +30,15 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 FIXED fallback
-    if (/\d{4,6}/.test(line) && !/^\d+$/.test(line)) {
-      const value = extractValueSafe(line);
+    // =============================
+    // 🔥 SMART FALLBACK (ograniczony)
+    // =============================
+    if (
+      /\d{4,6}/.test(line) &&
+      !/^\d+$/.test(line) &&
+      /[a-z]/i.test(line)
+    ) {
+      const value = extractValueFromBlock(cleanedLines, i);
       if (!value) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
@@ -39,6 +48,9 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
+    // =============================
+    // INLINE (rzadkie)
+    // =============================
     const inline = parseInlineStrong(line);
     if (inline) {
       entries.push({
@@ -80,7 +92,25 @@ function buildEntry(
 }
 
 // =====================================
-// VALUE EXTRACTION (🔥 FIXED)
+// 🔥 VALUE BLOCK FIX (NOWE)
+// =====================================
+function extractValueFromBlock(lines: string[], index: number): number | null {
+  let buffer = lines[index];
+
+  for (let i = 1; i <= 2; i++) {
+    const next = lines[index + i];
+    if (!next) continue;
+
+    if (/^,\d{3}$/.test(next.trim())) {
+      buffer += next.trim();
+    }
+  }
+
+  return extractValueSafe(buffer);
+}
+
+// =====================================
+// VALUE EXTRACTION
 // =====================================
 function extractValueSafe(line: string): number | null {
   let raw = line.toLowerCase();
@@ -96,7 +126,7 @@ function extractValueSafe(line: string): number | null {
 
   const parsed = matches
     .map((v) => parseInt(v.replace(/,/g, ""), 10))
-    .filter((v) => v < 1_000_000); // 🔥 anti garbage
+    .filter((v) => v < 1_000_000);
 
   if (!parsed.length) return null;
 
@@ -113,9 +143,8 @@ function extractValueSafe(line: string): number | null {
 }
 
 // =====================================
-// RESZTA (BEZ ZMIAN)
+// HELPERS
 // =====================================
-
 function isDonationsLine(line: string): boolean {
   const l = line.toLowerCase();
   return /donat|d0nat|donat1|e.?st.?ons/.test(l);
@@ -126,7 +155,7 @@ function isSystemLine(line: string): boolean {
 }
 
 function findNicknameAboveSmart(lines: string[], index: number) {
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 5; i++) {
     const line = lines[index - i];
     if (!line) continue;
 
@@ -145,11 +174,17 @@ function findNicknameAboveSmart(lines: string[], index: number) {
   return null;
 }
 
+// 🔥 FIXED NORMALIZATION
 function normalizeNickname(name: string): string {
   return name
+    .replace(/donations?.*/i, "")
+    .replace(/[|[\]{}()'"`,._]/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
-    .replace(/^[^a-zA-Z0-9]+/, "")
-    .replace(/[^\p{L}\p{N}_]/gu, "");
+    .split(" ")
+    .filter((w) => /[a-zA-Z]/.test(w))
+    .join("")
+    .slice(0, 20);
 }
 
 function parseInlineStrong(line: string) {
