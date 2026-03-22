@@ -60,22 +60,42 @@ export class SessionStore {
   private static DEBUG = true;
 
   // =====================================
-  // 🧠 NORMALIZE KEY
+  // 🧠 NORMALIZE KEY (IMPROVED 🔥)
   // =====================================
   private static normalizeKey(nick: string): string {
-    return nick.trim().toLowerCase();
+    return nick
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "") // 🔥 usuwa śmieci OCR
+      .trim();
   }
 
   // =====================================
-  // 🧠 MERGE ENGINE (GLOBAL)
+  // 🧠 VALIDATE ENTRY (NEW 🔥)
+  // =====================================
+  private static isValidEntry(e: SessionEntry): boolean {
+    if (!e) return false;
+
+    const nick = e.nickname?.trim();
+
+    if (!nick || nick.length < 2) return false;
+    if (!/[a-z]/i.test(nick)) return false; // 🔥 musi mieć litery
+    if (typeof e.value !== "number" || isNaN(e.value)) return false;
+    if (e.value < 0) return false;
+
+    return true;
+  }
+
+  // =====================================
+  // 🧠 MERGE ENGINE (IMPROVED 🔥)
   // =====================================
   private static mergeEntries(entries: SessionEntry[]): SessionEntry[] {
     const map = new Map<string, SessionEntry>();
 
     for (const e of entries) {
-      const key = this.normalizeKey(e.nickname);
+      if (!this.isValidEntry(e)) continue;
 
-      if (!key || e.value < 0) continue;
+      const key = this.normalizeKey(e.nickname);
+      if (!key) continue;
 
       const existing = map.get(key);
 
@@ -84,7 +104,17 @@ export class SessionStore {
         continue;
       }
 
+      // 🔥 prefer większą wartość
       if (e.value > existing.value) {
+        map.set(key, { ...e });
+        continue;
+      }
+
+      // 🔥 fallback: jeśli value równe → prefer dłuższy nick (lepszy OCR)
+      if (
+        e.value === existing.value &&
+        e.nickname.length > existing.nickname.length
+      ) {
         map.set(key, { ...e });
       }
     }
@@ -131,7 +161,7 @@ export class SessionStore {
   }
 
   // =====================================
-  // 🔥 ADD ENTRIES (MERGED + CLEAN)
+  // 🔥 ADD ENTRIES (IMPROVED 🔥)
   // =====================================
   static addEntries(guildId: string, newEntries: SessionEntry[]) {
     const session = this.sessions.get(guildId);
@@ -139,9 +169,12 @@ export class SessionStore {
 
     console.log("📥 SESSION ADD:", newEntries.length);
 
+    // 🔥 filtr przed merge (ważne!)
+    const filtered = newEntries.filter((e) => this.isValidEntry(e));
+
     const merged = this.mergeEntries([
       ...session.entries,
-      ...newEntries,
+      ...filtered,
     ]);
 
     session.entries = merged;
@@ -176,7 +209,11 @@ export class SessionStore {
     const entry = session.entries[index];
 
     if (field === "nick") {
-      entry.nickname = newValue.trim();
+      const newNick = newValue.trim();
+
+      if (newNick.length < 2) return false;
+
+      entry.nickname = newNick;
       session.entries = this.mergeEntries(session.entries);
       return true;
     }
