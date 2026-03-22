@@ -1,3 +1,4 @@
+// src/quickadd/commands/AdjustCommand.ts
 import { Message } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 import { SessionData } from "../session/SessionData";
