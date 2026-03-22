@@ -1,111 +1,54 @@
-// =====================================
-// 📁 src/quickadd/parsing/donations/DonationsParser.ts
-// =====================================
+export function parseDonations(lines: string[]) {
+  const results: { nickname: string; value: number }[] = [];
 
-import { debug } from "../../debug/DebugLogger";
-
-const SCOPE = "PARSER";
-
-export interface ParsedEntry {
-  nickname: string;
-  value: number;
-  raw?: string;
-}
-
-export function parseDonations(lines: string[]): ParsedEntry[] {
-  const cleaned = lines
-    .map(cleanLine)
-    .filter((l) => l.length > 0);
-
-  debug(SCOPE, "CLEANED_LINES", cleaned);
-
-  const entries: ParsedEntry[] = [];
-
-  let currentNick: string | null = null;
-
-  for (let i = 0; i < cleaned.length; i++) {
-    const line = cleaned[i];
-
-    // =============================
-    // 🔢 VALUE LINE (Donations)
-    // =============================
-    const value = extractValue(line);
-
-    if (value !== null) {
-      if (currentNick) {
-        entries.push({
-          nickname: currentNick,
-          value,
-          raw: line,
-        });
-
-        debug(SCOPE, "PAIR", {
-          nickname: currentNick,
-          value,
-        });
-
-        currentNick = null;
-      }
-
-      continue;
-    }
-
-    // =============================
-    // 👤 NICK LINE
-    // =============================
-    if (isValidNickname(line)) {
-      currentNick = line;
-      debug(SCOPE, "NICK_DETECTED", line);
-    }
+  function normalizeNumber(str: string): number {
+    return parseInt(str.replace(/[^\d]/g, ""), 10);
   }
 
-  return entries;
-}
+  function isValidNickname(str: string): boolean {
+    if (!str) return false;
 
-// =====================================
-// 🧹 CLEAN LINE
-// =====================================
-function cleanLine(line: string): string {
-  return line
-    .replace(/[^\w\s,]/g, "") // usuń śmieci
-    .replace(/\s+/g, " ")
-    .trim();
-}
+    const clean = str.trim();
 
-// =====================================
-// 🔢 EXTRACT VALUE
-// =====================================
-function extractValue(line: string): number | null {
-  if (!line.toLowerCase().includes("donations")) return null;
+    if (clean.length < 3) return false;
 
-  const match = line.match(/([\d\s,]+)/);
+    // wyklucz śmieci
+    if (/^[^a-zA-Z0-9]+$/.test(clean)) return false;
 
-  if (!match) return null;
+    if (clean.toLowerCase().includes("donations")) return false;
+    if (clean.toLowerCase().includes("ranking")) return false;
+    if (clean.toLowerCase().includes("rewards")) return false;
 
-  const raw = match[1]
-    .replace(/\s/g, "")
-    .replace(/,/g, "");
+    return true;
+  }
 
-  const value = parseInt(raw, 10);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
 
-  if (isNaN(value)) return null;
+    if (!line.toLowerCase().includes("donations")) continue;
 
-  return value;
-}
+    const numberMatch = line.match(/[\d\s,]+/);
 
-// =====================================
-// 👤 NICK VALIDATION
-// =====================================
-function isValidNickname(line: string): boolean {
-  if (line.length < 3) return false;
+    if (!numberMatch) continue;
 
-  // ❌ odrzucamy linie systemowe
-  if (line.toLowerCase().includes("donations")) return false;
-  if (line.toLowerCase().includes("ranking")) return false;
-  if (line.toLowerCase().includes("reward")) return false;
+    const value = normalizeNumber(numberMatch[0]);
 
-  // ❌ same cyfry → nie nick
-  if (/^\d+$/.test(line)) return false;
+    // 🔥 SZUKAMY NICKA (kolejna sensowna linia)
+    let nickname = "";
 
-  return true;
+    for (let j = i + 1; j < i + 4 && j < lines.length; j++) {
+      const candidate = lines[j]?.trim();
+
+      if (isValidNickname(candidate)) {
+        nickname = candidate;
+        break;
+      }
+    }
+
+    if (!nickname) continue;
+
+    results.push({ nickname, value });
+  }
+
+  return results;
 }
