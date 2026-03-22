@@ -1,8 +1,10 @@
 // src/quickadd/commands/PreviewCommand.ts
 
 import { Message, EmbedBuilder } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
+
+// ✅ FIX
+import { SessionStore } from "../session/sessionStore";
+
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 // =====================================
@@ -34,7 +36,7 @@ function getGroupLabel(entry: any): string {
 // =====================================
 export async function preview(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   console.log("=================================");
   console.log("📊 PREVIEW COMMAND START");
@@ -48,7 +50,8 @@ export async function preview(message: Message) {
 
   console.log("🧠 Session parserType:", session.parserType);
 
-  const entries = SessionData.getEntries(guildId) as QuickAddEntry[];
+  // ✅ FIX
+  const entries = SessionStore.getEntries(guildId) as QuickAddEntry[];
 
   if (!entries || entries.length === 0) {
     console.log("❌ No entries in session");
@@ -67,7 +70,7 @@ export async function preview(message: Message) {
 
   entries.forEach((e, i) => {
     console.log(
-      `[${i}] nick="${e.nickname}" value=${e.value} status=${e.status} raw="${e.raw}"`
+      `[${i}] nick="${e.nickname}" value=${e.value} status=${(e as any).status} raw="${e.raw}"`
     );
   });
 
@@ -101,8 +104,8 @@ export async function preview(message: Message) {
     const duplicateMark = count > 1 ? ` ⚠ x${count}` : "";
 
     let statusMark = "";
-    if (entry.status === "UNREADABLE") statusMark = " ⚠";
-    if (entry.status === "INVALID") statusMark = " ❌";
+    if ((entry as any).status === "UNREADABLE") statusMark = " ⚠";
+    if ((entry as any).status === "INVALID") statusMark = " ❌";
 
     const groupLabel = getGroupLabel(entry);
 
