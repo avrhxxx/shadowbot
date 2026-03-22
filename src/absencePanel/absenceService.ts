@@ -1,7 +1,8 @@
 // src/absencePanel/absenceService.ts
 
+// 🔥 [IMPORT FIX - TOP]
 import { SheetRepository } from "../google/SheetRepository";
-import crypto from "crypto";
+import crypto from "crypto"; // 🔥 [DODANE - uuid safety]
 
 // =============================
 // TYPES
@@ -71,9 +72,9 @@ export async function createAbsence(
 
   const newAbsence: AbsenceObject = {
     ...data,
-    id: data.id ?? crypto.randomUUID(),
-    year: data.year ?? new Date().getFullYear(),
-    createdAt: data.createdAt ?? Date.now(),
+    id: data.id ?? crypto.randomUUID(), // 🔥 [FIX - ID AUTO GENERATION]
+    year: data.year ?? new Date().getFullYear(), // 🔥 [SAFE DEFAULT]
+    createdAt: data.createdAt ?? Date.now(), // 🔥 [SAFE DEFAULT]
   };
 
   await absenceRepo.create(newAbsence);
@@ -108,6 +109,8 @@ export async function getAbsenceConfig(
   guildId: string
 ): Promise<AbsenceConfig> {
   const rows = await configRepo.findAll({ guildId });
+
+  // 🔥 [FIX - zawsze zwracaj obiekt z guildId]
   return rows[0] || { guildId };
 }
 
@@ -134,7 +137,7 @@ export async function setConfig(
 
   if (!existing.length) {
     await configRepo.create({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // 🔥 [FIX - ID REQUIRED BY REPO]
       guildId,
       [key]: value,
     });
