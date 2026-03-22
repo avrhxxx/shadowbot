@@ -1,5 +1,6 @@
 // src/quickadd/parsers/DonationsParser.ts
 import { QuickAddEntry } from "../types/QuickAddEntry";
+import { parseValue } from "../utils/parseValue";
 
 const DEBUG = true;
 
@@ -21,12 +22,10 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     line = fixSplitNumbers(line);
 
     if (isTimestamp(line) || isGarbage(line) || isSystemLine(line)) {
-      log("SKIP SYSTEM/GARBAGE:", line);
       continue;
     }
 
     if (/^,\d{3}$/.test(line)) {
-      log("SKIP SPLIT NUMBER:", line);
       continue;
     }
 
@@ -34,51 +33,36 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     // 🎯 PRIMARY
     // =============================
     if (isDonationsLine(line)) {
-      log("PRIMARY HIT:", line);
+      const value = extractValueSafe(line);
 
-      const value = extractValueFromBlock(cleanedLines, i);
-      if (!isValidValue(value)) {
-        log("❌ INVALID VALUE (PRIMARY):", line, value);
-        continue;
-      }
+      if (!isValidValue(value)) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
-      if (!nickData) {
-        log("❌ NO NICK (PRIMARY):", line);
-        continue;
-      }
+      if (!nickData) continue;
 
-      log("✅ PRIMARY ENTRY:", nickData.clean, value);
+      log("✅ PRIMARY:", nickData.clean, value);
 
       entries.push(buildEntry(lineId++, nickData, value!, line, 1));
       continue;
     }
 
     // =============================
-    // 🔥 FALLBACK
+    // 🔥 FALLBACK (BARDZIEJ RESTRYKCYJNY)
     // =============================
     if (
-      /\d{4,6}/.test(line) &&
-      !/^\d+$/.test(line) &&
-      /[a-z]/i.test(line)
+      /donat/i.test(line) && // 🔥 musi zawierać donations
+      /\d{4,6}/.test(line)
     ) {
-      log("FALLBACK HIT:", line);
+      const value = extractValueSafe(line);
 
-      const value = extractValueFromBlock(cleanedLines, i);
-      if (!isValidValue(value)) {
-        log("❌ INVALID VALUE (FALLBACK):", line, value);
-        continue;
-      }
+      if (!isValidValue(value)) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
-      if (!nickData) {
-        log("❌ NO NICK (FALLBACK):", line);
-        continue;
-      }
+      if (!nickData) continue;
 
-      log("✅ FALLBACK ENTRY:", nickData.clean, value);
+      log("✅ FALLBACK:", nickData.clean, value);
 
-      entries.push(buildEntry(lineId++, nickData, value!, line, 0.6));
+      entries.push(buildEntry(lineId++, nickData, value!, line, 0.7));
       continue;
     }
 
@@ -87,8 +71,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     // =============================
     const inline = parseInlineStrong(line);
     if (inline && isValidValue(inline.value)) {
-      log("INLINE HIT:", inline.nick, inline.value);
-
       entries.push({
         lineId: lineId++,
         nickname: inline.nick,
@@ -128,61 +110,32 @@ function buildEntry(
 }
 
 // =====================================
-function extractValueFromBlock(lines: string[], index: number): number | null {
-  let base = lines[index];
-  const next = lines[index + 1];
+// 🔥 NOWY CORE VALUE EXTRACT (KLUCZOWE)
+function extractValueSafe(line: string): number | null {
+  if (!line) return null;
 
-  if (next && /^,\d{3}$/.test(next.trim())) {
-    base += next.trim();
-    log("MERGED SPLIT NUMBER:", base);
+  // 1. spróbuj parseValue (twój util)
+  const parsed = parseValue(line);
+  if (parsed) return parsed;
+
+  // 2. fallback: klasyczne liczby z przecinkami
+  const match = line.match(/\d{2,3}(?:,\d{3})+/);
+  if (match) {
+    const num = parseInt(match[0].replace(/,/g, ""), 10);
+    if (num >= 1000 && num <= 300000) return num;
   }
 
-  const value = extractValueSafe(base);
-
-  log("VALUE EXTRACT:", {
-    base,
-    value,
-  });
-
-  return value;
-}
-
-// =====================================
-function extractValueSafe(line: string): number | null {
-  let raw = line.toLowerCase();
-
-  raw = raw.replace(/([0-9][0-9,.\s]*)[a-z]+\d*$/i, "$1");
-  raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
-
-  const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
-  if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
-
-  const matches = raw.match(/\d{2,6}(?:,\d{3})*/g);
-  if (!matches) return null;
-
-  const parsed = matches
-    .map((v) => parseInt(v.replace(/,/g, ""), 10))
-    .filter((v) => v < 1_000_000);
-
-  if (!parsed.length) return null;
-
-  parsed.sort((a, b) => {
-    const score = (x: number) => {
-      if (x >= 20000 && x <= 100000) return 100;
-      if (x >= 5000 && x <= 200000) return 50;
-      return 0;
-    };
-    return score(b) - score(a) || b - a;
-  });
-
-  return parsed[0];
+  return null;
 }
 
 // =====================================
 function isValidValue(value: number | null): value is number {
   if (!value) return false;
-  if (value < 1000) return false;
-  if (value > 1000000) return false;
+
+  // 🔥 zawężony zakres (usuwa 969396 itd.)
+  if (value < 5000) return false;
+  if (value > 300000) return false;
+
   return true;
 }
 
@@ -195,8 +148,9 @@ function isSystemLine(line: string): boolean {
   return /at least|required|rewards|ranking/i.test(line);
 }
 
+// =====================================
 function findNicknameAboveSmart(lines: string[], index: number) {
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 4; i++) {
     const line = lines[index - i];
     if (!line) continue;
 
@@ -209,7 +163,7 @@ function findNicknameAboveSmart(lines: string[], index: number) {
     return {
       raw: line,
       clean,
-      confidence: 1 - i * 0.1,
+      confidence: 1 - i * 0.15,
     };
   }
   return null;
@@ -238,6 +192,7 @@ function parseInlineStrong(line: string) {
   };
 }
 
+// =====================================
 function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
 }
@@ -261,6 +216,7 @@ function isGarbage(line: string): boolean {
   return line.length < 2;
 }
 
+// =====================================
 function dedupeLines(lines: string[]): string[] {
   const seen = new Set<string>();
   return lines.filter((l) => {
@@ -271,6 +227,7 @@ function dedupeLines(lines: string[]): string[] {
   });
 }
 
+// =====================================
 function dedupeEntries(entries: QuickAddEntry[]) {
   const map = new Map<string, QuickAddEntry>();
 
