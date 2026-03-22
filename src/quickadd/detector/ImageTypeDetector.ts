@@ -1,13 +1,28 @@
 // src/quickadd/detector/ImageTypeDetector.ts
 
-// ✅ FIX: ParserType z sessionStore
 import { ParserType } from "../session/sessionStore";
 
+// =====================================
+// 🔥 DEBUG
+// =====================================
+const DEBUG_DETECTOR = true;
+
+function log(...args: any[]) {
+  if (DEBUG_DETECTOR) {
+    console.log("[DETECTOR]", ...args);
+  }
+}
+
+// =====================================
 export function detectImageType(
   lines: string[],
   lockedType?: ParserType | null
 ): ParserType | null {
-  if (lockedType) return lockedType;
+  if (lockedType) {
+    log("🔒 LOCKED TYPE:", lockedType);
+    return lockedType;
+  }
+
   if (!lines?.length) return null;
 
   const scores: Record<ParserType, number> = {
@@ -87,13 +102,47 @@ export function detectImageType(
   if (attendanceLike >= 3) scores.RR_ATTENDANCE += 3;
 
   // =========================
+  // 🔥 ANTI-CONFLICT FIXES
+  // =========================
+
+  // jeśli donations ma słowa kluczowe → boost
+  if (scores.DONATIONS > 0 && donationLike > 2) {
+    scores.DONATIONS += 2;
+  }
+
+  // duel vs donations konflikt
+  if (scores.DUEL_POINTS > 0 && scores.DONATIONS > 0) {
+    if (donationLike > 2) {
+      scores.DONATIONS += 2;
+    } else {
+      scores.DUEL_POINTS += 1;
+    }
+  }
+
+  // =========================
   // 🧠 FINAL PICK
   // =========================
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+
   const [topType, topScore] = sorted[0];
+  const secondScore = sorted[1]?.[1] ?? 0;
+
+  log("SCORES:", scores);
+  log("TOP:", topType, topScore, "| SECOND:", secondScore);
 
   // 🔥 minimal threshold
-  if (topScore < 3) return null;
+  if (topScore < 3) {
+    log("❌ LOW CONFIDENCE");
+    return null;
+  }
+
+  // 🔥 confidence gap (ważne)
+  if (topScore - secondScore < 2) {
+    log("⚠️ TYPE UNCERTAIN (gap too small)");
+    return null;
+  }
+
+  log("✅ DETECTED:", topType);
 
   return topType as ParserType;
 }
