@@ -3,7 +3,7 @@
 // =====================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import { QuickAddSession } from "../core/QuickAddSession"; // 🔥 FIX
+import { QuickAddSession } from "../core/QuickAddSession";
 import { ensureQuickAddChannel } from "../integrations/QuickAddChannelService";
 
 export const quickAddCommand = new SlashCommandBuilder()
@@ -21,28 +21,29 @@ export async function handleQuickAddCommand(
 ) {
   if (!interaction.guild) return;
 
+  // 🔥 CRITICAL FIX – zapobiega Unknown interaction
+  await interaction.deferReply({ flags: 64 });
+
   const sub = interaction.options.getSubcommand();
 
   const channel = await ensureQuickAddChannel(interaction.guild);
 
   // 🔥 blokada – tylko w quick-add
   if (interaction.channelId !== channel.id) {
-    return interaction.reply({
+    return interaction.editReply({
       content: `❌ Use this command in <#${channel.id}>`,
-      ephemeral: true,
     });
   }
 
-  const session = QuickAddSession.get(interaction.guild.id); // 🔥 FIX
+  const session = QuickAddSession.get(interaction.guild.id);
 
   // =============================
   // ▶️ START
   // =============================
   if (sub === "start") {
-    if (session) { // 🔥 FIX (nie session.active)
-      return interaction.reply({
+    if (session) {
+      return interaction.editReply({
         content: `❌ Session already active by <@${session.ownerId}>`,
-        ephemeral: true,
       });
     }
 
@@ -50,11 +51,10 @@ export async function handleQuickAddCommand(
       interaction.guild.id,
       channel.id,
       interaction.user.id
-    ); // 🔥 FIX (channelId!)
+    );
 
-    return interaction.reply({
+    return interaction.editReply({
       content: "✅ Session started\n\n📸 Send screenshots now.",
-      ephemeral: true,
     });
   }
 
@@ -63,24 +63,21 @@ export async function handleQuickAddCommand(
   // =============================
   if (sub === "end") {
     if (!session) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ No active session",
-        ephemeral: true,
       });
     }
 
     if (session.ownerId !== interaction.user.id) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ Only session owner can end it",
-        ephemeral: true,
       });
     }
 
-    QuickAddSession.end(interaction.guild.id); // 🔥 FIX
+    QuickAddSession.end(interaction.guild.id);
 
-    return interaction.reply({
+    return interaction.editReply({
       content: "🛑 Session ended",
-      ephemeral: true,
     });
   }
 }
