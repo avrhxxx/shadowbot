@@ -1,21 +1,15 @@
 // src/quickadd/parsers/DonationsParser.ts
 import { QuickAddEntry } from "../types/QuickAddEntry";
 import { parseValue } from "../utils/parseValue";
-import { askLlama } from "../services/LlamaService"; // 🤖 AI
 
 const DEBUG = true;
-const DEBUG_AI = true;
 
 function log(...args: any[]) {
   if (DEBUG) console.log("[DonationsParser]", ...args);
 }
 
-function logAI(...args: any[]) {
-  if (DEBUG_AI) console.log("[DonationsParser][AI]", ...args);
-}
-
-// 🔥 UWAGA: parser async (bo AI)
-export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> {
+// 🔥 SYNCHRONICZNY PARSER (ZERO AI)
+export function parseDonations(lines: string[]): QuickAddEntry[] {
   let lineId = 1;
   const entries: QuickAddEntry[] = [];
   const cleanedLines = dedupeLines(lines);
@@ -32,16 +26,11 @@ export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> 
       continue;
     }
 
-    if (/^,\d{3}$/.test(line)) {
-      continue;
-    }
-
     // =============================
     // 🎯 PRIMARY
     // =============================
     if (isDonationsLine(line)) {
       const value = extractValueSafe(line);
-
       if (!isValidValue(value)) continue;
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
@@ -54,27 +43,12 @@ export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> 
     }
 
     // =============================
-    // 🔥 FALLBACK
-    // =============================
-    if (/donat/i.test(line) && /\d{4,6}/.test(line)) {
-      const value = extractValueSafe(line);
-
-      if (!isValidValue(value)) continue;
-
-      const nickData = findNicknameAboveSmart(cleanedLines, i);
-      if (!nickData) continue;
-
-      log("✅ FALLBACK:", nickData.clean, value);
-
-      entries.push(buildEntry(lineId++, nickData, value!, line, 0.7));
-      continue;
-    }
-
-    // =============================
-    // INLINE
+    // 🔥 INLINE (buff)
     // =============================
     const inline = parseInlineStrong(line);
     if (inline && isValidValue(inline.value)) {
+      log("✅ INLINE:", inline.nick, inline.value);
+
       entries.push({
         lineId: lineId++,
         nickname: inline.nick,
@@ -82,42 +56,35 @@ export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> 
         raw: line,
         rawText: line,
         status: "OK",
-        confidence: 0.75,
+        confidence: 0.8,
         sourceType: "OCR",
       });
       continue;
     }
 
     // =============================
-    // 🤖 AI FALLBACK (OSTATNIA SZANSA)
+    // 🔥 HARD OCR CASE (nick + next line value)
     // =============================
-    if (/[a-z]/i.test(line) && /\d{3,}/.test(line)) {
-      logAI("TRY:", line);
+    if (isNickname(line)) {
+      const next = cleanedLines[i + 1] || "";
+      const value = extractValueSafe(next);
 
-      const ai = await tryParseWithAI(line);
+      if (isValidValue(value)) {
+        const clean = normalizeNickname(line);
 
-      if (!ai) {
-        logAI("❌ AI NULL");
-        continue;
+        log("✅ PAIR:", clean, value);
+
+        entries.push({
+          lineId: lineId++,
+          nickname: clean,
+          value: value!,
+          raw: line,
+          rawText: `${line} | ${next}`,
+          status: "OK",
+          confidence: 0.85,
+          sourceType: "OCR",
+        });
       }
-
-      if (!isValidValue(ai.value)) {
-        logAI("❌ AI INVALID VALUE:", ai.value);
-        continue;
-      }
-
-      logAI("✅ AI HIT:", ai.nickname, ai.value);
-
-      entries.push({
-        lineId: lineId++,
-        nickname: ai.nickname,
-        value: ai.value,
-        raw: line,
-        rawText: line,
-        status: "OK",
-        confidence: ai.confidence ?? 0.5,
-        sourceType: "AI",
-      });
     }
   }
 
@@ -275,7 +242,7 @@ function dedupeEntries(entries: QuickAddEntry[]) {
 
     const existingConf = existing.confidence ?? 0;
 
-    if (existing.value === e.value) {
+    if (e.value === existing.value) {
       existing.confidence = existingConf + 0.2;
       continue;
     }
@@ -286,57 +253,4 @@ function dedupeEntries(entries: QuickAddEntry[]) {
   }
 
   return Array.from(map.values());
-}
-
-// =====================================
-// 🤖 AI FALLBACK
-// =====================================
-async function tryParseWithAI(line: string) {
-  try {
-    const prompt = `
-Extract nickname and donation value from OCR.
-
-Return ONLY JSON:
-{"nickname":"string","value":number}
-
-Text:
-${line}
-`;
-
-    logAI("PROMPT:", prompt);
-
-    const res = await askLlama(prompt);
-
-    logAI("RAW:", res);
-
-    // 🔥 FIX: null safety
-    if (!res) {
-      logAI("❌ EMPTY RESPONSE");
-      return null;
-    }
-
-    const jsonMatch = res.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      logAI("❌ NO JSON");
-      return null;
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    logAI("PARSED:", parsed);
-
-    if (!parsed.nickname || typeof parsed.value !== "number") {
-      logAI("❌ INVALID STRUCTURE");
-      return null;
-    }
-
-    return {
-      nickname: parsed.nickname.trim(),
-      value: parsed.value,
-      confidence: 0.5,
-    };
-  } catch (err) {
-    console.warn("⚠️ AI PARSE FAILED:", err);
-    return null;
-  }
 }
