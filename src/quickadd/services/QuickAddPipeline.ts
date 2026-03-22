@@ -1,5 +1,4 @@
 // src/quickadd/services/QuickAddPipeline.ts
-
 import { Message } from "discord.js";
 import { processOCR } from "./OCRService";
 import { detectImageType } from "../detector/ImageTypeDetector";
@@ -16,12 +15,29 @@ import { canParseDuelPoints } from "../parsers/DuelPointsParser";
 import { canParseReservoirAttendance } from "../parsers/ReservoirAttendanceParser";
 import { canParseReservoirRaid } from "../parsers/ReservoirRaidParser";
 
-// =====================================
 function debug(traceId: string, tag: string, ...args: any[]) {
   console.log(`[QA:${traceId}:${tag}]`, ...args);
 }
 
 const BATCH_DELAY = 10000;
+
+// =====================================
+// 🧠 STATUS MESSAGE
+async function updateStatus(message: Message, session: any, text: string) {
+  try {
+    if (!session.statusMessageId) {
+      const msg = await message.reply(text);
+      session.statusMessageId = msg.id;
+    } else {
+      const msg = await message.channel.messages.fetch(
+        session.statusMessageId
+      );
+      if (msg) await msg.edit(text);
+    }
+  } catch (e) {
+    console.warn("⚠️ STATUS UPDATE FAILED");
+  }
+}
 
 // =====================================
 function fallbackDetect(lines: string[]): any {
@@ -31,7 +47,6 @@ function fallbackDetect(lines: string[]): any {
   return null;
 }
 
-// =====================================
 function isValidEntry(e: any): boolean {
   if (!e) return false;
   if (!e.nickname || e.nickname.length < 2) return false;
@@ -42,35 +57,19 @@ function isValidEntry(e: any): boolean {
 }
 
 // =====================================
-// 🔥 OUTLIER FILTER (KEY)
-function isOutlier(value: number): boolean {
-  return value > 200000;
-}
-
-// =====================================
-// 🔥 SCORING SYSTEM (SERCE)
 function scoreEntry(e: any): number {
   let score = 0;
 
-  // parser confidence
   score += (e.confidence || 0) * 10;
 
-  // realistyczny zakres donations
   if (e.value >= 20000 && e.value <= 100000) score += 5;
-
-  // kara za dziwne wartości
   if (e.value > 150000) score -= 10;
 
   return score;
 }
 
-// =====================================
 function pickBetterEntry(a: any, b: any) {
-  const scoreA = scoreEntry(a);
-  const scoreB = scoreEntry(b);
-
-  if (scoreB > scoreA) return b;
-  return a;
+  return scoreEntry(b) > scoreEntry(a) ? b : a;
 }
 
 // =====================================
@@ -96,24 +95,20 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "BATCH_START");
+  await updateStatus(
+    message,
+    session,
+    `🧠 Processing ${session.imageCount} screenshots...`
+  );
 
   const buffer = session?.buffer?.ocrResults;
-  if (!buffer?.length) {
-    debug(traceId, "EMPTY_BUFFER");
-    return;
-  }
+  if (!buffer?.length) return;
 
-  // =====================================
-  // 🧠 1. PARSE PER SCREEN (IZOLACJA)
-  // =====================================
   const screens: any[] = [];
 
   for (const batch of buffer) {
     const lines = batch.lines || [];
     if (!lines.length) continue;
-
-    debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
 
     let type =
       detectImageType(lines, session.parserType) ||
@@ -125,19 +120,7 @@ async function processBatch(message: Message, session: any) {
     try {
       let parsed = parseByType(type, lines);
 
-      if (!parsed.length) continue;
-
-      // =====================================
-      // 🔥 FILTER PER SCREEN
-      // =====================================
-      parsed = parsed
-        .filter(isValidEntry)
-        .filter((e) => !isOutlier(e.value));
-
-      debug(traceId, "SCREEN_PARSED", {
-        type,
-        raw: parsed.length,
-      });
+      parsed = parsed.filter(isValidEntry);
 
       screens.push({
         type,
@@ -153,9 +136,6 @@ async function processBatch(message: Message, session: any) {
     return;
   }
 
-  // =====================================
-  // 🧠 2. SMART MERGE (ZAMIAST MAX VALUE)
-  // =====================================
   const merged = new Map<string, any>();
 
   for (const screen of screens) {
@@ -168,61 +148,25 @@ async function processBatch(message: Message, session: any) {
         continue;
       }
 
-      const better = pickBetterEntry(existing, e);
-
-      debug(traceId, "MERGE_DECISION", {
-        nick: key,
-        existing: existing.value,
-        incoming: e.value,
-        chosen: better.value,
-        scoreExisting: scoreEntry(existing),
-        scoreIncoming: scoreEntry(e),
-      });
-
-      merged.set(key, better);
+      merged.set(key, pickBetterEntry(existing, e));
     }
   }
 
-  let allEntries = Array.from(merged.values());
+  const mapped = await Promise.all(
+    Array.from(merged.values()).map(mapEntry)
+  );
 
-  debug(traceId, "AFTER_MERGE", allEntries.length);
-
-  // =====================================
-  // 🧠 3. MAP NICKNAMES (NA KOŃCU)
-  // =====================================
-  const mapped = await Promise.all(allEntries.map(mapEntry));
-
-  debug(traceId, "MAPPED", mapped.length);
-
-  // =====================================
-  // 🧠 4. SESSION STORE
-  // =====================================
   SessionStore.addEntries(message.guildId!, mapped);
 
-  const finalEntries = SessionStore.getEntries(message.guildId!);
+  await updateStatus(
+    message,
+    session,
+    `✅ Done! ${mapped.length} entries added from ${session.imageCount} screenshots.`
+  );
 
-  debug(traceId, "FINAL_SESSION", finalEntries.length);
-
-  // =====================================
-  // 🧠 5. SAVE NICK MAPPINGS
-  // =====================================
-  try {
-    if (process.env.DEV_MODE === "true") {
-      console.log("🧠 DEV MODE: skip nick mapping save");
-    } else {
-      await saveNickMappings(mapped);
-    }
-  } catch {
-    console.warn("⚠️ Nick mapping failed (non-blocking)");
-  }
-
-  await message.reply(`✅ Processed ${mapped.length} entries.`);
-
-  // =====================================
-  // 🔥 RESET BUFFER
-  // =====================================
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
+  session.imageCount = 0;
 }
 
 // =====================================
@@ -233,22 +177,24 @@ export async function processImageInput(
 ) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "IMAGE");
-
   const { lines } = await processOCR(imageUrl);
 
-  if (!lines?.length) {
-    debug(traceId, "OCR_EMPTY");
-    return;
-  }
+  if (!lines?.length) return;
 
-  // 🔥 zapisujemy SUROWE linie (bez parsowania)
+  session.imageCount = (session.imageCount || 0) + 1;
+
   session.buffer.ocrResults.push({
     lines,
     traceId,
   });
 
   await message.react("✅");
+
+  await updateStatus(
+    message,
+    session,
+    `📥 Screenshots: ${session.imageCount}\n⏳ Waiting for more...`
+  );
 
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
@@ -257,31 +203,4 @@ export async function processImageInput(
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
   }, BATCH_DELAY);
-}
-
-// =====================================
-export async function processTextInput(
-  message: Message,
-  session: any,
-  content: string
-) {
-  const lines = content
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  if (!lines.length) return;
-
-  session.buffer.ocrResults.push({
-    lines,
-    traceId: "text",
-  });
-
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
-
-  session.buffer.timer = setTimeout(() => {
-    processBatch(message, session);
-  }, 5000);
 }
