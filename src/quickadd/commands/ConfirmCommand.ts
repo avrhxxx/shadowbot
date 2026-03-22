@@ -1,20 +1,21 @@
 // src/quickadd/commands/ConfirmCommand.ts
 
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
-import { processQuickAdd } from "../services/QuickAddService";
+import { SessionStore } from "../session/sessionStore";
+
+// ✅ IMPORT PIPELINE (ważne)
+import { execute } from "../services/QuickAddPipeline";
 
 export async function confirm(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   if (!session) {
     await message.reply("❌ Brak aktywnej sesji.");
     return;
   }
 
-  const entries = SessionData.getEntries(guildId);
+  const entries = SessionStore.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
     await message.reply("❌ Brak danych do zapisania.");
@@ -22,11 +23,8 @@ export async function confirm(message: Message) {
   }
 
   try {
-    await processQuickAdd({
-      parserType: session.parserType,
-      entries,
-      guildId,
-    });
+    // 🔥 PRAWDZIWA LOGIKA
+    await execute(session.parserType, entries, guildId);
 
     await message.reply(`✅ Zapisano ${entries.length} wpisów!`);
   } catch (err) {
@@ -35,13 +33,15 @@ export async function confirm(message: Message) {
     return;
   }
 
-  SessionData.clear(guildId);
-  SessionManager.endSession(guildId);
+  SessionStore.clearEntries(guildId);
+  SessionStore.endSession(guildId);
 
   setTimeout(async () => {
     try {
       const channel = await message.guild?.channels.fetch(session.channelId);
-      await channel?.delete();
+      if (channel && "delete" in channel) {
+        await channel.delete();
+      }
     } catch (err) {
       console.error("Delete error:", err);
     }
