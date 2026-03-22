@@ -1,6 +1,9 @@
 // src/pointsPanel/pointsService.ts
+
+// 🔥 [IMPORT OK]
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
 import { SheetRepository } from "../google/SheetRepository";
+import crypto from "crypto"; // 🔥 [DODANE - ID SAFETY]
 
 // ----------------------------
 // TYPES
@@ -38,6 +41,7 @@ export async function createWeek(
   if (existing.length > 0) return;
 
   await weeksRepo.create({
+    id: crypto.randomUUID(), // 🔥 [FIX - REQUIRED BY REPO]
     category,
     week,
     nick: "",
@@ -73,7 +77,10 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
       points: entry.points,
     });
   } else {
-    await repo.create(entry);
+    await repo.create({
+      ...entry,
+      id: entry.id ?? crypto.randomUUID(), // 🔥 [CRITICAL FIX]
+    });
   }
 }
 
@@ -117,7 +124,7 @@ export async function compareWeeks(
 }
 
 // ----------------------------
-// 🎛 HANDLERY (na razie bez zmian)
+// 🎛 HANDLERY (placeholder)
 // ----------------------------
 export async function handleAddPoints(
   interaction: ButtonInteraction | ModalSubmitInteraction
