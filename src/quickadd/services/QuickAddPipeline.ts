@@ -88,6 +88,12 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
+  // 🔥 NOWE: nie startuj jeśli OCR jeszcze trwa
+  if (session.pendingOCR > 0) {
+    debug(traceId, "WAITING_FOR_OCR", session.pendingOCR);
+    return;
+  }
+
   if (session.isProcessing) {
     debug(traceId, "SKIP_ALREADY_PROCESSING");
     return;
@@ -182,6 +188,7 @@ async function processBatch(message: Message, session: any) {
     session.buffer.ocrResults = [];
     session.buffer.timer = null;
     session.imageCount = 0;
+    session.pendingOCR = 0; // 🔥
   } finally {
     session.isProcessing = false;
   }
@@ -199,6 +206,9 @@ export async function processImageInput(
 
   session.imageCount = (session.imageCount || 0) + 1;
 
+  // 🔥 NOWE
+  session.pendingOCR = (session.pendingOCR || 0) + 1;
+
   await message.react("📥");
 
   await sendStatus(
@@ -206,7 +216,24 @@ export async function processImageInput(
     `📥 Screenshot ${session.imageCount} received\n⏳ Masz ${BATCH_DELAY / 1000}s na kolejny screenshot...`
   );
 
-  // 🔥 KLUCZOWY FIX — RESET TIMERA OD RAZU
+  try {
+    const { lines } = await processOCR(imageUrl);
+
+    if (!lines?.length) {
+      debug(traceId, "OCR_EMPTY");
+      return;
+    }
+
+    session.buffer.ocrResults.push({
+      lines,
+      traceId,
+    });
+  } finally {
+    // 🔥 KLUCZOWE
+    session.pendingOCR--;
+    debug(traceId, "OCR_DONE", session.pendingOCR);
+  }
+
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
@@ -214,19 +241,6 @@ export async function processImageInput(
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
   }, BATCH_DELAY);
-
-  // OCR dopiero potem (żeby nie blokował timera)
-  const { lines } = await processOCR(imageUrl);
-
-  if (!lines?.length) {
-    debug(traceId, "OCR_EMPTY");
-    return;
-  }
-
-  session.buffer.ocrResults.push({
-    lines,
-    traceId,
-  });
 }
 
 // =====================================
