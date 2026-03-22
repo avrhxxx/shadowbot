@@ -8,6 +8,11 @@ import {
 
 import { SessionStore } from "../session/sessionStore";
 
+import {
+  getSelectableEvents,
+  getSelectableWeeks,
+} from "../services/QuickAddDataProvider";
+
 export async function confirm(message: Message) {
   const guildId = message.guildId!;
   const session = SessionStore.getSession(guildId);
@@ -24,34 +29,42 @@ export async function confirm(message: Message) {
     return;
   }
 
-  // =====================================
-  // 🔥 SELECT MENU (EVENT PICK)
-  // =====================================
+  try {
+    // =====================================
+    // 🔥 POBIERZ DANE DO SELECTA
+    // =====================================
+    const eventOptions = await getSelectableEvents(guildId);
+    const weekOptions = await getSelectableWeeks();
 
-  const select = new StringSelectMenuBuilder()
-    .setCustomId("quickadd_select_event")
-    .setPlaceholder("Select event to assign data")
-    .addOptions([
-      {
-        label: "Event 1",
-        value: "event1",
-      },
-      {
-        label: "Event 2",
-        value: "event2",
-      },
-      {
-        label: "Event 3",
-        value: "event3",
-      },
-    ]);
+    const options = [...eventOptions, ...weekOptions];
 
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    select
-  );
+    if (options.length === 0) {
+      await message.reply("❌ Brak dostępnych eventów lub tygodni.");
+      return;
+    }
 
-  await message.reply({
-    content: "📌 Select event to save data:",
-    components: [row],
-  });
+    // Discord limit = 25
+    const finalOptions = options.slice(0, 25);
+
+    // =====================================
+    // 🔽 SELECT MENU
+    // =====================================
+    const select = new StringSelectMenuBuilder()
+      .setCustomId("quickadd_select_event")
+      .setPlaceholder("Wybierz gdzie zapisać dane...")
+      .addOptions(finalOptions);
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      select
+    );
+
+    await message.reply({
+      content: `📌 Wybierz gdzie zapisać **${entries.length} wpisów**:`,
+      components: [row],
+    });
+
+  } catch (err) {
+    console.error("Confirm error:", err);
+    await message.reply("❌ Błąd podczas przygotowania wyboru.");
+  }
 }
