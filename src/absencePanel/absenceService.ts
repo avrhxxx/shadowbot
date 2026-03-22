@@ -2,9 +2,6 @@
 
 import { SheetRepository } from "../google/SheetRepository";
 
-const absenceRepo = new SheetRepository<AbsenceObject>("absence");
-const configRepo = new SheetRepository<any>("absence_config");
-
 // =============================
 // TYPES
 // =============================
@@ -19,15 +16,25 @@ export interface AbsenceObject {
 }
 
 export interface AbsenceConfig {
+  id?: string;
+  guildId: string;
   notificationChannel?: string;
   absenceEmbedId?: string;
   [key: string]: any;
 }
 
 // =============================
+// 📦 REPOS
+// =============================
+const absenceRepo = new SheetRepository<AbsenceObject>("absence");
+const configRepo = new SheetRepository<AbsenceConfig>("absence_config");
+
+// =============================
 // 📥 LOAD
 // =============================
-export async function getAbsences(guildId: string): Promise<AbsenceObject[]> {
+export async function getAbsences(
+  guildId: string
+): Promise<AbsenceObject[]> {
   return absenceRepo.findAll({ guildId });
 }
 
@@ -35,7 +42,7 @@ export async function getAbsenceByPlayer(
   guildId: string,
   player: string
 ): Promise<AbsenceObject | null> {
-  const absences = await absenceRepo.findAll({ guildId });
+  const absences = await getAbsences(guildId);
 
   return (
     absences.find(
@@ -63,6 +70,7 @@ export async function createAbsence(
 
   const newAbsence: AbsenceObject = {
     ...data,
+    id: data.id ?? crypto.randomUUID(), // 🔥 FIX
     year: data.year ?? new Date().getFullYear(),
     createdAt: data.createdAt ?? Date.now(),
   };
@@ -99,7 +107,7 @@ export async function getAbsenceConfig(
   guildId: string
 ): Promise<AbsenceConfig> {
   const rows = await configRepo.findAll({ guildId });
-  return rows[0] || {};
+  return rows[0] || { guildId };
 }
 
 export async function setNotificationChannel(
@@ -125,13 +133,14 @@ export async function setConfig(
 
   if (!existing.length) {
     await configRepo.create({
+      id: crypto.randomUUID(), // 🔥 FIX
       guildId,
       [key]: value,
     });
     return;
   }
 
-  await configRepo.updateById(existing[0].id, {
+  await configRepo.updateById(existing[0].id!, {
     [key]: value,
   });
 }
