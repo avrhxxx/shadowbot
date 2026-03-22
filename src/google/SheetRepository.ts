@@ -96,8 +96,6 @@ export class SheetRepository<T extends { id?: string }> {
       data = data.filter((item) =>
         Object.entries(filter).every(([key, val]) => {
           const itemVal = (item as any)[key];
-
-          // 🔥 SAFE COMPARE
           return String(itemVal) === String(val);
         })
       );
@@ -115,15 +113,27 @@ export class SheetRepository<T extends { id?: string }> {
   }
 
   // =============================
-  // ➕ CREATE
+  // ➕ CREATE (🔥 SAFE + AUTO ID)
   // =============================
   async create(data: T): Promise<T> {
     const { headers, dataRows } = await this.load();
 
-    const finalData = {
-      ...data,
-      id: data.id ?? crypto.randomUUID(), // 🔥 AUTO ID
-    };
+    const finalData: any = { ...data };
+
+    // 🔥 AUTO ID (jeśli brak)
+    if (!finalData.id) {
+      finalData.id = Date.now().toString();
+    }
+
+    // 🔥 jeśli kolumna id nie istnieje → dodaj ją
+    if (!headers.includes("id")) {
+      headers.unshift("id");
+
+      // dodaj pustą kolumnę do istniejących wierszy
+      for (const row of dataRows) {
+        row.unshift("");
+      }
+    }
 
     this.ensureColumns(headers, finalData);
 
