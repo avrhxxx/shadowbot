@@ -36,7 +36,7 @@ interface ModeratorPanelConfig {
 // =============================
 // REPO
 // =============================
-const repo = new SheetRepository<ModeratorPanelConfig>("moderator_panel");
+const repo = new SheetRepository<ModeratorPanelConfig>("moderator_config");
 
 // =============================
 // HELPERS
