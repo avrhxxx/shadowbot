@@ -206,6 +206,16 @@ export async function processImageInput(
     `📥 Screenshot ${session.imageCount} received\n⏳ Masz ${BATCH_DELAY / 1000}s na kolejny screenshot...`
   );
 
+  // 🔥 KLUCZOWY FIX — RESET TIMERA OD RAZU
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
+
+  session.buffer.timer = setTimeout(() => {
+    processBatch(message, session);
+  }, BATCH_DELAY);
+
+  // OCR dopiero potem (żeby nie blokował timera)
   const { lines } = await processOCR(imageUrl);
 
   if (!lines?.length) {
@@ -217,15 +227,6 @@ export async function processImageInput(
     lines,
     traceId,
   });
-
-  // 🔥 RESET TIMERA NA KAŻDY SCREEN
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
-
-  session.buffer.timer = setTimeout(() => {
-    processBatch(message, session);
-  }, BATCH_DELAY);
 }
 
 // =====================================
