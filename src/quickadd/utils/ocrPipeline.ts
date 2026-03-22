@@ -43,23 +43,31 @@ export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
 export async function extractTextFromImage(image: Buffer): Promise<string> {
   log("🚀 Running parallel OCR...");
 
-  const [ocrSpaceText, tesseractText] = await Promise.all([
+  const [ocrSpaceText, tesseractText, tesseractUI] = await Promise.all([
     runOCRSpace(image),
     runTesseract(image),
+    runTesseractUI(image),
   ]);
 
   log("🧠 OCR.space LENGTH:", ocrSpaceText.length);
   log("🧠 Tesseract LENGTH:", tesseractText.length);
+  log("🧠 Tesseract UI LENGTH:", tesseractUI.length);
 
   if (DEBUG_OCR_VERBOSE) {
     log("📄 OCR.space FULL:\n", ocrSpaceText);
     log("📄 Tesseract FULL:\n", tesseractText);
+    log("📄 Tesseract UI FULL:\n", tesseractUI);
   } else {
     log("📄 OCR.space PREVIEW:\n", ocrSpaceText.slice(0, 300));
     log("📄 Tesseract PREVIEW:\n", tesseractText.slice(0, 300));
+    log("📄 Tesseract UI PREVIEW:\n", tesseractUI.slice(0, 300));
   }
 
-  const merged = mergeOCRResults([ocrSpaceText, tesseractText]);
+  const merged = mergeOCRResults([
+    ocrSpaceText,
+    tesseractText,
+    tesseractUI,
+  ]);
 
   log("🔥 MERGED LENGTH:", merged.length);
   log("📄 FINAL PREVIEW:\n", merged.slice(0, 300));
@@ -84,14 +92,14 @@ async function runOCRSpace(image: Buffer): Promise<string> {
 
     const data: any = await res.json();
     return data?.ParsedResults?.[0]?.ParsedText || "";
-  } catch (err) {
+  } catch {
     log("❌ OCR.space FAILED");
     return "";
   }
 }
 
 // =====================================
-// 🤖 Tesseract
+// 🤖 Tesseract DEFAULT
 // =====================================
 async function runTesseract(image: Buffer): Promise<string> {
   try {
@@ -100,48 +108,93 @@ async function runTesseract(image: Buffer): Promise<string> {
     });
 
     return result.data.text || "";
-  } catch (err) {
+  } catch {
     log("❌ Tesseract FAILED");
     return "";
   }
 }
 
 // =====================================
-// 🔀 MERGE OCR RESULTS
+// 🤖 Tesseract UI MODE (🔥 NOWE)
+// =====================================
+async function runTesseractUI(image: Buffer): Promise<string> {
+  try {
+    const result = await Tesseract.recognize(image, "eng", {
+      logger: () => {},
+      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+    });
+
+    return result.data.text || "";
+  } catch {
+    log("❌ Tesseract UI FAILED");
+    return "";
+  }
+}
+
+// =====================================
+// 🔀 SMART MERGE (🔥 FIX)
 // =====================================
 function mergeOCRResults(texts: string[]): string {
-  const linesSets = texts.map(t =>
-    t
-      .split("\n")
-      .map(l => unicodeCleaner(l))
-      .map(l => l.trim())
-      .filter(Boolean)
-  );
+  const allLines = texts
+    .flatMap(t =>
+      t
+        .split("\n")
+        .map(l => unicodeCleaner(l))
+        .map(l => l.trim())
+        .filter(Boolean)
+    );
 
-  const maxLen = Math.max(...linesSets.map(l => l.length));
-  const merged: string[] = [];
+  log("🔀 SMART MERGE START");
+  log("TOTAL LINES:", allLines.length);
 
-  log("🔀 MERGE START");
-  log("SETS:", linesSets.length, "| MAX LINES:", maxLen);
+  const clusters: string[][] = [];
 
-  for (let i = 0; i < maxLen; i++) {
-    const candidates = linesSets
-      .map(set => set[i])
-      .filter(Boolean);
+  for (const line of allLines) {
+    let added = false;
 
-    if (!candidates.length) continue;
-
-    const best = pickBestLine(candidates);
-
-    if (DEBUG_OCR_VERBOSE) {
-      log(`LINE ${i}`, "CANDIDATES:", candidates);
-      log(`LINE ${i}`, "PICKED:", best);
+    for (const cluster of clusters) {
+      if (isSimilar(line, cluster[0])) {
+        cluster.push(line);
+        added = true;
+        break;
+      }
     }
 
-    merged.push(best);
+    if (!added) {
+      clusters.push([line]);
+    }
   }
 
+  const merged = clusters.map(cluster => pickBestLine(cluster));
+
+  log("🔥 CLUSTERS:", clusters.length);
+
   return merged.join("\n");
+}
+
+// =====================================
+// 🧠 SIMILARITY
+// =====================================
+function isSimilar(a: string, b: string): boolean {
+  a = normalizeCompare(a);
+  b = normalizeCompare(b);
+
+  if (a === b) return true;
+
+  let matches = 0;
+  const len = Math.max(a.length, b.length);
+
+  for (let i = 0; i < len; i++) {
+    if (a[i] === b[i]) matches++;
+  }
+
+  return matches / len > 0.7;
+}
+
+function normalizeCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 // =====================================
