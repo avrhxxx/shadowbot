@@ -23,20 +23,12 @@ function debug(traceId: string, tag: string, ...args: any[]) {
 const BATCH_DELAY = 10000;
 
 // =====================================
-// 🧠 STATUS MESSAGE
-async function updateStatus(message: Message, session: any, text: string) {
+// 🧠 NOWY STATUS (BEZ EDIT)
+async function sendStatus(message: Message, text: string) {
   try {
-    if (!session.statusMessageId) {
-      const msg = await message.reply(text);
-      session.statusMessageId = msg.id;
-    } else {
-      const msg = await message.channel.messages.fetch(
-        session.statusMessageId
-      );
-      if (msg) await msg.edit(text);
-    }
-  } catch (e) {
-    console.warn("⚠️ STATUS UPDATE FAILED");
+    await message.reply(text);
+  } catch {
+    console.warn("⚠️ STATUS SEND FAILED");
   }
 }
 
@@ -99,9 +91,8 @@ async function processBatch(message: Message, session: any) {
 
   debug(traceId, "BATCH_START");
 
-  await updateStatus(
+  await sendStatus(
     message,
-    session,
     `🧠 Processing ${session.imageCount || 0} screenshots...`
   );
 
@@ -172,8 +163,6 @@ async function processBatch(message: Message, session: any) {
         existing: existing.value,
         incoming: e.value,
         chosen: better.value,
-        scoreExisting: scoreEntry(existing),
-        scoreIncoming: scoreEntry(e),
       });
 
       merged.set(key, better);
@@ -186,14 +175,7 @@ async function processBatch(message: Message, session: any) {
 
   debug(traceId, "MAPPED", mapped.length);
 
-  // =====================================
-  // 🧠 SESSION STORE
-  // =====================================
   SessionStore.addEntries(message.guildId!, mapped);
-
-  const finalEntries = SessionStore.getEntries(message.guildId!);
-
-  debug(traceId, "FINAL_SESSION", finalEntries.length);
 
   // =====================================
   // 🧠 SAVE NICKS
@@ -208,14 +190,13 @@ async function processBatch(message: Message, session: any) {
     console.warn("⚠️ Nick mapping failed (non-blocking)");
   }
 
-  await updateStatus(
+  await sendStatus(
     message,
-    session,
     `✅ Done! ${mapped.length} entries added from ${session.imageCount || 0} screenshots.`
   );
 
   // =====================================
-  // 🔥 RESET
+  // RESET
   // =====================================
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
@@ -248,10 +229,9 @@ export async function processImageInput(
 
   await message.react("✅");
 
-  await updateStatus(
+  await sendStatus(
     message,
-    session,
-    `📥 Screenshots: ${session.imageCount}\n⏳ Waiting for more...`
+    `📥 Screenshot ${session.imageCount} received\n⏳ You can send more...`
   );
 
   if (session.buffer.timer) {
@@ -266,30 +246,8 @@ export async function processImageInput(
 // =====================================
 // 🔥 LEGACY EXPORTS (BUILD FIX)
 // =====================================
-export async function execute(payload: {
-  parserType: any;
-  entries: any[];
-  guildId: string;
-  targetType: string;
-  targetId: string;
-}) {
-  console.log("=================================");
-  console.log("🚀 EXECUTE (SAFE MODE)");
-  console.log("=================================");
-
-  console.log("Guild:", payload.guildId);
-  console.log("Parser:", payload.parserType);
-  console.log("TargetType:", payload.targetType);
-  console.log("TargetId:", payload.targetId);
-  console.log("Entries:", payload.entries.length);
-
-  payload.entries.forEach((e, i) => {
-    console.log(`[${i}] ${e.nickname} → ${e.value}`);
-  });
-
-  console.log("=================================");
-  console.log("✅ NO DB WRITE (SAFE MODE)");
-  console.log("=================================");
+export async function execute(payload: any) {
+  console.log("🚀 EXECUTE SAFE MODE", payload.entries.length);
 }
 
 // =====================================
