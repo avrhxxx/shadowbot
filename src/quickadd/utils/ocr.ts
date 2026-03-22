@@ -1,3 +1,4 @@
+// src/quickadd/utils/ocr.ts
 import Tesseract from "tesseract.js";
 import fetch from "node-fetch";
 import FormData from "form-data";
