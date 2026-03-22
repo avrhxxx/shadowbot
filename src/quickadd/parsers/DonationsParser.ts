@@ -5,9 +5,7 @@ import { QuickAddEntry } from "../types/QuickAddEntry";
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   let lineId = 1;
   const entries: QuickAddEntry[] = [];
-
-  // 🔥 MULTI OCR PREP
-  const cleanedLines = mergeSplitValueLines(dedupeLines(lines));
+  const cleanedLines = dedupeLines(lines);
 
   for (let i = 0; i < cleanedLines.length; i++) {
     let line = cleanedLines[i].trim();
@@ -19,9 +17,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // =====================================
     // 🔥 NORMAL donations
-    // =====================================
     if (isDonationsLine(line)) {
       const value = extractValueSafe(line);
       if (!value) continue;
@@ -33,15 +29,8 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // =====================================
-    // 🔥 FALLBACK
-    // =====================================
-    if (
-      /\d{4,6}/.test(line) &&
-      !isTimestamp(line) &&
-      !isSystemLine(line) &&
-      !isDonationsLine(line)
-    ) {
+    // 🔥 FALLBACK (BEZ "Donations")
+    if (/\d{4,6}/.test(line)) {
       const value = extractValueSafe(line);
       if (!value) continue;
 
@@ -52,9 +41,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // =====================================
     // 🔥 INLINE
-    // =====================================
     const inline = parseInlineStrong(line);
     if (inline) {
       entries.push({
@@ -74,35 +61,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 // =====================================
-// 🔥 MERGE SPLIT VALUES (multi OCR fix)
-// =====================================
-function mergeSplitValueLines(lines: string[]): string[] {
-  const result: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const current = lines[i];
-    const next = lines[i + 1];
-
-    if (
-      current?.startsWith(",") &&
-      next?.startsWith(",") &&
-      /^\d{2,3}$/.test(current.replace(",", "")) &&
-      /^\d{2,3}$/.test(next.replace(",", ""))
-    ) {
-      const merged = current.replace(",", "") + next.replace(",", "");
-      result.push(merged);
-      i++;
-      continue;
-    }
-
-    result.push(current);
-  }
-
-  return result;
-}
-
-// =====================================
-// BUILD ENTRY
+// 🔥 ENTRY BUILDER (FIXED CONFIDENCE)
 // =====================================
 function buildEntry(
   id: number,
@@ -118,13 +77,13 @@ function buildEntry(
     raw: nickData.raw,
     rawText: `${nickData.raw} | ${line}`,
     status: "OK",
-    confidence: conf,
+    confidence: conf ?? 0,
     sourceType: "OCR",
   };
 }
 
 // =====================================
-// DONATIONS DETECT
+// 🔥 DONATIONS DETECTION (FUZZY)
 // =====================================
 function isDonationsLine(line: string): boolean {
   const l = line.toLowerCase();
@@ -139,42 +98,31 @@ function isDonationsLine(line: string): boolean {
 }
 
 function isSystemLine(line: string): boolean {
-  return /at least|required|rewards|ranking|mail|donations\.$/i.test(line);
+  return /at least|required|rewards|ranking/i.test(line);
 }
 
 // =====================================
-// 🔥 VALUE EXTRACTION (ULTRA)
+// 🔥 VALUE EXTRACTION (SMART)
 // =====================================
 function extractValueSafe(line: string): number | null {
-  if (!line) return null;
-
   let raw = line.toLowerCase();
 
-  // 🔥 fix split numbers
-  raw = raw.replace(/(\d)\s+(\d)/g, "$1$2");
-
-  // 🔥 fix broken commas (37,1 54 → 37154)
-  raw = raw.replace(/(\d),(\d)\s+(\d{2})/g, "$1$2$3");
-
-  // 🔥 remove garbage suffix
   raw = raw.replace(/([0-9][0-9,.\s]*)[a-z]+\d*$/i, "$1");
+  raw = raw.replace(/(\d{2,})\s+(\d{3})/g, "$1$2");
 
-  // 🔥 K support
-  const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/i);
-  if (kMatch) {
-    return Math.round(parseFloat(kMatch[1]) * 1000);
-  }
+  const kMatch = raw.match(/(\d+(?:\.\d+)?)\s*k/);
+  if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);
 
-  const numbers = raw.match(/\d{2,}/g);
-  if (!numbers) return null;
+  const matches = raw.match(/\d{2,6}(?:,\d{3})*/g);
+  if (!matches) return null;
 
-  const parsed = numbers.map(n => parseInt(n.replace(/,/g, ""), 10));
-
-  return parsed.sort((a, b) => b - a)[0];
+  return matches
+    .map((v) => parseInt(v.replace(/,/g, ""), 10))
+    .sort((a, b) => b - a)[0];
 }
 
 // =====================================
-// 🔥 LOOKBACK SMART
+// 🔥 SMART LOOKBACK (8 LINES)
 // =====================================
 function findNicknameAboveSmart(lines: string[], index: number) {
   for (let i = 1; i <= 8; i++) {
@@ -182,27 +130,22 @@ function findNicknameAboveSmart(lines: string[], index: number) {
     if (!line) continue;
 
     if (isDonationsLine(line) || isSystemLine(line)) continue;
-    if (/\d{4,}/.test(line)) continue;
     if (!isNickname(line)) continue;
 
     const clean = normalizeNickname(line);
     if (!isValidNickname(clean)) continue;
 
-    const confidenceBoost =
-      /[A-Z]/.test(line) && /[a-z]/.test(line) ? 0.1 : 0;
-
     return {
       raw: line,
       clean,
-      confidence: Math.max(0.5, 1 - i * 0.1 + confidenceBoost),
+      confidence: 1 - i * 0.1,
     };
   }
-
   return null;
 }
 
 // =====================================
-// NORMALIZE NICK
+// 🔥 NICK CLEAN (SAFE)
 // =====================================
 function normalizeNickname(name: string): string {
   return name
@@ -212,7 +155,7 @@ function normalizeNickname(name: string): string {
 }
 
 // =====================================
-// INLINE PARSE
+// 🔥 INLINE PARSER
 // =====================================
 function parseInlineStrong(line: string) {
   const match = line.match(/^([^\d]{3,}?)\s*(\d{4,6})$/);
@@ -225,7 +168,7 @@ function parseInlineStrong(line: string) {
 }
 
 // =====================================
-// HELPERS
+// 🔥 HELPERS
 // =====================================
 function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
@@ -244,22 +187,15 @@ function isValidNickname(nick: string): boolean {
 }
 
 function isGarbage(line: string): boolean {
-  if (!line) return true;
-
-  const l = line.trim();
-
-  return (
-    l.length < 2 ||
-    /^[,.\-]+$/.test(l)
-  );
+  return line.length < 2;
 }
 
 // =====================================
-// DEDUPE
+// 🔥 LINE DEDUPE
 // =====================================
 function dedupeLines(lines: string[]): string[] {
   const seen = new Set<string>();
-  return lines.filter(l => {
+  return lines.filter((l) => {
     const key = l.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -267,7 +203,9 @@ function dedupeLines(lines: string[]): string[] {
   });
 }
 
-// 🔥 MULTI OCR READY MERGE
+// =====================================
+// 🔥 ENTRY DEDUPE (FIXED TS + SMART)
+// =====================================
 function dedupeEntries(entries: QuickAddEntry[]) {
   const map = new Map<string, QuickAddEntry>();
 
@@ -275,23 +213,33 @@ function dedupeEntries(entries: QuickAddEntry[]) {
     const key = e.nickname.toLowerCase();
     const existing = map.get(key);
 
+    const eConf = e.confidence ?? 0;
+
     if (!existing) {
-      map.set(key, e);
+      map.set(key, {
+        ...e,
+        confidence: eConf,
+      });
       continue;
     }
+
+    const existingConf = existing.confidence ?? 0;
 
     // 🔥 jeśli ta sama wartość → boost confidence
     if (existing.value === e.value) {
-      existing.confidence += 0.2;
+      existing.confidence = existingConf + 0.2;
       continue;
     }
 
-    // 🔥 wybierz lepszy wpis
+    // 🔥 wybór lepszego wpisu
     if (
       e.value > existing.value ||
-      e.confidence > existing.confidence
+      eConf > existingConf
     ) {
-      map.set(key, e);
+      map.set(key, {
+        ...e,
+        confidence: eConf,
+      });
     }
   }
 
