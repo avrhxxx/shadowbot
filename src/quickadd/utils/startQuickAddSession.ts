@@ -7,13 +7,13 @@ import {
   TextChannel,
 } from "discord.js";
 
+// ✅ FIX: SessionStore + SessionMode
 import {
-  SessionManager,
+  SessionStore,
   SessionMode,
-} from "../session/SessionManager";
+} from "../session/sessionStore";
 
 import { sendSessionInfo } from "./sendSessionInfo";
-import { SessionData } from "../session/SessionData";
 
 export async function startQuickAddSession(
   message: Message,
@@ -37,7 +37,7 @@ export async function startQuickAddSession(
   }
 
   // 🔒 jedna sesja na guild
-  if (SessionManager.hasSession(guild.id)) {
+  if (SessionStore.hasSession(guild.id)) {
     console.log("❌ Session already exists");
     await message.reply("❌ You already have an active session.");
     return;
@@ -68,7 +68,7 @@ export async function startQuickAddSession(
   // =====================================
   // 🧠 CREATE SESSION
   // =====================================
-  SessionManager.createSession({
+  SessionStore.createSession({
     guildId: guild.id,
     channelId: channel.id,
     moderatorId: message.author.id,
@@ -102,7 +102,7 @@ export async function startQuickAddSession(
   // =====================================
   // ⏱️ TIMEOUT INFO (tylko log)
   // =====================================
-  console.log("⏱️ Session timeout handled by SessionManager");
+  console.log("⏱️ Session timeout handled by SessionStore");
 
-  // (timeout już jest w SessionManager.resetTimeout)
+  // (timeout już jest w SessionStore.resetTimeout)
 }
