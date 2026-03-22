@@ -10,15 +10,16 @@ import { deleteEntry } from "./commands/DeleteCommand";
 import { merge } from "./commands/MergeCommand";
 import { help } from "./commands/HelpCommand";
 
-import { SessionManager } from "./session/SessionManager";
+// ✅ FIX: SessionManager → SessionStore
+import { SessionStore } from "./session/sessionStore";
 
 import { startQuickAddSession } from "./utils/startQuickAddSession";
 
-// 🔥 NOWY FLOW SERVICE
+// ✅ FIX: FlowService → Pipeline
 import {
   processImageInput,
   processTextInput,
-} from "./services/QuickAddFlowService";
+} from "./services/QuickAddPipeline";
 
 // =====================================
 // 🔹 MAIN LISTENER (CZYSTY ROUTER)
@@ -29,7 +30,9 @@ export function registerQuickAddListener(client: Client) {
     if (!message.guildId) return;
 
     const content = message.content.trim();
-    const session = SessionManager.getSession(message.guildId);
+
+    // ✅ FIX
+    const session = SessionStore.getSession(message.guildId);
 
     console.log("=== NEW MESSAGE ===");
     console.log("Content:", content);
