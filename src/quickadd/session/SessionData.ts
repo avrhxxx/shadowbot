@@ -12,6 +12,50 @@ export class SessionData {
   private static data = new Map<string, Entry[]>();
 
   // =====================================
+  // 🧠 NORMALIZE KEY (🔥 CRITICAL)
+  // =====================================
+  private static normalizeKey(nick: string): string {
+    return nick.trim().toLowerCase();
+  }
+
+  // =====================================
+  // 🧠 CORE MERGE ENGINE (🔥 SINGLE SOURCE OF TRUTH)
+  // =====================================
+  private static mergeIntoMap(map: Map<string, Entry>, entry: Entry) {
+    const key = this.normalizeKey(entry.nickname);
+
+    if (!key || entry.value < 0) {
+      console.log("❌ INVALID ENTRY SKIPPED:", entry);
+      return;
+    }
+
+    const existing = map.get(key);
+
+    if (!existing) {
+      console.log("➕ NEW ENTRY:", key, entry.value);
+      map.set(key, { ...entry });
+      return;
+    }
+
+    console.log(
+      "🔁 MERGE CHECK:",
+      key,
+      "| existing:",
+      existing.value,
+      "| incoming:",
+      entry.value
+    );
+
+    // 🔥 prefer większą wartość
+    if (entry.value > existing.value) {
+      console.log("   ✅ REPLACED (higher value)");
+      map.set(key, { ...entry });
+    } else {
+      console.log("   ⏭️ KEPT EXISTING");
+    }
+  }
+
+  // =====================================
   // ➕ ADD SINGLE
   // =====================================
   static addEntry(guildId: string, entry: Entry) {
@@ -19,7 +63,7 @@ export class SessionData {
   }
 
   // =====================================
-  // 🔥 ADD BATCH (FULL DEBUG)
+  // 🔥 ADD BATCH (CLEAN + MERGE)
   // =====================================
   static addEntries(guildId: string, newEntries: Entry[]) {
     const current = this.data.get(guildId) || [];
@@ -28,62 +72,16 @@ export class SessionData {
     console.log("📥 SessionData ADD BATCH");
     console.log("=================================");
 
-    console.log("➡️ incoming:", newEntries.length);
-    newEntries.forEach((e, i) => {
-      console.log(
-        `[IN ${i}] nick="${e.nickname}" value=${e.value} raw="${e.raw}"`
-      );
-    });
-
-    console.log("📦 current:", current.length);
-    current.forEach((e, i) => {
-      console.log(
-        `[CUR ${i}] nick="${e.nickname}" value=${e.value}`
-      );
-    });
-
     const map = new Map<string, Entry>();
 
-    // =====================================
-    // 🔹 LOAD EXISTING
-    // =====================================
+    // 🔹 existing
     for (const e of current) {
-      const key = e.nickname.toLowerCase();
-
-      console.log("🧠 LOAD EXISTING:", key, e.value);
-
-      map.set(key, { ...e });
+      this.mergeIntoMap(map, e);
     }
 
-    // =====================================
-    // 🔹 APPLY NEW
-    // =====================================
+    // 🔹 new
     for (const e of newEntries) {
-      const key = e.nickname.toLowerCase();
-      const existing = map.get(key);
-
-      if (!existing) {
-        console.log("➕ NEW ENTRY:", key, e.value);
-        map.set(key, { ...e });
-        continue;
-      }
-
-      console.log(
-        "🔁 MERGE CHECK:",
-        key,
-        "| existing:",
-        existing.value,
-        "| incoming:",
-        e.value
-      );
-
-      // 🔥 prefer bigger value
-      if (e.value > existing.value) {
-        console.log("   ✅ REPLACED (higher value)");
-        map.set(key, { ...e });
-      } else {
-        console.log("   ⏭️ KEPT EXISTING");
-      }
+      this.mergeIntoMap(map, e);
     }
 
     const merged = Array.from(map.values());
@@ -145,16 +143,19 @@ export class SessionData {
     const entry = entries[index];
 
     if (field === "nick") {
-      console.log("   old nick:", entry.nickname);
+      const oldNick = entry.nickname;
+
       entry.nickname = newValue.trim();
-      console.log("   new nick:", entry.nickname);
+
+      console.log("   nick:", oldNick, "→", entry.nickname);
+
+      // 🔥 RE-MERGE po zmianie nicku
+      this.addEntries(guildId, []);
       return true;
     }
 
     if (field === "value") {
       const parsed = parseValue(newValue);
-
-      console.log("   parsed value:", parsed);
 
       if (parsed === null) {
         console.log("❌ INVALID VALUE");
@@ -196,7 +197,7 @@ export class SessionData {
   }
 
   // =====================================
-  // 🔗 MERGE (manual)
+  // 🔗 MERGE (manual) — FIXED
   // =====================================
   static mergeEntries(
     guildId: string,
@@ -226,7 +227,11 @@ export class SessionData {
     to.value += from.value;
     to.raw = this.formatValue(to.value);
 
-    entries.splice(fromIndex, 1);
+    // 🔥 usuń większy index pierwszy (BUG FIX)
+    const first = Math.max(fromIndex, toIndex);
+    const second = Math.min(fromIndex, toIndex);
+
+    entries.splice(first, 1);
 
     console.log("   result:", to.value);
 
