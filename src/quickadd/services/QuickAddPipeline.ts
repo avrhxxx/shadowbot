@@ -89,7 +89,6 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
-  // 🔥 LOCK
   if (session.isProcessing) {
     debug(traceId, "SKIP_ALREADY_PROCESSING");
     return;
@@ -143,9 +142,6 @@ async function processBatch(message: Message, session: any) {
       return;
     }
 
-    // =====================================
-    // 🧠 MERGE
-    // =====================================
     const merged = new Map<string, any>();
 
     for (const screen of screens) {
@@ -168,9 +164,6 @@ async function processBatch(message: Message, session: any) {
 
     SessionStore.addEntries(message.guildId!, mapped);
 
-    // =====================================
-    // SAVE NICKS
-    // =====================================
     try {
       if (process.env.DEV_MODE !== "true") {
         await saveNickMappings(mapped);
@@ -184,12 +177,11 @@ async function processBatch(message: Message, session: any) {
       `✅ Done! ${mapped.length} entries added from ${buffer.length} screenshots.`
     );
 
-    // =====================================
     // RESET
-    // =====================================
     session.buffer.ocrResults = [];
     session.buffer.timer = null;
     session.imageCount = 0;
+    session.awaitingNext = false;
   } finally {
     session.isProcessing = false;
   }
@@ -205,17 +197,25 @@ export async function processImageInput(
 
   debug(traceId, "IMAGE_RECEIVED");
 
-  // 🔥 NATYCHMIASTOWY FEEDBACK (BEZ OCR)
-  session.imageCount = (session.imageCount || 0) + 1;
+  // 🔥 BLOKADA SPAMU
+  if (session.awaitingNext) {
+    await message.reply(
+      "⛔ Poczekaj aż potwierdzę poprzedni screen (napisz `next`)."
+    );
+    return;
+  }
 
-  await message.react("✅");
+  session.imageCount = (session.imageCount || 0) + 1;
+  session.awaitingNext = true;
+
+  await message.react("📥");
 
   await sendStatus(
     message,
-    `📥 Screenshot ${session.imageCount} received\n⏳ Send more within ${BATCH_DELAY / 1000}s...`
+    `📥 Screenshot ${session.imageCount} received\n✉️ Napisz \`next\` żeby wysłać kolejny\n⏳ Auto start za ${BATCH_DELAY / 1000}s`
   );
 
-  // 🔥 OCR W TLE (nie blokuje UX)
+  // OCR w tle
   const { lines } = await processOCR(imageUrl);
 
   if (!lines?.length) {
@@ -228,7 +228,6 @@ export async function processImageInput(
     traceId,
   });
 
-  // 🔥 RESET TIMER
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
@@ -249,6 +248,16 @@ export async function processTextInput(
   session: any,
   content: string
 ) {
+  const normalized = content.toLowerCase().trim();
+
+  // 🔥 OBSŁUGA NEXT
+  if (normalized === "next") {
+    session.awaitingNext = false;
+
+    await message.reply("➡️ Możesz wysłać kolejny screenshot.");
+    return;
+  }
+
   const lines = content
     .split("\n")
     .map((l) => l.trim())
