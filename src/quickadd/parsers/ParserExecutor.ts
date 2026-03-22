@@ -1,4 +1,5 @@
 // src/quickadd/parsers/ParserExecutor.ts
+
 import { ParserType } from "../session/SessionManager";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
@@ -8,14 +9,21 @@ import { parseReservoirRaid } from "./ReservoirRaidParser";
 import { parseReservoirAttendance } from "./ReservoirAttendanceParser";
 
 // =====================================
-// 🔥 MAIN EXECUTOR (V2 DEBUG)
+// 🧠 NORMALIZE KEY (🔥 MUST MATCH SessionData)
+// =====================================
+function normalizeKey(nick: string): string {
+  return nick.trim().toLowerCase();
+}
+
+// =====================================
+// 🔥 MAIN EXECUTOR (IMPROVED)
 // =====================================
 export function parseByType(
   type: ParserType | null,
   lines: string[]
 ): QuickAddEntry[] {
   console.log("=================================");
-  console.log("🚀 PARSER EXECUTOR START (V2)");
+  console.log("🚀 PARSER EXECUTOR START");
   console.log("=================================");
 
   if (!type) {
@@ -26,31 +34,27 @@ export function parseByType(
   console.log(`🧠 Selected parser: ${type}`);
   console.log(`📥 Input lines: ${lines.length}`);
 
-  lines.forEach((line, i) => {
-    console.log(`   [${i}] "${line}"`);
-  });
-
   let entries: QuickAddEntry[] = [];
 
   try {
     switch (type) {
       case "DONATIONS":
-        console.log("👉 Running DonationsParser");
+        console.log("👉 DonationsParser");
         entries = parseDonations(lines);
         break;
 
       case "DUEL_POINTS":
-        console.log("👉 Running DuelPointsParser");
+        console.log("👉 DuelPointsParser");
         entries = parseDuelPoints(lines);
         break;
 
       case "RR_RAID":
-        console.log("👉 Running ReservoirRaidParser");
+        console.log("👉 ReservoirRaidParser");
         entries = parseReservoirRaid(lines);
         break;
 
       case "RR_ATTENDANCE":
-        console.log("👉 Running ReservoirAttendanceParser");
+        console.log("👉 ReservoirAttendanceParser");
         entries = parseReservoirAttendance(lines);
         break;
 
@@ -64,63 +68,103 @@ export function parseByType(
   }
 
   console.log("=================================");
-  console.log(`📊 RAW ENTRIES COUNT: ${entries.length}`);
+  console.log(`📊 RAW ENTRIES: ${entries.length}`);
   console.log("=================================");
 
   entries.forEach((e, i) => {
     console.log(
-      `[RAW ${i}] nick="${e.nickname}" value=${e.value} raw="${e.raw}"`
+      `[RAW ${i}] nick="${e.nickname}" value=${e.value} conf=${e.confidence}`
     );
   });
 
   if (!entries.length) {
     console.log("💀 PARSER RETURNED 0 ENTRIES");
+    return [];
   }
 
   // =====================================
   // 🧹 CLEAN
   // =====================================
-  console.log("🧹 CLEANING STAGE");
+  console.log("🧹 CLEANING");
 
   const cleaned = entries.filter((e, i) => {
-    if (!e.nickname || e.nickname.length < 2) {
-      console.log(`❌ [CLEAN DROP ${i}] invalid nickname`, e.nickname);
+    const nick = e.nickname?.trim();
+
+    if (!nick || nick.length < 2) {
+      console.log(`❌ [DROP ${i}] invalid nickname`, nick);
       return false;
     }
 
-    if (e.nickname.toLowerCase() === "donations") {
-      console.log(`❌ [CLEAN DROP ${i}] header line`, e.nickname);
+    if (nick.toLowerCase() === "donations") {
+      console.log(`❌ [DROP ${i}] header`, nick);
       return false;
     }
 
-    if (typeof e.value === "number" && e.value < 0) {
-      console.log(`❌ [CLEAN DROP ${i}] negative value`, e.value);
+    if (typeof e.value !== "number" || isNaN(e.value)) {
+      console.log(`❌ [DROP ${i}] NaN value`, e.value);
+      return false;
+    }
+
+    if (e.value < 0) {
+      console.log(`❌ [DROP ${i}] negative`, e.value);
       return false;
     }
 
     return true;
   });
 
-  console.log(`✅ AFTER CLEAN: ${cleaned.length}`);
+  console.log(`✅ CLEANED: ${cleaned.length}`);
 
-  cleaned.forEach((e, i) => {
+  // =====================================
+  // 🔥 MERGE (CONSISTENT WITH SessionData)
+  // =====================================
+  console.log("🧠 MERGING");
+
+  const map = new Map<string, QuickAddEntry>();
+
+  for (const e of cleaned) {
+    const key = normalizeKey(e.nickname);
+    const existing = map.get(key);
+
+    if (!existing) {
+      console.log("➕ NEW:", e.nickname, e.value);
+      map.set(key, { ...e });
+      continue;
+    }
+
     console.log(
-      `[CLEAN ${i}] nick="${e.nickname}" value=${e.value}`
+      "🔁 MERGE:",
+      e.nickname,
+      "| existing:",
+      existing.value,
+      "| incoming:",
+      e.value
     );
-  });
 
-  // =====================================
-  // 🔥 MERGE
-  // =====================================
-  console.log("🧠 MERGE STAGE");
+    const eConf = e.confidence ?? 0;
+    const exConf = existing.confidence ?? 0;
 
-  const merged = mergeEntries(cleaned);
+    if (e.value > existing.value) {
+      console.log("   ✅ REPLACED (value)");
+      map.set(key, { ...e });
+      continue;
+    }
 
-  console.log(`✅ AFTER MERGE: ${merged.length}`);
+    if (eConf > exConf) {
+      console.log("   ✅ REPLACED (confidence)");
+      map.set(key, { ...e });
+    } else {
+      console.log("   ⏭️ KEPT");
+    }
+  }
+
+  const merged = Array.from(map.values());
+
+  console.log(`✅ FINAL: ${merged.length}`);
 
   merged.forEach((e, i) => {
     console.log(
-      `[MERGED ${i}] nick="${e.nickname}" value=${e.value}`
+      `[FINAL ${i}] nick="${e.nickname}" value=${e.value}`
     );
   });
 
@@ -129,49 +173,4 @@ export function parseByType(
   console.log("=================================");
 
   return merged;
-}
-
-// =====================================
-// 🔥 MERGE ENTRIES (DEBUG)
-// =====================================
-function mergeEntries(entries: QuickAddEntry[]): QuickAddEntry[] {
-  const map = new Map<string, QuickAddEntry>();
-
-  for (const e of entries) {
-    const key = e.nickname.toLowerCase();
-    const existing = map.get(key);
-
-    if (!existing) {
-      console.log("➕ NEW ENTRY:", e.nickname, e.value);
-      map.set(key, e);
-      continue;
-    }
-
-    console.log(
-      "🔁 MERGE CHECK:",
-      e.nickname,
-      "| existing:",
-      existing.value,
-      "| incoming:",
-      e.value
-    );
-
-    if (e.value > existing.value) {
-      console.log("   ✅ REPLACED (higher value)");
-      map.set(key, e);
-      continue;
-    }
-
-    const eConf = e.confidence ?? 0;
-    const exConf = existing.confidence ?? 0;
-
-    if (eConf > exConf) {
-      console.log("   ✅ REPLACED (better confidence)");
-      map.set(key, e);
-    } else {
-      console.log("   ⏭️ KEPT EXISTING");
-    }
-  }
-
-  return Array.from(map.values());
 }
