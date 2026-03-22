@@ -1,9 +1,8 @@
 // src/quickadd/interactions/eventSelectHandler.ts
 
 import { StringSelectMenuInteraction } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
-import { processQuickAdd } from "../services/QuickAddService";
+import { SessionStore } from "../session/sessionStore";
+import { execute } from "../services/QuickAddPipeline";
 
 export async function handleEventSelect(
   interaction: StringSelectMenuInteraction
@@ -11,7 +10,7 @@ export async function handleEventSelect(
   if (interaction.customId !== "quickadd_select_event") return;
 
   const guildId = interaction.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   if (!session) {
     await interaction.reply({
@@ -22,7 +21,7 @@ export async function handleEventSelect(
   }
 
   const eventId = interaction.values[0];
-  const entries = SessionData.getEntries(guildId);
+  const entries = SessionStore.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
     await interaction.reply({
@@ -41,12 +40,12 @@ export async function handleEventSelect(
   }
 
   try {
-    // ✅ NOWY SYSTEM (payload)
-    await processQuickAdd({
+    // 🔥 NOWY PIPELINE
+    await execute({
       parserType: session.parserType,
       entries,
       guildId,
-      targetId: eventId, // 🔥 kluczowe
+      targetId: eventId,
     });
 
     await interaction.reply({
@@ -55,8 +54,8 @@ export async function handleEventSelect(
     });
 
     // 🧹 cleanup
-    SessionData.clear(guildId);
-    SessionManager.endSession(guildId);
+    SessionStore.clearEntries(guildId);
+    SessionStore.endSession(guildId);
 
     // 🗑️ delete channel
     setTimeout(async () => {
