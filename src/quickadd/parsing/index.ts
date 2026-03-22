@@ -1,21 +1,10 @@
-// src/quickadd/parsing/index.ts
+// =====================================
+// 📁 src/quickadd/parsing/index.ts
+// =====================================
 
-import { ParsedEntry, QuickAddType } from "../core/QuickAddTypes";
+import { parseDonations } from "./donations/DonationsParser";
 
-export function parseByType(
-  type: QuickAddType,
-  lines: string[]
-): ParsedEntry[] {
-  switch (type) {
-    case "DONATIONS":
-      return [];
-    case "DUEL_POINTS":
-      return [];
-    case "RR_ATTENDANCE":
-      return [];
-    case "RR_RAID":
-      return [];
-    default:
-      return [];
-  }
+export function parseOCR(lines: string[]) {
+  // 🔥 NA RAZIE: na sztywno donations
+  return parseDonations(lines);
 }
