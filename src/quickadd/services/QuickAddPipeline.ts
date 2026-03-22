@@ -1,5 +1,4 @@
 // src/quickadd/services/QuickAddPipeline.ts
-
 import { Message } from "discord.js";
 import { processOCR } from "./OCRService";
 import { detectImageType } from "../detector/ImageTypeDetector";
@@ -68,24 +67,21 @@ async function execute(
 
   switch (parserType) {
     case "RR_RAID":
-    case "RR_ATTENDANCE": {
+    case "RR_ATTENDANCE":
       console.log("📋 EVENT PARTICIPANTS:", entries.map(e => e.nickname));
       break;
-    }
 
-    case "DONATIONS": {
+    case "DONATIONS":
       for (const e of entries) {
         console.log("💰 DONATION:", e.nickname, e.value);
       }
       break;
-    }
 
-    case "DUEL_POINTS": {
+    case "DUEL_POINTS":
       for (const e of entries) {
         console.log("⚔️ DUEL:", e.nickname, e.value);
       }
       break;
-    }
 
     default:
       console.log("❌ Unknown type:", parserType);
@@ -142,7 +138,7 @@ async function processBatch(message: Message, session: any) {
 
   debug(traceId, "MAPPED_ENTRIES", mapped.length);
 
-  // ✅ JEDYNY MERGE → SessionStore
+  // 🔥 SINGLE SOURCE OF TRUTH
   SessionStore.addEntries(message.guildId!, mapped);
 
   const finalEntries = SessionStore.getEntries(message.guildId!);
@@ -174,11 +170,16 @@ export async function processImageInput(
     return;
   }
 
-  session.buffer.ocrResults.push({ lines, traceId });
+  session.buffer.ocrResults.push({
+    lines,
+    traceId,
+  });
 
   await message.react("✅");
 
-  if (session.buffer.timer) clearTimeout(session.buffer.timer);
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
 
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
@@ -191,7 +192,10 @@ export async function processTextInput(
   session: any,
   content: string
 ) {
-  const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   if (!lines.length) return;
 
@@ -200,7 +204,9 @@ export async function processTextInput(
     traceId: "text",
   });
 
-  if (session.buffer.timer) clearTimeout(session.buffer.timer);
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
 
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
