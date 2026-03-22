@@ -70,6 +70,7 @@ export async function saveNickMappings(
     console.log(`➕ ${raw} → ${final}`);
 
     await repo.create({
+      id: crypto.randomUUID(), // ✅ FIX
       type: TYPE,
       ocr: raw,
       final,
