@@ -32,11 +32,23 @@ function fallbackDetect(lines: string[]): any {
 }
 
 // =====================================
+// 🔥 ENTRY VALIDATION
+// =====================================
+function isValidEntry(e: any): boolean {
+  if (!e) return false;
+  if (!e.nickname || e.nickname.length < 2) return false;
+  if (typeof e.value !== "number") return false;
+  if (isNaN(e.value)) return false;
+  if (e.value <= 0) return false;
+  return true;
+}
+
+// =====================================
 async function mapEntry(entry: any) {
   const rawNick = entry.nickname || "";
 
   const exact = await resolveNickname(rawNick);
-  const fuzzy = await resolveNicknameFuzzy(exact);
+  const fuzzy = exact ? await resolveNicknameFuzzy(exact) : null;
 
   const value =
     typeof entry.value === "number"
@@ -51,7 +63,7 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
-// 🔥 EXPORT (będzie używany w select handlerze)
+// 🔥 EXPORT (SAFE MODE)
 export async function execute(payload: {
   parserType: any;
   entries: any[];
@@ -98,6 +110,9 @@ async function processBatch(message: Message, session: any) {
     const lines = batch.lines || [];
     if (!lines.length) continue;
 
+    // 🔥 DEBUG LINES
+    debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
+
     let type =
       detectImageType(lines, session.parserType) ||
       fallbackDetect(lines) ||
@@ -110,7 +125,13 @@ async function processBatch(message: Message, session: any) {
 
       if (parsed.length) {
         finalType = type;
-        allEntries.push(...parsed);
+
+        const valid = parsed.filter(isValidEntry);
+
+        debug(traceId, "PARSED_RAW", parsed.length);
+        debug(traceId, "PARSED_VALID", valid.length);
+
+        allEntries.push(...valid);
       }
     } catch (err) {
       console.error("💥 PARSER ERROR:", err);
@@ -122,10 +143,30 @@ async function processBatch(message: Message, session: any) {
     return;
   }
 
+  // =====================================
+  // 🔥 DEDUPE ENTRIES
+  // =====================================
+  const uniqueMap = new Map<string, any>();
+
+  for (const e of allEntries) {
+    const key = e.nickname.toLowerCase();
+
+    if (!uniqueMap.has(key) || uniqueMap.get(key).value < e.value) {
+      uniqueMap.set(key, e);
+    }
+  }
+
+  allEntries = Array.from(uniqueMap.values());
+
+  debug(traceId, "AFTER_DEDUPE", allEntries.length);
+
+  // =====================================
   const mapped = await Promise.all(allEntries.map(mapEntry));
 
   debug(traceId, "MAPPED_ENTRIES", mapped.length);
+  debug(traceId, "FINAL_TYPE", finalType);
 
+  // =====================================
   // 🔥 SINGLE SOURCE OF TRUTH
   SessionStore.addEntries(message.guildId!, mapped);
 
@@ -133,6 +174,7 @@ async function processBatch(message: Message, session: any) {
 
   debug(traceId, "FINAL_SESSION_ENTRIES", finalEntries.length);
 
+  // =====================================
   // 🔥 SAFE MODE (no DB writes)
   try {
     if (process.env.DEV_MODE === "true") {
