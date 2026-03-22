@@ -1,6 +1,7 @@
 // src/quickadd/detector/ImageTypeDetector.ts
 
-import { ParserType } from "../session/SessionManager";
+// ✅ FIX: ParserType z sessionStore
+import { ParserType } from "../session/sessionStore";
 
 export function detectImageType(
   lines: string[],
