@@ -15,6 +15,7 @@ import { canParseDuelPoints } from "../parsers/DuelPointsParser";
 import { canParseReservoirAttendance } from "../parsers/ReservoirAttendanceParser";
 import { canParseReservoirRaid } from "../parsers/ReservoirRaidParser";
 
+// =====================================
 function debug(traceId: string, tag: string, ...args: any[]) {
   console.log(`[QA:${traceId}:${tag}]`, ...args);
 }
@@ -47,6 +48,7 @@ function fallbackDetect(lines: string[]): any {
   return null;
 }
 
+// =====================================
 function isValidEntry(e: any): boolean {
   if (!e) return false;
   if (!e.nickname || e.nickname.length < 2) return false;
@@ -95,20 +97,27 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
+  debug(traceId, "BATCH_START");
+
   await updateStatus(
     message,
     session,
-    `🧠 Processing ${session.imageCount} screenshots...`
+    `🧠 Processing ${session.imageCount || 0} screenshots...`
   );
 
   const buffer = session?.buffer?.ocrResults;
-  if (!buffer?.length) return;
+  if (!buffer?.length) {
+    debug(traceId, "EMPTY_BUFFER");
+    return;
+  }
 
   const screens: any[] = [];
 
   for (const batch of buffer) {
     const lines = batch.lines || [];
     if (!lines.length) continue;
+
+    debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
 
     let type =
       detectImageType(lines, session.parserType) ||
@@ -121,6 +130,11 @@ async function processBatch(message: Message, session: any) {
       let parsed = parseByType(type, lines);
 
       parsed = parsed.filter(isValidEntry);
+
+      debug(traceId, "SCREEN_PARSED", {
+        type,
+        count: parsed.length,
+      });
 
       screens.push({
         type,
@@ -136,6 +150,9 @@ async function processBatch(message: Message, session: any) {
     return;
   }
 
+  // =====================================
+  // 🧠 MERGE
+  // =====================================
   const merged = new Map<string, any>();
 
   for (const screen of screens) {
@@ -148,7 +165,18 @@ async function processBatch(message: Message, session: any) {
         continue;
       }
 
-      merged.set(key, pickBetterEntry(existing, e));
+      const better = pickBetterEntry(existing, e);
+
+      debug(traceId, "MERGE_DECISION", {
+        nick: key,
+        existing: existing.value,
+        incoming: e.value,
+        chosen: better.value,
+        scoreExisting: scoreEntry(existing),
+        scoreIncoming: scoreEntry(e),
+      });
+
+      merged.set(key, better);
     }
   }
 
@@ -156,14 +184,39 @@ async function processBatch(message: Message, session: any) {
     Array.from(merged.values()).map(mapEntry)
   );
 
+  debug(traceId, "MAPPED", mapped.length);
+
+  // =====================================
+  // 🧠 SESSION STORE
+  // =====================================
   SessionStore.addEntries(message.guildId!, mapped);
+
+  const finalEntries = SessionStore.getEntries(message.guildId!);
+
+  debug(traceId, "FINAL_SESSION", finalEntries.length);
+
+  // =====================================
+  // 🧠 SAVE NICKS
+  // =====================================
+  try {
+    if (process.env.DEV_MODE === "true") {
+      console.log("🧠 DEV MODE: skip nick mapping save");
+    } else {
+      await saveNickMappings(mapped);
+    }
+  } catch {
+    console.warn("⚠️ Nick mapping failed (non-blocking)");
+  }
 
   await updateStatus(
     message,
     session,
-    `✅ Done! ${mapped.length} entries added from ${session.imageCount} screenshots.`
+    `✅ Done! ${mapped.length} entries added from ${session.imageCount || 0} screenshots.`
   );
 
+  // =====================================
+  // 🔥 RESET
+  // =====================================
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
   session.imageCount = 0;
@@ -177,9 +230,14 @@ export async function processImageInput(
 ) {
   const traceId = Date.now().toString().slice(-5);
 
+  debug(traceId, "IMAGE");
+
   const { lines } = await processOCR(imageUrl);
 
-  if (!lines?.length) return;
+  if (!lines?.length) {
+    debug(traceId, "OCR_EMPTY");
+    return;
+  }
 
   session.imageCount = (session.imageCount || 0) + 1;
 
@@ -203,4 +261,60 @@ export async function processImageInput(
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
   }, BATCH_DELAY);
+}
+
+// =====================================
+// 🔥 LEGACY EXPORTS (BUILD FIX)
+// =====================================
+export async function execute(payload: {
+  parserType: any;
+  entries: any[];
+  guildId: string;
+  targetType: string;
+  targetId: string;
+}) {
+  console.log("=================================");
+  console.log("🚀 EXECUTE (SAFE MODE)");
+  console.log("=================================");
+
+  console.log("Guild:", payload.guildId);
+  console.log("Parser:", payload.parserType);
+  console.log("TargetType:", payload.targetType);
+  console.log("TargetId:", payload.targetId);
+  console.log("Entries:", payload.entries.length);
+
+  payload.entries.forEach((e, i) => {
+    console.log(`[${i}] ${e.nickname} → ${e.value}`);
+  });
+
+  console.log("=================================");
+  console.log("✅ NO DB WRITE (SAFE MODE)");
+  console.log("=================================");
+}
+
+// =====================================
+export async function processTextInput(
+  message: Message,
+  session: any,
+  content: string
+) {
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return;
+
+  session.buffer.ocrResults.push({
+    lines,
+    traceId: "text",
+  });
+
+  if (session.buffer.timer) {
+    clearTimeout(session.buffer.timer);
+  }
+
+  session.buffer.timer = setTimeout(() => {
+    processBatch(message, session);
+  }, 5000);
 }
