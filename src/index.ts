@@ -24,7 +24,7 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // -----------------------------
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService";
-import { SessionManager } from "./quickadd/session/SessionManager";
+import { SessionStore } from "./quickadd/session/sessionStore"; // ✅ FIX
 
 const client = new Client({
   intents: [
@@ -60,7 +60,7 @@ client.once("ready", async () => {
   // -----------------------------
   // 🔥 SESSION TIMEOUT HOOK
   // -----------------------------
-  SessionManager.setHandlers({
+  SessionStore.setHandlers({ // ✅ FIX
     sendMessage: async (channelId: string, content: string) => {
       try {
         const channel = await client.channels.fetch(channelId);
