@@ -1,5 +1,6 @@
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
+import { AbsenceObject } from "../absenceService";
 
 // -----------------------------
 // HELPERS
@@ -48,7 +49,7 @@ export async function updateAbsenceEmbed(guild: Guild) {
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
-  const absences = await AS.loadAbsences(guild.id);
+  const absences = await AS.getAbsences(guild.id); // 🔥 FIX
   const now = new Date();
   const unixNow = Math.floor(now.getTime() / 1000);
 
@@ -59,12 +60,11 @@ export async function updateAbsenceEmbed(guild: Guild) {
   if (!absences.length) {
     embed.setDescription("No active absences.");
   } else {
-
     const byBackDate: Record<string, string[]> = {};
 
-    absences.forEach(a => {
-
+    absences.forEach((a: AbsenceObject) => {
       const endDate = parseAbsenceDate(a.endDate, a.year ?? now.getFullYear());
+
       const backStr = endDate
         ? formatAbsenceDate(a.endDate, a.year ?? now.getFullYear())
         : "Unknown";
@@ -82,11 +82,7 @@ export async function updateAbsenceEmbed(guild: Guild) {
 
     embed.setDescription(
       Object.keys(byBackDate)
-        .sort((a, b) => {
-          const da = a.split(".").reverse().join("");
-          const db = b.split(".").reverse().join("");
-          return Number(da) - Number(db);
-        })
+        .sort()
         .map(date =>
           `📅 Back on ${date}\n${byBackDate[date].join("\n")}`
         )
@@ -100,38 +96,26 @@ export async function updateAbsenceEmbed(guild: Guild) {
   });
 
   try {
-
     const config = await AS.getAbsenceConfig(guild.id);
 
     let message;
 
     if (config.absenceEmbedId) {
-
       try {
         message = await channel.messages.fetch(config.absenceEmbedId);
         await message.edit({ embeds: [embed] });
-
       } catch {
-
         message = await channel.send({ embeds: [embed] });
         await AS.setAbsenceEmbedId(guild.id, message.id);
-
       }
-
     } else {
-
       message = await channel.send({ embeds: [embed] });
       await AS.setAbsenceEmbedId(guild.id, message.id);
-
     }
 
-    if (!message.pinned)
-      await message.pin().catch(() => {});
-
+    if (!message.pinned) await message.pin().catch(() => {});
   } catch (err) {
-
     console.error("Error updating absence embed:", err);
-
   }
 }
 
@@ -144,12 +128,12 @@ export async function notifyAbsenceAdded(
   startDate: string,
   endDate: string
 ) {
-
-  const absences = await AS.loadAbsences(guild.id);
+  const absences = await AS.getAbsences(guild.id); // 🔥 FIX
   const absence = absences.find(a => a.player === player);
-  const year = absence?.year ?? new Date().getFullYear();
 
+  const year = absence?.year ?? new Date().getFullYear();
   const end = parseAbsenceDate(endDate, year);
+
   const unixBack = end ? Math.floor(end.getTime() / 1000) : 0;
 
   const channel = await getNotificationChannel(guild);
@@ -162,61 +146,20 @@ export async function notifyAbsenceAdded(
   await updateAbsenceEmbed(guild);
 }
 
-export async function notifyAbsenceRemoved(guild: Guild, player: string) {
-
-  const channel = await getNotificationChannel(guild);
-  if (!channel) return;
-
-  await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-
-  await updateAbsenceEmbed(guild);
-}
-
-export async function notifyAbsenceAutoClean(guild: Guild, player: string) {
-
-  const channel = await getNotificationChannel(guild);
-  if (!channel) return;
-
-  await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-
-  await updateAbsenceEmbed(guild);
-}
-
 // -----------------------------
-// AUTO CLEANER + PERIODIC UPDATE
+// AUTO CLEANER
 // -----------------------------
 export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
-
   setInterval(async () => {
-    await updateAbsenceEmbed(guild);
-  }, 60_000);
-
-  setInterval(async () => {
-
-    const absences = await AS.loadAbsences(guild.id);
+    const absences = await AS.getAbsences(guild.id); // 🔥 FIX
     const now = new Date();
 
     for (const a of absences) {
-
-      const endDate = parseAbsenceDate(
-        a.endDate,
-        a.year ?? now.getFullYear()
-      );
+      const endDate = parseAbsenceDate(a.endDate, a.year ?? now.getFullYear());
 
       if (endDate && endDate < now) {
-
-        await AS.deleteAbsenceRow(a.id);
-        await notifyAbsenceAutoClean(guild, a.player);
-
+        await AS.removeAbsence(guild.id, a.player); // 🔥 FIX
       }
     }
-
   }, intervalMs);
-}
-
-// -----------------------------
-// INITIALIZE ABSENCE EMBED
-// -----------------------------
-export async function initAbsenceNotifications(guild: Guild) {
-  await updateAbsenceEmbed(guild);
 }
