@@ -1,10 +1,12 @@
 // src/quickadd/commands/ConfirmCommand.ts
 
-import { Message } from "discord.js";
-import { SessionStore } from "../session/sessionStore";
+import {
+  Message,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+} from "discord.js";
 
-// ✅ IMPORT PIPELINE (ważne)
-import { execute } from "../services/QuickAddPipeline";
+import { SessionStore } from "../session/sessionStore";
 
 export async function confirm(message: Message) {
   const guildId = message.guildId!;
@@ -22,28 +24,34 @@ export async function confirm(message: Message) {
     return;
   }
 
-  try {
-    // 🔥 PRAWDZIWA LOGIKA
-    await execute(session.parserType, entries, guildId);
+  // =====================================
+  // 🔥 SELECT MENU (EVENT PICK)
+  // =====================================
 
-    await message.reply(`✅ Zapisano ${entries.length} wpisów!`);
-  } catch (err) {
-    console.error("Confirm error:", err);
-    await message.reply("❌ Błąd podczas zapisu.");
-    return;
-  }
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("quickadd_select_event")
+    .setPlaceholder("Select event to assign data")
+    .addOptions([
+      {
+        label: "Event 1",
+        value: "event1",
+      },
+      {
+        label: "Event 2",
+        value: "event2",
+      },
+      {
+        label: "Event 3",
+        value: "event3",
+      },
+    ]);
 
-  SessionStore.clearEntries(guildId);
-  SessionStore.endSession(guildId);
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    select
+  );
 
-  setTimeout(async () => {
-    try {
-      const channel = await message.guild?.channels.fetch(session.channelId);
-      if (channel && "delete" in channel) {
-        await channel.delete();
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-    }
-  }, 3000);
+  await message.reply({
+    content: "📌 Select event to save data:",
+    components: [row],
+  });
 }
