@@ -38,9 +38,16 @@ export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
 }
 
 // =====================================
-// 🧠 MAIN OCR ENTRY
+// 🧠 MAIN OCR ENTRY (🔥 NOWY SYSTEM)
 // =====================================
-export async function extractTextFromImage(image: Buffer): Promise<string> {
+export interface OCRRawResult {
+  source: string;
+  text: string;
+}
+
+export async function extractTextFromImage(
+  image: Buffer
+): Promise<OCRRawResult[]> {
   log("🚀 Running parallel OCR...");
 
   const [ocrSpaceText, tesseractText, tesseractUI] = await Promise.all([
@@ -49,36 +56,24 @@ export async function extractTextFromImage(image: Buffer): Promise<string> {
     runTesseractUI(image),
   ]);
 
-  log("🧠 OCR.space LENGTH:", ocrSpaceText.length);
-  log("🧠 Tesseract LENGTH:", tesseractText.length);
-  log("🧠 Tesseract UI LENGTH:", tesseractUI.length);
+  const results: OCRRawResult[] = [
+    { source: "OCR_SPACE", text: ocrSpaceText || "" },
+    { source: "TESSERACT_RAW", text: tesseractText || "" },
+    { source: "TESSERACT_UI", text: tesseractUI || "" },
+  ];
 
-  if (DEBUG_OCR_VERBOSE) {
-    log("📄 OCR.space FULL:\n", ocrSpaceText);
-    log("📄 Tesseract FULL:\n", tesseractText);
-    log("📄 Tesseract UI FULL:\n", tesseractUI);
-  } else {
-    log("📄 OCR.space PREVIEW:\n", ocrSpaceText.slice(0, 300));
-    log("📄 Tesseract PREVIEW:\n", tesseractText.slice(0, 300));
-    log("📄 Tesseract UI PREVIEW:\n", tesseractUI.slice(0, 300));
+  for (const r of results) {
+    log(`🧠 ${r.source} LENGTH:`, r.text.length);
+
+    if (DEBUG_OCR_VERBOSE) {
+      log(`📄 ${r.source} FULL:\n`, r.text);
+    } else {
+      log(`📄 ${r.source} PREVIEW:\n`, r.text.slice(0, 300));
+    }
   }
 
-  const merged = mergeOCRResults([
-    ocrSpaceText,
-    tesseractText,
-    tesseractUI,
-  ]);
-
-  log("🔥 MERGED LENGTH:", merged.length);
-  log("📄 FINAL PREVIEW:\n", merged.slice(0, 300));
-
-  // 🔥 KLUCZOWY DEBUG (CAŁY OUTPUT)
-  log("=== FINAL OCR OUTPUT ===\n" + merged);
-
-  // 🔥 ILE LINII FINALNIE
-  log("🧾 TOTAL LINES AFTER MERGE:", merged.split("\n").length);
-
-  return merged;
+  // 🔥 ZERO MERGE — każdy OCR osobno
+  return results;
 }
 
 // =====================================
@@ -121,7 +116,7 @@ async function runTesseract(image: Buffer): Promise<string> {
 }
 
 // =====================================
-// 🤖 Tesseract UI MODE (FIXED 🔥)
+// 🤖 Tesseract UI MODE
 // =====================================
 async function runTesseractUI(image: Buffer): Promise<string> {
   try {
@@ -131,7 +126,7 @@ async function runTesseractUI(image: Buffer): Promise<string> {
     await worker.initialize("eng");
 
     await worker.setParameters({
-      tessedit_pageseg_mode: 6 as any, // 🔥 FIX (number zamiast string)
+      tessedit_pageseg_mode: 6 as any,
     });
 
     const result = await worker.recognize(image);
@@ -146,111 +141,16 @@ async function runTesseractUI(image: Buffer): Promise<string> {
 }
 
 // =====================================
-// 🔀 SMART MERGE (ORDER SAFE)
+// 🧹 CLEAN HELPERS (zostają – będą używane później)
 // =====================================
-function mergeOCRResults(texts: string[]): string {
-  const linesSets = texts.map(t =>
-    t
-      .split("\n")
-      .map(l => unicodeCleaner(l))
-      .map(l => l.trim())
-      .filter(Boolean)
-  );
-
-  const maxLen = Math.max(...linesSets.map(l => l.length));
-  const merged: string[] = [];
-
-  log("🔀 SMART MERGE START");
-  log("SETS:", linesSets.length, "| MAX:", maxLen);
-
-  for (let i = 0; i < maxLen; i++) {
-    const candidates = linesSets
-      .map(set => set[i])
-      .filter(Boolean);
-
-    if (!candidates.length) continue;
-
-    const unique: string[] = [];
-
-    for (const c of candidates) {
-      if (!unique.some(u => isSimilar(u, c))) {
-        unique.push(c);
-      }
-    }
-
-    const best = pickBestLine(unique);
-
-    if (DEBUG_OCR_VERBOSE) {
-      log(`LINE ${i}`, "CANDIDATES:", candidates);
-      log(`LINE ${i}`, "UNIQUE:", unique);
-      log(`LINE ${i}`, "PICKED:", best);
-    }
-
-    merged.push(best);
-  }
-
-  return merged.join("\n");
+export function splitAndCleanText(text: string): string[] {
+  return text
+    .split("\n")
+    .map((l) => unicodeCleaner(l))
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
-// =====================================
-// 🧠 SIMILARITY
-// =====================================
-function isSimilar(a: string, b: string): boolean {
-  a = normalizeCompare(a);
-  b = normalizeCompare(b);
-
-  if (a === b) return true;
-
-  let matches = 0;
-  const len = Math.max(a.length, b.length);
-
-  for (let i = 0; i < len; i++) {
-    if (a[i] === b[i]) matches++;
-  }
-
-  return matches / len > 0.7;
-}
-
-function normalizeCompare(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-// =====================================
-// 🧠 LINE SCORING
-// =====================================
-function pickBestLine(lines: string[]): string {
-  let best = lines[0];
-  let bestScore = scoreLine(best);
-
-  for (const line of lines.slice(1)) {
-    const score = scoreLine(line);
-    if (score > bestScore) {
-      best = line;
-      bestScore = score;
-    }
-  }
-
-  return best;
-}
-
-function scoreLine(line: string): number {
-  let score = 0;
-
-  score += Math.min(line.length, 50);
-
-  if (/\d/.test(line)) score += 20;
-  if (/donations/i.test(line)) score += 30;
-
-  const garbage = (line.match(/[^a-zA-Z0-9\s:,]/g) || []).length;
-  score -= garbage * 2;
-
-  return score;
-}
-
-// =====================================
-// 🧹 UNICODE CLEANER
 // =====================================
 function unicodeCleaner(input: string): string {
   return input
