@@ -1,3 +1,4 @@
+// src/quickadd/commands/HelpCommand.ts
 import { Message, EmbedBuilder } from "discord.js";
 import { SessionManager } from "../session/SessionManager";
 
