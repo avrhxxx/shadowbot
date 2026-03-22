@@ -1,4 +1,6 @@
-// src/index.ts
+// =====================================
+// 📁 src/index.ts
+// =====================================
 
 // 🔥 INIT GOOGLE CLIENT
 import "./google/googleSheetsClient";
@@ -28,6 +30,9 @@ import {
 
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
 
+// 🔥 FIX: LISTENER IMPORT
+import { registerQuickAddListener } from "./quickadd/QuickAddListener";
+
 // =============================
 
 const client = new Client({
@@ -46,7 +51,8 @@ if (!process.env.BOT_TOKEN) {
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-client.once("ready", async () => {
+// 🔥 FIX: clientReady zamiast ready
+client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
 
   // =============================
@@ -67,6 +73,9 @@ client.once("ready", async () => {
   // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
+
+  // 🔥 FIX: START LISTENER
+  registerQuickAddListener(client);
 
   // -----------------------------
   // Init reminders / notifications
