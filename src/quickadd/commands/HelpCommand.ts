@@ -1,10 +1,13 @@
 // src/quickadd/commands/HelpCommand.ts
+
 import { Message, EmbedBuilder } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
+
+// ✅ FIX: SessionStore zamiast SessionManager
+import { SessionStore } from "../session/sessionStore";
 
 export async function help(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   const isQuickAddChannel =
     message.channel.isTextBased() &&
