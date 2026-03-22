@@ -88,9 +88,18 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
-  // 🔥 NOWE: nie startuj jeśli OCR jeszcze trwa
+  // 🔥 INIT SAFETY
+  session.pendingOCR = session.pendingOCR || 0;
+  session.buffer = session.buffer || { ocrResults: [], timer: null };
+
+  // 🔥 FIX: retry zamiast return
   if (session.pendingOCR > 0) {
     debug(traceId, "WAITING_FOR_OCR", session.pendingOCR);
+
+    session.buffer.timer = setTimeout(() => {
+      processBatch(message, session);
+    }, 1000);
+
     return;
   }
 
@@ -188,7 +197,7 @@ async function processBatch(message: Message, session: any) {
     session.buffer.ocrResults = [];
     session.buffer.timer = null;
     session.imageCount = 0;
-    session.pendingOCR = 0; // 🔥
+    session.pendingOCR = 0;
   } finally {
     session.isProcessing = false;
   }
@@ -205,8 +214,6 @@ export async function processImageInput(
   debug(traceId, "IMAGE_RECEIVED");
 
   session.imageCount = (session.imageCount || 0) + 1;
-
-  // 🔥 NOWE
   session.pendingOCR = (session.pendingOCR || 0) + 1;
 
   await message.react("📥");
@@ -229,7 +236,6 @@ export async function processImageInput(
       traceId,
     });
   } finally {
-    // 🔥 KLUCZOWE
     session.pendingOCR--;
     debug(traceId, "OCR_DONE", session.pendingOCR);
   }
