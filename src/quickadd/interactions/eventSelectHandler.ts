@@ -20,7 +20,9 @@ export async function handleEventSelect(
     return;
   }
 
-  const eventId = interaction.values[0];
+  const raw = interaction.values[0];
+  const [targetType, targetId] = raw.split(":");
+
   const entries = SessionStore.getEntries(guildId);
 
   if (!entries || entries.length === 0) {
@@ -40,24 +42,23 @@ export async function handleEventSelect(
   }
 
   try {
-    // 🔥 NOWY PIPELINE
     await execute({
       parserType: session.parserType,
       entries,
       guildId,
-      targetId: eventId,
+      targetType,
+      targetId,
     });
 
     await interaction.reply({
-      content: `✅ Data assigned to event.`,
+      content: `✅ (DEV MODE) Processed ${entries.length} entries.`,
       ephemeral: true,
     });
 
-    // 🧹 cleanup
+    // cleanup
     SessionStore.clearEntries(guildId);
     SessionStore.endSession(guildId);
 
-    // 🗑️ delete channel
     setTimeout(async () => {
       try {
         const channel = await interaction.guild?.channels.fetch(
