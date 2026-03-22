@@ -5,6 +5,7 @@
 import { Message } from "discord.js";
 import { debugTrace } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
+import { parseOCR } from "../parsing"; // 🔥 NEW
 
 const SCOPE = "PIPELINE";
 
@@ -20,11 +21,11 @@ export async function processImageInput(
   });
 
   try {
-    // 🔥 HARD DEBUG (czy w ogóle tu wchodzimy dalej)
+    // 🔥 HARD DEBUG
     console.log("🔥 OCR CALL START", traceId);
 
     // =============================
-    // 🔥 OCR START
+    // 🔥 OCR
     // =============================
     const ocrResult = await runOCR(imageUrl);
 
@@ -33,10 +34,16 @@ export async function processImageInput(
     debugTrace(SCOPE, "OCR_RESULT", traceId, ocrResult);
 
     // =============================
-    // 🔜 TODO (następne etapy)
+    // 🔥 PARSING (NOWY ETAP)
+    // =============================
+    const parsed = parseOCR(ocrResult.lines);
+
+    debugTrace(SCOPE, "PARSED_RESULT", traceId, parsed);
+
+    // =============================
+    // 🔜 NEXT (później)
     // =============================
     // - detection (typ obrazka)
-    // - parsing
     // - mapping nicków
     // - zapis do buffer
 
