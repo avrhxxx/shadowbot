@@ -1,6 +1,6 @@
 // src/quickadd/services/OCRService.ts
 
-import { extractTextFromImage } from "../utils/ocr"; // 🔥 NOWY OCR (OCR.space + fallback)
+import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
 import fetch from "node-fetch";
@@ -12,21 +12,29 @@ export interface OCRResult {
 
 export async function processOCR(imageUrl: string): Promise<OCRResult> {
   const response = await fetch(imageUrl);
+
+  // 🔥 zabezpieczenie fetch
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status}`);
+  }
+
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
-  // 🔥 preprocess zostaje (bardzo ważne!)
+  // 🔥 preprocess (ważne dla jakości OCR)
   const processedBuffer = await preprocessImage(buffer);
 
-  // 🔥 ZAMIANA: OCR.space + fallback Tesseract
+  // 🔥 PARALLEL OCR (OCR.space + Tesseract)
   const text = await extractTextFromImage(processedBuffer);
 
   console.log("🧠 OCR LENGTH:", text.length);
 
-  if (!text || text.length < 10) {
-    console.log("⚠️ OCR returned very small text");
+  // 🔥 fallback bezpieczeństwa
+  if (!text || text.trim().length < 5) {
+    console.log("⚠️ OCR FAILED HARD - returning empty result");
+    return { text: "", lines: [] };
   }
 
   let lines = text
@@ -35,10 +43,15 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 pipeline zostaje — to jest DOBRE
+  // 🔥 pipeline czyszczenia
   lines = preprocessOCR(lines);
   lines = mergeBrokenLines(lines);
   lines = normalizeLines(lines);
+
+  // 🔥 zabezpieczenie przed spamem
+  if (lines.length > 100) {
+    lines = lines.slice(0, 100);
+  }
 
   console.log("=== FINAL LINES ===");
   lines.forEach((line, i) => {
