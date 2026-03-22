@@ -1,4 +1,5 @@
 // src/quickadd/services/QuickAddPipeline.ts
+
 import { Message } from "discord.js";
 import { processOCR } from "./OCRService";
 import { detectImageType } from "../detector/ImageTypeDetector";
@@ -50,44 +51,31 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
-async function execute(
-  parserType: any,
-  entries: any[],
-  guildId: string
-) {
-  console.log("=== EXECUTION START ===");
-  console.log("Type:", parserType);
-  console.log("Entries:", entries.length);
+// 🔥 EXPORT (będzie używany w select handlerze)
+export async function execute(payload: {
+  parserType: any;
+  entries: any[];
+  guildId: string;
+  targetType: string;
+  targetId: string;
+}) {
+  console.log("=================================");
+  console.log("🚀 EXECUTE (SAFE MODE)");
+  console.log("=================================");
 
-  try {
-    await saveNickMappings(entries);
-  } catch {
-    console.warn("⚠️ Nick mapping failed (non-blocking)");
-  }
+  console.log("Guild:", payload.guildId);
+  console.log("Parser:", payload.parserType);
+  console.log("TargetType:", payload.targetType);
+  console.log("TargetId:", payload.targetId);
+  console.log("Entries:", payload.entries.length);
 
-  switch (parserType) {
-    case "RR_RAID":
-    case "RR_ATTENDANCE":
-      console.log("📋 EVENT PARTICIPANTS:", entries.map(e => e.nickname));
-      break;
+  payload.entries.forEach((e, i) => {
+    console.log(`[${i}] ${e.nickname} → ${e.value}`);
+  });
 
-    case "DONATIONS":
-      for (const e of entries) {
-        console.log("💰 DONATION:", e.nickname, e.value);
-      }
-      break;
-
-    case "DUEL_POINTS":
-      for (const e of entries) {
-        console.log("⚔️ DUEL:", e.nickname, e.value);
-      }
-      break;
-
-    default:
-      console.log("❌ Unknown type:", parserType);
-  }
-
-  console.log("=== EXECUTION END ===");
+  console.log("=================================");
+  console.log("✅ NO DB WRITE (SAFE MODE)");
+  console.log("=================================");
 }
 
 // =====================================
@@ -145,7 +133,16 @@ async function processBatch(message: Message, session: any) {
 
   debug(traceId, "FINAL_SESSION_ENTRIES", finalEntries.length);
 
-  await execute(finalType, finalEntries, message.guildId!);
+  // 🔥 SAFE MODE (no DB writes)
+  try {
+    if (process.env.DEV_MODE === "true") {
+      console.log("🧠 DEV MODE: skip nick mapping save");
+    } else {
+      await saveNickMappings(mapped);
+    }
+  } catch {
+    console.warn("⚠️ Nick mapping failed (non-blocking)");
+  }
 
   await message.reply(`✅ Processed ${mapped.length} entries.`);
 
