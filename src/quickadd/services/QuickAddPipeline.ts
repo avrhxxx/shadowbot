@@ -23,7 +23,6 @@ function debug(traceId: string, tag: string, ...args: any[]) {
 const BATCH_DELAY = 10000;
 
 // =====================================
-// 🧠 STATUS
 async function sendStatus(message: Message, text: string) {
   try {
     await message.reply(text);
@@ -125,7 +124,9 @@ async function processBatch(message: Message, session: any) {
       if (!type) continue;
 
       try {
-        let parsed = parseByType(type, lines);
+        let parsed = await parseByType(type, lines); // 🔥 FIX
+        if (!parsed?.length) continue;
+
         parsed = parsed.filter(isValidEntry);
 
         screens.push({
@@ -177,7 +178,6 @@ async function processBatch(message: Message, session: any) {
       `✅ Done! ${mapped.length} entries added from ${buffer.length} screenshots.`
     );
 
-    // RESET
     session.buffer.ocrResults = [];
     session.buffer.timer = null;
     session.imageCount = 0;
@@ -197,7 +197,6 @@ export async function processImageInput(
 
   debug(traceId, "IMAGE_RECEIVED");
 
-  // 🔥 BLOKADA SPAMU
   if (session.awaitingNext) {
     await message.reply(
       "⛔ Poczekaj aż potwierdzę poprzedni screen (napisz `next`)."
@@ -215,11 +214,11 @@ export async function processImageInput(
     `📥 Screenshot ${session.imageCount} received\n✉️ Napisz \`next\` żeby wysłać kolejny\n⏳ Auto start za ${BATCH_DELAY / 1000}s`
   );
 
-  // OCR w tle
   const { lines } = await processOCR(imageUrl);
 
   if (!lines?.length) {
     debug(traceId, "OCR_EMPTY");
+    session.awaitingNext = false; // 🔥 FIX
     return;
   }
 
@@ -250,7 +249,6 @@ export async function processTextInput(
 ) {
   const normalized = content.toLowerCase().trim();
 
-  // 🔥 OBSŁUGA NEXT
   if (normalized === "next") {
     session.awaitingNext = false;
 
