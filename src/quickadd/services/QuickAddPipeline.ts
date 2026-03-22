@@ -24,8 +24,6 @@ function debug(traceId: string, tag: string, ...args: any[]) {
 const BATCH_DELAY = 10000;
 
 // =====================================
-// 🧠 FALLBACK DETECT
-// =====================================
 function fallbackDetect(lines: string[]): any {
   if (canParseDuelPoints(lines)) return "DUEL_POINTS";
   if (canParseReservoirAttendance(lines)) return "RR_ATTENDANCE";
@@ -33,8 +31,6 @@ function fallbackDetect(lines: string[]): any {
   return null;
 }
 
-// =====================================
-// 🔥 MAP ENTRY
 // =====================================
 async function mapEntry(entry: any) {
   const rawNick = entry.nickname || "";
@@ -55,28 +51,6 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
-// 🔥 PRE-MERGE
-// =====================================
-function preMerge(entries: any[]) {
-  const map = new Map<string, any>();
-
-  for (const e of entries) {
-    const key = (e.nickname || "").toLowerCase().trim();
-    if (!key) continue;
-
-    const existing = map.get(key);
-
-    if (!existing || e.value > existing.value) {
-      map.set(key, e);
-    }
-  }
-
-  return Array.from(map.values());
-}
-
-// =====================================
-// 🚀 FINAL EXECUTION (MERGED SERVICE)
-// =====================================
 async function execute(
   parserType: any,
   entries: any[],
@@ -86,37 +60,29 @@ async function execute(
   console.log("Type:", parserType);
   console.log("Entries:", entries.length);
 
-  // 🔥 SAVE NICK MAPPINGS
   try {
     await saveNickMappings(entries);
-  } catch (err) {
+  } catch {
     console.warn("⚠️ Nick mapping failed (non-blocking)");
   }
 
   switch (parserType) {
     case "RR_RAID":
     case "RR_ATTENDANCE": {
-      const nicknames = entries.map((e) => e.nickname);
-      console.log("📋 EVENT PARTICIPANTS:", nicknames);
+      console.log("📋 EVENT PARTICIPANTS:", entries.map(e => e.nickname));
       break;
     }
 
     case "DONATIONS": {
       for (const e of entries) {
-        console.log("💰 DONATION:", {
-          nick: e.nickname,
-          points: e.value,
-        });
+        console.log("💰 DONATION:", e.nickname, e.value);
       }
       break;
     }
 
     case "DUEL_POINTS": {
       for (const e of entries) {
-        console.log("⚔️ DUEL:", {
-          nick: e.nickname,
-          points: e.value,
-        });
+        console.log("⚔️ DUEL:", e.nickname, e.value);
       }
       break;
     }
@@ -128,8 +94,6 @@ async function execute(
   console.log("=== EXECUTION END ===");
 }
 
-// =====================================
-// 🔥 CORE BATCH PROCESS
 // =====================================
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
@@ -148,7 +112,6 @@ async function processBatch(message: Message, session: any) {
 
   for (const batch of buffer) {
     const lines = batch.lines || [];
-
     if (!lines.length) continue;
 
     let type =
@@ -176,25 +139,24 @@ async function processBatch(message: Message, session: any) {
   }
 
   const mapped = await Promise.all(allEntries.map(mapEntry));
-  const merged = preMerge(mapped);
 
-  debug(traceId, "FINAL_ENTRIES", merged.length);
+  debug(traceId, "MAPPED_ENTRIES", mapped.length);
 
-  // 🔥 SAVE TO SESSION
-  SessionStore.addEntries(message.guildId!, merged);
+  // ✅ JEDYNY MERGE → SessionStore
+  SessionStore.addEntries(message.guildId!, mapped);
 
-  // 🔥 EXECUTE FINAL LOGIC
-  await execute(finalType, merged, message.guildId!);
+  const finalEntries = SessionStore.getEntries(message.guildId!);
 
-  await message.reply(`✅ Processed ${merged.length} entries.`);
+  debug(traceId, "FINAL_SESSION_ENTRIES", finalEntries.length);
 
-  // reset buffer
+  await execute(finalType, finalEntries, message.guildId!);
+
+  await message.reply(`✅ Processed ${mapped.length} entries.`);
+
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
 }
 
-// =====================================
-// 📸 IMAGE INPUT
 // =====================================
 export async function processImageInput(
   message: Message,
@@ -212,16 +174,11 @@ export async function processImageInput(
     return;
   }
 
-  session.buffer.ocrResults.push({
-    lines,
-    traceId,
-  });
+  session.buffer.ocrResults.push({ lines, traceId });
 
   await message.react("✅");
 
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
+  if (session.buffer.timer) clearTimeout(session.buffer.timer);
 
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
@@ -229,17 +186,12 @@ export async function processImageInput(
 }
 
 // =====================================
-// 📝 TEXT INPUT
-// =====================================
 export async function processTextInput(
   message: Message,
   session: any,
   content: string
 ) {
-  const lines = content
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+  const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
 
   if (!lines.length) return;
 
@@ -248,9 +200,7 @@ export async function processTextInput(
     traceId: "text",
   });
 
-  if (session.buffer.timer) {
-    clearTimeout(session.buffer.timer);
-  }
+  if (session.buffer.timer) clearTimeout(session.buffer.timer);
 
   session.buffer.timer = setTimeout(() => {
     processBatch(message, session);
