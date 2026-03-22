@@ -20,7 +20,9 @@ export interface QuickAddEntry {
 
   status?: QuickAddEntryStatus;
   confidence?: number;
-  sourceType?: "OCR" | "MANUAL";
+
+  // 🔥 ROZSZERZONE O AI
+  sourceType?: "OCR" | "MANUAL" | "AI";
 
   // 🔥 NOWE POLE
   group?: "MAIN" | "RESERVE";
