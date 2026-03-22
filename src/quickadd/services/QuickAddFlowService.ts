@@ -1,10 +1,11 @@
+
 // src/quickadd/services/QuickAddFlowService.ts
 
 import { Message } from "discord.js";
 import { processOCR } from "./OCRService";
 import { detectImageType } from "../detector/ImageTypeDetector";
 import { parseByType } from "../parsers/ParserExecutor";
-import { SessionData } from "../session/SessionData";
+import { SessionStore } from "../session/sessionStore";
 
 import {
   resolveNickname,
@@ -42,7 +43,7 @@ function fallbackDetect(lines: string[]): any {
 }
 
 // =====================================
-// 🔥 SAFE MAP ENTRY (FIXED)
+// 🔥 SAFE MAP ENTRY (IMPROVED)
 // =====================================
 async function mapEntry(entry: any) {
   const rawNick = entry.nickname || "";
@@ -56,28 +57,25 @@ async function mapEntry(entry: any) {
       : Number(entry.value);
 
   return {
-    nickname: fuzzy || rawNick,
+    nickname: (fuzzy || rawNick || "").trim(),
     value: isNaN(value) ? 0 : value,
     raw: entry.raw || entry.rawText || "",
   };
 }
 
 // =====================================
-// 🔥 PRE-MERGE (ANTI DUPES BEFORE SESSION)
+// 🔥 PRE-MERGE (ANTI DUPES)
 // =====================================
 function preMerge(entries: any[]) {
   const map = new Map<string, any>();
 
   for (const e of entries) {
-    const key = e.nickname.toLowerCase();
+    const key = (e.nickname || "").toLowerCase().trim();
+    if (!key) continue;
+
     const existing = map.get(key);
 
-    if (!existing) {
-      map.set(key, e);
-      continue;
-    }
-
-    if (e.value > existing.value) {
+    if (!existing || e.value > existing.value) {
       map.set(key, e);
     }
   }
@@ -112,15 +110,16 @@ async function handleParsedData(
     return;
   }
 
-  // 🔥 PARALLEL MAP (faster)
+  // 🔥 PARALLEL MAP
   const mapped = await Promise.all(entries.map(mapEntry));
 
-  // 🔥 PRE MERGE BEFORE SESSION
+  // 🔥 PRE MERGE
   const merged = preMerge(mapped);
 
   debug("FLOW", "AFTER PRE-MERGE:", merged.length);
 
-  SessionData.addEntries(message.guildId!, merged);
+  // 🔥 NOWY SYSTEM (SessionStore)
+  SessionStore.addEntries(message.guildId!, merged);
 
   await message.reply(
     `✅ Parsed ${merged.length} entries from batch.`
@@ -128,7 +127,7 @@ async function handleParsedData(
 }
 
 // =====================================
-// 🔥 CORE — PER SCREEN (IMPROVED)
+// 🔥 CORE — PER SCREEN
 // =====================================
 async function processBatch(message: Message, session: any) {
   debug("BATCH", "🔥 START");
@@ -189,7 +188,7 @@ async function processBatch(message: Message, session: any) {
 
   await handleParsedData(message, session, finalType, allEntries);
 
-  // 🔥 HARD RESET
+  // 🔥 HARD RESET BUFFER
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
 }
