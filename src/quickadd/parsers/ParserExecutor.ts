@@ -1,3 +1,4 @@
+// src/quickadd/parsers/ParserExecutor.ts
 import { ParserType } from "../session/sessionStore";
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
