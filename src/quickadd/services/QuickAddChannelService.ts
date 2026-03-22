@@ -1,4 +1,4 @@
-// src/quickadd/createQuickAddChannel.ts
+// src/quickadd/services/QuickAddChannelService.ts
 
 import {
   Guild,
