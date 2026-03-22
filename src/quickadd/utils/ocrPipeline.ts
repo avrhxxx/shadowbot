@@ -72,6 +72,12 @@ export async function extractTextFromImage(image: Buffer): Promise<string> {
   log("🔥 MERGED LENGTH:", merged.length);
   log("📄 FINAL PREVIEW:\n", merged.slice(0, 300));
 
+  // 🔥 KLUCZOWY DEBUG (CAŁY OUTPUT)
+  log("=== FINAL OCR OUTPUT ===\n" + merged);
+
+  // 🔥 ILE LINII FINALNIE
+  log("🧾 TOTAL LINES AFTER MERGE:", merged.split("\n").length);
+
   return merged;
 }
 
@@ -158,7 +164,6 @@ function mergeOCRResults(texts: string[]): string {
 
     if (!candidates.length) continue;
 
-    // 🔥 dedupe podobnych linii (ale zachowujemy kolejność!)
     const unique: string[] = [];
 
     for (const c of candidates) {
