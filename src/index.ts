@@ -8,7 +8,6 @@ import {
   GatewayIntentBits,
   Partials,
   Interaction,
-  TextChannel,
 } from "discord.js";
 
 import { initTranslationModule } from "./modules/TranslationModule";
@@ -18,13 +17,6 @@ import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
 import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
 import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
-
-// -----------------------------
-// ✅ QuickAdd
-// -----------------------------
-import { registerQuickAddListener } from "./quickadd/QuickAddListener";
-import { createQuickAddChannel } from "./quickadd/services/QuickAddChannelService";
-import { SessionStore } from "./quickadd/session/sessionStore"; // ✅ FIX
 
 const client = new Client({
   intents: [
@@ -46,51 +38,6 @@ client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
 
   // -----------------------------
-  // 🔥 QuickAdd channel setup
-  // -----------------------------
-  for (const guild of client.guilds.cache.values()) {
-    try {
-      await createQuickAddChannel(guild);
-      console.log(`✅ QuickAdd ready in ${guild.name}`);
-    } catch (err) {
-      console.error(`❌ QuickAdd error in ${guild.name}:`, err);
-    }
-  }
-
-  // -----------------------------
-  // 🔥 SESSION TIMEOUT HOOK
-  // -----------------------------
-  SessionStore.setHandlers({ // ✅ FIX
-    sendMessage: async (channelId: string, content: string) => {
-      try {
-        const channel = await client.channels.fetch(channelId);
-
-        if (
-          channel &&
-          channel.isTextBased() &&
-          channel instanceof TextChannel
-        ) {
-          await channel.send(content);
-        }
-      } catch (err) {
-        console.error("❌ Send message error:", err);
-      }
-    },
-
-    deleteChannel: async (channelId: string) => {
-      try {
-        const channel = await client.channels.fetch(channelId);
-
-        if (channel && "delete" in channel) {
-          await channel.delete();
-        }
-      } catch (err) {
-        console.error("❌ Delete channel error:", err);
-      }
-    },
-  });
-
-  // -----------------------------
   // Init modules
   // -----------------------------
   initTranslationModule(client);
@@ -109,11 +56,6 @@ client.once("ready", async () => {
       );
     });
   }
-
-  // -----------------------------
-  // ✅ QuickAdd listener
-  // -----------------------------
-  registerQuickAddListener(client);
 
   // -----------------------------
   // Global interaction handler
