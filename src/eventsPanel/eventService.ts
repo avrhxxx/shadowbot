@@ -1,6 +1,12 @@
 // src/eventsPanel/eventService.ts
-import { SheetRepository } from "../google/SheetRepository";
 
+// 🔥 [IMPORT FIX - OK]
+import { SheetRepository } from "../google/SheetRepository";
+import crypto from "crypto"; // 🔥 [DODANE - ID SAFETY]
+
+// =============================
+// TYPES
+// =============================
 export interface EventObject {
   id: string;
   guildId: string;
@@ -22,6 +28,7 @@ export interface EventObject {
 }
 
 export interface EventConfig {
+  id?: string; // 🔥 [FIX - REQUIRED BY REPO]
   guildId: string;
   notificationChannel?: string;
   downloadChannel?: string;
@@ -46,7 +53,10 @@ export async function getEventById(
   eventId: string
 ): Promise<EventObject | null> {
   const event = await eventRepo.findById(eventId);
+
+  // 🔥 [FIX - SECURITY / DATA SAFETY]
   if (!event || event.guildId !== guildId) return null;
+
   return event;
 }
 
@@ -54,15 +64,20 @@ export async function getEventById(
 // ➕ CREATE
 // =============================
 export async function createEvent(data: EventObject): Promise<EventObject> {
-  return eventRepo.create({
+  const newEvent: EventObject = {
     ...data,
+    id: data.id ?? crypto.randomUUID(), // 🔥 [CRITICAL FIX - ID REQUIRED]
     participants: data.participants || [],
     absent: data.absent || [],
     reminderSent: data.reminderSent ?? false,
     started: data.started ?? false,
     createdAt: data.createdAt ?? Date.now(),
     year: data.year ?? new Date().getUTCFullYear(),
-  });
+  };
+
+  await eventRepo.create(newEvent);
+
+  return newEvent;
 }
 
 // =============================
@@ -75,7 +90,10 @@ export async function deleteEvent(eventId: string) {
 // =============================
 // ✏️ UPDATE
 // =============================
-export async function updateEvent(eventId: string, partial: Partial<EventObject>) {
+export async function updateEvent(
+  eventId: string,
+  partial: Partial<EventObject>
+) {
   await eventRepo.updateById(eventId, partial);
 }
 
@@ -190,6 +208,7 @@ export async function saveEvents(
   guildId: string,
   events: EventObject[]
 ) {
+  // 🔥 [OPTIONAL OPTIMIZATION - future: batch update]
   for (const event of events) {
     await updateEvent(event.id, {
       participants: event.participants,
@@ -212,6 +231,8 @@ export async function getConfig(
   guildId: string
 ): Promise<EventConfig> {
   const configs = await configRepo.findAll({ guildId });
+
+  // 🔥 [FIX - zawsze zwracaj guildId]
   return configs[0] || { guildId };
 }
 
@@ -220,17 +241,19 @@ export async function setConfig(
   key: string,
   value: any
 ) {
-  const existing = await getConfig(guildId);
+  const existing = await configRepo.findAll({ guildId });
 
-  if (!existing || !existing.guildId) {
+  // 🔥 [CRITICAL FIX - brak id wcześniej]
+  if (!existing.length) {
     await configRepo.create({
+      id: crypto.randomUUID(),
       guildId,
       [key]: value,
-    } as EventConfig);
+    });
     return;
   }
 
-  await configRepo.updateById(existing.id!, {
+  await configRepo.updateById(existing[0].id!, {
     [key]: value,
   });
 }
