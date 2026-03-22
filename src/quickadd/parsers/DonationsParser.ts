@@ -1,5 +1,3 @@
-// src/quickadd/parsers/DonationsParser.ts
-
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
@@ -17,7 +15,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 NORMAL donations
     if (isDonationsLine(line)) {
       const value = extractValueSafe(line);
       if (!value) continue;
@@ -29,8 +26,8 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 FALLBACK (BEZ "Donations")
-    if (/\d{4,6}/.test(line)) {
+    // 🔥 FIXED fallback
+    if (/\d{4,6}/.test(line) && !/^\d+$/.test(line)) {
       const value = extractValueSafe(line);
       if (!value) continue;
 
@@ -41,7 +38,6 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
       continue;
     }
 
-    // 🔥 INLINE
     const inline = parseInlineStrong(line);
     if (inline) {
       entries.push({
@@ -61,7 +57,7 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
 }
 
 // =====================================
-// 🔥 ENTRY BUILDER (FIXED CONFIDENCE)
+// ENTRY BUILDER
 // =====================================
 function buildEntry(
   id: number,
@@ -83,26 +79,7 @@ function buildEntry(
 }
 
 // =====================================
-// 🔥 DONATIONS DETECTION (FUZZY)
-// =====================================
-function isDonationsLine(line: string): boolean {
-  const l = line.toLowerCase();
-
-  return (
-    /donations/.test(l) ||
-    /donat/.test(l) ||
-    /d0nat/.test(l) ||
-    /donat1/.test(l) ||
-    /e.?st.?ons/.test(l)
-  );
-}
-
-function isSystemLine(line: string): boolean {
-  return /at least|required|rewards|ranking/i.test(line);
-}
-
-// =====================================
-// 🔥 VALUE EXTRACTION (SMART)
+// VALUE EXTRACTION (🔥 FIXED)
 // =====================================
 function extractValueSafe(line: string): number | null {
   let raw = line.toLowerCase();
@@ -116,14 +93,37 @@ function extractValueSafe(line: string): number | null {
   const matches = raw.match(/\d{2,6}(?:,\d{3})*/g);
   if (!matches) return null;
 
-  return matches
+  const parsed = matches
     .map((v) => parseInt(v.replace(/,/g, ""), 10))
-    .sort((a, b) => b - a)[0];
+    .filter((v) => v < 1_000_000); // 🔥 anti garbage
+
+  if (!parsed.length) return null;
+
+  parsed.sort((a, b) => {
+    const score = (x: number) => {
+      if (x > 10000 && x < 150000) return 100;
+      if (x > 1000 && x < 300000) return 50;
+      return 0;
+    };
+    return score(b) - score(a) || b - a;
+  });
+
+  return parsed[0];
 }
 
 // =====================================
-// 🔥 SMART LOOKBACK (8 LINES)
+// RESZTA (BEZ ZMIAN)
 // =====================================
+
+function isDonationsLine(line: string): boolean {
+  const l = line.toLowerCase();
+  return /donat|d0nat|donat1|e.?st.?ons/.test(l);
+}
+
+function isSystemLine(line: string): boolean {
+  return /at least|required|rewards|ranking/i.test(line);
+}
+
 function findNicknameAboveSmart(lines: string[], index: number) {
   for (let i = 1; i <= 8; i++) {
     const line = lines[index - i];
@@ -144,9 +144,6 @@ function findNicknameAboveSmart(lines: string[], index: number) {
   return null;
 }
 
-// =====================================
-// 🔥 NICK CLEAN (SAFE)
-// =====================================
 function normalizeNickname(name: string): string {
   return name
     .trim()
@@ -154,9 +151,6 @@ function normalizeNickname(name: string): string {
     .replace(/[^\p{L}\p{N}_]/gu, "");
 }
 
-// =====================================
-// 🔥 INLINE PARSER
-// =====================================
 function parseInlineStrong(line: string) {
   const match = line.match(/^([^\d]{3,}?)\s*(\d{4,6})$/);
   if (!match) return null;
@@ -167,9 +161,6 @@ function parseInlineStrong(line: string) {
   };
 }
 
-// =====================================
-// 🔥 HELPERS
-// =====================================
 function isTimestamp(line: string): boolean {
   return /\d{4}-\d{2}|\d{2}:\d{2}/.test(line);
 }
@@ -190,9 +181,6 @@ function isGarbage(line: string): boolean {
   return line.length < 2;
 }
 
-// =====================================
-// 🔥 LINE DEDUPE
-// =====================================
 function dedupeLines(lines: string[]): string[] {
   const seen = new Set<string>();
   return lines.filter((l) => {
@@ -203,9 +191,6 @@ function dedupeLines(lines: string[]): string[] {
   });
 }
 
-// =====================================
-// 🔥 ENTRY DEDUPE (FIXED TS + SMART)
-// =====================================
 function dedupeEntries(entries: QuickAddEntry[]) {
   const map = new Map<string, QuickAddEntry>();
 
@@ -216,30 +201,19 @@ function dedupeEntries(entries: QuickAddEntry[]) {
     const eConf = e.confidence ?? 0;
 
     if (!existing) {
-      map.set(key, {
-        ...e,
-        confidence: eConf,
-      });
+      map.set(key, { ...e, confidence: eConf });
       continue;
     }
 
     const existingConf = existing.confidence ?? 0;
 
-    // 🔥 jeśli ta sama wartość → boost confidence
     if (existing.value === e.value) {
       existing.confidence = existingConf + 0.2;
       continue;
     }
 
-    // 🔥 wybór lepszego wpisu
-    if (
-      e.value > existing.value ||
-      eConf > existingConf
-    ) {
-      map.set(key, {
-        ...e,
-        confidence: eConf,
-      });
+    if (e.value > existing.value || eConf > existingConf) {
+      map.set(key, { ...e, confidence: eConf });
     }
   }
 
