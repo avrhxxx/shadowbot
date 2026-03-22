@@ -115,13 +115,15 @@ async function runTesseract(image: Buffer): Promise<string> {
 }
 
 // =====================================
-// 🤖 Tesseract UI MODE (🔥 NOWE)
+// 🤖 Tesseract UI MODE (FIXED)
 // =====================================
 async function runTesseractUI(image: Buffer): Promise<string> {
   try {
     const result = await Tesseract.recognize(image, "eng", {
       logger: () => {},
-      tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+      config: {
+        tessedit_pageseg_mode: "6", // 🔥 SINGLE_BLOCK (UI friendly)
+      },
     });
 
     return result.data.text || "";
@@ -132,42 +134,49 @@ async function runTesseractUI(image: Buffer): Promise<string> {
 }
 
 // =====================================
-// 🔀 SMART MERGE (🔥 FIX)
+// 🔀 SMART MERGE (ORDER SAFE)
 // =====================================
 function mergeOCRResults(texts: string[]): string {
-  const allLines = texts
-    .flatMap(t =>
-      t
-        .split("\n")
-        .map(l => unicodeCleaner(l))
-        .map(l => l.trim())
-        .filter(Boolean)
-    );
+  const linesSets = texts.map(t =>
+    t
+      .split("\n")
+      .map(l => unicodeCleaner(l))
+      .map(l => l.trim())
+      .filter(Boolean)
+  );
+
+  const maxLen = Math.max(...linesSets.map(l => l.length));
+  const merged: string[] = [];
 
   log("🔀 SMART MERGE START");
-  log("TOTAL LINES:", allLines.length);
+  log("SETS:", linesSets.length, "| MAX:", maxLen);
 
-  const clusters: string[][] = [];
+  for (let i = 0; i < maxLen; i++) {
+    const candidates = linesSets
+      .map(set => set[i])
+      .filter(Boolean);
 
-  for (const line of allLines) {
-    let added = false;
+    if (!candidates.length) continue;
 
-    for (const cluster of clusters) {
-      if (isSimilar(line, cluster[0])) {
-        cluster.push(line);
-        added = true;
-        break;
+    // 🔥 dedupe podobnych linii (ale zachowujemy kolejność!)
+    const unique: string[] = [];
+
+    for (const c of candidates) {
+      if (!unique.some(u => isSimilar(u, c))) {
+        unique.push(c);
       }
     }
 
-    if (!added) {
-      clusters.push([line]);
+    const best = pickBestLine(unique);
+
+    if (DEBUG_OCR_VERBOSE) {
+      log(`LINE ${i}`, "CANDIDATES:", candidates);
+      log(`LINE ${i}`, "UNIQUE:", unique);
+      log(`LINE ${i}`, "PICKED:", best);
     }
+
+    merged.push(best);
   }
-
-  const merged = clusters.map(cluster => pickBestLine(cluster));
-
-  log("🔥 CLUSTERS:", clusters.length);
 
   return merged.join("\n");
 }
