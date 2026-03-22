@@ -1,3 +1,4 @@
+// src/quickadd/parsing/donations/DonationsParser.ts
 export function parseDonations(lines: string[]) {
   const results: { nickname: string; value: number }[] = [];
 
