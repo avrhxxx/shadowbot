@@ -9,9 +9,6 @@ const SCOPE = "OCR";
 export async function runFullImageOCR(imageUrl: string) {
   debug(SCOPE, "RUN_FULL_START", imageUrl);
 
-  // 🔥 NA RAZIE MOCK (żeby pipeline działał)
-  // później podmienimy na Tesseract
-
   const result = {
     text: "Sample OCR text",
     lines: ["Sample", "OCR", "text"],
