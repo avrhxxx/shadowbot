@@ -124,7 +124,7 @@ async function processBatch(message: Message, session: any) {
       if (!type) continue;
 
       try {
-        let parsed = await parseByType(type, lines); // 🔥 FIX
+        let parsed = await parseByType(type, lines);
         if (!parsed?.length) continue;
 
         parsed = parsed.filter(isValidEntry);
@@ -178,10 +178,10 @@ async function processBatch(message: Message, session: any) {
       `✅ Done! ${mapped.length} entries added from ${buffer.length} screenshots.`
     );
 
+    // RESET
     session.buffer.ocrResults = [];
     session.buffer.timer = null;
     session.imageCount = 0;
-    session.awaitingNext = false;
   } finally {
     session.isProcessing = false;
   }
@@ -197,28 +197,19 @@ export async function processImageInput(
 
   debug(traceId, "IMAGE_RECEIVED");
 
-  if (session.awaitingNext) {
-    await message.reply(
-      "⛔ Poczekaj aż potwierdzę poprzedni screen (napisz `next`)."
-    );
-    return;
-  }
-
   session.imageCount = (session.imageCount || 0) + 1;
-  session.awaitingNext = true;
 
   await message.react("📥");
 
   await sendStatus(
     message,
-    `📥 Screenshot ${session.imageCount} received\n✉️ Napisz \`next\` żeby wysłać kolejny\n⏳ Auto start za ${BATCH_DELAY / 1000}s`
+    `📥 Screenshot ${session.imageCount} received\n⏳ Masz ${BATCH_DELAY / 1000}s na kolejny screenshot...`
   );
 
   const { lines } = await processOCR(imageUrl);
 
   if (!lines?.length) {
     debug(traceId, "OCR_EMPTY");
-    session.awaitingNext = false; // 🔥 FIX
     return;
   }
 
@@ -227,6 +218,7 @@ export async function processImageInput(
     traceId,
   });
 
+  // 🔥 RESET TIMERA NA KAŻDY SCREEN
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
@@ -247,15 +239,6 @@ export async function processTextInput(
   session: any,
   content: string
 ) {
-  const normalized = content.toLowerCase().trim();
-
-  if (normalized === "next") {
-    session.awaitingNext = false;
-
-    await message.reply("➡️ Możesz wysłać kolejny screenshot.");
-    return;
-  }
-
   const lines = content
     .split("\n")
     .map((l) => l.trim())
