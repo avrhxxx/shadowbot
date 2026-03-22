@@ -1,3 +1,4 @@
+// src/quickadd/services/OCRService.ts
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
