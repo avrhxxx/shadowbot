@@ -32,8 +32,6 @@ function fallbackDetect(lines: string[]): any {
 }
 
 // =====================================
-// 🔥 ENTRY VALIDATION
-// =====================================
 function isValidEntry(e: any): boolean {
   if (!e) return false;
   if (!e.nickname || e.nickname.length < 2) return false;
@@ -41,6 +39,38 @@ function isValidEntry(e: any): boolean {
   if (isNaN(e.value)) return false;
   if (e.value <= 0) return false;
   return true;
+}
+
+// =====================================
+// 🔥 OUTLIER FILTER (KEY)
+function isOutlier(value: number): boolean {
+  return value > 200000;
+}
+
+// =====================================
+// 🔥 SCORING SYSTEM (SERCE)
+function scoreEntry(e: any): number {
+  let score = 0;
+
+  // parser confidence
+  score += (e.confidence || 0) * 10;
+
+  // realistyczny zakres donations
+  if (e.value >= 20000 && e.value <= 100000) score += 5;
+
+  // kara za dziwne wartości
+  if (e.value > 150000) score -= 10;
+
+  return score;
+}
+
+// =====================================
+function pickBetterEntry(a: any, b: any) {
+  const scoreA = scoreEntry(a);
+  const scoreB = scoreEntry(b);
+
+  if (scoreB > scoreA) return b;
+  return a;
 }
 
 // =====================================
@@ -63,54 +93,26 @@ async function mapEntry(entry: any) {
 }
 
 // =====================================
-// 🔥 EXPORT (SAFE MODE)
-export async function execute(payload: {
-  parserType: any;
-  entries: any[];
-  guildId: string;
-  targetType: string;
-  targetId: string;
-}) {
-  console.log("=================================");
-  console.log("🚀 EXECUTE (SAFE MODE)");
-  console.log("=================================");
-
-  console.log("Guild:", payload.guildId);
-  console.log("Parser:", payload.parserType);
-  console.log("TargetType:", payload.targetType);
-  console.log("TargetId:", payload.targetId);
-  console.log("Entries:", payload.entries.length);
-
-  payload.entries.forEach((e, i) => {
-    console.log(`[${i}] ${e.nickname} → ${e.value}`);
-  });
-
-  console.log("=================================");
-  console.log("✅ NO DB WRITE (SAFE MODE)");
-  console.log("=================================");
-}
-
-// =====================================
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
   debug(traceId, "BATCH_START");
 
   const buffer = session?.buffer?.ocrResults;
-
   if (!buffer?.length) {
     debug(traceId, "EMPTY_BUFFER");
     return;
   }
 
-  let allEntries: any[] = [];
-  let finalType: any = session.parserType || null;
+  // =====================================
+  // 🧠 1. PARSE PER SCREEN (IZOLACJA)
+  // =====================================
+  const screens: any[] = [];
 
   for (const batch of buffer) {
     const lines = batch.lines || [];
     if (!lines.length) continue;
 
-    // 🔥 DEBUG LINES
     debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
 
     let type =
@@ -121,61 +123,89 @@ async function processBatch(message: Message, session: any) {
     if (!type) continue;
 
     try {
-      const parsed = parseByType(type, lines);
+      let parsed = parseByType(type, lines);
 
-      if (parsed.length) {
-        finalType = type;
+      if (!parsed.length) continue;
 
-        const valid = parsed.filter(isValidEntry);
+      // =====================================
+      // 🔥 FILTER PER SCREEN
+      // =====================================
+      parsed = parsed
+        .filter(isValidEntry)
+        .filter((e) => !isOutlier(e.value));
 
-        debug(traceId, "PARSED_RAW", parsed.length);
-        debug(traceId, "PARSED_VALID", valid.length);
+      debug(traceId, "SCREEN_PARSED", {
+        type,
+        raw: parsed.length,
+      });
 
-        allEntries.push(...valid);
-      }
+      screens.push({
+        type,
+        entries: parsed,
+      });
     } catch (err) {
       console.error("💥 PARSER ERROR:", err);
     }
   }
 
-  if (!allEntries.length) {
+  if (!screens.length) {
     await message.reply("❌ No valid entries parsed.");
     return;
   }
 
   // =====================================
-  // 🔥 DEDUPE ENTRIES
+  // 🧠 2. SMART MERGE (ZAMIAST MAX VALUE)
   // =====================================
-  const uniqueMap = new Map<string, any>();
+  const merged = new Map<string, any>();
 
-  for (const e of allEntries) {
-    const key = e.nickname.toLowerCase();
+  for (const screen of screens) {
+    for (const e of screen.entries) {
+      const key = e.nickname.toLowerCase();
+      const existing = merged.get(key);
 
-    if (!uniqueMap.has(key) || uniqueMap.get(key).value < e.value) {
-      uniqueMap.set(key, e);
+      if (!existing) {
+        merged.set(key, e);
+        continue;
+      }
+
+      const better = pickBetterEntry(existing, e);
+
+      debug(traceId, "MERGE_DECISION", {
+        nick: key,
+        existing: existing.value,
+        incoming: e.value,
+        chosen: better.value,
+        scoreExisting: scoreEntry(existing),
+        scoreIncoming: scoreEntry(e),
+      });
+
+      merged.set(key, better);
     }
   }
 
-  allEntries = Array.from(uniqueMap.values());
+  let allEntries = Array.from(merged.values());
 
-  debug(traceId, "AFTER_DEDUPE", allEntries.length);
+  debug(traceId, "AFTER_MERGE", allEntries.length);
 
+  // =====================================
+  // 🧠 3. MAP NICKNAMES (NA KOŃCU)
   // =====================================
   const mapped = await Promise.all(allEntries.map(mapEntry));
 
-  debug(traceId, "MAPPED_ENTRIES", mapped.length);
-  debug(traceId, "FINAL_TYPE", finalType);
+  debug(traceId, "MAPPED", mapped.length);
 
   // =====================================
-  // 🔥 SINGLE SOURCE OF TRUTH
+  // 🧠 4. SESSION STORE
+  // =====================================
   SessionStore.addEntries(message.guildId!, mapped);
 
   const finalEntries = SessionStore.getEntries(message.guildId!);
 
-  debug(traceId, "FINAL_SESSION_ENTRIES", finalEntries.length);
+  debug(traceId, "FINAL_SESSION", finalEntries.length);
 
   // =====================================
-  // 🔥 SAFE MODE (no DB writes)
+  // 🧠 5. SAVE NICK MAPPINGS
+  // =====================================
   try {
     if (process.env.DEV_MODE === "true") {
       console.log("🧠 DEV MODE: skip nick mapping save");
@@ -188,6 +218,9 @@ async function processBatch(message: Message, session: any) {
 
   await message.reply(`✅ Processed ${mapped.length} entries.`);
 
+  // =====================================
+  // 🔥 RESET BUFFER
+  // =====================================
   session.buffer.ocrResults = [];
   session.buffer.timer = null;
 }
@@ -209,6 +242,7 @@ export async function processImageInput(
     return;
   }
 
+  // 🔥 zapisujemy SUROWE linie (bez parsowania)
   session.buffer.ocrResults.push({
     lines,
     traceId,
