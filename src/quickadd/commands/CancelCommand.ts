@@ -1,12 +1,11 @@
 // src/quickadd/commands/CancelCommand.ts
 
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
+import { SessionStore } from "../session/sessionStore"; // ✅ FIX
 
 export async function cancel(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId); // ✅ FIX
 
   if (!session) {
     await message.reply("❌ Brak aktywnej sesji.");
@@ -14,10 +13,10 @@ export async function cancel(message: Message) {
   }
 
   // 🧹 usuń dane
-  SessionData.clear(guildId);
+  SessionStore.clearEntries(guildId); // ✅ FIX
 
   // 🧠 usuń sesję
-  SessionManager.endSession(guildId);
+  SessionStore.endSession(guildId); // ✅ FIX
 
   await message.reply("❌ Sesja została anulowana.");
 
