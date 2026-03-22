@@ -1,8 +1,9 @@
+
 // =====================================
-// 📁 src/quickadd/parsers/DonationsParser.ts
+// 📁 src/quickadd/parsing/donations/DonationsParser.ts
 // =====================================
 
-import { debugTrace } from "../debug/DebugLogger";
+import { debugTrace } from "../../debug/DebugLogger";
 
 const SCOPE = "PARSER";
 
@@ -68,11 +69,8 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
 // =====================================
 function cleanNickname(name: string): string {
   return name
-    // usuń śmieci z początku (np. "4 ", "@ ", "Y ")
     .replace(/^[^a-zA-Z0-9]+/, "")
-    // usuń śmieci z końca
     .replace(/[^a-zA-Z0-9]+$/, "")
-    // usuń podwójne spacje
     .replace(/\s{2,}/g, " ")
     .trim();
 }
