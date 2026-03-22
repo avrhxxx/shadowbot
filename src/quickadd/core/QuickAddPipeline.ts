@@ -36,7 +36,7 @@ export async function processImageInput(
     // =============================
     // 🔥 PARSING (NOWY ETAP)
     // =============================
-    const parsed = parseOCR(ocrResult.lines);
+    const parsed = parseOCR(ocrResult.lines, traceId); // ✅ FIX
 
     debugTrace(SCOPE, "PARSED_RESULT", traceId, parsed);
 
