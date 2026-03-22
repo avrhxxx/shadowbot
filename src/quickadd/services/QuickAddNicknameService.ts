@@ -1,16 +1,13 @@
 // src/quickadd/services/QuickAddNicknameService.ts
-import * as GS from "../../googleSheetsStorage";
+import { SheetRepository } from "../../google/SheetRepository";
 
 const TYPE = "nickname";
 
+// =============================
+// TYPES
+// =============================
 interface NickMapping {
-  ocr: string;
-  final: string;
-  override?: string;
-  createdAt: number;
-}
-
-interface RawRow {
+  id?: string;
   type: string;
   ocr: string;
   final: string;
@@ -18,59 +15,45 @@ interface RawRow {
   createdAt: number;
 }
 
+// =============================
+// 📦 REPO
+// =============================
+const repo = new SheetRepository<NickMapping>("quickadd");
+
 let cache: NickMapping[] | null = null;
 
-// =====================================
-// 📥 LOAD FROM SHEETS
-// =====================================
+// =============================
+// 📥 LOAD
+// =============================
 async function loadMappings(): Promise<NickMapping[]> {
   if (cache) return cache;
 
-  const rows = await GS.readSheet("quickadd");
+  const all = await repo.findAll();
 
-  if (!rows || rows.length <= 1) {
-    cache = [];
-    return [];
-  }
-
-  const parsed: NickMapping[] = rows
-    .slice(1)
-    .map((r: unknown[]): RawRow => ({
-      type: String(r[0] ?? ""),
-      ocr: String(r[1] ?? ""),
-      final: String(r[2] ?? ""),
-      override: String(r[3] ?? ""),
-      createdAt: Number(r[4] ?? 0),
-    }))
-    .filter((r: RawRow) => r.type === TYPE && r.ocr)
-    .map((r: RawRow) => ({
+  const filtered = all
+    .filter((r) => r.type === TYPE && r.ocr)
+    .map((r) => ({
+      ...r,
       ocr: r.ocr.trim(),
       final: r.final?.trim() || "",
       override: r.override?.trim() || "",
       createdAt: r.createdAt || 0,
     }));
 
-  cache = parsed;
-  return parsed;
+  cache = filtered;
+  return filtered;
 }
 
-// =====================================
-// 💾 SAVE (AFTER CONFIRM)
-// =====================================
+// =============================
+// 💾 SAVE
+// =============================
 export async function saveNickMappings(
   entries: { nickname: string; raw: string }[]
 ) {
   console.log("🧠 [NickService] Saving mappings...");
 
-  const rowsToAppend: {
-    type: string;
-    ocr: string;
-    final: string;
-    override: string;
-    createdAt: number;
-  }[] = [];
-
   const now = Date.now();
+  let saved = 0;
 
   for (const e of entries) {
     const raw = e.raw?.trim();
@@ -86,35 +69,35 @@ export async function saveNickMappings(
 
     console.log(`➕ ${raw} → ${final}`);
 
-    rowsToAppend.push({
+    await repo.create({
       type: TYPE,
       ocr: raw,
       final,
       override: "",
       createdAt: now,
     });
+
+    saved++;
   }
 
-  if (!rowsToAppend.length) {
+  if (!saved) {
     console.log("⚠️ No mappings to save");
     return;
   }
 
-  await GS.appendQuickAddRows(rowsToAppend);
-
   cache = null;
 
-  console.log(`✅ Saved ${rowsToAppend.length} mappings`);
+  console.log(`✅ Saved ${saved} mappings`);
 }
 
-// =====================================
-// 🔍 RESOLVE (OVERRIDE FIRST)
-// =====================================
+// =============================
+// 🔍 EXACT RESOLVE
+// =============================
 export async function resolveNickname(raw: string): Promise<string> {
   const mappings = await loadMappings();
 
   const found = mappings.find(
-    (m: NickMapping) => m.ocr.toLowerCase() === raw.toLowerCase()
+    (m) => m.ocr.toLowerCase() === raw.toLowerCase()
   );
 
   if (found) {
@@ -132,9 +115,9 @@ export async function resolveNickname(raw: string): Promise<string> {
   return raw;
 }
 
-// =====================================
-// 🔍 FUZZY MATCH
-// =====================================
+// =============================
+// 🔍 FUZZY
+// =============================
 export async function resolveNicknameFuzzy(raw: string): Promise<string> {
   const mappings = await loadMappings();
 
@@ -145,13 +128,9 @@ export async function resolveNicknameFuzzy(raw: string): Promise<string> {
 
     if (score > 0.8 && (!best || score > best.score)) {
       const value = m.override || m.final;
-
       if (!value) continue;
 
-      best = {
-        score,
-        value,
-      };
+      best = { score, value };
     }
   }
 
@@ -163,9 +142,9 @@ export async function resolveNicknameFuzzy(raw: string): Promise<string> {
   return raw;
 }
 
-// =====================================
+// =============================
 // 🔧 SIMILARITY
-// =====================================
+// =============================
 function similarity(a: string, b: string): number {
   const normalize = (s: string) =>
     s.toLowerCase().replace(/\s+/g, "");
