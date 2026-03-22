@@ -125,10 +125,15 @@ async function runTesseract(image: Buffer): Promise<string> {
 // =====================================
 async function runTesseractUI(image: Buffer): Promise<string> {
   try {
-    const result = await Tesseract.recognize(image, "eng", {
-      logger: () => {},
-      tessedit_pageseg_mode: "6" as any, // 🔥 FIX
+    const worker = await Tesseract.createWorker("eng");
+
+    await worker.setParameters({
+      tessedit_pageseg_mode: "6", // 🔥 SINGLE_BLOCK
     });
+
+    const result = await worker.recognize(image);
+
+    await worker.terminate();
 
     return result.data.text || "";
   } catch {
