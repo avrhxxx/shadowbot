@@ -23,7 +23,7 @@ function debug(traceId: string, tag: string, ...args: any[]) {
 const BATCH_DELAY = 10000;
 
 // =====================================
-// 🧠 STATUS (NO EDIT)
+// 🧠 STATUS
 async function sendStatus(message: Message, text: string) {
   try {
     await message.reply(text);
@@ -89,7 +89,7 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
-  // 🔥 LOCK (ANTI DOUBLE EXEC)
+  // 🔥 LOCK
   if (session.isProcessing) {
     debug(traceId, "SKIP_ALREADY_PROCESSING");
     return;
@@ -98,26 +98,25 @@ async function processBatch(message: Message, session: any) {
   session.isProcessing = true;
 
   try {
-    debug(traceId, "BATCH_START");
+    const buffer = session?.buffer?.ocrResults;
+
+    if (!buffer?.length) {
+      debug(traceId, "EMPTY_BUFFER_SKIP");
+      return;
+    }
+
+    debug(traceId, "BATCH_START", buffer.length);
 
     await sendStatus(
       message,
-      `🧠 Processing ${session.imageCount || 0} screenshots...`
+      `🧠 Processing ${buffer.length} screenshots...`
     );
-
-    const buffer = session?.buffer?.ocrResults;
-    if (!buffer?.length) {
-      debug(traceId, "EMPTY_BUFFER");
-      return;
-    }
 
     const screens: any[] = [];
 
     for (const batch of buffer) {
       const lines = batch.lines || [];
       if (!lines.length) continue;
-
-      debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
 
       let type =
         detectImageType(lines, session.parserType) ||
@@ -130,11 +129,6 @@ async function processBatch(message: Message, session: any) {
         let parsed = parseByType(type, lines);
         parsed = parsed.filter(isValidEntry);
 
-        debug(traceId, "SCREEN_PARSED", {
-          type,
-          count: parsed.length,
-        });
-
         screens.push({
           type,
           entries: parsed,
@@ -145,7 +139,7 @@ async function processBatch(message: Message, session: any) {
     }
 
     if (!screens.length) {
-      await message.reply("❌ No valid entries parsed.");
+      await sendStatus(message, "❌ No valid entries parsed.");
       return;
     }
 
@@ -164,16 +158,7 @@ async function processBatch(message: Message, session: any) {
           continue;
         }
 
-        const better = pickBetterEntry(existing, e);
-
-        debug(traceId, "MERGE_DECISION", {
-          nick: key,
-          existing: existing.value,
-          incoming: e.value,
-          chosen: better.value,
-        });
-
-        merged.set(key, better);
+        merged.set(key, pickBetterEntry(existing, e));
       }
     }
 
@@ -181,26 +166,22 @@ async function processBatch(message: Message, session: any) {
       Array.from(merged.values()).map(mapEntry)
     );
 
-    debug(traceId, "MAPPED", mapped.length);
-
     SessionStore.addEntries(message.guildId!, mapped);
 
     // =====================================
-    // 🧠 SAVE NICKS
+    // SAVE NICKS
     // =====================================
     try {
-      if (process.env.DEV_MODE === "true") {
-        console.log("🧠 DEV MODE: skip nick mapping save");
-      } else {
+      if (process.env.DEV_MODE !== "true") {
         await saveNickMappings(mapped);
       }
     } catch {
-      console.warn("⚠️ Nick mapping failed (non-blocking)");
+      console.warn("⚠️ Nick mapping failed");
     }
 
     await sendStatus(
       message,
-      `✅ Done! ${mapped.length} entries added from ${session.imageCount || 0} screenshots.`
+      `✅ Done! ${mapped.length} entries added from ${buffer.length} screenshots.`
     );
 
     // =====================================
@@ -210,7 +191,6 @@ async function processBatch(message: Message, session: any) {
     session.buffer.timer = null;
     session.imageCount = 0;
   } finally {
-    // 🔥 ALWAYS UNLOCK
     session.isProcessing = false;
   }
 }
@@ -223,8 +203,19 @@ export async function processImageInput(
 ) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "IMAGE");
+  debug(traceId, "IMAGE_RECEIVED");
 
+  // 🔥 NATYCHMIASTOWY FEEDBACK (BEZ OCR)
+  session.imageCount = (session.imageCount || 0) + 1;
+
+  await message.react("✅");
+
+  await sendStatus(
+    message,
+    `📥 Screenshot ${session.imageCount} received\n⏳ Send more within ${BATCH_DELAY / 1000}s...`
+  );
+
+  // 🔥 OCR W TLE (nie blokuje UX)
   const { lines } = await processOCR(imageUrl);
 
   if (!lines?.length) {
@@ -232,19 +223,10 @@ export async function processImageInput(
     return;
   }
 
-  session.imageCount = (session.imageCount || 0) + 1;
-
   session.buffer.ocrResults.push({
     lines,
     traceId,
   });
-
-  await message.react("✅");
-
-  await sendStatus(
-    message,
-    `📥 Screenshot ${session.imageCount} received\n⏳ Waiting ${BATCH_DELAY / 1000}s for more...`
-  );
 
   // 🔥 RESET TIMER
   if (session.buffer.timer) {
@@ -256,8 +238,6 @@ export async function processImageInput(
   }, BATCH_DELAY);
 }
 
-// =====================================
-// 🔥 LEGACY EXPORTS (BUILD FIX)
 // =====================================
 export async function execute(payload: any) {
   console.log("🚀 EXECUTE SAFE MODE", payload.entries.length);
