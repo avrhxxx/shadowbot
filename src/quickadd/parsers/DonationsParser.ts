@@ -4,12 +4,17 @@ import { parseValue } from "../utils/parseValue";
 import { askLlama } from "../services/LlamaService"; // 🤖 AI
 
 const DEBUG = true;
+const DEBUG_AI = true;
 
 function log(...args: any[]) {
   if (DEBUG) console.log("[DonationsParser]", ...args);
 }
 
-// 🔥 UWAGA: parser teraz async (bo AI)
+function logAI(...args: any[]) {
+  if (DEBUG_AI) console.log("[DonationsParser][AI]", ...args);
+}
+
+// 🔥 UWAGA: parser async (bo AI)
 export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> {
   let lineId = 1;
   const entries: QuickAddEntry[] = [];
@@ -51,10 +56,7 @@ export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> 
     // =============================
     // 🔥 FALLBACK
     // =============================
-    if (
-      /donat/i.test(line) &&
-      /\d{4,6}/.test(line)
-    ) {
+    if (/donat/i.test(line) && /\d{4,6}/.test(line)) {
       const value = extractValueSafe(line);
 
       if (!isValidValue(value)) continue;
@@ -90,22 +92,32 @@ export async function parseDonations(lines: string[]): Promise<QuickAddEntry[]> 
     // 🤖 AI FALLBACK (OSTATNIA SZANSA)
     // =============================
     if (/[a-z]/i.test(line) && /\d{3,}/.test(line)) {
+      logAI("TRY:", line);
+
       const ai = await tryParseWithAI(line);
 
-      if (ai && isValidValue(ai.value)) {
-        log("🤖 AI HIT:", ai.nickname, ai.value);
-
-        entries.push({
-          lineId: lineId++,
-          nickname: ai.nickname,
-          value: ai.value,
-          raw: line,
-          rawText: line,
-          status: "OK",
-          confidence: ai.confidence ?? 0.5,
-          sourceType: "AI",
-        });
+      if (!ai) {
+        logAI("❌ AI NULL");
+        continue;
       }
+
+      if (!isValidValue(ai.value)) {
+        logAI("❌ AI INVALID VALUE:", ai.value);
+        continue;
+      }
+
+      logAI("✅ AI HIT:", ai.nickname, ai.value);
+
+      entries.push({
+        lineId: lineId++,
+        nickname: ai.nickname,
+        value: ai.value,
+        raw: line,
+        rawText: line,
+        status: "OK",
+        confidence: ai.confidence ?? 0.5,
+        sourceType: "AI",
+      });
     }
   }
 
@@ -282,30 +294,33 @@ function dedupeEntries(entries: QuickAddEntry[]) {
 async function tryParseWithAI(line: string) {
   try {
     const prompt = `
-You are parsing OCR text from a game donations screen.
-
-Extract:
-- nickname (string)
-- value (number)
+Extract nickname and donation value from OCR.
 
 Return ONLY JSON:
-{"nickname":"...", "value":12345}
+{"nickname":"string","value":number}
 
 Text:
 ${line}
 `;
 
+    logAI("PROMPT:", prompt);
+
     const res = await askLlama(prompt);
 
-    const jsonMatch = res.match(/\{.*\}/s);
-    if (!jsonMatch) return null;
+    logAI("RAW:", res);
+
+    const jsonMatch = res.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      logAI("❌ NO JSON");
+      return null;
+    }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    if (
-      !parsed.nickname ||
-      typeof parsed.value !== "number"
-    ) {
+    logAI("PARSED:", parsed);
+
+    if (!parsed.nickname || typeof parsed.value !== "number") {
+      logAI("❌ INVALID STRUCTURE");
       return null;
     }
 
