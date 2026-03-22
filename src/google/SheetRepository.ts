@@ -15,6 +15,11 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   private async load() {
     const rows = await readSheet(this.tab);
+
+    if (!rows || rows.length === 0) {
+      return { headers: [], dataRows: [] };
+    }
+
     const headers: string[] = rows[0] || [];
     const dataRows = rows.slice(1);
 
@@ -30,9 +35,14 @@ export class SheetRepository<T extends { id?: string }> {
     headers.forEach((h, i) => {
       let val = row[i];
 
-      // auto JSON parse
-      if (typeof val === "string" && val.startsWith("[") || val?.startsWith("{")) {
-        try { val = JSON.parse(val); } catch {}
+      // 🔥 FIXED JSON PARSE
+      if (
+        typeof val === "string" &&
+        (val.startsWith("[") || val.startsWith("{"))
+      ) {
+        try {
+          val = JSON.parse(val);
+        } catch {}
       }
 
       obj[h] = val ?? null;
@@ -84,9 +94,12 @@ export class SheetRepository<T extends { id?: string }> {
 
     if (filter) {
       data = data.filter((item) =>
-        Object.entries(filter).every(([key, val]) =>
-          (item as any)[key] === val
-        )
+        Object.entries(filter).every(([key, val]) => {
+          const itemVal = (item as any)[key];
+
+          // 🔥 SAFE COMPARE
+          return String(itemVal) === String(val);
+        })
       );
     }
 
@@ -107,13 +120,18 @@ export class SheetRepository<T extends { id?: string }> {
   async create(data: T): Promise<T> {
     const { headers, dataRows } = await this.load();
 
-    this.ensureColumns(headers, data);
+    const finalData = {
+      ...data,
+      id: data.id ?? crypto.randomUUID(), // 🔥 AUTO ID
+    };
 
-    const row = this.mapObject(headers, data);
+    this.ensureColumns(headers, finalData);
+
+    const row = this.mapObject(headers, finalData);
 
     await this.save(headers, [...dataRows, row]);
 
-    return data;
+    return finalData;
   }
 
   // =============================
