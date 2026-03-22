@@ -1,81 +1,65 @@
 // src/quickadd/QuickAddListener.ts
 
-import {
-  Client,
-  Message,
-} from "discord.js";
-
+import { Client, Message } from "discord.js";
 import { processImageInput } from "./core/QuickAddPipeline";
 import { QuickAddSession } from "./core/QuickAddSession";
-import { debug } from "./debug/DebugLogger";
+import { debug, debugTrace } from "./debug/DebugLogger";
 
-// =============================
-const TRACE = "LISTENER";
+const SCOPE = "LISTENER";
 
-// =============================
+// =====================================
 function getImageUrl(message: Message): string | null {
-  // 📸 attachment (najczęstsze)
   const attachment = message.attachments.first();
   if (attachment?.url) return attachment.url;
 
-  // 🔗 fallback: link w treści
-  const urlMatch = message.content.match(
+  const match = message.content.match(
     /(https?:\/\/.*\.(?:png|jpg|jpeg|webp))/i
   );
 
-  return urlMatch ? urlMatch[1] : null;
+  return match ? match[1] : null;
 }
 
-// =============================
+// =====================================
 export function registerQuickAddListener(client: Client) {
   client.on("messageCreate", async (message: Message) => {
     try {
-      // -----------------------------
-      // ❌ IGNORE BOT
-      // -----------------------------
       if (message.author.bot) return;
-
-      // -----------------------------
-      // ❌ IGNORE DM
-      // -----------------------------
       if (!message.guild) return;
 
-      // -----------------------------
-      // 📦 SESSION
-      // -----------------------------
+      debug(SCOPE, "MESSAGE_RECEIVED", {
+        user: message.author.id,
+        channel: message.channel.id,
+      });
+
       const session = QuickAddSession.get(message.guild.id);
 
-      if (!session) return;
-
-      // -----------------------------
-      // 🔒 CHANNEL LOCK
-      // -----------------------------
-      if (session.channelId !== message.channel.id) return;
-
-      // -----------------------------
-      // 🔒 OWNER LOCK
-      // -----------------------------
-      if (session.ownerId !== message.author.id) {
-        debug(TRACE, "IGNORED_NOT_OWNER", message.author.id);
+      if (!session) {
+        debug(SCOPE, "NO_SESSION");
         return;
       }
 
-      // -----------------------------
-      // 📸 IMAGE DETECTION
-      // -----------------------------
+      if (session.channelId !== message.channel.id) {
+        debug(SCOPE, "WRONG_CHANNEL");
+        return;
+      }
+
+      if (session.ownerId !== message.author.id) {
+        debug(SCOPE, "IGNORED_NOT_OWNER", message.author.id);
+        return;
+      }
+
       const imageUrl = getImageUrl(message);
 
       if (!imageUrl) {
-        debug(TRACE, "NO_IMAGE");
+        debug(SCOPE, "NO_IMAGE");
         return;
       }
 
-      debug(TRACE, "IMAGE_DETECTED", imageUrl);
+      const traceId = Date.now().toString().slice(-5);
 
-      // -----------------------------
-      // 🚀 PIPELINE
-      // -----------------------------
-      await processImageInput(message, session, imageUrl);
+      debugTrace(SCOPE, "IMAGE_DETECTED", traceId, imageUrl);
+
+      await processImageInput(message, session, imageUrl, traceId);
 
     } catch (err) {
       console.error("❌ QuickAddListener error:", err);
