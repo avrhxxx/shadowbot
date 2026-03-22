@@ -1,6 +1,11 @@
 // src/quickadd/services/OCRService.ts
 
-import { extractTextFromImage, preprocessImage } from "../utils/ocrPipeline";
+import {
+  extractTextFromImage,
+  preprocessImage,
+  splitAndCleanText,
+  OCRRawResult,
+} from "../utils/ocrPipeline";
 import fetch from "node-fetch";
 
 // =====================================
@@ -15,7 +20,8 @@ function log(...args: any[]) {
 }
 
 // =====================================
-export interface OCRResult {
+export interface OCRProcessed {
+  source: string;
   text: string;
   lines: string[];
 }
@@ -23,7 +29,9 @@ export interface OCRResult {
 // =====================================
 // 🚀 MAIN
 // =====================================
-export async function processOCR(imageUrl: string): Promise<OCRResult> {
+export async function processOCR(
+  imageUrl: string
+): Promise<OCRProcessed[]> {
   log("📸 FETCH IMAGE:", imageUrl);
 
   const response = await fetch(imageUrl);
@@ -37,7 +45,7 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   if (!buffer || buffer.length < 100) {
     log("❌ INVALID IMAGE BUFFER");
-    return { text: "", lines: [] };
+    return [];
   }
 
   log("📸 IMAGE SIZE:", buffer.length);
@@ -48,72 +56,78 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
   const processedBuffer = await preprocessImage(buffer);
 
   // =====================================
-  // 🧠 OCR
+  // 🧠 OCR (🔥 MULTI SOURCE)
   // =====================================
-  const text = await extractTextFromImage(processedBuffer);
+  const rawResults: OCRRawResult[] =
+    await extractTextFromImage(processedBuffer);
 
-  log("🧠 OCR LENGTH:", text.length);
-
-  if (!text || text.trim().length < 5) {
+  if (!rawResults?.length) {
     log("⚠️ OCR FAILED HARD");
-    return { text: "", lines: [] };
+    return [];
   }
 
-  // =====================================
-  // ✂️ SPLIT
-  // =====================================
-  let lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+  const finalResults: OCRProcessed[] = [];
 
-  log("📄 RAW LINES:", lines.length);
+  for (const raw of rawResults) {
+    if (!raw.text || raw.text.trim().length < 5) {
+      log(`⚠️ SKIP EMPTY OCR: ${raw.source}`);
+      continue;
+    }
 
-  // =====================================
-  // 🧹 CLEAN
-  // =====================================
-  lines = preprocessOCR(lines);
-  log("🧹 AFTER PREPROCESS:", lines.length);
+    log(`🧠 PROCESSING SOURCE: ${raw.source}`);
 
-  // =====================================
-  // 🔀 MERGE
-  // =====================================
-  lines = mergeBrokenLines(lines);
-  log("🔀 AFTER MERGE:", lines.length);
+    // =====================================
+    // ✂️ SPLIT
+    // =====================================
+    let lines = splitAndCleanText(raw.text);
+    log(`[${raw.source}] RAW LINES:`, lines.length);
 
-  // =====================================
-  // 📏 NORMALIZE
-  // =====================================
-  lines = normalizeLines(lines);
-  log("📏 AFTER NORMALIZE:", lines.length);
+    // =====================================
+    // 🧹 CLEAN
+    // =====================================
+    lines = preprocessOCR(lines);
+    log(`[${raw.source}] AFTER PREPROCESS:`, lines.length);
 
-  // =====================================
-  // 🔒 LIMIT
-  // =====================================
-  if (lines.length > 100) {
-    log("⚠️ LINE LIMIT APPLIED (100)");
-    lines = lines.slice(0, 100);
+    // =====================================
+    // 🔀 MERGE
+    // =====================================
+    lines = mergeBrokenLines(lines);
+    log(`[${raw.source}] AFTER MERGE:`, lines.length);
+
+    // =====================================
+    // 📏 NORMALIZE
+    // =====================================
+    lines = normalizeLines(lines);
+    log(`[${raw.source}] AFTER NORMALIZE:`, lines.length);
+
+    // =====================================
+    // 🔒 LIMIT
+    // =====================================
+    if (lines.length > 100) {
+      log(`[${raw.source}] ⚠️ LIMIT APPLIED`);
+      lines = lines.slice(0, 100);
+    }
+
+    // =====================================
+    // 📊 DEBUG
+    // =====================================
+    log(`=== ${raw.source} FINAL PREVIEW ===`);
+    lines.slice(0, 15).forEach((line, i) => {
+      log(`[${raw.source}][${i}] ${line}`);
+    });
+
+    finalResults.push({
+      source: raw.source,
+      text: raw.text,
+      lines,
+    });
   }
 
-  // =====================================
-  // 📊 FINAL DEBUG
-  // =====================================
-  log("=== FINAL LINES PREVIEW ===");
-  lines.slice(0, 20).forEach((line, i) => {
-    log(`[${i}] "${line}"`);
-  });
-
-  // 🔥 FULL DEBUG (NAJWAŻNIEJSZE)
-  log("=== FINAL CLEAN LINES ===");
-  lines.forEach((line, i) => {
-    log(`[${i}] ${line}`);
-  });
-
-  return { text, lines };
+  return finalResults;
 }
 
 // =====================================
-// 🧹 CLEAN (FIXED)
+// 🧹 CLEAN
 // =====================================
 function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -122,7 +136,6 @@ function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      // 🔥 usuwa tylko realny garbage
       .replace(/[^\p{L}\p{N}\s:.,]/gu, "")
       .replace(/^\d+\s*/, "")
       .replace(/\s+/g, " ")
@@ -132,7 +145,6 @@ function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
-    // 🔥 UI garbage
     if (
       lower.includes("tap to") ||
       lower.includes("share") ||
@@ -140,7 +152,6 @@ function preprocessOCR(lines: string[]): string[] {
       lower === "ok"
     ) continue;
 
-    // 🔥 OCR garbage filter
     if (cleaned.length < 3) continue;
     if (!/[a-zA-Z]/.test(cleaned) && !/\d{2,}/.test(cleaned)) continue;
 
@@ -151,7 +162,7 @@ function preprocessOCR(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔀 MERGE (FIXED 🔥)
+// 🔀 MERGE
 // =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
@@ -165,35 +176,30 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 42 + 815 → 42815
     if (/^\d{2,}$/.test(current) && /^\d{3}$/.test(next)) {
       merged.push(current + next);
       i++;
       continue;
     }
 
-    // 🔥 42 + ,815 → 42815
     if (/^\d{2,}$/.test(current) && /^,\d{3}$/.test(next)) {
       merged.push(current + next.replace(",", ""));
       i++;
       continue;
     }
 
-    // 🔥 Donations: + 42815
     if (/donat/i.test(current) && /^\d{2,6}$/.test(next)) {
       merged.push(`${current} ${next}`);
       i++;
       continue;
     }
 
-    // 🔥 Donations: + ,815
     if (/donat/i.test(current) && /^,\d{3}$/.test(next)) {
       merged.push(`${current}${next}`);
       i++;
       continue;
     }
 
-    // 🔥 41 + 999 → 41999
     if (/^\d{2,}$/.test(current) && /^\d{1,3}$/.test(next)) {
       merged.push(current + next);
       i++;
