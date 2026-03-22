@@ -6,24 +6,16 @@ import fetch from "node-fetch";
 import FormData from "form-data";
 
 // =====================================
-// 🔥 DEBUG CONFIG
-// =====================================
 const DEBUG_OCR = true;
-const DEBUG_OCR_VERBOSE = false;
 
 function log(...args: any[]) {
-  if (DEBUG_OCR) {
-    console.log("[OCR]", ...args);
-  }
+  if (DEBUG_OCR) console.log("[OCR]", ...args);
 }
 
 // =====================================
-// 📸 PREPROCESS IMAGE
-// =====================================
+// 📸 PREPROCESS (bez zmian)
 export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
-  log("📸 INPUT SIZE:", buffer.length);
-
-  const out = await sharp(buffer)
+  return sharp(buffer)
     .resize({ width: 2000 })
     .grayscale()
     .linear(1.5, -10)
@@ -31,60 +23,43 @@ export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
     .median(1)
     .threshold(140)
     .toBuffer();
-
-  log("🧹 PREPROCESS DONE:", out.length);
-
-  return out;
 }
 
 // =====================================
-// 🧠 MAIN OCR ENTRY (🔥 NOWY SYSTEM)
-// =====================================
-export interface OCRRawResult {
-  source: string;
-  text: string;
-}
+// 🧠 MAIN OCR → ZWRACA 3 WERSJE!
+export async function extractOCRVariants(image: Buffer) {
+  log("🚀 OCR VARIANTS START");
 
-export async function extractTextFromImage(
-  image: Buffer
-): Promise<OCRRawResult[]> {
-  log("🚀 Running parallel OCR...");
-
-  const [ocrSpaceText, tesseractText, tesseractUI] = await Promise.all([
+  const [ocrSpace, tFull, tLine, tBlock] = await Promise.all([
     runOCRSpace(image),
-    runTesseract(image),
-    runTesseractUI(image),
+    runTesseract(image, 3),  // full page
+    runTesseract(image, 7),  // line mode 🔥
+    runTesseract(image, 6),  // UI/block 🔥
   ]);
 
-  const results: OCRRawResult[] = [
-    { source: "OCR_SPACE", text: ocrSpaceText || "" },
-    { source: "TESSERACT_RAW", text: tesseractText || "" },
-    { source: "TESSERACT_UI", text: tesseractUI || "" },
-  ];
+  return {
+    ocrSpace: splitLines(ocrSpace),
+    full: splitLines(tFull),
+    line: splitLines(tLine),
+    block: splitLines(tBlock),
+  };
+}
 
-  for (const r of results) {
-    log(`🧠 ${r.source} LENGTH:`, r.text.length);
-
-    if (DEBUG_OCR_VERBOSE) {
-      log(`📄 ${r.source} FULL:\n`, r.text);
-    } else {
-      log(`📄 ${r.source} PREVIEW:\n`, r.text.slice(0, 300));
-    }
-  }
-
-  // 🔥 ZERO MERGE — każdy OCR osobno
-  return results;
+// =====================================
+function splitLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
 }
 
 // =====================================
 // 🌐 OCR.space
-// =====================================
 async function runOCRSpace(image: Buffer): Promise<string> {
   try {
     const formData = new FormData();
     formData.append("file", image, "image.png");
     formData.append("apikey", "helloworld");
-    formData.append("language", "eng");
 
     const res = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
@@ -94,31 +69,13 @@ async function runOCRSpace(image: Buffer): Promise<string> {
     const data: any = await res.json();
     return data?.ParsedResults?.[0]?.ParsedText || "";
   } catch {
-    log("❌ OCR.space FAILED");
     return "";
   }
 }
 
 // =====================================
-// 🤖 Tesseract DEFAULT
-// =====================================
-async function runTesseract(image: Buffer): Promise<string> {
-  try {
-    const result = await Tesseract.recognize(image, "eng", {
-      logger: () => {},
-    });
-
-    return result.data.text || "";
-  } catch {
-    log("❌ Tesseract FAILED");
-    return "";
-  }
-}
-
-// =====================================
-// 🤖 Tesseract UI MODE
-// =====================================
-async function runTesseractUI(image: Buffer): Promise<string> {
+// 🤖 Tesseract (z parametrem)
+async function runTesseract(image: Buffer, psm: number): Promise<string> {
   try {
     const worker = await Tesseract.createWorker();
 
@@ -126,7 +83,7 @@ async function runTesseractUI(image: Buffer): Promise<string> {
     await worker.initialize("eng");
 
     await worker.setParameters({
-      tessedit_pageseg_mode: 6 as any,
+      tessedit_pageseg_mode: psm as any,
     });
 
     const result = await worker.recognize(image);
@@ -135,26 +92,6 @@ async function runTesseractUI(image: Buffer): Promise<string> {
 
     return result.data.text || "";
   } catch {
-    log("❌ Tesseract UI FAILED");
     return "";
   }
-}
-
-// =====================================
-// 🧹 CLEAN HELPERS (zostają – będą używane później)
-// =====================================
-export function splitAndCleanText(text: string): string[] {
-  return text
-    .split("\n")
-    .map((l) => unicodeCleaner(l))
-    .map((l) => l.trim())
-    .filter(Boolean);
-}
-
-// =====================================
-function unicodeCleaner(input: string): string {
-  return input
-    .normalize("NFC")
-    .trim()
-    .replace(/\p{C}/gu, "");
 }
