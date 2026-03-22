@@ -1,10 +1,18 @@
 // src/quickadd/parsers/DonationsParser.ts
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
+const DEBUG = true;
+
+function log(...args: any[]) {
+  if (DEBUG) console.log("[DonationsParser]", ...args);
+}
+
 export function parseDonations(lines: string[]): QuickAddEntry[] {
   let lineId = 1;
   const entries: QuickAddEntry[] = [];
   const cleanedLines = dedupeLines(lines);
+
+  log("START PARSE | lines:", cleanedLines.length);
 
   for (let i = 0; i < cleanedLines.length; i++) {
     let line = cleanedLines[i].trim();
@@ -13,46 +21,74 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     line = fixSplitNumbers(line);
 
     if (isTimestamp(line) || isGarbage(line) || isSystemLine(line)) {
+      log("SKIP SYSTEM/GARBAGE:", line);
+      continue;
+    }
+
+    if (/^,\d{3}$/.test(line)) {
+      log("SKIP SPLIT NUMBER:", line);
       continue;
     }
 
     // =============================
-    // 🎯 PRIMARY (Donations line)
+    // 🎯 PRIMARY
     // =============================
     if (isDonationsLine(line)) {
+      log("PRIMARY HIT:", line);
+
       const value = extractValueFromBlock(cleanedLines, i);
-      if (!value) continue;
+      if (!isValidValue(value)) {
+        log("❌ INVALID VALUE (PRIMARY):", line, value);
+        continue;
+      }
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
-      if (!nickData) continue;
+      if (!nickData) {
+        log("❌ NO NICK (PRIMARY):", line);
+        continue;
+      }
 
-      entries.push(buildEntry(lineId++, nickData, value, line, 1));
+      log("✅ PRIMARY ENTRY:", nickData.clean, value);
+
+      entries.push(buildEntry(lineId++, nickData, value!, line, 1));
       continue;
     }
 
     // =============================
-    // 🔥 SMART FALLBACK (ograniczony)
+    // 🔥 FALLBACK
     // =============================
     if (
       /\d{4,6}/.test(line) &&
       !/^\d+$/.test(line) &&
       /[a-z]/i.test(line)
     ) {
+      log("FALLBACK HIT:", line);
+
       const value = extractValueFromBlock(cleanedLines, i);
-      if (!value) continue;
+      if (!isValidValue(value)) {
+        log("❌ INVALID VALUE (FALLBACK):", line, value);
+        continue;
+      }
 
       const nickData = findNicknameAboveSmart(cleanedLines, i);
-      if (!nickData) continue;
+      if (!nickData) {
+        log("❌ NO NICK (FALLBACK):", line);
+        continue;
+      }
 
-      entries.push(buildEntry(lineId++, nickData, value, line, 0.6));
+      log("✅ FALLBACK ENTRY:", nickData.clean, value);
+
+      entries.push(buildEntry(lineId++, nickData, value!, line, 0.6));
       continue;
     }
 
     // =============================
-    // INLINE (rzadkie)
+    // INLINE
     // =============================
     const inline = parseInlineStrong(line);
-    if (inline) {
+    if (inline && isValidValue(inline.value)) {
+      log("INLINE HIT:", inline.nick, inline.value);
+
       entries.push({
         lineId: lineId++,
         nickname: inline.nick,
@@ -66,11 +102,11 @@ export function parseDonations(lines: string[]): QuickAddEntry[] {
     }
   }
 
+  log("END PARSE | entries:", entries.length);
+
   return dedupeEntries(entries);
 }
 
-// =====================================
-// ENTRY BUILDER
 // =====================================
 function buildEntry(
   id: number,
@@ -92,25 +128,25 @@ function buildEntry(
 }
 
 // =====================================
-// 🔥 VALUE BLOCK FIX (NOWE)
-// =====================================
 function extractValueFromBlock(lines: string[], index: number): number | null {
-  let buffer = lines[index];
+  let base = lines[index];
+  const next = lines[index + 1];
 
-  for (let i = 1; i <= 2; i++) {
-    const next = lines[index + i];
-    if (!next) continue;
-
-    if (/^,\d{3}$/.test(next.trim())) {
-      buffer += next.trim();
-    }
+  if (next && /^,\d{3}$/.test(next.trim())) {
+    base += next.trim();
+    log("MERGED SPLIT NUMBER:", base);
   }
 
-  return extractValueSafe(buffer);
+  const value = extractValueSafe(base);
+
+  log("VALUE EXTRACT:", {
+    base,
+    value,
+  });
+
+  return value;
 }
 
-// =====================================
-// VALUE EXTRACTION
 // =====================================
 function extractValueSafe(line: string): number | null {
   let raw = line.toLowerCase();
@@ -132,8 +168,8 @@ function extractValueSafe(line: string): number | null {
 
   parsed.sort((a, b) => {
     const score = (x: number) => {
-      if (x > 10000 && x < 150000) return 100;
-      if (x > 1000 && x < 300000) return 50;
+      if (x >= 20000 && x <= 100000) return 100;
+      if (x >= 5000 && x <= 200000) return 50;
       return 0;
     };
     return score(b) - score(a) || b - a;
@@ -143,11 +179,16 @@ function extractValueSafe(line: string): number | null {
 }
 
 // =====================================
-// HELPERS
+function isValidValue(value: number | null): value is number {
+  if (!value) return false;
+  if (value < 1000) return false;
+  if (value > 1000000) return false;
+  return true;
+}
+
 // =====================================
 function isDonationsLine(line: string): boolean {
-  const l = line.toLowerCase();
-  return /donat|d0nat|donat1|e.?st.?ons/.test(l);
+  return /donat|d0nat|donat1|e.?st.?ons/i.test(line);
 }
 
 function isSystemLine(line: string): boolean {
@@ -174,11 +215,11 @@ function findNicknameAboveSmart(lines: string[], index: number) {
   return null;
 }
 
-// 🔥 FIXED NORMALIZATION
+// =====================================
 function normalizeNickname(name: string): string {
   return name
     .replace(/donations?.*/i, "")
-    .replace(/[|[\]{}()'"`,._]/g, " ")
+    .replace(/[|[\]{}()'"`,._:;]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .split(" ")
@@ -206,7 +247,10 @@ function fixSplitNumbers(str: string): string {
 }
 
 function isNickname(line: string): boolean {
-  return line.length >= 3 && /[a-zA-Z]/.test(line);
+  if (line.length < 3) return false;
+  if (!/[a-zA-Z]/.test(line)) return false;
+  if (/donations/i.test(line)) return false;
+  return true;
 }
 
 function isValidNickname(nick: string): boolean {
