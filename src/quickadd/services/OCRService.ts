@@ -75,9 +75,15 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
   lines = preprocessOCR(lines);
   log("🧹 AFTER PREPROCESS:", lines.length);
 
+  // =====================================
+  // 🔀 MERGE
+  // =====================================
   lines = mergeBrokenLines(lines);
   log("🔀 AFTER MERGE:", lines.length);
 
+  // =====================================
+  // 📏 NORMALIZE
+  // =====================================
   lines = normalizeLines(lines);
   log("📏 AFTER NORMALIZE:", lines.length);
 
@@ -97,11 +103,17 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     log(`[${i}] "${line}"`);
   });
 
+  // 🔥 FULL DEBUG (NAJWAŻNIEJSZE)
+  log("=== FINAL CLEAN LINES ===");
+  lines.forEach((line, i) => {
+    log(`[${i}] ${line}`);
+  });
+
   return { text, lines };
 }
 
 // =====================================
-// 🧹 CLEAN
+// 🧹 CLEAN (FIXED)
 // =====================================
 function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -110,7 +122,8 @@ function preprocessOCR(lines: string[]): string[] {
     if (!line) continue;
 
     let cleaned = line
-      .replace(/[ÔÇś@%*=~`"'\\]/g, "")
+      // 🔥 usuwa tylko realny garbage
+      .replace(/[^\p{L}\p{N}\s:.,]/gu, "")
       .replace(/^\d+\s*/, "")
       .replace(/\s+/g, " ")
       .trim();
@@ -119,12 +132,17 @@ function preprocessOCR(lines: string[]): string[] {
 
     const lower = cleaned.toLowerCase();
 
+    // 🔥 UI garbage
     if (
       lower.includes("tap to") ||
       lower.includes("share") ||
       lower.includes("copy") ||
       lower === "ok"
     ) continue;
+
+    // 🔥 OCR garbage filter
+    if (cleaned.length < 3) continue;
+    if (!/[a-zA-Z]/.test(cleaned) && !/\d{2,}/.test(cleaned)) continue;
 
     result.push(cleaned);
   }
@@ -133,7 +151,7 @@ function preprocessOCR(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔀 MERGE
+// 🔀 MERGE (FIXED 🔥)
 // =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
@@ -147,22 +165,36 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 41 + 999
-    if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
+    // 🔥 42 + 815 → 42815
+    if (/^\d{2,}$/.test(current) && /^\d{3}$/.test(next)) {
       merged.push(current + next);
       i++;
       continue;
     }
 
-    // 41 + ,999
+    // 🔥 42 + ,815 → 42815
     if (/^\d{2,}$/.test(current) && /^,\d{3}$/.test(next)) {
       merged.push(current + next.replace(",", ""));
       i++;
       continue;
     }
 
-    // donations split
+    // 🔥 Donations: + 42815
+    if (/donat/i.test(current) && /^\d{2,6}$/.test(next)) {
+      merged.push(`${current} ${next}`);
+      i++;
+      continue;
+    }
+
+    // 🔥 Donations: + ,815
     if (/donat/i.test(current) && /^,\d{3}$/.test(next)) {
+      merged.push(`${current}${next}`);
+      i++;
+      continue;
+    }
+
+    // 🔥 41 + 999 → 41999
+    if (/^\d{2,}$/.test(current) && /^\d{1,3}$/.test(next)) {
       merged.push(current + next);
       i++;
       continue;
