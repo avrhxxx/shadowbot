@@ -121,15 +121,13 @@ async function runTesseract(image: Buffer): Promise<string> {
 }
 
 // =====================================
-// 🤖 Tesseract UI MODE (FIXED)
+// 🤖 Tesseract UI MODE (FIXED 🔥)
 // =====================================
 async function runTesseractUI(image: Buffer): Promise<string> {
   try {
     const result = await Tesseract.recognize(image, "eng", {
       logger: () => {},
-      config: {
-        tessedit_pageseg_mode: "6", // 🔥 SINGLE_BLOCK (UI friendly)
-      },
+      tessedit_pageseg_mode: "6" as any, // 🔥 FIX
     });
 
     return result.data.text || "";
