@@ -23,7 +23,7 @@ function debug(traceId: string, tag: string, ...args: any[]) {
 const BATCH_DELAY = 10000;
 
 // =====================================
-// 🧠 NOWY STATUS (BEZ EDIT)
+// 🧠 STATUS (NO EDIT)
 async function sendStatus(message: Message, text: string) {
   try {
     await message.reply(text);
@@ -89,118 +89,130 @@ async function mapEntry(entry: any) {
 async function processBatch(message: Message, session: any) {
   const traceId = Date.now().toString().slice(-5);
 
-  debug(traceId, "BATCH_START");
-
-  await sendStatus(
-    message,
-    `🧠 Processing ${session.imageCount || 0} screenshots...`
-  );
-
-  const buffer = session?.buffer?.ocrResults;
-  if (!buffer?.length) {
-    debug(traceId, "EMPTY_BUFFER");
+  // 🔥 LOCK (ANTI DOUBLE EXEC)
+  if (session.isProcessing) {
+    debug(traceId, "SKIP_ALREADY_PROCESSING");
     return;
   }
 
-  const screens: any[] = [];
+  session.isProcessing = true;
 
-  for (const batch of buffer) {
-    const lines = batch.lines || [];
-    if (!lines.length) continue;
-
-    debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
-
-    let type =
-      detectImageType(lines, session.parserType) ||
-      fallbackDetect(lines) ||
-      session.parserType;
-
-    if (!type) continue;
-
-    try {
-      let parsed = parseByType(type, lines);
-
-      parsed = parsed.filter(isValidEntry);
-
-      debug(traceId, "SCREEN_PARSED", {
-        type,
-        count: parsed.length,
-      });
-
-      screens.push({
-        type,
-        entries: parsed,
-      });
-    } catch (err) {
-      console.error("💥 PARSER ERROR:", err);
-    }
-  }
-
-  if (!screens.length) {
-    await message.reply("❌ No valid entries parsed.");
-    return;
-  }
-
-  // =====================================
-  // 🧠 MERGE
-  // =====================================
-  const merged = new Map<string, any>();
-
-  for (const screen of screens) {
-    for (const e of screen.entries) {
-      const key = e.nickname.toLowerCase();
-      const existing = merged.get(key);
-
-      if (!existing) {
-        merged.set(key, e);
-        continue;
-      }
-
-      const better = pickBetterEntry(existing, e);
-
-      debug(traceId, "MERGE_DECISION", {
-        nick: key,
-        existing: existing.value,
-        incoming: e.value,
-        chosen: better.value,
-      });
-
-      merged.set(key, better);
-    }
-  }
-
-  const mapped = await Promise.all(
-    Array.from(merged.values()).map(mapEntry)
-  );
-
-  debug(traceId, "MAPPED", mapped.length);
-
-  SessionStore.addEntries(message.guildId!, mapped);
-
-  // =====================================
-  // 🧠 SAVE NICKS
-  // =====================================
   try {
-    if (process.env.DEV_MODE === "true") {
-      console.log("🧠 DEV MODE: skip nick mapping save");
-    } else {
-      await saveNickMappings(mapped);
+    debug(traceId, "BATCH_START");
+
+    await sendStatus(
+      message,
+      `🧠 Processing ${session.imageCount || 0} screenshots...`
+    );
+
+    const buffer = session?.buffer?.ocrResults;
+    if (!buffer?.length) {
+      debug(traceId, "EMPTY_BUFFER");
+      return;
     }
-  } catch {
-    console.warn("⚠️ Nick mapping failed (non-blocking)");
+
+    const screens: any[] = [];
+
+    for (const batch of buffer) {
+      const lines = batch.lines || [];
+      if (!lines.length) continue;
+
+      debug(traceId, "LINES_PREVIEW", lines.slice(0, 10));
+
+      let type =
+        detectImageType(lines, session.parserType) ||
+        fallbackDetect(lines) ||
+        session.parserType;
+
+      if (!type) continue;
+
+      try {
+        let parsed = parseByType(type, lines);
+        parsed = parsed.filter(isValidEntry);
+
+        debug(traceId, "SCREEN_PARSED", {
+          type,
+          count: parsed.length,
+        });
+
+        screens.push({
+          type,
+          entries: parsed,
+        });
+      } catch (err) {
+        console.error("💥 PARSER ERROR:", err);
+      }
+    }
+
+    if (!screens.length) {
+      await message.reply("❌ No valid entries parsed.");
+      return;
+    }
+
+    // =====================================
+    // 🧠 MERGE
+    // =====================================
+    const merged = new Map<string, any>();
+
+    for (const screen of screens) {
+      for (const e of screen.entries) {
+        const key = e.nickname.toLowerCase();
+        const existing = merged.get(key);
+
+        if (!existing) {
+          merged.set(key, e);
+          continue;
+        }
+
+        const better = pickBetterEntry(existing, e);
+
+        debug(traceId, "MERGE_DECISION", {
+          nick: key,
+          existing: existing.value,
+          incoming: e.value,
+          chosen: better.value,
+        });
+
+        merged.set(key, better);
+      }
+    }
+
+    const mapped = await Promise.all(
+      Array.from(merged.values()).map(mapEntry)
+    );
+
+    debug(traceId, "MAPPED", mapped.length);
+
+    SessionStore.addEntries(message.guildId!, mapped);
+
+    // =====================================
+    // 🧠 SAVE NICKS
+    // =====================================
+    try {
+      if (process.env.DEV_MODE === "true") {
+        console.log("🧠 DEV MODE: skip nick mapping save");
+      } else {
+        await saveNickMappings(mapped);
+      }
+    } catch {
+      console.warn("⚠️ Nick mapping failed (non-blocking)");
+    }
+
+    await sendStatus(
+      message,
+      `✅ Done! ${mapped.length} entries added from ${session.imageCount || 0} screenshots.`
+    );
+
+    // =====================================
+    // RESET
+    // =====================================
+    session.buffer.ocrResults = [];
+    session.buffer.timer = null;
+    session.imageCount = 0;
+  } finally {
+    // 🔥 ALWAYS UNLOCK
+    session.isProcessing = false;
   }
-
-  await sendStatus(
-    message,
-    `✅ Done! ${mapped.length} entries added from ${session.imageCount || 0} screenshots.`
-  );
-
-  // =====================================
-  // RESET
-  // =====================================
-  session.buffer.ocrResults = [];
-  session.buffer.timer = null;
-  session.imageCount = 0;
 }
 
 // =====================================
@@ -231,9 +243,10 @@ export async function processImageInput(
 
   await sendStatus(
     message,
-    `📥 Screenshot ${session.imageCount} received\n⏳ You can send more...`
+    `📥 Screenshot ${session.imageCount} received\n⏳ Waiting ${BATCH_DELAY / 1000}s for more...`
   );
 
+  // 🔥 RESET TIMER
   if (session.buffer.timer) {
     clearTimeout(session.buffer.timer);
   }
