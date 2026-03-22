@@ -1,3 +1,4 @@
+// src/quickadd/parsers/DonationsParser.ts
 import { QuickAddEntry } from "../types/QuickAddEntry";
 
 export function parseDonations(lines: string[]): QuickAddEntry[] {
