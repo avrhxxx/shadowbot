@@ -1,6 +1,6 @@
 // src/quickadd/services/OCRService.ts
 
-import { extractTextGoogle } from "../../google/GoogleVisionService";
+import { extractTextFromImage } from "../utils/ocr"; // 🔥 NOWY OCR (OCR.space + fallback)
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
 import fetch from "node-fetch";
@@ -17,13 +17,13 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
-  // 🔥 nadal robimy preprocess (Vision też zyskuje na tym!)
+  // 🔥 preprocess zostaje (bardzo ważne!)
   const processedBuffer = await preprocessImage(buffer);
 
-  // 🔥 TU ZMIANA: Google Vision zamiast Tesseract
-  const text = await extractTextGoogle(processedBuffer);
+  // 🔥 ZAMIANA: OCR.space + fallback Tesseract
+  const text = await extractTextFromImage(processedBuffer);
 
-  console.log("🧠 OCR (VISION) LENGTH:", text.length);
+  console.log("🧠 OCR LENGTH:", text.length);
 
   if (!text || text.length < 10) {
     console.log("⚠️ OCR returned very small text");
@@ -49,7 +49,7 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 }
 
 // =====================================
-// 🔥 CLEAN (lekki, bo Vision jest lepszy)
+// 🔥 CLEAN
 // =====================================
 function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -81,7 +81,7 @@ function preprocessOCR(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 MERGE (minimalny — Vision już dobrze składa)
+// 🔥 MERGE
 // =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
@@ -95,7 +95,6 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
-    // 🔥 tylko liczby (bez zgadywania nicków!)
     if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
       merged.push(current + next);
       i++;
