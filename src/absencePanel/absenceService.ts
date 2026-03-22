@@ -1,6 +1,7 @@
 // src/absencePanel/absenceService.ts
 
 import { SheetRepository } from "../google/SheetRepository";
+import crypto from "crypto";
 
 // =============================
 // TYPES
@@ -70,7 +71,7 @@ export async function createAbsence(
 
   const newAbsence: AbsenceObject = {
     ...data,
-    id: data.id ?? crypto.randomUUID(), // 🔥 FIX
+    id: data.id ?? crypto.randomUUID(),
     year: data.year ?? new Date().getFullYear(),
     createdAt: data.createdAt ?? Date.now(),
   };
@@ -133,7 +134,7 @@ export async function setConfig(
 
   if (!existing.length) {
     await configRepo.create({
-      id: crypto.randomUUID(), // 🔥 FIX
+      id: crypto.randomUUID(),
       guildId,
       [key]: value,
     });
