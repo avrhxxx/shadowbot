@@ -1,11 +1,13 @@
 // src/quickadd/commands/DeleteCommand.ts
+
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
+
+// ✅ FIX: jeden store zamiast dwóch
+import { SessionStore } from "../session/sessionStore";
 
 export async function deleteEntry(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   // ❌ brak sesji
   if (!session) {
@@ -35,7 +37,8 @@ export async function deleteEntry(message: Message) {
     return;
   }
 
-  const success = SessionData.removeEntry(guildId, index);
+  // ✅ FIX
+  const success = SessionStore.removeEntry(guildId, index);
 
   // ❌ brak wpisu
   if (!success) {
