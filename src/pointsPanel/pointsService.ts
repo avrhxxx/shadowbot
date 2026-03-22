@@ -1,6 +1,6 @@
 // src/pointsPanel/pointsService.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import { readSheet, writeSheet, updateCell } from "../google/googleSheetsStorage";
+import { SheetRepository } from "../google/SheetRepository";
 
 // ----------------------------
 // TYPES
@@ -8,134 +8,149 @@ import { readSheet, writeSheet, updateCell } from "../google/googleSheetsStorage
 export type PointsCategory = "Donations" | "Duel";
 
 export interface PointsEntry {
+  id?: string;
   category: PointsCategory;
   nick: string;
-  points: string; // np. "100", "24.07M"
-  week: string;   // np. "01-03 - 07-03"
-}
-
-// Typ wiersza w arkuszu Google Sheets (A-D kolumny)
-type PointsRow = [string, string, string, string];
-
-// ----------------------------
-// HELPERS
-// ----------------------------
-function normalizePointsRows(rows: any[][]): PointsRow[] {
-  return rows.map((r: any[]) => [
-    r[0] ?? "",
-    r[1] ?? "",
-    r[2] ?? "",
-    r[3] ?? ""
-  ] as PointsRow);
+  points: string;
+  week: string;
 }
 
 // ----------------------------
-// WEEKS TAB
+// 📦 REPOS
 // ----------------------------
-export async function createWeek(category: PointsCategory, weekName: string): Promise<void> {
-  const rawRows: any[][] = await readSheet("points_weeks");
-  const rows: PointsRow[] = normalizePointsRows(rawRows);
+const weeksRepo = new SheetRepository<PointsEntry>("points_weeks");
+const donationsRepo = new SheetRepository<PointsEntry>("points_donations");
+const duelRepo = new SheetRepository<PointsEntry>("points_duel");
 
-  const exists = rows.some((r: PointsRow) => r[0] === category && r[1] === weekName);
-  if (exists) return;
-
-  const newRow: PointsRow = [category, weekName, "", ""];
-  await writeSheet("points_weeks", [...rows, newRow]);
+function getRepo(category: PointsCategory) {
+  return category === "Donations" ? donationsRepo : duelRepo;
 }
 
-export async function getAllWeeks(category?: PointsCategory): Promise<string[]> {
-  const rawRows: any[][] = await readSheet("points_weeks");
-  const rows: PointsRow[] = normalizePointsRows(rawRows);
+// ----------------------------
+// 📆 WEEKS
+// ----------------------------
+export async function createWeek(
+  category: PointsCategory,
+  week: string
+): Promise<void> {
+  const existing = await weeksRepo.findAll({ category, week });
 
-  const weeksSet = new Set<string>();
-  rows.forEach((r: PointsRow) => {
-    if (!category || r[0] === category) weeksSet.add(r[1]);
+  if (existing.length > 0) return;
+
+  await weeksRepo.create({
+    category,
+    week,
+    nick: "",
+    points: "",
   });
+}
 
-  return Array.from(weeksSet);
+export async function getAllWeeks(
+  category?: PointsCategory
+): Promise<string[]> {
+  const rows = await weeksRepo.findAll();
+
+  const filtered = category
+    ? rows.filter((r) => r.category === category)
+    : rows;
+
+  return [...new Set(filtered.map((r) => r.week))];
 }
 
 // ----------------------------
-// ADD / UPDATE POINTS
+// ➕ ADD / UPDATE
 // ----------------------------
 export async function addPoints(entry: PointsEntry): Promise<void> {
-  const tab = entry.category === "Donations" ? "points_donations" : "points_duel";
-  const rawRows: any[][] = await readSheet(tab);
-  const rows: PointsRow[] = normalizePointsRows(rawRows);
+  const repo = getRepo(entry.category);
 
-  const rowIndex = rows.findIndex((r: PointsRow) => r[1] === entry.week && r[2] === entry.nick);
+  const existing = await repo.findAll({
+    week: entry.week,
+    nick: entry.nick,
+  });
 
-  if (rowIndex !== -1) {
-    await updateCell(tab, rowIndex + 2, 4, entry.points);
+  if (existing.length > 0) {
+    await repo.updateById(existing[0].id!, {
+      points: entry.points,
+    });
   } else {
-    const newRow: PointsRow = [entry.category, entry.week, entry.nick, entry.points];
-    await writeSheet(tab, [...rows, newRow]);
+    await repo.create(entry);
   }
 }
 
-export async function getPoints(category: PointsCategory, week?: string): Promise<PointsEntry[]> {
-  const tab = category === "Donations" ? "points_donations" : "points_duel";
-  const rawRows: any[][] = await readSheet(tab);
-  const rows: PointsRow[] = normalizePointsRows(rawRows);
+// ----------------------------
+// 📋 GET
+// ----------------------------
+export async function getPoints(
+  category: PointsCategory,
+  week?: string
+): Promise<PointsEntry[]> {
+  const repo = getRepo(category);
 
-  return rows
-    .filter((r: PointsRow) => (!week || r[1] === week))
-    .map((r: PointsRow) => ({
-      category: r[0] as PointsCategory,
-      week: r[1],
-      nick: r[2],
-      points: r[3]
-    }));
+  const rows = await repo.findAll();
+
+  return rows.filter((r) => !week || r.week === week);
 }
 
 // ----------------------------
-// COMPARE WEEKS
+// 📊 COMPARE
 // ----------------------------
-export async function compareWeeks(category: PointsCategory, week1: string, week2: string) {
-  const tab = category === "Donations" ? "points_donations" : "points_duel";
-  const rawRows: any[][] = await readSheet(tab);
-  const rows: PointsRow[] = normalizePointsRows(rawRows);
+export async function compareWeeks(
+  category: PointsCategory,
+  week1: string,
+  week2: string
+) {
+  const repo = getRepo(category);
 
-  const week1Rows = rows.filter((r: PointsRow) => r[1] === week1);
-  const week2Rows = rows.filter((r: PointsRow) => r[1] === week2);
+  const all = await repo.findAll();
 
-  const week2Map = new Map<string, string>();
-  week2Rows.forEach((r: PointsRow) => week2Map.set(r[2], r[3]));
+  const w1 = all.filter((r) => r.week === week1);
+  const w2 = all.filter((r) => r.week === week2);
 
-  return week1Rows.map((r: PointsRow) => ({
-    nick: r[2],
-    week1Points: r[3],
-    week2Points: week2Map.get(r[2]) || "0"
+  const map2 = new Map<string, string>();
+  w2.forEach((r) => map2.set(r.nick, r.points));
+
+  return w1.map((r) => ({
+    nick: r.nick,
+    week1Points: r.points,
+    week2Points: map2.get(r.nick) || "0",
   }));
 }
 
 // ----------------------------
-// HANDLERY BUTTONÓW
+// 🎛 HANDLERY (na razie bez zmian)
 // ----------------------------
-export async function handleAddPoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+export async function handleAddPoints(
+  interaction: ButtonInteraction | ModalSubmitInteraction
+): Promise<void> {
   await interaction.reply({
     content: "🟢 Add Points functionality placeholder – to be implemented.",
-    ephemeral: true
+    ephemeral: true,
   });
 }
 
-export async function handleRemovePoints(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+export async function handleRemovePoints(
+  interaction: ButtonInteraction | ModalSubmitInteraction
+): Promise<void> {
   await interaction.reply({
     content: "🔴 Remove Points functionality placeholder – to be implemented.",
-    ephemeral: true
+    ephemeral: true,
   });
 }
 
-export async function handlePointsList(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+export async function handlePointsList(
+  interaction: ButtonInteraction | ModalSubmitInteraction
+): Promise<void> {
   await interaction.reply({
     content: "📋 Points List functionality placeholder – to be implemented.",
-    ephemeral: true
+    ephemeral: true,
   });
 }
 
-export async function handleCompareWeeks(interaction: ButtonInteraction | ModalSubmitInteraction): Promise<void> {
+export async function handleCompareWeeks(
+  interaction: ButtonInteraction | ModalSubmitInteraction
+): Promise<void> {
   await interaction.reply({
     content: "📊 Compare Points functionality placeholder – to be implemented.",
-    ephemeral: true
+    ephemeral: true,
   });
 }
