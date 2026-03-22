@@ -1,5 +1,3 @@
-// src/quickadd/services/OCRService.ts
-
 import { extractTextFromImage } from "../utils/ocr";
 import { preprocessImage } from "../utils/imagePreprocess";
 import { unicodeCleaner } from "../utils/unicodeCleaner";
@@ -13,7 +11,6 @@ export interface OCRResult {
 export async function processOCR(imageUrl: string): Promise<OCRResult> {
   const response = await fetch(imageUrl);
 
-  // 🔥 zabezpieczenie fetch
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${response.status}`);
   }
@@ -23,15 +20,11 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 
   console.log("📸 IMAGE SIZE:", buffer.length);
 
-  // 🔥 preprocess (ważne dla jakości OCR)
   const processedBuffer = await preprocessImage(buffer);
-
-  // 🔥 PARALLEL OCR (OCR.space + Tesseract)
   const text = await extractTextFromImage(processedBuffer);
 
   console.log("🧠 OCR LENGTH:", text.length);
 
-  // 🔥 fallback bezpieczeństwa
   if (!text || text.trim().length < 5) {
     console.log("⚠️ OCR FAILED HARD - returning empty result");
     return { text: "", lines: [] };
@@ -43,12 +36,10 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 🔥 pipeline czyszczenia
   lines = preprocessOCR(lines);
   lines = mergeBrokenLines(lines);
   lines = normalizeLines(lines);
 
-  // 🔥 zabezpieczenie przed spamem
   if (lines.length > 100) {
     lines = lines.slice(0, 100);
   }
@@ -62,7 +53,7 @@ export async function processOCR(imageUrl: string): Promise<OCRResult> {
 }
 
 // =====================================
-// 🔥 CLEAN
+// CLEAN
 // =====================================
 function preprocessOCR(lines: string[]): string[] {
   const result: string[] = [];
@@ -94,13 +85,13 @@ function preprocessOCR(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 MERGE
+// 🔥 MERGE (FIXED)
 // =====================================
 function mergeBrokenLines(lines: string[]): string[] {
   const merged: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const current = lines[i];
+    let current = lines[i];
     const next = lines[i + 1];
 
     if (!next) {
@@ -108,7 +99,22 @@ function mergeBrokenLines(lines: string[]): string[] {
       continue;
     }
 
+    // 41 + 999
     if (/^\d{2,}$/.test(current) && /^\d{2,3}$/.test(next)) {
+      merged.push(current + next);
+      i++;
+      continue;
+    }
+
+    // 🔥 41 + ,999
+    if (/^\d{2,}$/.test(current) && /^,\d{3}$/.test(next)) {
+      merged.push(current + next.replace(",", ""));
+      i++;
+      continue;
+    }
+
+    // 🔥 Donations: 41 + ,999
+    if (/donat/i.test(current) && /^,\d{3}$/.test(next)) {
       merged.push(current + next);
       i++;
       continue;
@@ -121,12 +127,13 @@ function mergeBrokenLines(lines: string[]): string[] {
 }
 
 // =====================================
-// 🔥 NORMALIZE
+// 🔥 NORMALIZE (FIXED)
 // =====================================
 function normalizeLines(lines: string[]): string[] {
   return lines.map((line) =>
     line
       .replace(/(\d)\s+(\d{3})/g, "$1$2")
+      .replace(/,\s*(\d{3})/g, ",$1")
       .replace(/\s+/g, " ")
       .trim()
   );
