@@ -1,7 +1,9 @@
 // src/quickadd/commands/MergeCommand.ts
+
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
+
+// ✅ FIX: jeden store
+import { SessionStore } from "../session/sessionStore";
 
 // 🔧 helper do formatowania (clean preview)
 function formatValue(value: number): string {
@@ -18,7 +20,7 @@ function formatValue(value: number): string {
 
 export async function merge(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId);
 
   // ❌ brak sesji
   if (!session) {
@@ -54,7 +56,8 @@ export async function merge(message: Message) {
     return;
   }
 
-  const entries = SessionData.getEntries(guildId);
+  // ✅ FIX
+  const entries = SessionStore.getEntries(guildId);
 
   if (!entries[fromIndex] || !entries[toIndex]) {
     await message.reply("❌ Nie znaleziono wpisu.");
@@ -74,8 +77,9 @@ export async function merge(message: Message) {
 
   entries.splice(first, 1);
 
-  // jeśli usunęliśmy element przed `toIndex`, to jego index się przesunął
-  // ale ponieważ operujemy na referencji "to", to jest OK
+  // ⚠️ WAŻNE: zapisz zmiany do store
+  SessionStore.clearEntries(guildId);
+  SessionStore.addEntries(guildId, entries);
 
   await message.reply(
     `🔗 Zmergowano wpis ${fromIndex + 1} → ${toIndex + 1}.`
