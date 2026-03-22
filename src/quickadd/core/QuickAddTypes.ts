@@ -1,4 +1,6 @@
-// src/quickadd/core/QuickAddTypes.ts
+// =====================================
+// 📁 src/quickadd/core/QuickAddTypes.ts
+// =====================================
 
 export type QuickAddType =
   | "DONATIONS"
@@ -23,7 +25,8 @@ export interface ParsedScreen {
   entries: ParsedEntry[];
 }
 
-export interface QuickAddSession {
+// 🔥 FIX: zmieniona nazwa (unikamy konfliktu z QuickAddSession)
+export interface QuickAddSessionState {
   buffer: {
     ocrResults: {
       lines: string[];
