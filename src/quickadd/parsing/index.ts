@@ -4,7 +4,7 @@
 
 import { parseDonations } from "./donations/DonationsParser";
 
-export function parseOCR(lines: string[]) {
+export function parseOCR(lines: string[], traceId: string) {
   // 🔥 NA RAZIE: na sztywno donations
-  return parseDonations(lines);
+  return parseDonations(lines, traceId);
 }
