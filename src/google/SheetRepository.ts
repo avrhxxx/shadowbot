@@ -1,4 +1,3 @@
-// src/google/SheetRepository.ts
 import { readSheet, writeSheet } from "./googleSheetsStorage";
 
 type Filter<T> = Partial<{ [K in keyof T]: T[K] }>;
@@ -15,11 +14,6 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   private async load() {
     const rows = await readSheet(this.tab);
-
-    if (!rows || rows.length === 0) {
-      return { headers: [], dataRows: [] };
-    }
-
     const headers: string[] = rows[0] || [];
     const dataRows = rows.slice(1);
 
@@ -35,14 +29,16 @@ export class SheetRepository<T extends { id?: string }> {
     headers.forEach((h, i) => {
       let val = row[i];
 
-      // 🔥 FIXED JSON PARSE
+      // ✅ FIX: poprawiony warunek JSON.parse
       if (
         typeof val === "string" &&
         (val.startsWith("[") || val.startsWith("{"))
       ) {
         try {
           val = JSON.parse(val);
-        } catch {}
+        } catch {
+          // ignore parse error
+        }
       }
 
       obj[h] = val ?? null;
@@ -94,10 +90,9 @@ export class SheetRepository<T extends { id?: string }> {
 
     if (filter) {
       data = data.filter((item) =>
-        Object.entries(filter).every(([key, val]) => {
-          const itemVal = (item as any)[key];
-          return String(itemVal) === String(val);
-        })
+        Object.entries(filter).every(([key, val]) =>
+          (item as any)[key] === val
+        )
       );
     }
 
@@ -113,35 +108,36 @@ export class SheetRepository<T extends { id?: string }> {
   }
 
   // =============================
-  // ➕ CREATE (🔥 SAFE + AUTO ID)
+  // ➕ CREATE
   // =============================
   async create(data: T): Promise<T> {
     const { headers, dataRows } = await this.load();
 
-    const finalData: any = { ...data };
+    this.ensureColumns(headers, data);
 
-    // 🔥 AUTO ID (jeśli brak)
-    if (!finalData.id) {
-      finalData.id = Date.now().toString();
-    }
-
-    // 🔥 jeśli kolumna id nie istnieje → dodaj ją
-    if (!headers.includes("id")) {
-      headers.unshift("id");
-
-      // dodaj pustą kolumnę do istniejących wierszy
-      for (const row of dataRows) {
-        row.unshift("");
-      }
-    }
-
-    this.ensureColumns(headers, finalData);
-
-    const row = this.mapObject(headers, finalData);
+    const row = this.mapObject(headers, data);
 
     await this.save(headers, [...dataRows, row]);
 
-    return finalData;
+    return data;
+  }
+
+  // =============================
+  // 🚀 CREATE MANY (BATCH INSERT)
+  // =============================
+  async createMany(dataArray: T[]): Promise<void> {
+    if (!dataArray.length) return;
+
+    const { headers, dataRows } = await this.load();
+
+    // ensure all columns
+    dataArray.forEach((data) => this.ensureColumns(headers, data));
+
+    const newRows = dataArray.map((data) =>
+      this.mapObject(headers, data)
+    );
+
+    await this.save(headers, [...dataRows, ...newRows]);
   }
 
   // =============================
