@@ -1,55 +1,78 @@
-// src/quickadd/parsing/donations/DonationsParser.ts
-export function parseDonations(lines: string[]) {
-  const results: { nickname: string; value: number }[] = [];
+// =====================================
+// 📁 src/quickadd/parsers/DonationsParser.ts
+// =====================================
 
-  function normalizeNumber(str: string): number {
-    return parseInt(str.replace(/[^\d]/g, ""), 10);
-  }
+import { debugTrace } from "../debug/DebugLogger";
 
-  function isValidNickname(str: string): boolean {
-    if (!str) return false;
+const SCOPE = "PARSER";
 
-    const clean = str.trim();
+type ParsedEntry = {
+  nickname: string;
+  value: number;
+};
 
-    if (clean.length < 3) return false;
-
-    // wyklucz śmieci
-    if (/^[^a-zA-Z0-9]+$/.test(clean)) return false;
-
-    if (clean.toLowerCase().includes("donations")) return false;
-    if (clean.toLowerCase().includes("ranking")) return false;
-    if (clean.toLowerCase().includes("rewards")) return false;
-
-    return true;
-  }
+export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
+  const results: ParsedEntry[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (!line.toLowerCase().includes("donations")) continue;
+    // =============================
+    // 🔍 SZUKAMY "Donations"
+    // =============================
+    const match = line.match(/Donations:\s*([\d\s]+)/i);
 
-    const numberMatch = line.match(/[\d\s,]+/);
+    if (!match) continue;
 
-    if (!numberMatch) continue;
+    const rawValue = match[1]; // np. "58 396"
+    const value = parseInt(rawValue.replace(/\s/g, ""));
 
-    const value = normalizeNumber(numberMatch[0]);
+    const nextLine = lines[i + 1] || "";
 
-    // 🔥 SZUKAMY NICKA (kolejna sensowna linia)
-    let nickname = "";
+    // =============================
+    // 🧼 CLEAN NICKNAME
+    // =============================
+    const nickname = cleanNickname(nextLine);
 
-    for (let j = i + 1; j < i + 4 && j < lines.length; j++) {
-      const candidate = lines[j]?.trim();
-
-      if (isValidNickname(candidate)) {
-        nickname = candidate;
-        break;
-      }
+    // =============================
+    // ❌ VALIDATION
+    // =============================
+    if (!nickname || isNaN(value)) {
+      debugTrace(SCOPE, "SKIPPED_ENTRY", traceId, {
+        line,
+        nextLine,
+        rawValue,
+      });
+      continue;
     }
 
-    if (!nickname) continue;
+    // =============================
+    // ✅ OK
+    // =============================
+    results.push({
+      nickname,
+      value,
+    });
 
-    results.push({ nickname, value });
+    debugTrace(SCOPE, "PARSED_ENTRY", traceId, {
+      nickname,
+      value,
+    });
   }
 
   return results;
+}
+
+// =====================================
+// 🧼 CLEAN FUNCTION
+// =====================================
+function cleanNickname(name: string): string {
+  return name
+    // usuń śmieci z początku (np. "4 ", "@ ", "Y ")
+    .replace(/^[^a-zA-Z0-9]+/, "")
+    // usuń śmieci z końca
+    .replace(/[^a-zA-Z0-9]+$/, "")
+    // usuń podwójne spacje
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
