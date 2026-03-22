@@ -1,11 +1,9 @@
-// src/quickadd/commands/quickadd.command.ts
+// =====================================
+// 📁 src/quickadd/commands/quickadd.command.ts
+// =====================================
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import {
-  startSession,
-  endSession,
-  getSession,
-} from "../core/QuickAddSession";
+import { QuickAddSession } from "../core/QuickAddSession"; // 🔥 FIX
 import { ensureQuickAddChannel } from "../integrations/QuickAddChannelService";
 
 export const quickAddCommand = new SlashCommandBuilder()
@@ -35,24 +33,27 @@ export async function handleQuickAddCommand(
     });
   }
 
-  const session = getSession(interaction.guild.id);
+  const session = QuickAddSession.get(interaction.guild.id); // 🔥 FIX
 
   // =============================
   // ▶️ START
   // =============================
   if (sub === "start") {
-    if (session?.active) {
+    if (session) { // 🔥 FIX (nie session.active)
       return interaction.reply({
         content: `❌ Session already active by <@${session.ownerId}>`,
         ephemeral: true,
       });
     }
 
-    startSession(interaction.guild.id, interaction.user.id);
+    QuickAddSession.start(
+      interaction.guild.id,
+      channel.id,
+      interaction.user.id
+    ); // 🔥 FIX (channelId!)
 
     return interaction.reply({
-      content:
-        "✅ Session started\n\n📸 Send screenshots now.",
+      content: "✅ Session started\n\n📸 Send screenshots now.",
       ephemeral: true,
     });
   }
@@ -75,7 +76,7 @@ export async function handleQuickAddCommand(
       });
     }
 
-    endSession(interaction.guild.id);
+    QuickAddSession.end(interaction.guild.id); // 🔥 FIX
 
     return interaction.reply({
       content: "🛑 Session ended",
