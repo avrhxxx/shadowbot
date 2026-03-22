@@ -1,11 +1,23 @@
-// src/quickadd/ocr/OCRRunner.ts
+// =====================================
+// 📁 src/quickadd/ocr/OCRRunner.ts
+// =====================================
 
-import Tesseract from "tesseract.js";
+import { debug } from "../debug/DebugLogger";
 
-export async function runOCR(buffer: Buffer): Promise<string[]> {
-  const result = await Tesseract.recognize(buffer, "eng", {
-    logger: () => {},
-  });
+const SCOPE = "OCR";
 
-  return [result.data.text || ""];
+export async function runFullImageOCR(imageUrl: string) {
+  debug(SCOPE, "RUN_FULL_START", imageUrl);
+
+  // 🔥 NA RAZIE MOCK (żeby pipeline działał)
+  // później podmienimy na Tesseract
+
+  const result = {
+    text: "Sample OCR text",
+    lines: ["Sample", "OCR", "text"],
+  };
+
+  debug(SCOPE, "RUN_FULL_RESULT", result);
+
+  return result;
 }
