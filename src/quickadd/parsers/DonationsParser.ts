@@ -309,6 +309,12 @@ ${line}
 
     logAI("RAW:", res);
 
+    // 🔥 FIX: null safety
+    if (!res) {
+      logAI("❌ EMPTY RESPONSE");
+      return null;
+    }
+
     const jsonMatch = res.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       logAI("❌ NO JSON");
