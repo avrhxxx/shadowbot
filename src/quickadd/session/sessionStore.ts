@@ -42,6 +42,10 @@ interface QuickAddSession {
     timer?: NodeJS.Timeout;
   };
 
+  // 🔥 NEW
+  statusMessageId?: string;
+  imageCount?: number;
+
   lastActivity: number;
   timeout?: NodeJS.Timeout;
   warningTimeout?: NodeJS.Timeout;
@@ -113,14 +117,12 @@ export class SessionStore {
         continue;
       }
 
-      // 🔥 prefer większą wartość
       if (e.value > existing.value) {
         this.log("🔁 REPLACE (higher value):", existing, "→", e);
         map.set(key, { ...e });
         continue;
       }
 
-      // 🔥 fallback: lepszy nick
       if (
         e.value === existing.value &&
         e.nickname.length > existing.nickname.length
@@ -155,6 +157,10 @@ export class SessionStore {
       entries: [],
       lastActivity: Date.now(),
       buffer: { ocrResults: [] },
+
+      // 🔥 INIT
+      statusMessageId: undefined,
+      imageCount: 0,
     };
 
     this.sessions.set(session.guildId, newSession);
@@ -195,7 +201,6 @@ export class SessionStore {
 
     this.log("🧠 AFTER MERGE:", merged.length);
 
-    // preview
     merged.slice(0, 10).forEach((e, i) => {
       this.log(`[${i}] ${e.nickname} → ${e.value}`);
     });
@@ -306,6 +311,10 @@ export class SessionStore {
     if (session.watchdogInterval) clearInterval(session.watchdogInterval);
 
     session.buffer.ocrResults = [];
+
+    // 🔥 RESET NOWYCH POL
+    session.statusMessageId = undefined;
+    session.imageCount = 0;
   }
 
   static resetTimeout(guildId: string) {
