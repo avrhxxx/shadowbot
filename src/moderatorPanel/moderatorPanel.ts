@@ -18,7 +18,47 @@ import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
 import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 
-import * as GS from "../googleSheetsStorage";
+import { SheetRepository } from "../google/SheetRepository";
+
+// =============================
+// TYPES
+// =============================
+interface ModeratorPanelConfig {
+  id?: string;
+  modChannelId?: string;
+  updateChannelId?: string;
+  dateEmbedId?: string;
+  hubMessageId?: string;
+  version?: string;
+  lastUpdated?: number;
+}
+
+// =============================
+// REPO
+// =============================
+const repo = new SheetRepository<ModeratorPanelConfig>("moderator_panel");
+
+// =============================
+// HELPERS
+// =============================
+async function getConfig(): Promise<ModeratorPanelConfig> {
+  const all = await repo.findAll();
+  return all[0] || {};
+}
+
+async function updateConfig(partial: Partial<ModeratorPanelConfig>) {
+  const existing = await getConfig();
+
+  if (!existing.id) {
+    await repo.create({
+      id: crypto.randomUUID(),
+      ...partial
+    });
+    return;
+  }
+
+  await repo.updateById(existing.id, partial);
+}
 
 // ---- EMBED ----
 function renderDateFormatsEmbed(): EmbedBuilder {
@@ -66,7 +106,7 @@ function formatVersion(num: number): string {
 async function syncModeratorPanel(modChannel: TextChannel, messages: Map<string, Message>) {
   if (!messages.get("dateEmbed")) {
     const msg = await modChannel.send({ embeds: [renderDateFormatsEmbed()] });
-    await GS.updateModeratorPanelColumn("dateEmbedId", msg.id);
+    await updateConfig({ dateEmbedId: msg.id });
   }
 
   if (!messages.get("hubMessage")) {
@@ -74,20 +114,24 @@ async function syncModeratorPanel(modChannel: TextChannel, messages: Map<string,
       content: "📌 **Moderator Panel**",
       components: [renderModeratorHubRow()]
     });
-    await GS.updateModeratorPanelColumn("hubMessageId", msg.id);
+    await updateConfig({ hubMessageId: msg.id });
   }
 }
 
 // ---- CLEANUP ----
-async function cleanupDeletedChannels(guild: Guild, modChannelId?: string, updateChannelId?: string) {
-  if (modChannelId && !guild.channels.cache.get(modChannelId)) {
-    await GS.updateModeratorPanelColumn("modChannelId", "");
-    await GS.updateModeratorPanelColumn("dateEmbedId", "");
-    await GS.updateModeratorPanelColumn("hubMessageId", "");
+async function cleanupDeletedChannels(guild: Guild, config: ModeratorPanelConfig) {
+  if (config.modChannelId && !guild.channels.cache.get(config.modChannelId)) {
+    await updateConfig({
+      modChannelId: "",
+      dateEmbedId: "",
+      hubMessageId: ""
+    });
   }
 
-  if (updateChannelId && !guild.channels.cache.get(updateChannelId)) {
-    await GS.updateModeratorPanelColumn("updateChannelId", "");
+  if (config.updateChannelId && !guild.channels.cache.get(config.updateChannelId)) {
+    await updateConfig({
+      updateChannelId: ""
+    });
   }
 }
 
@@ -96,8 +140,9 @@ export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
-    await GS.ensureModeratorConfigHeaders();
-    const panelInfo = await GS.getModeratorPanelInfo();
+    let config = await getConfig();
+
+    await cleanupDeletedChannels(guild, config);
 
     let modChannel = guild.channels.cache.find(
       (c) => c.type === ChannelType.GuildText && c.name === "moderator-panel"
@@ -107,16 +152,13 @@ export async function initModeratorPanel(client: Client) {
       (c) => c.type === ChannelType.GuildText && c.name === "bot-updates"
     ) as TextChannel | undefined;
 
-    if (panelInfo) {
-      await cleanupDeletedChannels(guild, panelInfo.modChannelId, panelInfo.updateChannelId);
-    }
-
     if (!modChannel) {
       modChannel = await guild.channels.create({
         name: "moderator-panel",
         type: ChannelType.GuildText
       });
-      await GS.updateModeratorPanelColumn("modChannelId", modChannel.id);
+
+      await updateConfig({ modChannelId: modChannel.id });
     }
 
     if (!updatesChannel) {
@@ -124,7 +166,8 @@ export async function initModeratorPanel(client: Client) {
         name: "bot-updates",
         type: ChannelType.GuildText
       });
-      await GS.updateModeratorPanelColumn("updateChannelId", updatesChannel.id);
+
+      await updateConfig({ updateChannelId: updatesChannel.id });
     }
 
     const fetched = await modChannel.messages.fetch({ limit: 50 });
@@ -132,11 +175,11 @@ export async function initModeratorPanel(client: Client) {
     const map = new Map<string, Message>();
 
     const dateMsg = fetched.find(
-      (m: Message) => m.embeds[0]?.title === "📅 Accepted Date & Time Formats"
+      (m) => m.embeds[0]?.title === "📅 Accepted Date & Time Formats"
     );
 
     const hubMsg = fetched.find(
-      (m: Message) => m.content === "📌 **Moderator Panel**"
+      (m) => m.content === "📌 **Moderator Panel**"
     );
 
     if (dateMsg) map.set("dateEmbed", dateMsg);
@@ -156,10 +199,10 @@ export async function initModeratorPanel(client: Client) {
 
     await syncModeratorPanel(modChannel, map);
 
-    const currentInfo = await GS.getModeratorPanelInfo();
+    config = await getConfig();
 
-    let versionNum = currentInfo?.version
-      ? Number(currentInfo.version.split(".").join(""))
+    let versionNum = config.version
+      ? Number(config.version.split(".").join(""))
       : 100;
 
     if (updated) {
@@ -170,8 +213,10 @@ export async function initModeratorPanel(client: Client) {
         content: `Shadow Bot updated → v${formatVersion(versionNum)}\n<t:${unix}:F>`
       });
 
-      await GS.updateModeratorPanelColumn("version", formatVersion(versionNum));
-      await GS.updateModeratorPanelColumn("lastUpdated", unix);
+      await updateConfig({
+        version: formatVersion(versionNum),
+        lastUpdated: unix
+      });
     }
 
     setInterval(async () => {
@@ -179,8 +224,8 @@ export async function initModeratorPanel(client: Client) {
 
       const map = new Map<string, Message>();
 
-      const dateMsg = fetched.find((m: Message) => m.embeds[0]?.title);
-      const hubMsg = fetched.find((m: Message) => m.content === "📌 **Moderator Panel**");
+      const dateMsg = fetched.find((m) => m.embeds[0]?.title);
+      const hubMsg = fetched.find((m) => m.content === "📌 **Moderator Panel**");
 
       if (dateMsg) map.set("dateEmbed", dateMsg);
       if (hubMsg) map.set("hubMessage", hubMsg);
