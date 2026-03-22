@@ -1,11 +1,10 @@
 // src/quickadd/commands/AdjustCommand.ts
 import { Message } from "discord.js";
-import { SessionManager } from "../session/SessionManager";
-import { SessionData } from "../session/SessionData";
+import { SessionStore } from "../session/sessionStore"; // ✅ FIX
 
 export async function adjust(message: Message) {
   const guildId = message.guildId!;
-  const session = SessionManager.getSession(guildId);
+  const session = SessionStore.getSession(guildId); // ✅ FIX
 
   if (!session) {
     await message.reply("❌ Brak aktywnej sesji.");
@@ -35,7 +34,8 @@ export async function adjust(message: Message) {
     return;
   }
 
-  const success = SessionData.updateEntry(
+  // ✅ FIX: SessionData → SessionStore
+  const success = SessionStore.updateEntry(
     guildId,
     index,
     field,
