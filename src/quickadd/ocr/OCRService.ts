@@ -1,19 +1,18 @@
-// src/quickadd/ocr/OCRService.ts
+// =====================================
+// 📁 src/quickadd/ocr/OCRService.ts
+// =====================================
 
 import fetch from "node-fetch";
 import { preprocessImage } from "./OCRPreprocess";
 import { runFullImage } from "./OCRRunner";
-import { debug } from "../debug/DebugLogger";
+import { createLogger } from "../debug/DebugLogger";
 
-const SCOPE = "OCR";
+const log = createLogger("OCR");
 
 export async function runOCR(imageUrl: string) {
-  debug(SCOPE, "OCR_START", imageUrl);
+  log("ocr_start", imageUrl);
 
   try {
-    // =============================
-    // 🔽 DOWNLOAD IMAGE
-    // =============================
     const response = await fetch(imageUrl);
 
     if (!response.ok) {
@@ -23,21 +22,22 @@ export async function runOCR(imageUrl: string) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // =============================
-    // 🧪 PREPROCESS
-    // =============================
+    log("image_downloaded", {
+      size: buffer.length,
+    });
+
     const processed = await preprocessImage(buffer);
 
-    // =============================
-    // 🔍 OCR (NA RAZIE FULL ONLY)
-    // =============================
     const result = await runFullImage(processed);
 
-    debug(SCOPE, "OCR_DONE", result);
+    log("ocr_done", {
+      textLength: result.text.length,
+      lines: result.lines.length,
+    });
 
     return result;
   } catch (err) {
-    debug(SCOPE, "OCR_ERROR", err);
+    log.error("ocr_error", err);
 
     return {
       text: "",
