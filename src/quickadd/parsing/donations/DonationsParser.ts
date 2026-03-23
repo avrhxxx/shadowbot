@@ -64,9 +64,9 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
 // =====================================
 function findNickname(lines: string[], index: number): string {
   const candidates = [
+    lines[index - 1], // 🔥 FIX: najpierw NAD
+    lines[index - 2],
     lines[index + 1],
-    lines[index + 2],
-    lines[index - 1],
   ];
 
   for (const candidate of candidates) {
