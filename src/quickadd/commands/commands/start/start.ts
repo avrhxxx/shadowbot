@@ -42,6 +42,21 @@ export async function startCommand(
   });
 
   return interaction.editReply({
-    content: "✅ Session started\n\n📸 Send screenshots now.",
+    content: 
+`✅ Session started
+
+📸 Send screenshots now
+
+Status:
+📥 received
+⏳ processing
+✅ done
+❌ error
+
+📊 A preview will be generated automatically after processing.
+
+You can also run it manually anytime:
+→ /qa preview
+→ /quickadd preview`
   });
 }
