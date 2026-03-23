@@ -3,10 +3,10 @@
 // =====================================
 
 export type QuickAddType =
-  | "DONATIONS"
+  | "DONATIONS_POINTS"
   | "DUEL_POINTS"
-  | "RR_ATTENDANCE"
-  | "RR_RAID";
+  | "RR_SIGNUPS"
+  | "RR_RESULTS";
 
 export interface OCRResult {
   text: string;
