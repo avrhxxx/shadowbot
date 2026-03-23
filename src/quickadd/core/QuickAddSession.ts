@@ -7,11 +7,21 @@ import { QuickAddType } from "./QuickAddTypes";
 
 const log = createLogger("SESSION");
 
+// 🔥 NEW — SESSION STAGE
+type QuickAddStage =
+  | "COLLECTING"
+  | "CONFIRM_PENDING";
+
 type SessionData = {
   guildId: string;
   threadId: string;
   ownerId: string;
-  type: QuickAddType; // 🔥 NEW
+  type: QuickAddType;
+
+  // 🔥 NEW
+  stage: QuickAddStage;
+  finalPreview?: string;
+  confirmStartedAt?: number;
 };
 
 const sessions = new Map<string, SessionData>();
@@ -21,17 +31,20 @@ export const QuickAddSession = {
     guildId: string,
     threadId: string,
     ownerId: string,
-    type: QuickAddType // 🔥 NEW
+    type: QuickAddType
   ) {
     if (sessions.has(guildId)) {
-      throw new Error("Session already exists"); // 🔥 FIX
+      throw new Error("Session already exists");
     }
 
     const session: SessionData = {
       guildId,
       threadId,
       ownerId,
-      type, // 🔥 NEW
+      type,
+
+      // 🔥 INIT STAGE
+      stage: "COLLECTING",
     };
 
     sessions.set(guildId, session);
@@ -51,20 +64,41 @@ export const QuickAddSession = {
   },
 
   get(guildId: string): SessionData | null {
-    return sessions.get(guildId) || null;
+    const session = sessions.get(guildId) || null;
+
+    log("session_get", {
+      guildId,
+      found: !!session,
+    });
+
+    return session;
   },
 
   isInSession(guildId: string, channelId: string): boolean {
     const session = sessions.get(guildId);
-    if (!session) return false;
 
-    return session.threadId === channelId;
+    const valid = session?.threadId === channelId;
+
+    log("session_check_channel", {
+      guildId,
+      channelId,
+      valid,
+    });
+
+    return !!valid;
   },
 
   isOwner(guildId: string, userId: string): boolean {
     const session = sessions.get(guildId);
-    if (!session) return false;
 
-    return session.ownerId === userId;
+    const isOwner = session?.ownerId === userId;
+
+    log("session_check_owner", {
+      guildId,
+      userId,
+      isOwner,
+    });
+
+    return !!isOwner;
   },
 };
