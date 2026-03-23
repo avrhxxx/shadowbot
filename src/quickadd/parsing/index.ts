@@ -6,22 +6,18 @@ import { QuickAddType } from "../core/QuickAddTypes";
 import { parseDonations } from "./donations/DonationsParser";
 
 export function parseByType(
-  type: QuickAddType | null,
+  type: QuickAddType,
   lines: string[],
   traceId: string
 ) {
-  if (!type) {
-    return [];
-  }
-
   switch (type) {
-    case "DONATIONS":
+    case "DONATIONS_POINTS":
       return parseDonations(lines, traceId);
 
     // 🔥 PLACEHOLDERS (future ready)
     case "DUEL_POINTS":
-    case "RR_ATTENDANCE":
-    case "RR_RAID":
+    case "RR_SIGNUPS":
+    case "RR_RESULTS":
       return [];
 
     default:
