@@ -2,9 +2,9 @@
 // 📁 src/quickadd/parsing/donations/DonationsParser.ts
 // =====================================
 
-import { debugTrace } from "../../debug/DebugLogger";
+import { createLogger } from "../../debug/DebugLogger";
 
-const SCOPE = "PARSER";
+const log = createLogger("PARSER");
 
 type ParsedEntry = {
   nickname: string;
@@ -14,34 +14,25 @@ type ParsedEntry = {
 export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
   const results: ParsedEntry[] = [];
 
+  log.trace("parse_start", traceId, {
+    lines: lines.length,
+  });
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // =============================
-    // 🔍 SZUKAMY "Donations"
-    // =============================
     const match = line.match(/Donations:\s*([\d\s,]+)/i);
 
     if (!match) continue;
 
     const rawValue = match[1];
-
-    // =============================
-    // 🧠 PARSOWANIE LICZBY
-    // =============================
     const value = parseNumber(rawValue);
 
-    // =============================
-    // 🔍 SZUKAJ NICKA (NIE TYLKO nextLine)
-    // =============================
     const nicknameRaw = findNickname(lines, i);
     const nickname = cleanNickname(nicknameRaw);
 
-    // =============================
-    // ❌ VALIDATION
-    // =============================
     if (!isValidNickname(nickname) || isNaN(value)) {
-      debugTrace(SCOPE, "SKIPPED_ENTRY", traceId, {
+      log.trace("skipped_entry", traceId, {
         line,
         nicknameRaw,
         rawValue,
@@ -50,19 +41,20 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
       continue;
     }
 
-    // =============================
-    // ✅ OK
-    // =============================
     results.push({
       nickname,
       value,
     });
 
-    debugTrace(SCOPE, "PARSED_ENTRY", traceId, {
+    log.trace("parsed_entry", traceId, {
       nickname,
       value,
     });
   }
+
+  log.trace("parse_done", traceId, {
+    parsed: results.length,
+  });
 
   return results;
 }
@@ -104,13 +96,9 @@ function parseNumber(raw: string): number {
 // =====================================
 function cleanNickname(name: string): string {
   return name
-    // usuń numer pozycji na początku (np. "4 ", "34 ")
     .replace(/^\d+\s*/, "")
-    // usuń śmieci typu "@", "~", ":" na początku
     .replace(/^[^a-zA-Z0-9]+/, "")
-    // usuń śmieci z końca
     .replace(/[^a-zA-Z0-9]+$/, "")
-    // usuń podwójne spacje
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -121,13 +109,10 @@ function cleanNickname(name: string): string {
 function isValidNickname(name: string): boolean {
   if (!name) return false;
 
-  // minimum długości
   if (name.length < 3) return false;
 
-  // musi zawierać literę
   if (!/[a-zA-Z]/.test(name)) return false;
 
-  // ❌ odrzucamy typowe OCR śmieci
   if (/^[^a-zA-Z]+$/.test(name)) return false;
 
   return true;
