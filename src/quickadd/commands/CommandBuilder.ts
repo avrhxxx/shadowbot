@@ -3,6 +3,7 @@
 // =====================================
 
 import { SlashCommandBuilder } from "discord.js";
+import { QuickAddType } from "../core/QuickAddTypes";
 
 // =============================
 // 🧠 SUBCOMMANDS
@@ -11,7 +12,21 @@ function applySubcommands(builder: SlashCommandBuilder) {
   return builder
     // ▶️ START
     .addSubcommand((sub) =>
-      sub.setName("start").setDescription("Start session")
+      sub
+        .setName("start")
+        .setDescription("Start session")
+        .addStringOption((opt) =>
+          opt
+            .setName("type")
+            .setDescription("Select screenshot type")
+            .setRequired(true)
+            .addChoices(
+              { name: "Donations Points", value: "DONATIONS_POINTS" },
+              { name: "Duel Points", value: "DUEL_POINTS" },
+              { name: "Reservoir Signups", value: "RR_SIGNUPS" },
+              { name: "Reservoir Results", value: "RR_RESULTS" }
+            )
+        )
     )
 
     // ⛔ END
@@ -58,17 +73,11 @@ function applySubcommands(builder: SlashCommandBuilder) {
 }
 
 // =============================
-// 🔥 EXPORTY
+// 🔥 EXPORT
 // =============================
 
-export const quickAddCommand = applySubcommands(
+export const qCommand = applySubcommands(
   new SlashCommandBuilder()
-    .setName("quickadd")
+    .setName("q")
     .setDescription("QuickAdd OCR system")
-);
-
-export const qaCommand = applySubcommands(
-  new SlashCommandBuilder()
-    .setName("qa")
-    .setDescription("QuickAdd shortcut command")
 );
