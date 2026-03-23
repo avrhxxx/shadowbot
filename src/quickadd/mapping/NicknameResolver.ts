@@ -3,12 +3,12 @@
 // =====================================
 
 import { createLogger } from "../debug/DebugLogger";
+import { loadNicknameMap } from "./NicknameMapLoader"; // 🔥 NEW
 
 const log = createLogger("RESOLVER");
 
-// 🔥 TEMP CACHE (MVP)
-// później podmienimy to na Google Sheets
-const nicknameMap: Record<string, string> = {
+// 🔥 LOCAL FALLBACK (awaryjny)
+const localFallbackMap: Record<string, string> = {
   // przykłady:
   // "lunax": "LunaxDragon",
   // "lnx": "LunaxDragon",
@@ -19,20 +19,46 @@ export async function resolveNickname(nick: string): Promise<string> {
 
   const cleaned = cleanNickname(nick);
 
-  // 🔥 exact match
-  const mapped = nicknameMap[cleaned];
+  try {
+    // =====================================
+    // 🔥 LOAD MAP (cache + sheet)
+    // =====================================
+    const sheetMap = await loadNicknameMap();
 
-  if (mapped) {
-    log("nickname_resolved", {
-      input: nick,
-      cleaned,
-      result: mapped,
-    });
+    // 🔥 1. GOOGLE SHEETS (priority)
+    const mappedFromSheet = sheetMap[cleaned];
+    if (mappedFromSheet) {
+      log("nickname_resolved_sheet", {
+        input: nick,
+        cleaned,
+        result: mappedFromSheet,
+      });
 
-    return mapped;
+      return mappedFromSheet;
+    }
+
+  } catch (err) {
+    log.warn("nickname_map_failed_using_fallback", err);
   }
 
-  // 🔥 fallback
+  // =====================================
+  // 🔥 2. LOCAL FALLBACK
+  // =====================================
+  const mappedLocal = localFallbackMap[cleaned];
+
+  if (mappedLocal) {
+    log("nickname_resolved_local", {
+      input: nick,
+      cleaned,
+      result: mappedLocal,
+    });
+
+    return mappedLocal;
+  }
+
+  // =====================================
+  // 🔥 3. FINAL FALLBACK
+  // =====================================
   log.warn("nickname_unmapped", {
     input: nick,
     cleaned,
