@@ -8,7 +8,6 @@ import { createLogger } from "../../../debug/DebugLogger";
 
 const log = createLogger("COMMAND");
 
-// 🔥 DOZWOLONE POLA (łatwe do rozszerzenia)
 type AdjustField = "nickname" | "value";
 
 export async function adjustCommand(
@@ -27,7 +26,7 @@ export async function adjustCommand(
   });
 
   const data = QuickAddBuffer.getEntries(guildId);
-  const entry = data[id - 1];
+  const entry = data.find(e => e.id === id); // 🔥 FIX
 
   if (!entry) {
     log.warn("adjust_invalid_id", id);
@@ -40,9 +39,6 @@ export async function adjustCommand(
   let oldValueDisplay = "";
   let newValueDisplay = "";
 
-  // =============================
-  // 🔥 FIELD HANDLING
-  // =============================
   switch (field) {
     case "nickname":
       oldValueDisplay = entry.nickname;
@@ -84,9 +80,6 @@ export async function adjustCommand(
       });
   }
 
-  // =============================
-  // ✅ CLEAN OUTPUT (VARIANT 3 PRO)
-  // =============================
   return interaction.editReply({
     content: `
 ✅ Entry updated
@@ -98,9 +91,6 @@ ${oldValueDisplay} → ${newValueDisplay}
   });
 }
 
-// =====================================
-// 🔢 NUMBER FORMATTER
-// =====================================
 function formatNumber(value: number): string {
   return value.toLocaleString("en-US");
 }
