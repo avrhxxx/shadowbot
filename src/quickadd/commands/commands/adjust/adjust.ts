@@ -4,7 +4,9 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
+import { isQuickAddContext } from "../../../rules/isQuickAddContext";
 
 const log = createLogger("COMMAND");
 
@@ -14,6 +16,27 @@ export async function adjustCommand(
   interaction: ChatInputCommandInteraction
 ) {
   const guildId = interaction.guild!.id;
+
+  const session = QuickAddSession.get(guildId);
+
+  if (!session) {
+    log.warn("adjust_no_session");
+
+    return interaction.editReply({
+      content: "❌ No active session",
+    });
+  }
+
+  // 🔥 CONTEXT CHECK (channel OR thread)
+  if (!isQuickAddContext(interaction.channel, session)) {
+    log.warn("adjust_wrong_context", {
+      channel: interaction.channelId,
+    });
+
+    return interaction.editReply({
+      content: "❌ Use this command inside QuickAdd session (thread)",
+    });
+  }
 
   const id = interaction.options.getInteger("id", true);
   const field = interaction.options.getString("field", true) as AdjustField;
@@ -26,13 +49,13 @@ export async function adjustCommand(
   });
 
   const data = QuickAddBuffer.getEntries(guildId);
-  const entry = data.find(e => e.id === id); // 🔥 FIX
+  const entry = data.find(e => e.id === id);
 
   if (!entry) {
     log.warn("adjust_invalid_id", id);
 
     return interaction.editReply({
-      content: "❌ Invalid line ID",
+      content: "❌ Invalid entry ID",
     });
   }
 
@@ -91,6 +114,9 @@ ${oldValueDisplay} → ${newValueDisplay}
   });
 }
 
+// =====================================
+// 🔢 NUMBER FORMATTER
+// =====================================
 function formatNumber(value: number): string {
   return value.toLocaleString("en-US");
 }
