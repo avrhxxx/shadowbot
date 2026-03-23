@@ -4,14 +4,13 @@
 
 /**
  * 🔥 GLOBAL DEBUG SWITCH
- * Możesz to później podpiąć pod ENV (process.env.DEBUG === "true")
  */
 const DEBUG_ENABLED = true;
 
 /**
- * 🔥 SCOPES – uporządkowane według architektury
+ * 🔥 SCOPES – zgodne z architekturą
  */
-type DebugScope =
+export type DebugScope =
   | "OCR"
   | "PIPELINE"
   | "PARSER"
@@ -23,102 +22,57 @@ type DebugScope =
   | "COMMAND";
 
 /**
- * 🔥 OPCJE DEBUGA
- */
-interface DebugOptions {
-  traceId?: string;
-}
-
-/**
- * 🧠 GŁÓWNY LOGGER
- */
-export function debug(
-  scope: DebugScope,
-  tag: string,
-  ...args: any[]
-) {
-  if (!DEBUG_ENABLED) return;
-
-  console.log(formatPrefix(scope, tag), ...args);
-}
-
-/**
- * 🧠 LOGGER Z TRACE (🔥 KLUCZOWE DO OCR PIPELINE)
- */
-export function debugTrace(
-  scope: DebugScope,
-  tag: string,
-  traceId: string,
-  ...args: any[]
-) {
-  if (!DEBUG_ENABLED) return;
-
-  console.log(formatPrefix(scope, tag, traceId), ...args);
-}
-
-/**
- * ❌ ERROR LOGGER
- */
-export function debugError(
-  scope: DebugScope,
-  tag: string,
-  error: any,
-  traceId?: string
-) {
-  if (!DEBUG_ENABLED) return;
-
-  console.error(formatPrefix(scope, tag, traceId), error);
-}
-
-/**
- * ⚠️ WARN LOGGER
- */
-export function debugWarn(
-  scope: DebugScope,
-  tag: string,
-  ...args: any[]
-) {
-  if (!DEBUG_ENABLED) return;
-
-  console.warn(formatPrefix(scope, tag), ...args);
-}
-
-/**
  * =====================================
- * 🔧 FORMATTER
+ * 🔧 CORE LOGGER
  * =====================================
  */
-function formatPrefix(
+
+function logMessage(
+  level: "log" | "warn" | "error",
   scope: DebugScope,
   tag: string,
-  traceId?: string
+  traceId?: string,
+  ...args: any[]
 ) {
+  if (!DEBUG_ENABLED) return;
+
   const time = new Date().toISOString().split("T")[1].split(".")[0];
 
-  if (traceId) {
-    return `[QA:${scope}:${tag}:${traceId}:${time}]`;
-  }
+  const prefix = traceId
+    ? `[QA:${scope}:${tag}:${traceId}:${time}]`
+    : `[QA:${scope}:${tag}:${time}]`;
 
-  return `[QA:${scope}:${tag}:${time}]`;
+  console[level](prefix, ...args);
 }
 
 /**
  * =====================================
- * 🧠 SCOPED LOGGER (🔥 NEW)
+ * 🧠 MAIN LOGGER FACTORY
  * =====================================
+ *
+ * 🔥 UŻYCIE:
+ * const log = createLogger("COMMAND");
+ * log("INIT", "something");
  */
+
 export function createLogger(scope: DebugScope) {
-  return {
-    log: (tag: string, ...args: any[]) =>
-      debug(scope, tag, ...args),
+  return Object.assign(
+    // 🔥 DEFAULT = log()
+    (tag: string, ...args: any[]) => {
+      logMessage("log", scope, tag, undefined, ...args);
+    },
+    {
+      trace: (tag: string, traceId: string, ...args: any[]) => {
+        logMessage("log", scope, tag, traceId, ...args);
+      },
 
-    trace: (tag: string, traceId: string, ...args: any[]) =>
-      debugTrace(scope, tag, traceId, ...args),
+      warn: (tag: string, ...args: any[]) => {
+        logMessage("warn", scope, tag, undefined, ...args);
+      },
 
-    error: (tag: string, error: any, traceId?: string) =>
-      debugError(scope, tag, error, traceId),
-
-    warn: (tag: string, ...args: any[]) =>
-      debugWarn(scope, tag, ...args),
-  };
+      error: (tag: string, error: any, traceId?: string) => {
+        logMessage("error", scope, tag, traceId, error);
+      },
+    }
+  );
 }
