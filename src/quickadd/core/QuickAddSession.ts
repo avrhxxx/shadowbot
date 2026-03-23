@@ -3,6 +3,7 @@
 // =====================================
 
 import { createLogger } from "../debug/DebugLogger";
+import { QuickAddType } from "./QuickAddTypes";
 
 const log = createLogger("SESSION");
 
@@ -10,12 +11,18 @@ type SessionData = {
   guildId: string;
   threadId: string;
   ownerId: string;
+  type: QuickAddType; // 🔥 NEW
 };
 
 const sessions = new Map<string, SessionData>();
 
 export const QuickAddSession = {
-  start(guildId: string, threadId: string, ownerId: string) {
+  start(
+    guildId: string,
+    threadId: string,
+    ownerId: string,
+    type: QuickAddType // 🔥 NEW
+  ) {
     if (sessions.has(guildId)) {
       throw new Error("Session already exists"); // 🔥 FIX
     }
@@ -24,6 +31,7 @@ export const QuickAddSession = {
       guildId,
       threadId,
       ownerId,
+      type, // 🔥 NEW
     };
 
     sessions.set(guildId, session);
