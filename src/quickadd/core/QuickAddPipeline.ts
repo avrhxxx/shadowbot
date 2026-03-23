@@ -3,12 +3,12 @@
 // =====================================
 
 import { Message, AttachmentBuilder } from "discord.js";
-import { debugTrace } from "../debug/DebugLogger";
+import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
 
-const SCOPE = "PIPELINE";
+const log = createLogger("PIPELINE");
 
 export async function processImageInput(
   message: Message,
@@ -16,34 +16,38 @@ export async function processImageInput(
   imageUrl: string,
   traceId: string
 ) {
-  debugTrace(SCOPE, "IMAGE_RECEIVED", traceId, {
+  log.trace("image_received", traceId, {
     user: message.author.id,
     url: imageUrl,
   });
 
   try {
-    console.log("🔥 OCR CALL START", traceId);
+    log.trace("ocr_start", traceId);
 
     // =============================
     // 🔥 OCR
     // =============================
     const ocrResult = await runOCR(imageUrl);
 
-    console.log("🔥 OCR CALL END", traceId);
+    log.trace("ocr_end", traceId);
 
-    debugTrace(SCOPE, "OCR_RESULT", traceId, ocrResult);
+    log.trace("ocr_result", traceId, ocrResult);
 
     // =============================
     // 🔥 PARSING
     // =============================
     const parsed = parseOCR(ocrResult.lines, traceId);
 
-    debugTrace(SCOPE, "PARSED_RESULT", traceId, parsed);
+    log.trace("parsed_result", traceId, parsed);
 
     // =============================
     // 🔥 BUFFER (NOWE)
     // =============================
     QuickAddBuffer.addEntries(message.guild!.id, parsed);
+
+    log.trace("buffer_updated", traceId, {
+      added: parsed.length,
+    });
 
     // =============================
     // 📤 DEBUG → WYŚLIJ NA PRIV
@@ -69,8 +73,10 @@ ${JSON.stringify(parsed, null, 2)}
         content: `📄 QuickAdd debug (${traceId})`,
         files: [file],
       });
+
+      log.trace("debug_dm_sent", traceId);
     } catch (err) {
-      console.error("❌ Failed to send DM debug:", err);
+      log.warn("debug_dm_failed", err);
     }
 
     // =============================
@@ -81,6 +87,6 @@ ${JSON.stringify(parsed, null, 2)}
     // - approval
 
   } catch (err) {
-    console.error("❌ Pipeline OCR error:", err);
+    log.error("pipeline_error", err, traceId);
   }
 }
