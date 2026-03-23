@@ -15,9 +15,6 @@ export * from "./ocr/OCRService";
 // parsing
 export * from "./parsing";
 
-// detection
-export * from "./detection/ImageTypeDetector";
-
 // mapping
 export * from "./mapping/NicknameResolver";
 
