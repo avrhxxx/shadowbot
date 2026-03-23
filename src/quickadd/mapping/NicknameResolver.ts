@@ -3,7 +3,7 @@
 // =====================================
 
 import { createLogger } from "../debug/DebugLogger";
-import { loadNicknameMap } from "./NicknameMapLoader"; // 🔥 NEW
+import { loadNicknameMap } from "./NicknameMapLoader";
 
 const log = createLogger("RESOLVER");
 
@@ -14,6 +14,11 @@ const localFallbackMap: Record<string, string> = {
   // "lnx": "LunaxDragon",
 };
 
+// 🔥 CACHE (kluczowy dla wydajności)
+let cachedMap: Record<string, string> | null = null;
+let lastLoad = 0;
+const CACHE_TTL = 60_000; // 60s
+
 export async function resolveNickname(nick: string): Promise<string> {
   if (!nick) return "";
 
@@ -21,11 +26,22 @@ export async function resolveNickname(nick: string): Promise<string> {
 
   try {
     // =====================================
-    // 🔥 LOAD MAP (cache + sheet)
+    // 🔥 CACHE LAYER
     // =====================================
-    const sheetMap = await loadNicknameMap();
+    if (!cachedMap || Date.now() - lastLoad > CACHE_TTL) {
+      cachedMap = await loadNicknameMap();
+      lastLoad = Date.now();
 
+      log("nickname_map_loaded", {
+        size: Object.keys(cachedMap).length,
+      });
+    }
+
+    const sheetMap = cachedMap;
+
+    // =====================================
     // 🔥 1. GOOGLE SHEETS (priority)
+    // =====================================
     const mappedFromSheet = sheetMap[cleaned];
     if (mappedFromSheet) {
       log("nickname_resolved_sheet", {
