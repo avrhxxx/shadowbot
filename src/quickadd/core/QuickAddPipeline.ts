@@ -5,7 +5,7 @@
 import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
-import { parseOCR } from "../parsing";
+import { parseByType } from "../parsing"; // 🔥 FIX
 import { detectImageType } from "../detection/ImageTypeDetector";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
@@ -47,7 +47,7 @@ export async function processImageInput(
   try {
     await setStatusReaction(message, "⏳", traceId);
 
-    const ocrResult = await runOCR(imageUrl, traceId);
+    const ocrResult = await runOCR(imageUrl);
 
     const type = detectImageType(ocrResult.lines);
 
@@ -55,11 +55,11 @@ export async function processImageInput(
       log.warn("unknown_image_type", traceId);
     }
 
-    const parsed = parseOCR(ocrResult.lines, traceId);
+    // 🔥 FIX — routing przez typ
+    const parsed = parseByType(type, ocrResult.lines, traceId);
 
     QuickAddBuffer.addEntries(guildId, parsed);
 
-    // 🔥 FIX guard
     if (message.channel && "send" in message.channel) {
       const allData = QuickAddBuffer.getEntries(guildId);
       const content = formatPreview(allData);
@@ -68,7 +68,9 @@ export async function processImageInput(
 
       try {
         if (existingId) {
-          const existingMsg = await message.channel.messages.fetch(existingId).catch(() => null);
+          const existingMsg = await message.channel.messages
+            .fetch(existingId)
+            .catch(() => null);
 
           if (existingMsg) {
             await existingMsg.edit({ content });
