@@ -6,9 +6,13 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { CommandRegistry } from "./CommandRegistry";
 import { ensureQuickAddChannel } from "../integrations/QuickAddChannelService";
 import { QuickAddSession } from "../core/QuickAddSession";
-import { createLogger } from "../debug/DebugLogger"; // 🔥 FIX
+import { createLogger } from "../debug/DebugLogger";
+import {
+  validateQuickAddContext,
+  validateSessionOwner,
+} from "../rules/quickAddRules";
 
-const log = createLogger("COMMAND"); // 🔥 FIX
+const log = createLogger("COMMAND");
 
 export async function handleQuickAddInteraction(
   interaction: ChatInputCommandInteraction
@@ -26,18 +30,7 @@ export async function handleQuickAddInteraction(
 
   log("subcommand", sub);
 
-  const channel = await ensureQuickAddChannel(interaction.guild);
-
-  if (interaction.channelId !== channel.id) {
-    log.warn("wrong_channel", {
-      current: interaction.channelId,
-      expected: channel.id,
-    });
-
-    return interaction.editReply({
-      content: `❌ Use this command in <#${channel.id}>`,
-    });
-  }
+  const quickAddChannel = await ensureQuickAddChannel(interaction.guild);
 
   const handler = CommandRegistry[sub];
 
@@ -49,27 +42,44 @@ export async function handleQuickAddInteraction(
     });
   }
 
-  // 🔒 session check dla wszystkiego poza start
-  if (sub !== "start") {
-    const session = QuickAddSession.get(interaction.guild.id);
+  const session = QuickAddSession.get(interaction.guild.id);
 
-    if (!session) {
-      log.warn("no_session");
+  // =====================================
+  // ▶️ START — tylko w głównym kanale
+  // =====================================
+  if (sub === "start") {
+    if (interaction.channelId !== quickAddChannel.id) {
+      log.warn("start_wrong_channel", {
+        current: interaction.channelId,
+        expected: quickAddChannel.id,
+      });
 
       return interaction.editReply({
-        content: "❌ No active session",
+        content: `❌ Use this command in <#${quickAddChannel.id}>`,
       });
     }
 
-    if (session.ownerId !== interaction.user.id) {
-      log.warn("not_owner", {
-        owner: session.ownerId,
-        user: interaction.user.id,
-      });
+    log("handler_execute", sub);
+    return handler(interaction);
+  }
 
-      return interaction.editReply({
-        content: "❌ Only session owner can use this",
-      });
+  // =====================================
+  // 🔒 RESZTA — rules system (SSOT)
+  // =====================================
+
+  // 1. session + context
+  const contextError = validateQuickAddContext(interaction, session);
+  if (contextError) {
+    log.warn("blocked_context", contextError);
+    return interaction.editReply({ content: contextError });
+  }
+
+  // 2. owner (tylko dla end)
+  if (sub === "end") {
+    const ownerError = validateSessionOwner(interaction, session);
+    if (ownerError) {
+      log.warn("blocked_owner", ownerError);
+      return interaction.editReply({ content: ownerError });
     }
   }
 
