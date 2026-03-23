@@ -21,18 +21,10 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 
 // =============================
-// 🔥 QUICKADD (NEW)
+// 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
-import {
-  quickAddCommand,
-  handleQuickAddCommand,
-} from "./quickadd/commands/quickadd.command";
-
-// 🔥 NEW: QA SHORTCUT
-import {
-  qaCommand,
-  handleQaCommand,
-} from "./quickadd/commands/qa.command";
+import { CommandRegistry } from "./quickadd/commands/commands/CommandRegistry";
+import { handleQuickAddInteraction } from "./quickadd/commands/commands/CommandHandler";
 
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
 
@@ -65,10 +57,9 @@ client.once("clientReady", async () => {
   // 🔥 REGISTER SLASH COMMANDS
   // =============================
   try {
-    await client.application?.commands.set([
-      quickAddCommand.toJSON(),
-      qaCommand.toJSON(), // 🔥 NEW
-    ]);
+    await client.application?.commands.set(
+      CommandRegistry.map((cmd) => cmd.toJSON())
+    );
 
     console.log("✅ Slash commands registered");
   } catch (err) {
@@ -112,17 +103,14 @@ client.once("clientReady", async () => {
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       // =============================
-      // 🔥 QUICKADD HANDLER FIRST
+      // 🔥 NEW GLOBAL COMMAND HANDLER
       // =============================
       if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === "quickadd") {
-          await handleQuickAddCommand(interaction);
-          return;
-        }
-
-        // 🔥 NEW: QA HANDLER
-        if (interaction.commandName === "qa") {
-          await handleQaCommand(interaction);
+        if (
+          interaction.commandName === "quickadd" ||
+          interaction.commandName === "qa"
+        ) {
+          await handleQuickAddInteraction(interaction);
           return;
         }
       }
