@@ -1,4 +1,6 @@
-// src/quickadd/ocr/OCRTypes.ts
+// =====================================
+// 📁 src/quickadd/ocr/OCRTypes.ts
+// =====================================
 
 export interface OCRConfig {
   language?: string;
