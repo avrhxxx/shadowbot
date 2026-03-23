@@ -2,12 +2,11 @@
 // 📁 src/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-import { Message } from "discord.js";
+import { Message, AttachmentBuilder } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
-import { QuickAddBuffer } from "../storage/QuickAddBuffer";
-import { formatPreview } from "../utils/formatPreview";
+import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -72,51 +71,6 @@ function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
   }, delay);
 }
 
-// =====================================
-// 🔥 HELPER: AUTO PREVIEW
-// =====================================
-async function sendAutoPreview(message: Message, traceId: string) {
-  try {
-    log.trace("auto_preview_triggered", traceId);
-
-    if (!message.channel.isTextBased()) {
-      log.warn("auto_preview_invalid_channel", {
-        messageId: message.id,
-      });
-      return;
-    }
-
-    const data = QuickAddBuffer.getEntries(message.guild!.id);
-
-    if (!data.length) {
-      log.trace("auto_preview_skipped_empty", traceId);
-      return;
-    }
-
-    const formatted = formatPreview(data);
-
-    await message.channel.send({
-      content:
-`📊 QuickAdd Preview (${data.length} entries)
-
-\`\`\`
-${formatted}
-\`\`\`
-
-✏️ Adjust entry:
-→ /qa adjust <id> <field> <value>
-→ /quickadd adjust <id> <field> <value>`
-    });
-
-    log.trace("auto_preview_sent", traceId, {
-      entries: data.length,
-    });
-
-  } catch (err) {
-    log.warn("auto_preview_failed", err);
-  }
-}
-
 export async function processImageInput(
   message: Message,
   session: any,
@@ -143,6 +97,7 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl);
 
     log.trace("ocr_end", traceId);
+
     log.trace("ocr_result", traceId, ocrResult);
 
     // =============================
@@ -153,7 +108,7 @@ export async function processImageInput(
     log.trace("parsed_result", traceId, parsed);
 
     // =============================
-    // 🔥 BUFFER
+    // 🔥 BUFFER (NOWE)
     // =============================
     QuickAddBuffer.addEntries(message.guild!.id, parsed);
 
@@ -162,24 +117,25 @@ export async function processImageInput(
     });
 
     // =============================
-    // 🔥 AUTO PREVIEW
+    // 🔥 AUTO PREVIEW (FIX SEND ERROR)
     // =============================
-    if (parsed.length > 0) {
-      setTimeout(() => {
-        sendAutoPreview(message, traceId);
-      }, 500);
-    } else {
-      log.trace("auto_preview_skipped_no_data", traceId);
+    if (message.channel.isTextBased()) {
+      await message.channel.send({
+        content: "📊 Preview updated. Use `/qa preview` to view details.",
+      });
     }
 
     // =============================
-    // ✅ DONE
+    // 🔜 NEXT
     // =============================
+    // - detection
+    // - mapping
+    // - approval
+
+    // ✅ DONE
     await setStatusReaction(message, "✅", traceId);
 
-    // =============================
-    // 🧹 SAFE DELETE
-    // =============================
+    // 🧹 SAFE DELETE (only if parsed data exists)
     if (parsed.length > 0) {
       scheduleSafeDelete(message, traceId, 15000);
     } else {
