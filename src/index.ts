@@ -23,12 +23,18 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // =============================
 // 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
-import { CommandRegistry } from "./quickadd/commands/commands/CommandRegistry";
-import { handleQuickAddInteraction } from "./quickadd/commands/commands/CommandHandler";
+
+// ❌ USUWAMY stare:
+// quickAddCommand
+// handleQuickAddCommand
+// qaCommand
+// handleQaCommand
+
+// ✅ NOWE:
+import { qaCommand, quickAddCommand } from "./quickadd/commands/qa/qa.command";
+import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
 
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
-
-// 🔥 FIX: LISTENER IMPORT
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 
 // =============================
@@ -49,7 +55,6 @@ if (!process.env.BOT_TOKEN) {
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// 🔥 FIX: clientReady zamiast ready
 client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
 
@@ -57,9 +62,10 @@ client.once("clientReady", async () => {
   // 🔥 REGISTER SLASH COMMANDS
   // =============================
   try {
-    await client.application?.commands.set(
-      CommandRegistry.map((cmd) => cmd.toJSON())
-    );
+    await client.application?.commands.set([
+      quickAddCommand.toJSON(),
+      qaCommand.toJSON(),
+    ]);
 
     console.log("✅ Slash commands registered");
   } catch (err) {
@@ -72,14 +78,11 @@ client.once("clientReady", async () => {
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // 🔥 FIX: START LISTENER
+  // 🔥 LISTENER
   registerQuickAddListener(client);
 
   // -----------------------------
-  // Init reminders / notifications
-  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
-    // 🔥 QUICKADD CHANNEL INIT
     try {
       await ensureQuickAddChannel(guild);
       console.log(`✅ QuickAdd channel ready in ${guild.name}`);
@@ -97,14 +100,11 @@ client.once("clientReady", async () => {
     });
   }
 
-  // -----------------------------
-  // Global interaction handler
-  // -----------------------------
+  // =============================
+  // 🔥 GLOBAL HANDLER
+  // =============================
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
-      // =============================
-      // 🔥 NEW GLOBAL COMMAND HANDLER
-      // =============================
       if (interaction.isChatInputCommand()) {
         if (
           interaction.commandName === "quickadd" ||
@@ -115,8 +115,6 @@ client.once("clientReady", async () => {
         }
       }
 
-      // -----------------------------
-      // EXISTING SYSTEMS
       // -----------------------------
       await handleEventInteraction(interaction);
       await handleAbsenceInteraction(interaction);
