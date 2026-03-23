@@ -22,6 +22,30 @@ async function setStatusReaction(message: Message, emoji: string) {
   }
 }
 
+// =====================================
+// 🔥 HELPER: SAFE DELETE
+// =====================================
+function scheduleSafeDelete(message: Message, delay = 15000) {
+  setTimeout(async () => {
+    try {
+      if (!message.deletable) {
+        log.warn("message_not_deletable", {
+          messageId: message.id,
+        });
+        return;
+      }
+
+      await message.delete();
+
+      log.trace("message_deleted", null, {
+        messageId: message.id,
+      });
+    } catch (err) {
+      log.warn("message_delete_failed", err);
+    }
+  }, delay);
+}
+
 export async function processImageInput(
   message: Message,
   session: any,
@@ -106,6 +130,11 @@ export async function processImageInput(
 
     // ✅ DONE
     await setStatusReaction(message, "✅");
+
+    // 🧹 SAFE DELETE (only if parsed data exists)
+    if (parsed.length > 0) {
+      scheduleSafeDelete(message, 15000);
+    }
 
   } catch (err) {
     log.error("pipeline_error", err, traceId);
