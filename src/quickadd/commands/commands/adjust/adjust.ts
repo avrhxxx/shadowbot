@@ -8,11 +8,11 @@ import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
 import { validateQuickAddContext } from "../../../rules/quickAddRules";
 
-// 🔥 NEW — resolver
+// 🔥 resolver
 import { resolveNickname } from "../../../mapping/NicknameResolver";
 
-// 🔥 NEW — zapis do sheet
-import { appendQuickAddRows } from "../../../../googleSheetsStorage";
+// 🔥 zapis adjusted (TYLKO NICK)
+import { appendQuickAddAdjusted } from "../../../../googleSheetsStorage";
 
 const log = createLogger("COMMAND");
 
@@ -73,8 +73,66 @@ export async function adjustCommand(
       });
 
       // =====================================
-      // 🔥 SAVE ONLY NICKNAME
+      // 🔥 SAVE ONLY NICKNAME (LEARNING)
       // =====================================
       try {
-        await appendQuickAddRows([
-         
+        if (session?.type) {
+          await appendQuickAddAdjusted([
+            {
+              type: session.type,
+              nickname: resolved,
+            },
+          ]);
+        }
+      } catch (err) {
+        log.warn("adjust_save_failed", err);
+      }
+
+      break;
+
+    case "value":
+      const parsed = Number(newValue);
+
+      if (isNaN(parsed)) {
+        log.warn("adjust_invalid_value", newValue);
+
+        return interaction.editReply({
+          content: "❌ Value must be a number",
+        });
+      }
+
+      oldValueDisplay = formatNumber(entry.value);
+      entry.value = parsed;
+      newValueDisplay = formatNumber(entry.value);
+
+      log("adjust_value", {
+        id,
+        value: parsed,
+      });
+      break;
+
+    default:
+      log.warn("adjust_unknown_field", field);
+
+      return interaction.editReply({
+        content: "❌ Unknown field",
+      });
+  }
+
+  return interaction.editReply({
+    content: `
+✅ Entry updated
+
+[${id}] ${entry.nickname}
+
+${oldValueDisplay} → ${newValueDisplay}
+`.trim(),
+  });
+}
+
+// =====================================
+// 🔢 NUMBER FORMATTER
+// =====================================
+function formatNumber(value: number): string {
+  return value.toLocaleString("en-US");
+}
