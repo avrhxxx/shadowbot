@@ -4,6 +4,7 @@
 
 import { ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
+import { QuickAddType } from "../../../core/QuickAddTypes";
 import { createLogger } from "../../../debug/DebugLogger";
 
 const log = createLogger("COMMAND");
@@ -13,9 +14,12 @@ export async function startCommand(
 ) {
   const guildId = interaction.guild!.id;
 
+  const type = interaction.options.getString("type", true) as QuickAddType; // 🔥 NEW
+
   log("start_attempt", {
     user: interaction.user.id,
     guildId,
+    type, // 🔥 NEW
   });
 
   const existing = QuickAddSession.get(guildId);
@@ -49,7 +53,7 @@ export async function startCommand(
   // 🧵 CREATE THREAD
   // =====================================
   const thread = await channel.threads.create({
-    name: `quickadd-${interaction.user.username}`,
+    name: `q-${type.toLowerCase()}-${interaction.user.username}`, // 🔥 UPDATED
     autoArchiveDuration: 60,
   });
 
@@ -63,13 +67,15 @@ export async function startCommand(
   // =====================================
   QuickAddSession.start(
     guildId,
-    thread.id, // 🔥 thread is now the session context
-    interaction.user.id
+    thread.id,
+    interaction.user.id,
+    type // 🔥 NEW
   );
 
   log("start_success", {
     user: interaction.user.id,
     threadId: thread.id,
+    type, // 🔥 NEW
   });
 
   // =====================================
@@ -80,6 +86,7 @@ export async function startCommand(
 `✅ Session started
 
 🧵 Thread: <#${thread.id}>
+📂 Type: ${type}
 
 📸 Send screenshots inside this thread
 
@@ -92,7 +99,6 @@ Status:
 📊 Preview is generated automatically after each image
 
 You can also run manually:
-→ /qa preview
-→ /quickadd preview`,
+→ /q preview`,
   });
 }
