@@ -5,9 +5,9 @@
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { createLogger } from "../../../debug/DebugLogger"; // 🔥 NEW
+import { createLogger } from "../../../debug/DebugLogger";
 
-const log = createLogger("COMMAND"); // 🔥 NEW
+const log = createLogger("COMMAND");
 
 export async function endCommand(
   interaction: ChatInputCommandInteraction
@@ -40,14 +40,52 @@ export async function endCommand(
     });
   }
 
+  // =====================================
+  // 🛑 END SESSION + CLEAR BUFFER
+  // =====================================
   QuickAddSession.end(guildId);
   QuickAddBuffer.clear(guildId);
 
   log("end_success", {
     user: interaction.user.id,
+    threadId: session.threadId,
   });
 
+  // =====================================
+  // 🧵 DELETE THREAD (SAFE DELAY)
+  // =====================================
+  try {
+    const channel = interaction.client.channels.cache.get(session.threadId);
+
+    if (channel && channel.isThread()) {
+      log("thread_delete_scheduled", {
+        threadId: session.threadId,
+      });
+
+      setTimeout(async () => {
+        try {
+          await channel.delete();
+
+          log("thread_deleted", {
+            threadId: session.threadId,
+          });
+        } catch (err) {
+          log.warn("thread_delete_failed", err);
+        }
+      }, 15000);
+    } else {
+      log.warn("thread_not_found_or_invalid", {
+        threadId: session.threadId,
+      });
+    }
+  } catch (err) {
+    log.warn("thread_delete_error", err);
+  }
+
   return interaction.editReply({
-    content: "🛑 Session ended",
+    content: 
+`🛑 Session ended
+
+🧹 This thread will be deleted in 15 seconds.`,
   });
 }
