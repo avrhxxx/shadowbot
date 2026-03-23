@@ -6,16 +6,16 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { CommandRegistry } from "./CommandRegistry";
 import { ensureQuickAddChannel } from "../integrations/QuickAddChannelService";
 import { QuickAddSession } from "../core/QuickAddSession";
-import { debug } from "../debug/DebugLogger"; // 🔥 NEW
+import { createLogger } from "../debug/DebugLogger"; // 🔥 FIX
 
-const SCOPE = "COMMAND"; // 🔥 NEW
+const log = createLogger("COMMAND"); // 🔥 FIX
 
 export async function handleQuickAddInteraction(
   interaction: ChatInputCommandInteraction
 ) {
   if (!interaction.guild) return;
 
-  debug(SCOPE, "INTERACTION_RECEIVED", {
+  log("interaction_received", {
     command: interaction.commandName,
     user: interaction.user.id,
   });
@@ -24,12 +24,12 @@ export async function handleQuickAddInteraction(
 
   const sub = interaction.options.getSubcommand();
 
-  debug(SCOPE, "SUBCOMMAND", sub);
+  log("subcommand", sub);
 
   const channel = await ensureQuickAddChannel(interaction.guild);
 
   if (interaction.channelId !== channel.id) {
-    debug(SCOPE, "WRONG_CHANNEL", {
+    log.warn("wrong_channel", {
       current: interaction.channelId,
       expected: channel.id,
     });
@@ -42,7 +42,7 @@ export async function handleQuickAddInteraction(
   const handler = CommandRegistry[sub];
 
   if (!handler) {
-    debug(SCOPE, "UNKNOWN_SUBCOMMAND", sub);
+    log.warn("unknown_subcommand", sub);
 
     return interaction.editReply({
       content: `❌ Unknown subcommand: ${sub}`,
@@ -54,7 +54,7 @@ export async function handleQuickAddInteraction(
     const session = QuickAddSession.get(interaction.guild.id);
 
     if (!session) {
-      debug(SCOPE, "NO_SESSION");
+      log.warn("no_session");
 
       return interaction.editReply({
         content: "❌ No active session",
@@ -62,7 +62,7 @@ export async function handleQuickAddInteraction(
     }
 
     if (session.ownerId !== interaction.user.id) {
-      debug(SCOPE, "NOT_OWNER", {
+      log.warn("not_owner", {
         owner: session.ownerId,
         user: interaction.user.id,
       });
@@ -73,7 +73,7 @@ export async function handleQuickAddInteraction(
     }
   }
 
-  debug(SCOPE, "HANDLER_EXECUTE", sub);
+  log("handler_execute", sub);
 
   return handler(interaction);
 }
