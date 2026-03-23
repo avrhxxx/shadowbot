@@ -7,6 +7,7 @@ import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
+import { formatPreview } from "../utils/formatPreview"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -117,11 +118,35 @@ export async function processImageInput(
     });
 
     // =============================
-    // 🔥 AUTO PREVIEW (FIX SEND ERROR)
+    // 🔥 AUTO PREVIEW (REAL)
     // =============================
     if (message.channel.isTextBased()) {
-      await message.channel.send({
-        content: "📊 Preview updated. Use `/qa preview` to view details.",
+      const allData = QuickAddBuffer.getEntries(message.guild!.id);
+
+      const preview = formatPreview(allData);
+
+      const content = `
+📊 QuickAdd Preview (${allData.length} entries)
+
+${preview}
+
+────────────────────────────
+
+✏️ Adjust entry:
+→ /qa adjust <id> <field> <value>
+→ /quickadd adjust <id> <field> <value>
+
+Example:
+→ /qa adjust 1 value 60000
+
+💡 Pro tip:
+Fix OCR mistakes like wrong numbers or nicknames.
+`.trim();
+
+      await message.channel.send({ content });
+
+      log.trace("preview_sent", traceId, {
+        entries: allData.length,
       });
     }
 
