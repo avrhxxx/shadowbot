@@ -64,7 +64,7 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
 // =====================================
 function findNickname(lines: string[], index: number): string {
   const candidates = [
-    lines[index - 1], // 🔥 FIX: najpierw NAD
+    lines[index - 1],
     lines[index - 2],
     lines[index + 1],
   ];
@@ -104,7 +104,7 @@ function cleanNickname(name: string): string {
 }
 
 // =====================================
-// ✅ VALIDATION
+// ✅ VALIDATION (IMPROVED)
 // =====================================
 function isValidNickname(name: string): boolean {
   if (!name) return false;
@@ -114,6 +114,18 @@ function isValidNickname(name: string): boolean {
   if (!/[a-zA-Z]/.test(name)) return false;
 
   if (/^[^a-zA-Z]+$/.test(name)) return false;
+
+  // ❌ ALL CAPS (OCR headers typu RANKINGIREWARDS)
+  if (name === name.toUpperCase()) return false;
+
+  // ❌ zawiera dużo symboli i jest krótki (OCR garbage)
+  if (/[^a-zA-Z0-9\s]/.test(name) && name.length < 5) return false;
+
+  // ❌ znane śmieci systemowe
+  const blacklist = ["REWARDS", "DONATIONS", "RANKING"];
+  for (const word of blacklist) {
+    if (name.toUpperCase().includes(word)) return false;
+  }
 
   return true;
 }
