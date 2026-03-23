@@ -28,27 +28,50 @@ export function registerQuickAddListener(client: Client) {
       if (message.author.bot) return;
       if (!message.guild) return;
 
+      const guildId = message.guild.id;
+      const channelId = message.channel.id;
+      const userId = message.author.id;
+
       log("message_received", {
-        user: message.author.id,
-        channel: message.channel.id,
+        user: userId,
+        channel: channelId,
       });
 
-      const session = QuickAddSession.get(message.guild.id);
+      const session = QuickAddSession.get(guildId);
 
       if (!session) {
-        log("no_session");
+        log("listener_ignored_no_session", {
+          guildId,
+        });
         return;
       }
 
-      if (session.channelId !== message.channel.id) {
-        log("wrong_channel");
+      // =====================================
+      // 🔒 ONLY ACTIVE THREAD
+      // =====================================
+      if (!QuickAddSession.isInSession(guildId, channelId)) {
+        log("listener_ignored_outside_thread", {
+          channelId,
+          expected: session.threadId,
+        });
         return;
       }
 
-      if (session.ownerId !== message.author.id) {
-        log("ignored_not_owner", message.author.id);
+      // =====================================
+      // 🔒 ONLY SESSION OWNER
+      // =====================================
+      if (!QuickAddSession.isOwner(guildId, userId)) {
+        log("listener_ignored_wrong_user", {
+          userId,
+          owner: session.ownerId,
+        });
         return;
       }
+
+      log("listener_accepted", {
+        user: userId,
+        threadId: channelId,
+      });
 
       const imageUrl = getImageUrl(message);
 
