@@ -11,6 +11,9 @@ import { validateQuickAddContext } from "../../../rules/quickAddRules";
 // 🔥 NEW — resolver
 import { resolveNickname } from "../../../mapping/NicknameResolver";
 
+// 🔥 NEW — zapis do sheet
+import { appendQuickAddRows } from "../../../../googleSheetsStorage";
+
 const log = createLogger("COMMAND");
 
 type AdjustField = "nickname" | "value";
@@ -57,7 +60,7 @@ export async function adjustCommand(
     case "nickname":
       oldValueDisplay = entry.nickname;
 
-      // 🔥 NEW — RESOLVE NICKNAME
+      // 🔥 RESOLVE
       const resolved = await resolveNickname(newValue);
 
       entry.nickname = resolved;
@@ -68,51 +71,10 @@ export async function adjustCommand(
         input: newValue,
         resolved,
       });
-      break;
 
-    case "value":
-      const parsed = Number(newValue);
-
-      if (isNaN(parsed)) {
-        log.warn("adjust_invalid_value", newValue);
-
-        return interaction.editReply({
-          content: "❌ Value must be a number",
-        });
-      }
-
-      oldValueDisplay = formatNumber(entry.value);
-      entry.value = parsed;
-      newValueDisplay = formatNumber(entry.value);
-
-      log("adjust_value", {
-        id,
-        value: parsed,
-      });
-      break;
-
-    default:
-      log.warn("adjust_unknown_field", field);
-
-      return interaction.editReply({
-        content: "❌ Unknown field",
-      });
-  }
-
-  return interaction.editReply({
-    content: `
-✅ Entry updated
-
-[${id}] ${entry.nickname}
-
-${oldValueDisplay} → ${newValueDisplay}
-`.trim(),
-  });
-}
-
-// =====================================
-// 🔢 NUMBER FORMATTER
-// =====================================
-function formatNumber(value: number): string {
-  return value.toLocaleString("en-US");
-}
+      // =====================================
+      // 🔥 SAVE ONLY NICKNAME
+      // =====================================
+      try {
+        await appendQuickAddRows([
+         
