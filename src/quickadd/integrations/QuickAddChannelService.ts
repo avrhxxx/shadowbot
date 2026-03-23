@@ -2,7 +2,7 @@
 // 📁 src/quickadd/integrations/QuickAddChannelService.ts
 // =====================================
 
-import { Guild, TextChannel, ChannelType } from "discord.js";
+import { Guild, TextChannel, ChannelType, EmbedBuilder } from "discord.js";
 
 const CHANNEL_NAME = "quick-add";
 
@@ -20,7 +20,38 @@ export async function ensureQuickAddChannel(
     type: ChannelType.GuildText,
   });
 
-  await channel.send("🧠 QuickAdd channel ready.\nUse `/quickadd start` to begin.");
+  // =====================================
+  // 💬 EMBED MESSAGE (NEW)
+  // =====================================
+  const embed = new EmbedBuilder()
+    .setTitle("🧠 QuickAdd System")
+    .setDescription(
+`Automated OCR system for fast point tracking.
+
+━━━━━━━━━━━━━━━━━━
+
+🚀 **How to start**
+Use:
+/q start
+
+Then choose a screenshot type and follow instructions in the thread.
+
+━━━━━━━━━━━━━━━━━━
+
+📊 **Supported types**
+• Donations Points  
+• Duel Points  
+• Reservoir Signups  
+• Reservoir Results  
+
+━━━━━━━━━━━━━━━━━━
+
+💡 Tip:
+Each session runs in a private thread`
+    )
+    .setColor(0x5865F2); // Discord blurple
+
+  await channel.send({ embeds: [embed] });
 
   return channel;
 }
