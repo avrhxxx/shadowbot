@@ -4,9 +4,9 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
-import { createLogger } from "../../../debug/DebugLogger"; // 🔥 NEW
+import { createLogger } from "../../../debug/DebugLogger";
 
-const log = createLogger("COMMAND"); // 🔥 NEW
+const log = createLogger("COMMAND");
 
 export async function startCommand(
   interaction: ChatInputCommandInteraction
@@ -30,22 +30,55 @@ export async function startCommand(
     });
   }
 
+  // =====================================
+  // 🧵 CREATE THREAD (SESSION WORKSPACE)
+  // =====================================
+  const thread = await interaction.channel!.threads.create({
+    name: `quickadd-${interaction.user.username}`,
+    autoArchiveDuration: 60,
+    reason: "QuickAdd session",
+  });
+
+  log("thread_created", {
+    threadId: thread.id,
+    name: thread.name,
+  });
+
+  // =====================================
+  // 🧠 START SESSION (THREAD-BASED)
+  // =====================================
   QuickAddSession.start(
     guildId,
-    interaction.channelId,
+    thread.id, // 🔥 session now bound to thread
     interaction.user.id
   );
 
   log("start_success", {
     user: interaction.user.id,
-    channel: interaction.channelId,
+    threadId: thread.id,
   });
 
-  return interaction.editReply({
+  // =====================================
+  // 📩 MINIMAL REPLY (REDIRECT ONLY)
+  // =====================================
+  await interaction.editReply({
     content: 
 `✅ Session started
 
-📸 Send screenshots now
+🧵 Go to your thread:
+→ <#${thread.id}>`,
+  });
+
+  // =====================================
+  // 🧵 FULL ONBOARDING INSIDE THREAD
+  // =====================================
+  await thread.send({
+    content:
+`📸 **QuickAdd session started**
+
+Send screenshots in this thread.
+
+━━━━━━━━━━━━━━━━━━━
 
 Status:
 📥 received
@@ -53,10 +86,12 @@ Status:
 ✅ done
 ❌ error
 
-📊 A preview will be generated automatically after processing.
+━━━━━━━━━━━━━━━━━━━
 
-You can also run it manually anytime:
-→ /qa preview
-→ /quickadd preview`
+📊 Preview will appear automatically after each processed image.
+
+✏️ Adjust entries using:
+→ /qa adjust
+→ /quickadd adjust`,
   });
 }
