@@ -56,8 +56,12 @@ client.once("clientReady", async () => {
   // 🔥 REGISTER SLASH COMMANDS
   // =============================
   try {
+    // 🔥 HARD RESET COMMANDS
+    await client.application?.commands.set([]);
+
+    // 🔥 REGISTER NEW COMMANDS
     await client.application?.commands.set([
-      qCommand.toJSON(), // ✅ tylko jedna komenda
+      qCommand.toJSON(),
     ]);
 
     console.log("✅ Slash commands registered");
