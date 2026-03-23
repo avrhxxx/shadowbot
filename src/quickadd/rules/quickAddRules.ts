@@ -5,9 +5,6 @@
 import { Channel, ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
 
-// =====================================
-// 🔥 INTERNAL TYPE
-// =====================================
 type SessionData = ReturnType<typeof QuickAddSession.get> extends infer T
   ? T extends null
     ? never
@@ -15,7 +12,7 @@ type SessionData = ReturnType<typeof QuickAddSession.get> extends infer T
   : never;
 
 // =====================================
-// 🧠 RULE: CONTEXT (THREAD-BASED FIX)
+// 🧠 RULE: CONTEXT
 // =====================================
 export function isQuickAddContext(
   channel: Channel | null,
@@ -23,8 +20,12 @@ export function isQuickAddContext(
 ): boolean {
   if (!channel || !session) return false;
 
-  // ✅ dokładnie thread sesji
+  // 🔥 FIX → threadId zamiast channelId
   if (channel.id === session.threadId) {
+    return true;
+  }
+
+  if ("parentId" in channel && channel.parentId === session.threadId) {
     return true;
   }
 
