@@ -4,26 +4,80 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+import { createLogger } from "../../../debug/DebugLogger";
+
+const log = createLogger("COMMAND");
+
+// 🔥 DOZWOLONE POLA (łatwe do rozszerzenia)
+type AdjustField = "nickname" | "value";
 
 export async function adjustCommand(
   interaction: ChatInputCommandInteraction
 ) {
+  const guildId = interaction.guild!.id;
+
   const id = interaction.options.getInteger("id", true);
-  const nickname = interaction.options.getString("nickname");
-  const value = interaction.options.getInteger("value");
+  const field = interaction.options.getString("field", true) as AdjustField;
+  const newValue = interaction.options.getString("value", true);
 
-  const data = QuickAddBuffer.getEntries(interaction.guild!.id);
+  log("adjust_attempt", {
+    id,
+    field,
+    value: newValue,
+  });
 
-  if (!data[id - 1]) {
+  const data = QuickAddBuffer.getEntries(guildId);
+  const entry = data[id - 1];
+
+  if (!entry) {
+    log.warn("adjust_invalid_id", id);
+
     return interaction.editReply({
       content: "❌ Invalid line ID",
     });
   }
 
-  if (nickname) data[id - 1].nickname = nickname;
-  if (value !== null) data[id - 1].value = value;
+  // =============================
+  // 🔥 FIELD HANDLING
+  // =============================
+  switch (field) {
+    case "nickname":
+      entry.nickname = newValue;
+
+      log("adjust_nickname", {
+        id,
+        value: newValue,
+      });
+      break;
+
+    case "value":
+      const parsed = Number(newValue);
+
+      if (isNaN(parsed)) {
+        log.warn("adjust_invalid_value", newValue);
+
+        return interaction.editReply({
+          content: "❌ Value must be a number",
+        });
+      }
+
+      entry.value = parsed;
+
+      log("adjust_value", {
+        id,
+        value: parsed,
+      });
+      break;
+
+    default:
+      log.warn("adjust_unknown_field", field);
+
+      return interaction.editReply({
+        content: "❌ Unknown field",
+      });
+  }
 
   return interaction.editReply({
-    content: `✅ Updated entry [${id}]`,
+    content: `✅ Updated [${id}] ${field} → ${newValue}`,
   });
 }
