@@ -12,12 +12,9 @@ import { formatPreview } from "../utils/formatPreview";
 
 const log = createLogger("PIPELINE");
 
-// 🔥 preview message per guild (anti-spam)
 const previewMessages = new Map<string, string>();
 
 async function setStatusReaction(message: Message, emoji: string, traceId?: string) {
-  const tid = traceId ?? "no-trace";
-
   try {
     await message.reactions.removeAll();
     await message.react(emoji);
@@ -50,32 +47,20 @@ export async function processImageInput(
   try {
     await setStatusReaction(message, "⏳", traceId);
 
-    // =============================
-    // 🔥 OCR (TRACE ENABLED)
-    // =============================
     const ocrResult = await runOCR(imageUrl, traceId);
 
-    // =============================
-    // 🔥 DETECTION (NEW)
-    // =============================
     const type = detectImageType(ocrResult.lines);
 
-    log.trace("detected_type", traceId, { type });
+    if (!type) {
+      log.warn("unknown_image_type", traceId);
+    }
 
-    // =============================
-    // 🔥 PARSING
-    // =============================
     const parsed = parseOCR(ocrResult.lines, traceId);
 
-    // =============================
-    // 🔥 BUFFER
-    // =============================
     QuickAddBuffer.addEntries(guildId, parsed);
 
-    // =============================
-    // 🔥 PREVIEW (ANTI-SPAM)
-    // =============================
-    if ("send" in message.channel) {
+    // 🔥 FIX guard
+    if (message.channel && "send" in message.channel) {
       const allData = QuickAddBuffer.getEntries(guildId);
       const content = formatPreview(allData);
 
@@ -87,16 +72,13 @@ export async function processImageInput(
 
           if (existingMsg) {
             await existingMsg.edit({ content });
-            log.trace("preview_updated", traceId, { entries: allData.length });
           } else {
             const sent = await message.channel.send({ content });
             previewMessages.set(guildId, sent.id);
-            log.trace("preview_recreated", traceId);
           }
         } else {
           const sent = await message.channel.send({ content });
           previewMessages.set(guildId, sent.id);
-          log.trace("preview_created", traceId);
         }
       } catch (err) {
         log.warn("preview_failed", err);
