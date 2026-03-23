@@ -1,3 +1,6 @@
+// =====================================
+// 📁 src/quickadd/storage/QuickAddBuffer.ts
+// =====================================
 type ParsedEntry = {
   nickname: string;
   value: number;
