@@ -1,4 +1,7 @@
-// src/googleSheetsStorage.ts
+// =====================================
+// 📁 src/googleSheetsStorage.ts
+// =====================================
+
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -103,8 +106,9 @@ export async function ensureQuickAddHeaders() {
   const rows = await readSheet(QUICKADD_TAB);
 
   if (!rows || rows.length === 0 || rows[0].length === 0) {
-    const headers = [["type", "ocr", "final", "override", "createdAt"]];
-    await writeSheet(`${QUICKADD_TAB}!A1:E1`, headers);
+    // 🔥 UPDATED: dodane "adjusted"
+    const headers = [["type", "ocr", "final", "adjusted", "override", "createdAt"]];
+    await writeSheet(`${QUICKADD_TAB}!A1:F1`, headers);
   }
 }
 
@@ -115,11 +119,13 @@ export async function appendQuickAddRows(
 
   await ensureQuickAddHeaders();
 
+  // 🔥 UPDATED: dodane adjusted
   const values = rows.map(r => [
     r.type,
     r.ocr,
     r.final,
-    "", // 🔥 override (manual column)
+    "", // adjusted (user session fix)
+    "", // override (admin)
     Date.now(),
   ]);
 
@@ -336,4 +342,4 @@ function toA1(col: number, row: number): string {
 // --------------------------
 // EXPORT
 // --------------------------
-export { readSheet, writeSheet, updateCell, deleteRow };  
+export { readSheet, writeSheet, updateCell, deleteRow };
