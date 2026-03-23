@@ -6,7 +6,7 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
-import { isQuickAddContext } from "../../../rules/isQuickAddContext";
+import { validateQuickAddContext } from "../../../rules/quickAddRules";
 
 const log = createLogger("COMMAND");
 
@@ -19,23 +19,11 @@ export async function adjustCommand(
 
   const session = QuickAddSession.get(guildId);
 
-  if (!session) {
-    log.warn("adjust_no_session");
-
-    return interaction.editReply({
-      content: "❌ No active session",
-    });
-  }
-
-  // 🔥 CONTEXT CHECK (channel OR thread)
-  if (!isQuickAddContext(interaction.channel, session)) {
-    log.warn("adjust_wrong_context", {
-      channel: interaction.channelId,
-    });
-
-    return interaction.editReply({
-      content: "❌ Use this command inside QuickAdd session (thread)",
-    });
+  // 🔥 CENTRAL VALIDATION
+  const error = validateQuickAddContext(interaction, session);
+  if (error) {
+    log.warn("adjust_blocked", error);
+    return interaction.editReply({ content: error });
   }
 
   const id = interaction.options.getInteger("id", true);
