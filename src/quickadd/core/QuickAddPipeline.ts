@@ -6,7 +6,6 @@ import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseByType } from "../parsing"; // 🔥 FIX
-import { detectImageType } from "../detection/ImageTypeDetector";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 
@@ -49,14 +48,8 @@ export async function processImageInput(
 
     const ocrResult = await runOCR(imageUrl);
 
-    const type = detectImageType(ocrResult.lines);
-
-    if (!type) {
-      log.warn("unknown_image_type", traceId);
-    }
-
-    // 🔥 FIX — routing przez typ
-    const parsed = parseByType(type, ocrResult.lines, traceId);
+    // 🔥 NEW — używamy typu z sesji (bez autodetect)
+    const parsed = parseByType(session.type, ocrResult.lines, traceId);
 
     QuickAddBuffer.addEntries(guildId, parsed);
 
