@@ -7,8 +7,8 @@ import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("OCR");
 
-export async function runFullImage(buffer: Buffer) {
-  log("run_full_start");
+export async function runFullImage(buffer: Buffer, traceId: string) {
+  log.trace("run_full_start", traceId);
 
   const result = await Tesseract.recognize(buffer, "eng", {
     logger: () => {},
@@ -21,24 +21,18 @@ export async function runFullImage(buffer: Buffer) {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  const output = { text, lines };
-
-  log("run_full_result", {
+  log.trace("run_full_result", traceId, {
     length: text.length,
     lines: lines.length,
   });
 
-  return output;
+  return { text, lines };
 }
 
 export async function runLineBased(_buffer: Buffer) {
-  log.warn("run_line_based_not_implemented");
-
   return { text: "", lines: [] };
 }
 
 export async function runBlockBased(_buffer: Buffer) {
-  log.warn("run_block_based_not_implemented");
-
   return { text: "", lines: [] };
 }
