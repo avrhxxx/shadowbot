@@ -2,11 +2,12 @@
 // 📁 src/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-import { Message, AttachmentBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
-import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
+import { QuickAddBuffer } from "../storage/QuickAddBuffer";
+import { formatPreview } from "../utils/formatPreview"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -69,6 +70,44 @@ function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
   }, delay);
 }
 
+// =====================================
+// 🔥 HELPER: AUTO PREVIEW
+// =====================================
+async function sendAutoPreview(message: Message, traceId: string) {
+  try {
+    log.trace("auto_preview_triggered", traceId);
+
+    const data = QuickAddBuffer.getEntries(message.guild!.id);
+
+    if (!data.length) {
+      log.trace("auto_preview_skipped_empty", traceId);
+      return;
+    }
+
+    const formatted = formatPreview(data);
+
+    await message.channel.send({
+      content:
+`📊 QuickAdd Preview (${data.length} entries)
+
+\`\`\`
+${formatted}
+\`\`\`
+
+✏️ Adjust entry:
+→ /qa adjust <id> <field> <value>
+→ /quickadd adjust <id> <field> <value>`
+    });
+
+    log.trace("auto_preview_sent", traceId, {
+      entries: data.length,
+    });
+
+  } catch (err) {
+    log.warn("auto_preview_failed", err);
+  }
+}
+
 export async function processImageInput(
   message: Message,
   session: any,
@@ -95,7 +134,6 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl);
 
     log.trace("ocr_end", traceId);
-
     log.trace("ocr_result", traceId, ocrResult);
 
     // =============================
@@ -106,7 +144,7 @@ export async function processImageInput(
     log.trace("parsed_result", traceId, parsed);
 
     // =============================
-    // 🔥 BUFFER (NOWE)
+    // 🔥 BUFFER
     // =============================
     QuickAddBuffer.addEntries(message.guild!.id, parsed);
 
@@ -115,46 +153,24 @@ export async function processImageInput(
     });
 
     // =============================
-    // 📤 DEBUG → WYŚLIJ NA PRIV (TEMP DISABLED)
+    // 🔥 AUTO PREVIEW (NEW)
     // =============================
-    // try {
-    //   const content = `
-    // TRACE ID: ${traceId}
-    //
-    // === OCR TEXT ===
-    // ${ocrResult.text}
-    //
-    // === PARSED ===
-    // ${JSON.stringify(parsed, null, 2)}
-    //   `.trim();
-    //
-    //   const buffer = Buffer.from(content, "utf-8");
-    //
-    //   const file = new AttachmentBuilder(buffer, {
-    //     name: `quickadd_${traceId}.txt`,
-    //   });
-    //
-    //   await message.author.send({
-    //     content: `📄 QuickAdd debug (${traceId})`,
-    //     files: [file],
-    //   });
-    //
-    //   log.trace("debug_dm_sent", traceId);
-    // } catch (err) {
-    //   log.warn("debug_dm_failed", err);
-    // }
+    if (parsed.length > 0) {
+      setTimeout(() => {
+        sendAutoPreview(message, traceId);
+      }, 500); // lekki debounce
+    } else {
+      log.trace("auto_preview_skipped_no_data", traceId);
+    }
 
     // =============================
-    // 🔜 NEXT
-    // =============================
-    // - detection
-    // - mapping
-    // - approval
-
     // ✅ DONE
+    // =============================
     await setStatusReaction(message, "✅", traceId);
 
-    // 🧹 SAFE DELETE (only if parsed data exists)
+    // =============================
+    // 🧹 SAFE DELETE
+    // =============================
     if (parsed.length > 0) {
       scheduleSafeDelete(message, traceId, 15000);
     } else {
