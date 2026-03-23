@@ -1,11 +1,13 @@
-// src/quickadd/QuickAddListener.ts
+// =====================================
+// 📁 src/quickadd/QuickAddListener.ts
+// =====================================
 
 import { Client, Message } from "discord.js";
 import { processImageInput } from "./core/QuickAddPipeline";
 import { QuickAddSession } from "./core/QuickAddSession";
-import { debug, debugTrace } from "./debug/DebugLogger";
+import { createLogger } from "./debug/DebugLogger";
 
-const SCOPE = "LISTENER";
+const log = createLogger("LISTENER");
 
 // =====================================
 function getImageUrl(message: Message): string | null {
@@ -26,7 +28,7 @@ export function registerQuickAddListener(client: Client) {
       if (message.author.bot) return;
       if (!message.guild) return;
 
-      debug(SCOPE, "MESSAGE_RECEIVED", {
+      log("message_received", {
         user: message.author.id,
         channel: message.channel.id,
       });
@@ -34,35 +36,35 @@ export function registerQuickAddListener(client: Client) {
       const session = QuickAddSession.get(message.guild.id);
 
       if (!session) {
-        debug(SCOPE, "NO_SESSION");
+        log("no_session");
         return;
       }
 
       if (session.channelId !== message.channel.id) {
-        debug(SCOPE, "WRONG_CHANNEL");
+        log("wrong_channel");
         return;
       }
 
       if (session.ownerId !== message.author.id) {
-        debug(SCOPE, "IGNORED_NOT_OWNER", message.author.id);
+        log("ignored_not_owner", message.author.id);
         return;
       }
 
       const imageUrl = getImageUrl(message);
 
       if (!imageUrl) {
-        debug(SCOPE, "NO_IMAGE");
+        log("no_image");
         return;
       }
 
       const traceId = Date.now().toString().slice(-5);
 
-      debugTrace(SCOPE, "IMAGE_DETECTED", traceId, imageUrl);
+      log.trace("image_detected", traceId, imageUrl);
 
       await processImageInput(message, session, imageUrl, traceId);
 
     } catch (err) {
-      console.error("❌ QuickAddListener error:", err);
+      log.error("listener_error", err);
     }
   });
 }
