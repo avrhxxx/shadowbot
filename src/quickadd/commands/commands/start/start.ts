@@ -18,42 +18,52 @@ export async function startCommand(
     guildId,
   });
 
-  const session = QuickAddSession.get(guildId);
+  const existing = QuickAddSession.get(guildId);
 
-  if (session) {
+  if (existing) {
     log.warn("start_blocked_existing_session", {
-      owner: session.ownerId,
+      owner: existing.ownerId,
     });
 
     return interaction.editReply({
-      content: `❌ Session already active by <@${session.ownerId}>`,
+      content: `❌ Session already active by <@${existing.ownerId}>`,
     });
   }
 
   // =====================================
-  // 🧵 CREATE THREAD (SAFE TYPE)
+  // 🧵 VALIDATE CHANNEL
   // =====================================
   const channel = interaction.channel;
 
   if (!channel || !(channel instanceof TextChannel)) {
-    log.warn("start_invalid_channel");
+    log.warn("start_invalid_channel", {
+      channelId: interaction.channelId,
+    });
 
     return interaction.editReply({
       content: "❌ This command must be used in a server text channel",
     });
   }
 
+  // =====================================
+  // 🧵 CREATE THREAD
+  // =====================================
   const thread = await channel.threads.create({
     name: `quickadd-${interaction.user.username}`,
     autoArchiveDuration: 60,
   });
 
+  log("thread_created", {
+    threadId: thread.id,
+    parent: channel.id,
+  });
+
   // =====================================
-  // 🧠 START SESSION
+  // 🧠 START SESSION (threadId as channelId)
   // =====================================
   QuickAddSession.start(
     guildId,
-    thread.id,
+    thread.id, // 🔥 thread is now the session context
     interaction.user.id
   );
 
@@ -62,13 +72,16 @@ export async function startCommand(
     threadId: thread.id,
   });
 
+  // =====================================
+  // 💬 RESPONSE
+  // =====================================
   return interaction.editReply({
     content:
 `✅ Session started
 
 🧵 Thread: <#${thread.id}>
 
-📸 Send screenshots inside the thread
+📸 Send screenshots inside this thread
 
 Status:
 📥 received
@@ -76,9 +89,9 @@ Status:
 ✅ done
 ❌ error
 
-📊 Preview will be generated automatically
+📊 Preview is generated automatically after each image
 
-You can also run:
+You can also run manually:
 → /qa preview
 → /quickadd preview`,
   });
