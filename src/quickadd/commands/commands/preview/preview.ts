@@ -4,23 +4,35 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+import { createLogger } from "../../../debug/DebugLogger";
+import { formatPreview } from "../../../utils/formatPreview"; // 🔥 NEW
+
+const log = createLogger("COMMAND");
 
 export async function previewCommand(
   interaction: ChatInputCommandInteraction
 ) {
-  const data = QuickAddBuffer.getEntries(interaction.guild!.id);
+  const guildId = interaction.guild!.id;
+
+  const data = QuickAddBuffer.getEntries(guildId);
+
+  log("preview_fetch", {
+    count: data.length,
+  });
 
   if (!data.length) {
+    log.warn("preview_empty");
+
     return interaction.editReply({
       content: "⚠️ No parsed data yet",
     });
   }
 
-  const formatted = data
-    .map((entry, index) => {
-      return `[${index + 1}] ${entry.nickname} → ${entry.value}`;
-    })
-    .join("\n");
+  const formatted = formatPreview(data); // 🔥 CLEAN
+
+  log("preview_render", {
+    lines: data.length,
+  });
 
   return interaction.editReply({
     content: `📊 Preview:\n\n\`\`\`\n${formatted}\n\`\`\``,
