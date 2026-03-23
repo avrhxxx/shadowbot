@@ -50,34 +50,34 @@ export async function processImageInput(
     });
 
     // =============================
-    // 📤 DEBUG → WYŚLIJ NA PRIV
+    // 📤 DEBUG → WYŚLIJ NA PRIV (TEMP DISABLED)
     // =============================
-    try {
-      const content = `
-TRACE ID: ${traceId}
-
-=== OCR TEXT ===
-${ocrResult.text}
-
-=== PARSED ===
-${JSON.stringify(parsed, null, 2)}
-      `.trim();
-
-      const buffer = Buffer.from(content, "utf-8");
-
-      const file = new AttachmentBuilder(buffer, {
-        name: `quickadd_${traceId}.txt`,
-      });
-
-      await message.author.send({
-        content: `📄 QuickAdd debug (${traceId})`,
-        files: [file],
-      });
-
-      log.trace("debug_dm_sent", traceId);
-    } catch (err) {
-      log.warn("debug_dm_failed", err);
-    }
+    // try {
+    //   const content = `
+    // TRACE ID: ${traceId}
+    //
+    // === OCR TEXT ===
+    // ${ocrResult.text}
+    //
+    // === PARSED ===
+    // ${JSON.stringify(parsed, null, 2)}
+    //   `.trim();
+    //
+    //   const buffer = Buffer.from(content, "utf-8");
+    //
+    //   const file = new AttachmentBuilder(buffer, {
+    //     name: `quickadd_${traceId}.txt`,
+    //   });
+    //
+    //   await message.author.send({
+    //     content: `📄 QuickAdd debug (${traceId})`,
+    //     files: [file],
+    //   });
+    //
+    //   log.trace("debug_dm_sent", traceId);
+    // } catch (err) {
+    //   log.warn("debug_dm_failed", err);
+    // }
 
     // =============================
     // 🔜 NEXT
