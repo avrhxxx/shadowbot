@@ -3,7 +3,6 @@
 // =====================================
 
 import { SlashCommandBuilder } from "discord.js";
-import { QuickAddType } from "../core/QuickAddTypes";
 
 // =============================
 // 🧠 SUBCOMMANDS
