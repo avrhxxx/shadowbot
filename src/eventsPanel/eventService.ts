@@ -20,6 +20,7 @@ export interface EventObject {
   reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
+  results: string[]; // 🔥 NEW
   absent: string[];
   createdAt: number;
   reminderSent: boolean;
@@ -68,6 +69,7 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
     ...data,
     id: data.id ?? crypto.randomUUID(), // 🔥 [CRITICAL FIX - ID REQUIRED]
     participants: data.participants || [],
+    results: data.results || [], // 🔥 NEW
     absent: data.absent || [],
     reminderSent: data.reminderSent ?? false,
     started: data.started ?? false,
@@ -187,6 +189,56 @@ export async function markAbsent(
 }
 
 // =============================
+// 🧠 RESULTS (NEW)
+// =============================
+export async function addResults(
+  guildId: string,
+  eventId: string,
+  nicknames: string[]
+) {
+  const event = await getEventById(guildId, eventId);
+  if (!event) throw new Error("Event not found");
+
+  const participants = [...event.participants];
+  const resultsSet = new Set(event.results || []);
+
+  // 🔥 ADD RESULTS (idempotent)
+  for (const nick of nicknames) {
+    // 👉 opcja A: ignorujemy osoby spoza participants
+    if (!participants.includes(nick)) continue;
+
+    resultsSet.add(nick);
+  }
+
+  const results = Array.from(resultsSet);
+
+  // =============================
+  // 🔥 COMPUTE ABSENT
+  // =============================
+  const computedAbsent = participants.filter(
+    (p) => !results.includes(p)
+  );
+
+  // 🔥 MERGE manual + computed
+  const absentSet = new Set([
+    ...(event.absent || []),
+    ...computedAbsent,
+  ]);
+
+  const absent = Array.from(absentSet);
+
+  await updateEvent(eventId, {
+    results,
+    absent,
+  });
+
+  return {
+    results,
+    absent,
+  };
+}
+
+// =============================
 // 🚫 STATUS
 // =============================
 export async function cancelEvent(
@@ -212,6 +264,7 @@ export async function saveEvents(
   for (const event of events) {
     await updateEvent(event.id, {
       participants: event.participants,
+      results: event.results, // 🔥 NEW
       absent: event.absent,
       status: event.status,
       reminderSent: event.reminderSent,
