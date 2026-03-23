@@ -8,6 +8,7 @@ import { runOCR } from "../ocr/OCRService";
 import { parseByType } from "../parsing"; // 🔥 FIX
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
+import { appendQuickAddRows } from "../../googleSheetsStorage"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -49,8 +50,32 @@ export async function processImageInput(
     // ✅ FIX: przekazujemy traceId
     const ocrResult = await runOCR(imageUrl, traceId);
 
-    // 🔥 NEW — używamy typu z sesji (bez autodetect)
+    // 🔥 PARSE
     const parsed = parseByType(session.type, ocrResult.lines, traceId);
+
+    // =====================================
+    // 🔥 NEW — SAVE TO GOOGLE SHEETS (learning)
+    // =====================================
+    try {
+      if (parsed.length > 0) {
+        const rows = parsed.map((entry) => ({
+          type: session.type,
+          ocr: entry.raw || entry.nickname, // fallback jeśli brak raw
+          final: `${entry.nickname}:${entry.value}`,
+        }));
+
+        await appendQuickAddRows(rows);
+
+        log("quickadd_saved_to_sheet", {
+          count: rows.length,
+          traceId,
+        });
+      }
+    } catch (err) {
+      log.warn("quickadd_save_failed", err);
+    }
+
+    // =====================================
 
     QuickAddBuffer.addEntries(guildId, parsed);
 
