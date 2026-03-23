@@ -7,7 +7,7 @@ import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
-import { formatPreview } from "../utils/formatPreview"; // 🔥 NEW
+import { formatPreview } from "../utils/formatPreview";
 
 const log = createLogger("PIPELINE");
 
@@ -15,8 +15,10 @@ const log = createLogger("PIPELINE");
 // 🔥 HELPER: STATUS REACTIONS
 // =====================================
 async function setStatusReaction(message: Message, emoji: string, traceId?: string) {
+  const tid = traceId ?? "no-trace";
+
   try {
-    log.trace("reaction_set_start", traceId, {
+    log.trace("reaction_set_start", tid, {
       messageId: message.id,
       emoji,
     });
@@ -24,7 +26,7 @@ async function setStatusReaction(message: Message, emoji: string, traceId?: stri
     await message.reactions.removeAll();
     await message.react(emoji);
 
-    log.trace("reaction_set_done", traceId, {
+    log.trace("reaction_set_done", tid, {
       messageId: message.id,
       emoji,
     });
@@ -76,6 +78,13 @@ function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
 async function sendAutoPreview(message: Message, traceId: string) {
   try {
     log.trace("auto_preview_triggered", traceId);
+
+    if (!message.channel.isTextBased()) {
+      log.warn("auto_preview_invalid_channel", {
+        messageId: message.id,
+      });
+      return;
+    }
 
     const data = QuickAddBuffer.getEntries(message.guild!.id);
 
@@ -153,12 +162,12 @@ export async function processImageInput(
     });
 
     // =============================
-    // 🔥 AUTO PREVIEW (NEW)
+    // 🔥 AUTO PREVIEW
     // =============================
     if (parsed.length > 0) {
       setTimeout(() => {
         sendAutoPreview(message, traceId);
-      }, 500); // lekki debounce
+      }, 500);
     } else {
       log.trace("auto_preview_skipped_no_data", traceId);
     }
