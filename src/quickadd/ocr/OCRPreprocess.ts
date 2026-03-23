@@ -1,26 +1,28 @@
-// src/quickadd/ocr/OCRPreprocess.ts
+// =====================================
+// 📁 src/quickadd/ocr/OCRPreprocess.ts
+// =====================================
 
 import sharp from "sharp";
-import { debug } from "../debug/DebugLogger";
+import { createLogger } from "../debug/DebugLogger";
 
-const SCOPE = "OCR";
+const log = createLogger("OCR");
 
 export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
-  debug(SCOPE, "PREPROCESS_START");
+  log("preprocess_start");
 
   try {
     const processed = await sharp(buffer)
-      .grayscale()              // 🔥 usuwa kolory (lepszy kontrast)
-      .normalize()              // 🔥 poprawia kontrast
-      .sharpen()                // 🔥 wyostrzenie tekstu
-      .resize({ width: 1500 })  // 🔥 upscale dla OCR
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .resize({ width: 1500 })
       .toBuffer();
 
-    debug(SCOPE, "PREPROCESS_DONE");
+    log("preprocess_done");
 
     return processed;
   } catch (err) {
-    debug(SCOPE, "PREPROCESS_ERROR", err);
-    return buffer; // fallback
+    log.error("preprocess_error", err);
+    return buffer;
   }
 }
