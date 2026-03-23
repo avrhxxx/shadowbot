@@ -5,6 +5,7 @@
 type ParsedEntry = {
   nickname: string;
   value: number;
+  id: number; // 🔥 FIX
 };
 
 export function formatPreview(entries: ParsedEntry[]): string {
@@ -12,12 +13,11 @@ export function formatPreview(entries: ParsedEntry[]): string {
     return "⚠️ No data";
   }
 
-  // 🔥 calculate padding for alignment
   const maxNameLength = Math.max(...entries.map(e => e.nickname.length));
 
   const formattedEntries = entries
-    .map((entry, index) => {
-      const id = index + 1;
+    .map((entry) => {
+      const id = entry.id; // 🔥 FIX
 
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
 
@@ -42,18 +42,9 @@ Use:
 Commands:
 → /qa adjust id:<index> field:<field> value:<value>
 → /quickadd adjust id:<index> field:<field> value:<value>
-
-Example:
-→ /qa adjust id:1 field:value value:60000
-
-💡 Pro tip:
-Fix OCR mistakes like wrong numbers or nicknames.
 `.trim();
 }
 
-// =====================================
-// 🔢 NUMBER FORMATTER
-// =====================================
 function formatNumber(value: number): string {
   return value.toLocaleString("en-US");
 }
