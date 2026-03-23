@@ -2,9 +2,9 @@
 // 📁 src/quickadd/core/QuickAddSession.ts
 // =====================================
 
-import { debug } from "../debug/DebugLogger";
+import { createLogger } from "../debug/DebugLogger";
 
-const SCOPE = "SESSION";
+const log = createLogger("SESSION");
 
 type SessionData = {
   guildId: string;
@@ -17,7 +17,7 @@ const sessions = new Map<string, SessionData>();
 export const QuickAddSession = {
   start(guildId: string, channelId: string, ownerId: string) {
     if (sessions.has(guildId)) {
-      debug(SCOPE, "SESSION_ALREADY_EXISTS", guildId);
+      log.warn("session_already_exists", guildId);
       return null;
     }
 
@@ -29,7 +29,7 @@ export const QuickAddSession = {
 
     sessions.set(guildId, session);
 
-    debug(SCOPE, "SESSION_STARTED", session);
+    log("session_started", session);
 
     return session;
   },
@@ -37,7 +37,7 @@ export const QuickAddSession = {
   end(guildId: string) {
     const existed = sessions.delete(guildId);
 
-    debug(SCOPE, "SESSION_ENDED", {
+    log("session_ended", {
       guildId,
       existed,
     });
