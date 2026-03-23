@@ -5,7 +5,7 @@
 import { Message, AttachmentBuilder } from "discord.js";
 import { debugTrace } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
-import { parseOCR } from "../parsing"; // 🔥 NEW
+import { parseOCR } from "../parsing";
 
 const SCOPE = "PIPELINE";
 
@@ -21,7 +21,6 @@ export async function processImageInput(
   });
 
   try {
-    // 🔥 HARD DEBUG
     console.log("🔥 OCR CALL START", traceId);
 
     // =============================
