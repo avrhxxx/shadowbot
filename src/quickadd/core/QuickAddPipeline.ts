@@ -6,66 +6,31 @@ import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
+import { detectImageType } from "../detection/ImageTypeDetector";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 
 const log = createLogger("PIPELINE");
 
-// =====================================
-// 🔥 HELPER: STATUS REACTIONS
-// =====================================
+// 🔥 preview message per guild (anti-spam)
+const previewMessages = new Map<string, string>();
+
 async function setStatusReaction(message: Message, emoji: string, traceId?: string) {
   const tid = traceId ?? "no-trace";
 
   try {
-    log.trace("reaction_set_start", tid, {
-      messageId: message.id,
-      emoji,
-    });
-
     await message.reactions.removeAll();
     await message.react(emoji);
-
-    log.trace("reaction_set_done", tid, {
-      messageId: message.id,
-      emoji,
-    });
   } catch (err) {
-    log.warn("reaction_set_failed", {
-      messageId: message.id,
-      emoji,
-      err,
-    });
+    log.warn("reaction_set_failed", { emoji, err });
   }
 }
 
-// =====================================
-// 🔥 HELPER: SAFE DELETE
-// =====================================
 function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
-  log.trace("delete_scheduled", traceId, {
-    messageId: message.id,
-    delay,
-  });
-
   setTimeout(async () => {
     try {
-      log.trace("delete_attempt", traceId, {
-        messageId: message.id,
-      });
-
-      if (!message.deletable) {
-        log.warn("message_not_deletable", {
-          messageId: message.id,
-        });
-        return;
-      }
-
+      if (!message.deletable) return;
       await message.delete();
-
-      log.trace("message_deleted", traceId, {
-        messageId: message.id,
-      });
     } catch (err) {
       log.warn("message_delete_failed", err);
     }
@@ -78,77 +43,74 @@ export async function processImageInput(
   imageUrl: string,
   traceId: string
 ) {
-  log.trace("image_received", traceId, {
-    user: message.author.id,
-    url: imageUrl,
-  });
+  const guildId = message.guild!.id;
 
-  // 📥 RECEIVED
   await setStatusReaction(message, "📥", traceId);
 
   try {
-    log.trace("ocr_start", traceId);
-
-    // ⏳ PROCESSING
     await setStatusReaction(message, "⏳", traceId);
 
     // =============================
-    // 🔥 OCR
+    // 🔥 OCR (TRACE ENABLED)
     // =============================
-    const ocrResult = await runOCR(imageUrl);
+    const ocrResult = await runOCR(imageUrl, traceId);
 
-    log.trace("ocr_end", traceId);
+    // =============================
+    // 🔥 DETECTION (NEW)
+    // =============================
+    const type = detectImageType(ocrResult.lines);
 
-    log.trace("ocr_result", traceId, ocrResult);
+    log.trace("detected_type", traceId, { type });
 
     // =============================
     // 🔥 PARSING
     // =============================
     const parsed = parseOCR(ocrResult.lines, traceId);
 
-    log.trace("parsed_result", traceId, parsed);
-
     // =============================
     // 🔥 BUFFER
     // =============================
-    QuickAddBuffer.addEntries(message.guild!.id, parsed);
-
-    log.trace("buffer_updated", traceId, {
-      added: parsed.length,
-    });
+    QuickAddBuffer.addEntries(guildId, parsed);
 
     // =============================
-    // 🔥 AUTO PREVIEW
+    // 🔥 PREVIEW (ANTI-SPAM)
     // =============================
     if ("send" in message.channel) {
-      const allData = QuickAddBuffer.getEntries(message.guild!.id);
+      const allData = QuickAddBuffer.getEntries(guildId);
       const content = formatPreview(allData);
 
-      await message.channel.send({ content });
+      const existingId = previewMessages.get(guildId);
 
-      log.trace("preview_sent", traceId, {
-        entries: allData.length,
-      });
+      try {
+        if (existingId) {
+          const existingMsg = await message.channel.messages.fetch(existingId).catch(() => null);
+
+          if (existingMsg) {
+            await existingMsg.edit({ content });
+            log.trace("preview_updated", traceId, { entries: allData.length });
+          } else {
+            const sent = await message.channel.send({ content });
+            previewMessages.set(guildId, sent.id);
+            log.trace("preview_recreated", traceId);
+          }
+        } else {
+          const sent = await message.channel.send({ content });
+          previewMessages.set(guildId, sent.id);
+          log.trace("preview_created", traceId);
+        }
+      } catch (err) {
+        log.warn("preview_failed", err);
+      }
     }
 
-    // =============================
-    // ✅ DONE
-    // =============================
     await setStatusReaction(message, "✅", traceId);
 
-    // 🧹 SAFE DELETE
     if (parsed.length > 0) {
-      scheduleSafeDelete(message, traceId, 15000);
-    } else {
-      log.trace("delete_skipped_no_data", traceId, {
-        messageId: message.id,
-      });
+      scheduleSafeDelete(message, traceId);
     }
 
   } catch (err) {
     log.error("pipeline_error", err, traceId);
-
-    // ❌ ERROR
     await setStatusReaction(message, "❌", traceId);
   }
 }
