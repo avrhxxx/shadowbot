@@ -5,7 +5,7 @@
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { createLogger } from "../../../debug/DebugLogger";
-import { formatPreview } from "../../../utils/formatPreview"; // 🔥 NEW
+import { formatPreview } from "../../../utils/formatPreview";
 
 const log = createLogger("COMMAND");
 
@@ -28,19 +28,18 @@ export async function previewCommand(
     });
   }
 
-  const formatted = formatPreview(data); // 🔥 CLEAN
+  const formatted = formatPreview(data);
 
   log("preview_render", {
     lines: data.length,
   });
 
-  // 🔥 NEW — pełny output preview do logów
   log("preview_output", {
     lines: data.length,
     content: formatted,
   });
 
   return interaction.editReply({
-    content: `📊 Preview:\n\n\`\`\`\n${formatted}\n\`\`\``,
+    content: formatted,
   });
 }
