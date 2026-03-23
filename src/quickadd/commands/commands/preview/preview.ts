@@ -34,6 +34,12 @@ export async function previewCommand(
     lines: data.length,
   });
 
+  // 🔥 NEW — pełny output preview do logów
+  log("preview_output", {
+    lines: data.length,
+    content: formatted,
+  });
+
   return interaction.editReply({
     content: `📊 Preview:\n\n\`\`\`\n${formatted}\n\`\`\``,
   });
