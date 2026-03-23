@@ -31,6 +31,9 @@ import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 
+// 🔥 NEW — SELF HEALING SHEETS
+import { ensureAllSheets } from "./googleSheetsStorage";
+
 // =============================
 
 const client = new Client({
@@ -51,6 +54,14 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 
 client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
+
+  // 🔥 SELF HEALING SHEETS (CRITICAL)
+  try {
+    await ensureAllSheets();
+    console.log("✅ Sheets structure verified");
+  } catch (err) {
+    console.error("❌ Sheets init failed:", err);
+  }
 
   // =============================
   // 🔥 REGISTER SLASH COMMANDS
@@ -103,13 +114,12 @@ client.once("clientReady", async () => {
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === "q") { // ✅ nowa komenda
+        if (interaction.commandName === "q") {
           await handleQuickAddInteraction(interaction);
           return;
         }
       }
 
-      // -----------------------------
       await handleEventInteraction(interaction);
       await handleAbsenceInteraction(interaction);
       await handlePointsInteraction(interaction);
