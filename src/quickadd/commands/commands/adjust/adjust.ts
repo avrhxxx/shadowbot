@@ -8,6 +8,9 @@ import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
 import { validateQuickAddContext } from "../../../rules/quickAddRules";
 
+// 🔥 NEW — resolver
+import { resolveNickname } from "../../../mapping/NicknameResolver";
+
 const log = createLogger("COMMAND");
 
 type AdjustField = "nickname" | "value";
@@ -53,12 +56,17 @@ export async function adjustCommand(
   switch (field) {
     case "nickname":
       oldValueDisplay = entry.nickname;
-      entry.nickname = newValue;
+
+      // 🔥 NEW — RESOLVE NICKNAME
+      const resolved = await resolveNickname(newValue);
+
+      entry.nickname = resolved;
       newValueDisplay = entry.nickname;
 
       log("adjust_nickname", {
         id,
-        value: newValue,
+        input: newValue,
+        resolved,
       });
       break;
 
