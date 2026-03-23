@@ -14,6 +14,9 @@ export const quickAddCommand = new SlashCommandBuilder()
   )
   .addSubcommand((sub) =>
     sub.setName("end").setDescription("End session")
+  )
+  .addSubcommand((sub) =>
+    sub.setName("preview").setDescription("Preview parsed data (coming soon)")
   );
 
 export async function handleQuickAddCommand(
@@ -78,6 +81,15 @@ export async function handleQuickAddCommand(
 
     return interaction.editReply({
       content: "🛑 Session ended",
+    });
+  }
+
+  // =============================
+  // 👁️ PREVIEW (placeholder)
+  // =============================
+  if (sub === "preview") {
+    return interaction.editReply({
+      content: "👀 Preview coming soon...",
     });
   }
 }
