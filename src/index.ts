@@ -24,8 +24,8 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
 
-// ✅ POPRAWKA: import z CommandBuilder
-import { qaCommand, quickAddCommand } from "./quickadd/commands/CommandBuilder";
+// ✅ FIX: tylko qCommand
+import { qCommand } from "./quickadd/commands/CommandBuilder";
 import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
 
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
@@ -57,8 +57,7 @@ client.once("clientReady", async () => {
   // =============================
   try {
     await client.application?.commands.set([
-      quickAddCommand.toJSON(),
-      qaCommand.toJSON(),
+      qCommand.toJSON(), // ✅ tylko jedna komenda
     ]);
 
     console.log("✅ Slash commands registered");
@@ -100,10 +99,7 @@ client.once("clientReady", async () => {
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
-        if (
-          interaction.commandName === "quickadd" ||
-          interaction.commandName === "qa"
-        ) {
+        if (interaction.commandName === "q") { // ✅ nowa komenda
           await handleQuickAddInteraction(interaction);
           return;
         }
