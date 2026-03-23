@@ -34,6 +34,9 @@ import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 // 🔥 NEW — SELF HEALING SHEETS
 import { ensureAllSheets } from "./googleSheetsStorage";
 
+// 🔥 NEW — QUEUE WORKER
+import { startQuickAddWorker } from "./quickadd/integrations/QuickAddQueueWorker";
+
 // =============================
 
 const client = new Client({
@@ -61,6 +64,14 @@ client.once("clientReady", async () => {
     console.log("✅ Sheets structure verified");
   } catch (err) {
     console.error("❌ Sheets init failed:", err);
+  }
+
+  // 🔥 START QUICKADD WORKER
+  try {
+    startQuickAddWorker();
+    console.log("✅ QuickAdd worker started");
+  } catch (err) {
+    console.error("❌ QuickAdd worker failed:", err);
   }
 
   // =============================
