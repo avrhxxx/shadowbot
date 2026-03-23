@@ -5,6 +5,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
 import { ensureQuickAddChannel } from "../integrations/QuickAddChannelService";
+import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
 
 export const quickAddCommand = new SlashCommandBuilder()
   .setName("quickadd")
@@ -16,7 +17,7 @@ export const quickAddCommand = new SlashCommandBuilder()
     sub.setName("end").setDescription("End session")
   )
   .addSubcommand((sub) =>
-    sub.setName("preview").setDescription("Preview parsed data (coming soon)")
+    sub.setName("preview").setDescription("Preview parsed data")
   );
 
 export async function handleQuickAddCommand(
@@ -24,14 +25,12 @@ export async function handleQuickAddCommand(
 ) {
   if (!interaction.guild) return;
 
-  // 🔥 CRITICAL FIX – zapobiega Unknown interaction
   await interaction.deferReply({ flags: 64 });
 
   const sub = interaction.options.getSubcommand();
 
   const channel = await ensureQuickAddChannel(interaction.guild);
 
-  // 🔥 blokada – tylko w quick-add
   if (interaction.channelId !== channel.id) {
     return interaction.editReply({
       content: `❌ Use this command in <#${channel.id}>`,
@@ -78,6 +77,7 @@ export async function handleQuickAddCommand(
     }
 
     QuickAddSession.end(interaction.guild.id);
+    QuickAddBuffer.clear(interaction.guild.id); // 🔥 czyścimy buffer
 
     return interaction.editReply({
       content: "🛑 Session ended",
@@ -85,11 +85,35 @@ export async function handleQuickAddCommand(
   }
 
   // =============================
-  // 👁️ PREVIEW (placeholder)
+  // 👀 PREVIEW
   // =============================
   if (sub === "preview") {
+    if (!session) {
+      return interaction.editReply({
+        content: "❌ No active session",
+      });
+    }
+
+    if (session.ownerId !== interaction.user.id) {
+      return interaction.editReply({
+        content: "❌ Only session owner can use preview",
+      });
+    }
+
+    const data = QuickAddBuffer.getEntries(interaction.guild.id);
+
+    if (!data.length) {
+      return interaction.editReply({
+        content: "⚠️ No parsed data yet",
+      });
+    }
+
     return interaction.editReply({
-      content: "👀 Preview coming soon...",
+      content: `📊 Parsed preview:\n\n\`\`\`json\n${JSON.stringify(
+        data,
+        null,
+        2
+      )}\n\`\`\``,
     });
   }
 }
