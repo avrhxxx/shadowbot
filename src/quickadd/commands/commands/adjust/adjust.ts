@@ -37,12 +37,17 @@ export async function adjustCommand(
     });
   }
 
+  let oldValueDisplay = "";
+  let newValueDisplay = "";
+
   // =============================
   // 🔥 FIELD HANDLING
   // =============================
   switch (field) {
     case "nickname":
+      oldValueDisplay = entry.nickname;
       entry.nickname = newValue;
+      newValueDisplay = entry.nickname;
 
       log("adjust_nickname", {
         id,
@@ -61,7 +66,9 @@ export async function adjustCommand(
         });
       }
 
+      oldValueDisplay = formatNumber(entry.value);
       entry.value = parsed;
+      newValueDisplay = formatNumber(entry.value);
 
       log("adjust_value", {
         id,
@@ -77,7 +84,23 @@ export async function adjustCommand(
       });
   }
 
+  // =============================
+  // ✅ CLEAN OUTPUT (VARIANT 3 PRO)
+  // =============================
   return interaction.editReply({
-    content: `✅ Updated [${id}] ${field} → ${newValue}`,
+    content: `
+✅ Entry updated
+
+[${id}] ${entry.nickname}
+
+${oldValueDisplay} → ${newValueDisplay}
+`.trim(),
   });
+}
+
+// =====================================
+// 🔢 NUMBER FORMATTER
+// =====================================
+function formatNumber(value: number): string {
+  return value.toLocaleString("en-US");
 }
