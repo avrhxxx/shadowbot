@@ -8,9 +8,9 @@ import {
   endCommand,
   adjustCommand,
 } from "./commands";
-import { debug } from "../debug/DebugLogger"; // 🔥 NEW
+import { createLogger } from "../debug/DebugLogger"; // 🔥 NEW
 
-const SCOPE = "COMMAND"; // 🔥 NEW
+const log = createLogger("COMMAND"); // 🔥 NEW
 
 export const CommandRegistry: Record<string, Function> = {
   start: startCommand,
@@ -20,4 +20,4 @@ export const CommandRegistry: Record<string, Function> = {
 };
 
 // 🔥 DEBUG – sprawdzenie rejestru przy starcie
-debug(SCOPE, "REGISTRY_INIT", Object.keys(CommandRegistry));
+log("registry_init", Object.keys(CommandRegistry));
