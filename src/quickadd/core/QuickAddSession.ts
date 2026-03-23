@@ -8,7 +8,7 @@ const log = createLogger("SESSION");
 
 type SessionData = {
   guildId: string;
-  threadId: string; // 🔥 was channelId → now thread-based
+  threadId: string;
   ownerId: string;
 };
 
@@ -17,8 +17,7 @@ const sessions = new Map<string, SessionData>();
 export const QuickAddSession = {
   start(guildId: string, threadId: string, ownerId: string) {
     if (sessions.has(guildId)) {
-      log.warn("session_already_exists", guildId);
-      return null;
+      throw new Error("Session already exists"); // 🔥 FIX
     }
 
     const session: SessionData = {
@@ -46,10 +45,6 @@ export const QuickAddSession = {
   get(guildId: string): SessionData | null {
     return sessions.get(guildId) || null;
   },
-
-  // =====================================
-  // 🔍 HELPERS
-  // =====================================
 
   isInSession(guildId: string, channelId: string): boolean {
     const session = sessions.get(guildId);
