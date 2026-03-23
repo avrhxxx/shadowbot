@@ -20,7 +20,7 @@ type DebugScope =
   | "INTEGRATION"
   | "SESSION"
   | "LISTENER"
-  | "COMMAND"; // 🔥 NEW
+  | "COMMAND";
 
 /**
  * 🔥 OPCJE DEBUGA
@@ -100,4 +100,25 @@ function formatPrefix(
   }
 
   return `[QA:${scope}:${tag}:${time}]`;
+}
+
+/**
+ * =====================================
+ * 🧠 SCOPED LOGGER (🔥 NEW)
+ * =====================================
+ */
+export function createLogger(scope: DebugScope) {
+  return {
+    log: (tag: string, ...args: any[]) =>
+      debug(scope, tag, ...args),
+
+    trace: (tag: string, traceId: string, ...args: any[]) =>
+      debugTrace(scope, tag, traceId, ...args),
+
+    error: (tag: string, error: any, traceId?: string) =>
+      debugError(scope, tag, error, traceId),
+
+    warn: (tag: string, ...args: any[]) =>
+      debugWarn(scope, tag, ...args),
+  };
 }
