@@ -24,14 +24,8 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
 
-// ❌ USUWAMY stare:
-// quickAddCommand
-// handleQuickAddCommand
-// qaCommand
-// handleQaCommand
-
-// ✅ NOWE:
-import { qaCommand, quickAddCommand } from "./quickadd/commands/qa/qa.command";
+// ✅ POPRAWKA: import z CommandBuilder
+import { qaCommand, quickAddCommand } from "./quickadd/commands/CommandBuilder";
 import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
 
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
