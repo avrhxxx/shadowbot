@@ -28,6 +28,12 @@ import {
   handleQuickAddCommand,
 } from "./quickadd/commands/quickadd.command";
 
+// 🔥 NEW: QA SHORTCUT
+import {
+  qaCommand,
+  handleQaCommand,
+} from "./quickadd/commands/qa.command";
+
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
 
 // 🔥 FIX: LISTENER IMPORT
@@ -61,6 +67,7 @@ client.once("clientReady", async () => {
   try {
     await client.application?.commands.set([
       quickAddCommand.toJSON(),
+      qaCommand.toJSON(), // 🔥 NEW
     ]);
 
     console.log("✅ Slash commands registered");
@@ -110,6 +117,12 @@ client.once("clientReady", async () => {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "quickadd") {
           await handleQuickAddCommand(interaction);
+          return;
+        }
+
+        // 🔥 NEW: QA HANDLER
+        if (interaction.commandName === "qa") {
+          await handleQaCommand(interaction);
           return;
         }
       }
