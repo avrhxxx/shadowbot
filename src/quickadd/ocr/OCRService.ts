@@ -9,8 +9,8 @@ import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("OCR");
 
-export async function runOCR(imageUrl: string) {
-  log("ocr_start", imageUrl);
+export async function runOCR(imageUrl: string, traceId: string) {
+  log.trace("ocr_start", traceId, imageUrl);
 
   try {
     const response = await fetch(imageUrl);
@@ -22,22 +22,20 @@ export async function runOCR(imageUrl: string) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    log("image_downloaded", {
-      size: buffer.length,
-    });
+    log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    const processed = await preprocessImage(buffer);
+    const processed = await preprocessImage(buffer, traceId);
 
-    const result = await runFullImage(processed);
+    const result = await runFullImage(processed, traceId);
 
-    log("ocr_done", {
+    log.trace("ocr_done", traceId, {
       textLength: result.text.length,
       lines: result.lines.length,
     });
 
     return result;
   } catch (err) {
-    log.error("ocr_error", err);
+    log.error("ocr_error", err, traceId);
 
     return {
       text: "",
