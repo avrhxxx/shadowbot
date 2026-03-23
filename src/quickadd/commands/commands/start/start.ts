@@ -2,7 +2,7 @@
 // 📁 src/quickadd/commands/commands/start/start.ts
 // =====================================
 
-import { ChatInputCommandInteraction, TextChannel } from "discord.js";
+import { ChatInputCommandInteraction, TextChannel, ChannelType } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
 import { createLogger } from "../../../debug/DebugLogger";
@@ -14,12 +14,12 @@ export async function startCommand(
 ) {
   const guildId = interaction.guild!.id;
 
-  const type = interaction.options.getString("type", true) as QuickAddType; // 🔥 NEW
+  const type = interaction.options.getString("type", true) as QuickAddType;
 
   log("start_attempt", {
     user: interaction.user.id,
     guildId,
-    type, // 🔥 NEW
+    type,
   });
 
   const existing = QuickAddSession.get(guildId);
@@ -50,12 +50,17 @@ export async function startCommand(
   }
 
   // =====================================
-  // 🧵 CREATE THREAD
+  // 🧵 CREATE PRIVATE THREAD
   // =====================================
   const thread = await channel.threads.create({
-    name: `q-${type.toLowerCase()}-${interaction.user.username}`, // 🔥 UPDATED
+    name: `qa-${type.toLowerCase()}-${interaction.user.username}`,
     autoArchiveDuration: 60,
+    type: ChannelType.PrivateThread, // 🔒 PRIVATE
+    invitable: false, // 🔒 nobody can invite others
   });
+
+  // 🔥 ADD USER TO THREAD (required for private)
+  await thread.members.add(interaction.user.id);
 
   log("thread_created", {
     threadId: thread.id,
@@ -63,23 +68,47 @@ export async function startCommand(
   });
 
   // =====================================
-  // 🧠 START SESSION (threadId as channelId)
+  // 🧠 START SESSION
   // =====================================
   QuickAddSession.start(
     guildId,
     thread.id,
     interaction.user.id,
-    type // 🔥 NEW
+    type
   );
 
   log("start_success", {
     user: interaction.user.id,
     threadId: thread.id,
-    type, // 🔥 NEW
+    type,
   });
 
   // =====================================
-  // 💬 RESPONSE
+  // 💬 MESSAGE INSIDE THREAD (NEW UX)
+  // =====================================
+  await thread.send(
+`🧠 **QuickAdd Session**
+
+📂 Type: ${type}
+
+📸 Send screenshots in this thread
+
+Status:
+📥 received
+⏳ processing
+✅ done
+❌ error
+
+📊 Preview updates automatically
+
+Commands:
+→ /q preview
+→ /q adjust
+→ /q end`
+  );
+
+  // =====================================
+  // 💬 EPHEMERAL RESPONSE
   // =====================================
   return interaction.editReply({
     content:
@@ -88,17 +117,6 @@ export async function startCommand(
 🧵 Thread: <#${thread.id}>
 📂 Type: ${type}
 
-📸 Send screenshots inside this thread
-
-Status:
-📥 received
-⏳ processing
-✅ done
-❌ error
-
-📊 Preview is generated automatically after each image
-
-You can also run manually:
-→ /q preview`,
+👉 Go to the thread and start sending screenshots`,
   });
 }
