@@ -46,7 +46,8 @@ export async function processImageInput(
   try {
     await setStatusReaction(message, "⏳", traceId);
 
-    const ocrResult = await runOCR(imageUrl);
+    // ✅ FIX: przekazujemy traceId
+    const ocrResult = await runOCR(imageUrl, traceId);
 
     // 🔥 NEW — używamy typu z sesji (bez autodetect)
     const parsed = parseByType(session.type, ocrResult.lines, traceId);
