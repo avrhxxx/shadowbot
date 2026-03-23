@@ -6,6 +6,7 @@ import { Message, AttachmentBuilder } from "discord.js";
 import { debugTrace } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
+import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
 
 const SCOPE = "PIPELINE";
 
@@ -40,6 +41,11 @@ export async function processImageInput(
     debugTrace(SCOPE, "PARSED_RESULT", traceId, parsed);
 
     // =============================
+    // 🔥 BUFFER (NOWE)
+    // =============================
+    QuickAddBuffer.addEntries(message.guild!.id, parsed);
+
+    // =============================
     // 📤 DEBUG → WYŚLIJ NA PRIV
     // =============================
     try {
@@ -68,11 +74,11 @@ ${JSON.stringify(parsed, null, 2)}
     }
 
     // =============================
-    // 🔜 NEXT (później)
+    // 🔜 NEXT
     // =============================
-    // - detection (typ obrazka)
-    // - mapping nicków
-    // - zapis do buffer
+    // - detection
+    // - mapping
+    // - approval
 
   } catch (err) {
     console.error("❌ Pipeline OCR error:", err);
