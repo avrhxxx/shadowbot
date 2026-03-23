@@ -2,7 +2,7 @@
 // 📁 src/quickadd/commands/commands/start/start.ts
 // =====================================
 
-import { ChatInputCommandInteraction } from "discord.js";
+import { ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
 
@@ -31,25 +31,29 @@ export async function startCommand(
   }
 
   // =====================================
-  // 🧵 CREATE THREAD (SESSION WORKSPACE)
+  // 🧵 CREATE THREAD (SAFE TYPE)
   // =====================================
-  const thread = await interaction.channel!.threads.create({
+  const channel = interaction.channel;
+
+  if (!channel || !(channel instanceof TextChannel)) {
+    log.warn("start_invalid_channel");
+
+    return interaction.editReply({
+      content: "❌ This command must be used in a server text channel",
+    });
+  }
+
+  const thread = await channel.threads.create({
     name: `quickadd-${interaction.user.username}`,
     autoArchiveDuration: 60,
-    reason: "QuickAdd session",
-  });
-
-  log("thread_created", {
-    threadId: thread.id,
-    name: thread.name,
   });
 
   // =====================================
-  // 🧠 START SESSION (THREAD-BASED)
+  // 🧠 START SESSION
   // =====================================
   QuickAddSession.start(
     guildId,
-    thread.id, // 🔥 session now bound to thread
+    thread.id, // 🔥 THREAD ID
     interaction.user.id
   );
 
@@ -58,27 +62,13 @@ export async function startCommand(
     threadId: thread.id,
   });
 
-  // =====================================
-  // 📩 MINIMAL REPLY (REDIRECT ONLY)
-  // =====================================
-  await interaction.editReply({
-    content: 
+  return interaction.editReply({
+    content:
 `✅ Session started
 
-🧵 Go to your thread:
-→ <#${thread.id}>`,
-  });
+🧵 Thread: <#${thread.id}>
 
-  // =====================================
-  // 🧵 FULL ONBOARDING INSIDE THREAD
-  // =====================================
-  await thread.send({
-    content:
-`📸 **QuickAdd session started**
-
-Send screenshots in this thread.
-
-━━━━━━━━━━━━━━━━━━━
+📸 Send screenshots inside the thread
 
 Status:
 📥 received
@@ -86,12 +76,10 @@ Status:
 ✅ done
 ❌ error
 
-━━━━━━━━━━━━━━━━━━━
+📊 Preview will be generated automatically
 
-📊 Preview will appear automatically after each processed image.
-
-✏️ Adjust entries using:
-→ /qa adjust
-→ /quickadd adjust`,
+You can also run:
+→ /qa preview
+→ /quickadd preview`,
   });
 }
