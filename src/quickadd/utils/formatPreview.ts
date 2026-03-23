@@ -5,7 +5,7 @@
 type ParsedEntry = {
   nickname: string;
   value: number;
-  id: number; // 🔥 FIX
+  id: number;
 };
 
 export function formatPreview(entries: ParsedEntry[]): string {
@@ -17,7 +17,7 @@ export function formatPreview(entries: ParsedEntry[]): string {
 
   const formattedEntries = entries
     .map((entry) => {
-      const id = entry.id; // 🔥 FIX
+      const id = entry.id;
 
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
 
@@ -26,22 +26,22 @@ export function formatPreview(entries: ParsedEntry[]): string {
     .join("\n");
 
   return `
-📊 QuickAdd Preview (${entries.length} entries)
+📊 **QuickAdd Preview**
+Entries: ${entries.length}
 
 ${formattedEntries}
 
-────────────────────────────
+━━━━━━━━━━━━━━━━━━
 
-✏️ Adjust entry
+✏️ **Adjust entry**
 
 Use:
-→ id = entry number
-→ field = value | nickname
-→ value = new value
+• id = entry number  
+• field = nickname | value  
+• value = new value  
 
-Commands:
-→ /qa adjust id:<index> field:<field> value:<value>
-→ /quickadd adjust id:<index> field:<field> value:<value>
+Command:
+→ /q adjust id:<id> field:<field> value:<value>
 `.trim();
 }
 
