@@ -13,21 +13,44 @@ const log = createLogger("PIPELINE");
 // =====================================
 // 🔥 HELPER: STATUS REACTIONS
 // =====================================
-async function setStatusReaction(message: Message, emoji: string) {
+async function setStatusReaction(message: Message, emoji: string, traceId?: string) {
   try {
+    log.trace("reaction_set_start", traceId, {
+      messageId: message.id,
+      emoji,
+    });
+
     await message.reactions.removeAll();
     await message.react(emoji);
+
+    log.trace("reaction_set_done", traceId, {
+      messageId: message.id,
+      emoji,
+    });
   } catch (err) {
-    console.error("❌ Reaction error:", err);
+    log.warn("reaction_set_failed", {
+      messageId: message.id,
+      emoji,
+      err,
+    });
   }
 }
 
 // =====================================
 // 🔥 HELPER: SAFE DELETE
 // =====================================
-function scheduleSafeDelete(message: Message, delay = 15000) {
+function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
+  log.trace("delete_scheduled", traceId, {
+    messageId: message.id,
+    delay,
+  });
+
   setTimeout(async () => {
     try {
+      log.trace("delete_attempt", traceId, {
+        messageId: message.id,
+      });
+
       if (!message.deletable) {
         log.warn("message_not_deletable", {
           messageId: message.id,
@@ -37,7 +60,7 @@ function scheduleSafeDelete(message: Message, delay = 15000) {
 
       await message.delete();
 
-      log.trace("message_deleted", null, {
+      log.trace("message_deleted", traceId, {
         messageId: message.id,
       });
     } catch (err) {
@@ -58,13 +81,13 @@ export async function processImageInput(
   });
 
   // 📥 RECEIVED
-  await setStatusReaction(message, "📥");
+  await setStatusReaction(message, "📥", traceId);
 
   try {
     log.trace("ocr_start", traceId);
 
     // ⏳ PROCESSING
-    await setStatusReaction(message, "⏳");
+    await setStatusReaction(message, "⏳", traceId);
 
     // =============================
     // 🔥 OCR
@@ -129,17 +152,21 @@ export async function processImageInput(
     // - approval
 
     // ✅ DONE
-    await setStatusReaction(message, "✅");
+    await setStatusReaction(message, "✅", traceId);
 
     // 🧹 SAFE DELETE (only if parsed data exists)
     if (parsed.length > 0) {
-      scheduleSafeDelete(message, 15000);
+      scheduleSafeDelete(message, traceId, 15000);
+    } else {
+      log.trace("delete_skipped_no_data", traceId, {
+        messageId: message.id,
+      });
     }
 
   } catch (err) {
     log.error("pipeline_error", err, traceId);
 
     // ❌ ERROR
-    await setStatusReaction(message, "❌");
+    await setStatusReaction(message, "❌", traceId);
   }
 }
