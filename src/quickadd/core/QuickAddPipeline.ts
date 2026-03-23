@@ -10,6 +10,18 @@ import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
+// =====================================
+// 🔥 HELPER: STATUS REACTIONS
+// =====================================
+async function setStatusReaction(message: Message, emoji: string) {
+  try {
+    await message.reactions.removeAll();
+    await message.react(emoji);
+  } catch (err) {
+    console.error("❌ Reaction error:", err);
+  }
+}
+
 export async function processImageInput(
   message: Message,
   session: any,
@@ -21,8 +33,14 @@ export async function processImageInput(
     url: imageUrl,
   });
 
+  // 📥 RECEIVED
+  await setStatusReaction(message, "📥");
+
   try {
     log.trace("ocr_start", traceId);
+
+    // ⏳ PROCESSING
+    await setStatusReaction(message, "⏳");
 
     // =============================
     // 🔥 OCR
@@ -86,7 +104,13 @@ export async function processImageInput(
     // - mapping
     // - approval
 
+    // ✅ DONE
+    await setStatusReaction(message, "✅");
+
   } catch (err) {
     log.error("pipeline_error", err, traceId);
+
+    // ❌ ERROR
+    await setStatusReaction(message, "❌");
   }
 }
