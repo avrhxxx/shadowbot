@@ -53,7 +53,7 @@ export async function startCommand(
   // =====================================
   QuickAddSession.start(
     guildId,
-    thread.id, // 🔥 THREAD ID
+    thread.id,
     interaction.user.id
   );
 
