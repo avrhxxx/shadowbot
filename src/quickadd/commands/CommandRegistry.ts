@@ -8,16 +8,21 @@ import {
   endCommand,
   adjustCommand,
 } from "./commands";
-import { createLogger } from "../debug/DebugLogger"; // 🔥 NEW
+import { ChatInputCommandInteraction } from "discord.js";
+import { createLogger } from "../debug/DebugLogger";
 
-const log = createLogger("COMMAND"); // 🔥 NEW
+const log = createLogger("COMMAND");
 
-export const CommandRegistry: Record<string, Function> = {
+// 🔥 STRONG TYPING
+type CommandHandler = (
+  interaction: ChatInputCommandInteraction
+) => Promise<any>;
+
+export const CommandRegistry: Record<string, CommandHandler> = {
   start: startCommand,
   end: endCommand,
   preview: previewCommand,
   adjust: adjustCommand,
 };
 
-// 🔥 DEBUG – sprawdzenie rejestru przy starcie
 log("registry_init", Object.keys(CommandRegistry));
