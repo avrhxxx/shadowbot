@@ -4,8 +4,10 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+import { QuickAddSession } from "../../../core/QuickAddSession";
 import { createLogger } from "../../../debug/DebugLogger";
 import { formatPreview } from "../../../utils/formatPreview";
+import { validateQuickAddContext } from "../../../rules/quickAddRules";
 
 const log = createLogger("COMMAND");
 
@@ -13,6 +15,15 @@ export async function previewCommand(
   interaction: ChatInputCommandInteraction
 ) {
   const guildId = interaction.guild!.id;
+
+  const session = QuickAddSession.get(guildId);
+
+  // 🔥 CENTRAL VALIDATION (session + context)
+  const error = validateQuickAddContext(interaction, session);
+  if (error) {
+    log.warn("preview_blocked", error);
+    return interaction.editReply({ content: error });
+  }
 
   const data = QuickAddBuffer.getEntries(guildId);
 
