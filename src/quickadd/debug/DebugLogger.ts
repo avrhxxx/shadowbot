@@ -19,7 +19,8 @@ type DebugScope =
   | "MAPPING"
   | "INTEGRATION"
   | "SESSION"
-  | "LISTENER";
+  | "LISTENER"
+  | "COMMAND"; // 🔥 NEW
 
 /**
  * 🔥 OPCJE DEBUGA
