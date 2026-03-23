@@ -16,7 +16,7 @@ export function formatPreview(entries: ParsedEntry[]): string {
     .map((entry, index) => {
       const id = index + 1;
 
-      return `[${id}] ${entry.nickname} — ${entry.value}`;
+      return `[${id}] ${entry.nickname} → ${entry.value}`;
     })
     .join("\n");
 }
