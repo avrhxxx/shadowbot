@@ -2,12 +2,12 @@
 // 📁 src/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-import { Message, AttachmentBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
-import { formatPreview } from "../utils/formatPreview"; // 🔥 CLEAN
+import { formatPreview } from "../utils/formatPreview";
 
 const log = createLogger("PIPELINE");
 
@@ -118,11 +118,10 @@ export async function processImageInput(
     });
 
     // =============================
-    // 🔥 AUTO PREVIEW (CLEAN)
+    // 🔥 AUTO PREVIEW
     // =============================
-    if (message.channel.isTextBased()) {
+    if ("send" in message.channel) {
       const allData = QuickAddBuffer.getEntries(message.guild!.id);
-
       const content = formatPreview(allData);
 
       await message.channel.send({ content });
@@ -133,16 +132,11 @@ export async function processImageInput(
     }
 
     // =============================
-    // 🔜 NEXT
-    // =============================
-    // - detection
-    // - mapping
-    // - approval
-
     // ✅ DONE
+    // =============================
     await setStatusReaction(message, "✅", traceId);
 
-    // 🧹 SAFE DELETE (only if parsed data exists)
+    // 🧹 SAFE DELETE
     if (parsed.length > 0) {
       scheduleSafeDelete(message, traceId, 15000);
     } else {
