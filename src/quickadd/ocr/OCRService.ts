@@ -24,9 +24,11 @@ export async function runOCR(imageUrl: string, traceId: string) {
 
     log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    const processed = await preprocessImage(buffer, traceId);
+    // ✅ FIX: usunięty traceId
+    const processed = await preprocessImage(buffer);
 
-    const result = await runFullImage(processed, traceId);
+    // ✅ FIX: usunięty traceId
+    const result = await runFullImage(processed);
 
     log.trace("ocr_done", traceId, {
       textLength: result.text.length,
