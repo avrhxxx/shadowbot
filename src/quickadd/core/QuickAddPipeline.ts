@@ -6,8 +6,8 @@ import { Message, AttachmentBuilder } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
 import { parseOCR } from "../parsing";
-import { QuickAddBuffer } from "../storage/QuickAddBuffer"; // 🔥 NEW
-import { formatPreview } from "../utils/formatPreview"; // 🔥 NEW
+import { QuickAddBuffer } from "../storage/QuickAddBuffer";
+import { formatPreview } from "../utils/formatPreview"; // 🔥 CLEAN
 
 const log = createLogger("PIPELINE");
 
@@ -109,7 +109,7 @@ export async function processImageInput(
     log.trace("parsed_result", traceId, parsed);
 
     // =============================
-    // 🔥 BUFFER (NOWE)
+    // 🔥 BUFFER
     // =============================
     QuickAddBuffer.addEntries(message.guild!.id, parsed);
 
@@ -118,30 +118,12 @@ export async function processImageInput(
     });
 
     // =============================
-    // 🔥 AUTO PREVIEW (REAL)
+    // 🔥 AUTO PREVIEW (CLEAN)
     // =============================
     if (message.channel.isTextBased()) {
       const allData = QuickAddBuffer.getEntries(message.guild!.id);
 
-      const preview = formatPreview(allData);
-
-      const content = `
-📊 QuickAdd Preview (${allData.length} entries)
-
-${preview}
-
-────────────────────────────
-
-✏️ Adjust entry:
-→ /qa adjust <id> <field> <value>
-→ /quickadd adjust <id> <field> <value>
-
-Example:
-→ /qa adjust 1 value 60000
-
-💡 Pro tip:
-Fix OCR mistakes like wrong numbers or nicknames.
-`.trim();
+      const content = formatPreview(allData);
 
       await message.channel.send({ content });
 
