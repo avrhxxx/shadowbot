@@ -1,4 +1,6 @@
-// src/quickadd/core/QuickAddSession.ts
+// =====================================
+// 📁 src/quickadd/core/QuickAddSession.ts
+// =====================================
 
 import { debug } from "../debug/DebugLogger";
 
