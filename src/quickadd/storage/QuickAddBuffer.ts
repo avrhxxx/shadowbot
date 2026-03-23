@@ -1,13 +1,18 @@
-// =====================================
-// 📁 src/quickadd/storage/QuickAddBuffer.ts
-// =====================================
-
 type ParsedEntry = {
   nickname: string;
   value: number;
 };
 
-const buffer = new Map<string, ParsedEntry[]>();
+type BufferedEntry = {
+  id: number;
+  nickname: string;
+  value: number;
+};
+
+const buffer = new Map<string, BufferedEntry[]>();
+
+// 🔥 ID COUNTER PER GUILD
+const idCounters = new Map<string, number>();
 
 export const QuickAddBuffer = {
   // =============================
@@ -18,15 +23,28 @@ export const QuickAddBuffer = {
       buffer.set(guildId, []);
     }
 
-    const current = buffer.get(guildId)!;
+    if (!idCounters.has(guildId)) {
+      idCounters.set(guildId, 1);
+    }
 
-    current.push(...entries);
+    const current = buffer.get(guildId)!;
+    let currentId = idCounters.get(guildId)!;
+
+    for (const entry of entries) {
+      current.push({
+        id: currentId++,
+        nickname: entry.nickname,
+        value: entry.value,
+      });
+    }
+
+    idCounters.set(guildId, currentId);
   },
 
   // =============================
   // 📥 GET ENTRIES
   // =============================
-  getEntries(guildId: string): ParsedEntry[] {
+  getEntries(guildId: string): BufferedEntry[] {
     return buffer.get(guildId) || [];
   },
 
@@ -35,5 +53,6 @@ export const QuickAddBuffer = {
   // =============================
   clear(guildId: string) {
     buffer.delete(guildId);
+    idCounters.delete(guildId); // 🔥 reset ID
   },
 };
