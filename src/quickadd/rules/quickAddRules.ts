@@ -6,7 +6,7 @@ import { Channel, ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
 
 // =====================================
-// 🔥 INTERNAL TYPE (zgodny z session store)
+// 🔥 INTERNAL TYPE
 // =====================================
 type SessionData = ReturnType<typeof QuickAddSession.get> extends infer T
   ? T extends null
@@ -15,7 +15,7 @@ type SessionData = ReturnType<typeof QuickAddSession.get> extends infer T
   : never;
 
 // =====================================
-// 🧠 RULE: CONTEXT
+// 🧠 RULE: CONTEXT (THREAD-BASED FIX)
 // =====================================
 export function isQuickAddContext(
   channel: Channel | null,
@@ -23,13 +23,8 @@ export function isQuickAddContext(
 ): boolean {
   if (!channel || !session) return false;
 
-  // ✅ main QuickAdd channel
-  if (channel.id === session.channelId) {
-    return true;
-  }
-
-  // ✅ thread inside QuickAdd channel
-  if ("parentId" in channel && channel.parentId === session.channelId) {
+  // ✅ dokładnie thread sesji
+  if (channel.id === session.threadId) {
     return true;
   }
 
@@ -51,7 +46,7 @@ export function isSessionOwner(
 }
 
 // =====================================
-// 🧠 VALIDATOR: CONTEXT (READY TO USE)
+// 🧠 VALIDATOR: CONTEXT
 // =====================================
 export function validateQuickAddContext(
   interaction: ChatInputCommandInteraction,
@@ -69,7 +64,7 @@ export function validateQuickAddContext(
 }
 
 // =====================================
-// 🧠 VALIDATOR: OWNER (FOR /end ETC.)
+// 🧠 VALIDATOR: OWNER
 // =====================================
 export function validateSessionOwner(
   interaction: ChatInputCommandInteraction,
