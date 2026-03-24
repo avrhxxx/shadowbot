@@ -79,6 +79,7 @@ client.once("clientReady", async () => {
   // =============================
   try {
     await client.application?.commands.set([]);
+
     await client.application?.commands.set([
       qCommand.toJSON(),
     ]);
@@ -88,11 +89,16 @@ client.once("clientReady", async () => {
     console.error("❌ Slash command registration failed:", err);
   }
 
+  // -----------------------------
+  // Init modules
+  // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
 
+  // 🔥 LISTENER
   registerQuickAddListener(client);
 
+  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     try {
       await ensureQuickAddChannel(guild);
@@ -111,6 +117,9 @@ client.once("clientReady", async () => {
     });
   }
 
+  // =============================
+  // 🔥 GLOBAL HANDLER
+  // =============================
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
