@@ -4,9 +4,12 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
-import { QuickAddBuffer } from "../../../storage/QuickAddBuffer"; // 🔥 NEW
-import { formatPreview } from "../../../utils/formatPreview"; // 🔥 NEW
+import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+import { formatPreview } from "../../../utils/formatPreview";
 import { createLogger } from "../../../debug/DebugLogger";
+
+// 🔥 NEW — QUEUE WRITE
+import { appendQuickAddQueueRows } from "../../../../googleSheetsStorage";
 
 const log = createLogger("COMMAND");
 
@@ -25,9 +28,6 @@ export async function confirmCommand(
 
   const session = QuickAddSession.get(guildId);
 
-  // =============================
-  // ❌ NO SESSION
-  // =============================
   if (!session) {
     log.warn("confirm_no_session", { guildId });
 
@@ -36,9 +36,6 @@ export async function confirmCommand(
     });
   }
 
-  // =============================
-  // ❌ WRONG CHANNEL
-  // =============================
   if (!QuickAddSession.isInSession(guildId, channelId)) {
     log.warn("confirm_wrong_channel", {
       guildId,
@@ -51,9 +48,6 @@ export async function confirmCommand(
     });
   }
 
-  // =============================
-  // ❌ NOT OWNER
-  // =============================
   if (!QuickAddSession.isOwner(guildId, userId)) {
     log.warn("confirm_not_owner", {
       guildId,
@@ -66,9 +60,6 @@ export async function confirmCommand(
     });
   }
 
-  // =====================================
-  // 📊 GET BUFFER
-  // =====================================
   const entries = QuickAddBuffer.getEntries(guildId);
 
   if (!entries.length) {
@@ -77,22 +68,15 @@ export async function confirmCommand(
     });
   }
 
-  // =====================================
-  // ❌ VALIDATION BLOCKER
-  // =====================================
   const invalidEntries = entries.filter(
     (e: any) => e.status && e.status !== "OK"
   );
 
   // =============================
-  // 🧠 STAGE 1 — PREVIEW
+  // 🧠 STAGE 1
   // =============================
   if (session.stage === "COLLECTING") {
     if (invalidEntries.length > 0) {
-      log.warn("confirm_blocked_invalid_entries", {
-        count: invalidEntries.length,
-      });
-
       const preview = formatPreview(entries);
 
       return interaction.editReply({
@@ -106,17 +90,11 @@ ${preview}
       });
     }
 
-    // ✅ ALL GOOD → proceed
     const preview = formatPreview(entries);
 
     session.stage = "CONFIRM_PENDING";
     session.finalPreview = preview;
     session.confirmStartedAt = Date.now();
-
-    log("confirm_stage_enter", {
-      guildId,
-      userId,
-    });
 
     return interaction.editReply({
       content:
@@ -124,54 +102,63 @@ ${preview}
 
 ${preview}
 
-❗ This data will be sent to the system.
-
-👉 Type \`/q confirm\` again to finalize  
-👉 Or use \`/q cancel\` to abort`,
+👉 Type \`/q confirm\` again to finalize`,
     });
   }
 
   // =============================
-  // 🧠 STAGE 2 — FINAL CONFIRM
+  // 🧠 STAGE 2 — FINAL
   // =============================
   if (session.stage === "CONFIRM_PENDING") {
-    // 🔥 SAFETY CHECK AGAIN
     if (invalidEntries.length > 0) {
-      log.warn("confirm_blocked_on_finalize", {
-        count: invalidEntries.length,
-      });
-
       return interaction.editReply({
-        content:
-`❌ Data changed or invalid entries detected.
-
-👉 Fix issues before confirming again.`,
+        content: "❌ Data invalid — fix before confirming again",
       });
     }
 
-    log("confirm_finalize", {
-      guildId,
-      userId,
-    });
+    // =====================================
+    // 🔥 QUEUE BUILD
+    // =====================================
+    try {
+      const rows = entries.map((e) => ({
+        guildId,
+        type: session.type,
+        nickname: e.nickname,
+        value: e.value,
+        status: "PENDING",
+        createdAt: Date.now(),
+      }));
 
-    // 🔥 TODO: tutaj podłączysz zapis do QUEUE
+      await appendQuickAddQueueRows(rows);
 
-    // reset stage
+      log("queue_enqueued", {
+        count: rows.length,
+        type: session.type,
+      });
+
+    } catch (err) {
+      log.error("queue_failed", err);
+
+      return interaction.editReply({
+        content: "❌ Failed to enqueue data",
+      });
+    }
+
+    // =====================================
+    // 🔥 RESET
+    // =====================================
     session.stage = "COLLECTING";
     session.finalPreview = undefined;
     session.confirmStartedAt = undefined;
 
     return interaction.editReply({
       content:
-`✅ **Data confirmed and sent**
+`✅ **Data sent to queue**
 
-🚀 Processing started`,
+⚙️ Worker will process it shortly`,
     });
   }
 
-  // =============================
-  // ❌ FALLBACK
-  // =============================
   log.warn("confirm_invalid_stage", {
     guildId,
     stage: session.stage,
