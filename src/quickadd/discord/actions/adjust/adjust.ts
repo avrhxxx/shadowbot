@@ -21,7 +21,10 @@ import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { saveAdjusted } from "../../../storage/QuickAddService";
+
+// ✅ FIX — correct layer (service removed, repository used)
+import { QuickAddRepository } from "../../../storage/QuickAddRepository";
+
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
 import { createLogger } from "../../../debug/DebugLogger";
@@ -96,7 +99,8 @@ export async function handleAdjust(
 
     QuickAddBuffer.setEntries(guildId, newEntries);
 
-    log("adjust_applied", {
+    // ✅ FIX — logger consistency
+    log.trace("adjust_applied", {
       id,
       before: target,
       after: updated,
@@ -107,14 +111,14 @@ export async function handleAdjust(
     // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
-        await saveAdjusted([
+        await QuickAddRepository.saveAdjustments([
           {
             ocr_raw: target.nickname,
             adjusted: newNickname,
           },
         ]);
 
-        log("learning_saved_adjust", {
+        log.trace("learning_saved_adjust", {
           from: target.nickname,
           to: newNickname,
         });
