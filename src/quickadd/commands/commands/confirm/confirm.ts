@@ -4,6 +4,8 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
+import { QuickAddBuffer } from "../../../storage/QuickAddBuffer"; // 🔥 NEW
+import { formatPreview } from "../../../utils/formatPreview"; // 🔥 NEW
 import { createLogger } from "../../../debug/DebugLogger";
 
 const log = createLogger("COMMAND");
@@ -64,12 +66,48 @@ export async function confirmCommand(
     });
   }
 
+  // =====================================
+  // 📊 GET BUFFER
+  // =====================================
+  const entries = QuickAddBuffer.getEntries(guildId);
+
+  if (!entries.length) {
+    return interaction.editReply({
+      content: "⚠️ No data to confirm",
+    });
+  }
+
+  // =====================================
+  // ❌ VALIDATION BLOCKER
+  // =====================================
+  const invalidEntries = entries.filter(
+    (e: any) => e.status && e.status !== "OK"
+  );
+
   // =============================
   // 🧠 STAGE 1 — PREVIEW
   // =============================
   if (session.stage === "COLLECTING") {
-    // 🔥 TODO: tutaj podepniesz realny preview z pipeline
-    const preview = "📊 Example preview:\n- Arek\n- Allie\n- DomSugarDaddy";
+    if (invalidEntries.length > 0) {
+      log.warn("confirm_blocked_invalid_entries", {
+        count: invalidEntries.length,
+      });
+
+      const preview = formatPreview(entries);
+
+      return interaction.editReply({
+        content:
+`❌ **Cannot confirm — invalid entries detected**
+
+${preview}
+
+👉 Fix entries using:
+/q adjust`,
+      });
+    }
+
+    // ✅ ALL GOOD → proceed
+    const preview = formatPreview(entries);
 
     session.stage = "CONFIRM_PENDING";
     session.finalPreview = preview;
@@ -97,14 +135,26 @@ ${preview}
   // 🧠 STAGE 2 — FINAL CONFIRM
   // =============================
   if (session.stage === "CONFIRM_PENDING") {
+    // 🔥 SAFETY CHECK AGAIN
+    if (invalidEntries.length > 0) {
+      log.warn("confirm_blocked_on_finalize", {
+        count: invalidEntries.length,
+      });
+
+      return interaction.editReply({
+        content:
+`❌ Data changed or invalid entries detected.
+
+👉 Fix issues before confirming again.`,
+      });
+    }
+
     log("confirm_finalize", {
       guildId,
       userId,
     });
 
-    // 🔥 TODO: tutaj podłączysz zapis do QUEUE (events / points)
-    // np:
-    // await enqueueEvents(session.finalPreview)
+    // 🔥 TODO: tutaj podłączysz zapis do QUEUE
 
     // reset stage
     session.stage = "COLLECTING";
