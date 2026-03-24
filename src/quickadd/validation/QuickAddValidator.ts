@@ -41,9 +41,7 @@ export async function validateEntries(
 ): Promise<ValidatedEntry[]> {
   const results: ValidatedEntry[] = [];
 
-  // 🔥 duplicate detection WITHOUT cleaning
   const seen = new Set<string>();
-
   let idCounter = 1;
 
   for (const entry of entries) {
@@ -71,23 +69,27 @@ export async function validateEntries(
       log.warn("resolve_failed", err);
     }
 
-    // =============================
-    // 🧠 SIMILARITY (SAFE COMPARISON)
-    // =============================
-
-    let similarity = 0;
-
-    if (resolved) {
-      similarity = stringSimilarity(entry.nickname, resolved);
-    }
+    // 🔥 KLUCZOWE — czy mapping faktycznie zaszedł
+    const wasMapped = resolved && resolved !== entry.nickname;
 
     // =============================
     // 🧠 CONFIDENCE + STATUS
     // =============================
-    if (!resolved) {
+    if (!wasMapped) {
+      // 🔥 brak mapowania = NIE OK
       status = "UNRESOLVED";
       confidence = 0.3;
+
+      // 🔥 heurystyka śmieci OCR
+      if (
+        entry.nickname.length < 4 ||
+        /donations|total|points/i.test(entry.nickname)
+      ) {
+        confidence = 0.1;
+      }
     } else {
+      const similarity = stringSimilarity(entry.nickname, resolved);
+
       confidence = similarity;
 
       if (similarity >= 0.9) {
