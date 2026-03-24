@@ -6,7 +6,7 @@ import fetch from "node-fetch";
 import { preprocessBase, preprocessForTesseract } from "./OCRPreprocess";
 import { runFullImage, runLineBased, runBoxBased } from "./OCRRunner";
 import { createLogger } from "../debug/DebugLogger";
-import { OCRMultiResult } from "./OCRTypes";
+import { OCRMultiResult, OCRSourceResult } from "./OCRTypes";
 
 const log = createLogger("OCR");
 
@@ -25,52 +25,39 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
 
     log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    // =====================================
-    // 🔹 BASE PREPROCESS
-    // =====================================
     const base = await preprocessBase(buffer);
-
-    // =====================================
-    // 🔹 ENGINE PREPROCESS
-    // =====================================
     const tesseractBuffer = await preprocessForTesseract(base);
 
-    // =====================================
-    // 🔹 RUN TESSERACT
-    // =====================================
     const [full, line, box] = await Promise.all([
       runFullImage(tesseractBuffer, traceId),
       runLineBased(tesseractBuffer, traceId),
       runBoxBased(tesseractBuffer, traceId),
     ]);
 
-    const sources = [
+    const sources: OCRSourceResult[] = [
       {
-        source: "TESSERACT_FULL" as const,
+        source: "TESSERACT_FULL",
         text: full.text,
         lines: full.lines,
       },
       {
-        source: "TESSERACT_LINE" as const,
+        source: "TESSERACT_LINE",
         text: line.text,
         lines: line.lines,
       },
       {
-        source: "TESSERACT_BOX" as const,
+        source: "TESSERACT_BOX",
         tokens: box.tokens,
       },
     ];
 
     // =====================================
-    // 🔥 OCR SPACE (PLACEHOLDER - FUTURE)
+    // 🔥 SAFE DEBUG
     // =====================================
-    // TODO: add OCR Space integration here
-
-    // =====================================
-    // 🔥 DEBUG (FIXED TYPE NARROWING)
-    // =====================================
-    log.trace("ocr_multi_done", traceId, {
-      sources: sources.map((s) => {
+    log.trace(
+      "ocr_multi_done",
+      traceId,
+      sources.map((s) => {
         if ("lines" in s) {
           return {
             source: s.source,
@@ -89,8 +76,8 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
         return {
           source: s.source,
         };
-      }),
-    });
+      })
+    );
 
     return { sources };
   } catch (err) {
