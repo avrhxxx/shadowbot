@@ -2,14 +2,9 @@
 // 📁 src/quickadd/debug/DebugLogger.ts
 // =====================================
 
-/**
- * 🔥 GLOBAL DEBUG SWITCH
- */
 const DEBUG_ENABLED = true;
+const PRETTY_LOGS = true; // 🔥 NEW
 
-/**
- * 🔥 SCOPES – zgodne z architekturą
- */
 export type DebugScope =
   | "OCR"
   | "PIPELINE"
@@ -20,16 +15,31 @@ export type DebugScope =
   | "SESSION"
   | "LISTENER"
   | "COMMAND"
-  | "MAP_LOADER"   // ✅ NEW
-  | "RESOLVER"     // ✅ NEW
-  | "VALIDATION"   // ✅ NEW
-  | "QA_SERVICE";  // ✅ NEW
+  | "MAP_LOADER"
+  | "RESOLVER"
+  | "VALIDATION"
+  | "QA_SERVICE"
+  | "LAYOUT";
 
-/**
- * =====================================
- * 🔧 CORE LOGGER
- * =====================================
- */
+// 🎨 kolory per scope (ANSI)
+const scopeColors: Record<DebugScope, string> = {
+  OCR: "\x1b[36m",        // cyan
+  PIPELINE: "\x1b[35m",   // magenta
+  PARSER: "\x1b[33m",     // yellow
+  DETECT: "\x1b[32m",
+  MAPPING: "\x1b[34m",
+  INTEGRATION: "\x1b[31m",
+  SESSION: "\x1b[90m",
+  LISTENER: "\x1b[37m",
+  COMMAND: "\x1b[94m",
+  MAP_LOADER: "\x1b[95m",
+  RESOLVER: "\x1b[96m",
+  VALIDATION: "\x1b[92m",
+  QA_SERVICE: "\x1b[91m",
+  LAYOUT: "\x1b[93m",
+};
+
+const RESET = "\x1b[0m";
 
 function logMessage(
   level: "log" | "warn" | "error",
@@ -42,18 +52,33 @@ function logMessage(
 
   const time = new Date().toISOString().split("T")[1].split(".")[0];
 
-  const prefix = traceId
-    ? `[QA:${scope}:${tag}:${traceId}:${time}]`
-    : `[QA:${scope}:${tag}:${time}]`;
+  if (!PRETTY_LOGS) {
+    const prefix = traceId
+      ? `[QA:${scope}:${tag}:${traceId}:${time}]`
+      : `[QA:${scope}:${tag}:${time}]`;
 
-  console[level](prefix, ...args);
+    console[level](prefix, ...args);
+    return;
+  }
+
+  // =====================================
+  // 🔥 PRETTY MODE
+  // =====================================
+
+  const color = scopeColors[scope] || "";
+  const idPart = traceId ? `#${traceId}` : "";
+
+  const header = `${color}${scope}${RESET}`;
+  const meta = `${tag} ${idPart}`.trim();
+
+  console[level](
+    `${header} ${meta} ${RESET}(${time})`
+  );
+
+  if (args.length > 0) {
+    console[level]("   ", ...args);
+  }
 }
-
-/**
- * =====================================
- * 🧠 MAIN LOGGER FACTORY
- * =====================================
- */
 
 export function createLogger(scope: DebugScope) {
   return Object.assign(
