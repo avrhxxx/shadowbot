@@ -8,8 +8,6 @@ import { runOCR } from "../ocr/OCRService";
 import { parseByType } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
-
-// 🔥 NEW
 import { validateEntries } from "../validation/QuickAddValidator";
 
 const log = createLogger("PIPELINE");
@@ -40,37 +38,32 @@ export async function processImageInput(
 
     const ocrResult = await runOCR(imageUrl, traceId);
 
-    // =====================================
-    // 🔥 MULTI SOURCE PARSING
-    // =====================================
     let bestParsed: any[] = [];
     let bestSource = "none";
 
     for (const source of ocrResult.sources) {
       try {
-        log("parse_attempt", {
-          source: source.source,
-          lines: "lines" in source ? source.lines.length : undefined,
-          tokens: "tokens" in source ? source.tokens.length : undefined,
-          traceId,
-        });
-
         let parsed: any[] = [];
 
-        // 🔹 STANDARD (LINES)
+        // =====================================
+        // 🔥 TYPE SAFE INPUT
+        // =====================================
         if ("lines" in source) {
+          log("parse_attempt", {
+            source: source.source,
+            lines: source.lines.length,
+            traceId,
+          });
+
           parsed = parseByType(session.type, source.lines, traceId);
-        }
+        } else if ("tokens" in source) {
+          log("parse_attempt", {
+            source: source.source,
+            tokens: source.tokens.length,
+            traceId,
+          });
 
-        // 🔥 NEW — LAYOUT (TOKENS)
-        if ("tokens" in source) {
-          if (session.type === "DONATIONS_POINTS") {
-            const { parseDonationsFromLayout } = await import(
-              "../parsing/donations/DonationsParser"
-            );
-
-            parsed = parseDonationsFromLayout(source.tokens, traceId);
-          }
+          parsed = parseByType(session.type, { tokens: source.tokens }, traceId);
         }
 
         log("parse_result", {
@@ -99,9 +92,6 @@ export async function processImageInput(
 
     const parsed = bestParsed;
 
-    // =====================================
-    // 🔥 VALIDATION LAYER
-    // =====================================
     let validated = [];
 
     try {
@@ -119,9 +109,6 @@ export async function processImageInput(
       }));
     }
 
-    // =====================================
-    // 🔥 BUFFER
-    // =====================================
     QuickAddBuffer.addEntries(guildId, validated as any);
 
     if (message.channel && "send" in message.channel) {
