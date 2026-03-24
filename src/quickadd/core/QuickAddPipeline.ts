@@ -46,7 +46,7 @@ export async function processImageInput(
         let parsed: any[] = [];
 
         // =====================================
-        // 🔥 TYPE SAFE INPUT
+        // 🔥 TYPE SAFE INPUT (FIX)
         // =====================================
         if ("lines" in source) {
           log("parse_attempt", {
@@ -55,8 +55,10 @@ export async function processImageInput(
             traceId,
           });
 
-          parsed = parseByType(session.type, source.lines, traceId);
-        } else if ("tokens" in source) {
+          parsed = parseByType(session.type, { lines: source.lines }, traceId);
+        }
+
+        if ("tokens" in source) {
           log("parse_attempt", {
             source: source.source,
             tokens: source.tokens.length,
