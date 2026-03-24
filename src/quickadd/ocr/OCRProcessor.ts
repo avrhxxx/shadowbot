@@ -58,19 +58,26 @@ export async function runOCR(
     }
 
     // =====================================
-    // 🔹 RUN OCR
+    // 🔹 RUN OCR (MAIN MODES)
     // =====================================
-    const tasks = [
+    const [full, line, box] = await Promise.all([
       OCREngine.full(inputBuffer, traceId),
       OCREngine.line(inputBuffer, traceId),
       OCREngine.box(inputBuffer, traceId),
-    ];
+    ]);
+
+    // =====================================
+    // 🔹 HOCR (SEPARATE — FIX)
+    // =====================================
+    let hocrResult: { hocr: string } | null = null;
 
     if (ENABLE_HOCR) {
-      tasks.push(OCREngine.hocr(inputBuffer, traceId) as any);
+      try {
+        hocrResult = await OCREngine.hocr(inputBuffer, traceId);
+      } catch (err) {
+        log.warn("hocr_failed", traceId);
+      }
     }
-
-    const [full, line, box, hocr] = await Promise.all(tasks);
 
     // =====================================
     // 🔹 BUILD SOURCES
@@ -92,22 +99,27 @@ export async function runOCR(
       },
     ] as OCRResult["sources"];
 
-    if (ENABLE_HOCR && hocr) {
+    if (ENABLE_HOCR && hocrResult) {
       sources.push({
         source: "TESSERACT_HOCR",
-        text: hocr.hocr,
+        text: hocrResult.hocr,
         lines: [],
       } as any);
     }
 
+    // =====================================
+    // 🔹 SAFE LOGGING (FIX)
+    // =====================================
     log.trace(
       "ocr_done",
       traceId,
-      sources.map((s) =>
-        "lines" in s
-          ? { source: s.source, lines: s.lines.length }
-          : { source: s.source, tokens: s.tokens.length }
-      )
+      sources.map((s) => {
+        if ("tokens" in s) {
+          return { source: s.source, tokens: s.tokens.length };
+        }
+
+        return { source: s.source, lines: s.lines.length };
+      })
     );
 
     return { sources };
