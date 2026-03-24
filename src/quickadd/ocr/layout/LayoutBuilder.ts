@@ -76,8 +76,13 @@ function normalizeTokens(
   tokens: OCRToken[],
   traceId: string
 ): NormalizedToken[] {
-  const maxX = Math.max(...tokens.map((t) => t.x + t.width));
-  const maxY = Math.max(...tokens.map((t) => t.y + t.height));
+  const maxX = tokens.length
+    ? Math.max(...tokens.map((t) => t.x + t.width))
+    : 0;
+
+  const maxY = tokens.length
+    ? Math.max(...tokens.map((t) => t.y + t.height))
+    : 0;
 
   const normalized = tokens.map((t) => ({
     ...t,
