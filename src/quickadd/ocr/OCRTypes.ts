@@ -2,10 +2,16 @@
 // 📁 src/quickadd/ocr/OCRTypes.ts
 // =====================================
 
-export interface OCRConfig {
-  language?: string;
+export type OCRSourceType =
+  | "TESSERACT_FULL"
+  | "TESSERACT_LINE";
+
+export interface OCRSourceResult {
+  source: OCRSourceType;
+  text: string;
+  lines: string[];
 }
 
-export interface OCRRawResult {
-  text: string;
+export interface OCRMultiResult {
+  sources: OCRSourceResult[];
 }
