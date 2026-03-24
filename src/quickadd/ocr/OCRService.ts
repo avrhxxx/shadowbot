@@ -36,7 +36,7 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
     const tesseractBuffer = await preprocessForTesseract(base);
 
     // =====================================
-    // 🔹 RUN MULTI OCR (🔥 UPDATED)
+    // 🔹 RUN TESSERACT
     // =====================================
     const [full, line, box] = await Promise.all([
       runFullImage(tesseractBuffer, traceId),
@@ -62,7 +62,17 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
     ];
 
     // =====================================
-    // 🔥 DEBUG (IMPORTANT)
+    // 🔥 OCR SPACE (PLACEHOLDER - FUTURE)
+    // =====================================
+    // TODO: add OCR Space integration here
+    // sources.push({
+    //   source: "OCRSPACE_FULL",
+    //   text: "...",
+    //   lines: [...]
+    // });
+
+    // =====================================
+    // 🔥 DEBUG
     // =====================================
     log.trace("ocr_multi_done", traceId, {
       sources: sources.map((s) => ({
