@@ -9,6 +9,9 @@ import { parseByType } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 import { validateEntries } from "../validation/QuickAddValidator";
+import { buildLayout } from "../parsing/layout/LayoutParser";
+import { resolveNickname } from "../mapping/NicknameResolver";
+import { saveLearning } from "../storage/QuickAddService";
 
 const log = createLogger("PIPELINE");
 
@@ -77,15 +80,17 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     let bestParsed: any[] = [];
+    let bestLayout: any[] = [];
     let bestSource = "none";
     let bestScore = -Infinity;
 
     for (const source of ocrResult.sources) {
       try {
         let parsed: any[] = [];
+        let layout: any[] = [];
 
         // =====================================
-        // 🔥 UNIFIED FLOW (tokens first)
+        // 🔥 TOKENS → LAYOUT → PARSER
         // =====================================
         if ("tokens" in source && source.tokens?.length > 0) {
           log("parse_attempt", {
@@ -94,15 +99,17 @@ export async function processImageInput(
             traceId,
           });
 
+          layout = buildLayout(source.tokens, traceId);
+
           parsed = parseByType(
             session.type,
-            { tokens: source.tokens }, // ✅ FIX
+            { layout },
             traceId
           );
         }
 
         // =====================================
-        // 🔹 FALLBACK (lines)
+        // 🔹 FALLBACK (LINES)
         // =====================================
         else if ("lines" in source && source.lines?.length > 0) {
           log("parse_attempt", {
@@ -134,6 +141,7 @@ export async function processImageInput(
 
         if (score > bestScore) {
           bestParsed = parsed;
+          bestLayout = layout;
           bestSource = source.source;
           bestScore = score;
         }
@@ -153,10 +161,55 @@ export async function processImageInput(
       traceId,
     });
 
+    // =====================================
+    // 🔥 LEARNING (OCR → LAYOUT → PARSER)
+    // =====================================
+    try {
+      const learningRows = bestParsed.map((e, i) => {
+        const layoutRow = bestLayout?.[i];
+
+        return {
+          type: session.type,
+          ocr_raw: e.nickname,
+          layout_text: layoutRow
+            ? [
+                ...layoutRow.left.map((t: any) => t.text),
+                ...layoutRow.right.map((t: any) => t.text),
+              ].join(" ")
+            : "",
+          parser_output: e.nickname,
+        };
+      });
+
+      await saveLearning(learningRows);
+    } catch (err) {
+      log.warn("learning_save_failed", err);
+    }
+
+    // =====================================
+    // 🔥 MAPPING (RESOLVE NICKNAMES)
+    // =====================================
+    let mapped: any[] = [];
+
+    try {
+      mapped = await Promise.all(
+        bestParsed.map(async (e) => ({
+          ...e,
+          nickname: await resolveNickname(e.nickname),
+        }))
+      );
+    } catch (err) {
+      log.warn("mapping_failed", err);
+      mapped = bestParsed;
+    }
+
+    // =====================================
+    // 🔥 VALIDATION
+    // =====================================
     let validated = [];
 
     try {
-      validated = await validateEntries(bestParsed);
+      validated = await validateEntries(mapped);
 
       log("validation_done", {
         count: validated.length,
@@ -165,13 +218,19 @@ export async function processImageInput(
     } catch (err) {
       log.warn("validation_failed_fallback_to_parsed", err);
 
-      validated = bestParsed.map((e) => ({
+      validated = mapped.map((e) => ({
         ...e,
       }));
     }
 
+    // =====================================
+    // 🔥 BUFFER
+    // =====================================
     QuickAddBuffer.addEntries(guildId, validated as any);
 
+    // =====================================
+    // 🔥 PREVIEW
+    // =====================================
     if (message.channel && "send" in message.channel) {
       const allData = QuickAddBuffer.getEntries(guildId);
       const content = formatPreview(allData);
