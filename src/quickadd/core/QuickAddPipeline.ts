@@ -5,10 +5,9 @@
 import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 import { runOCR } from "../ocr/OCRService";
-import { parseByType } from "../parsing"; // 🔥 FIX
+import { parseByType } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
-import { appendQuickAddRows } from "../../googleSheetsStorage"; // 🔥 NEW
 
 // 🔥 NEW
 import { validateEntries } from "../validation/QuickAddValidator";
@@ -50,36 +49,13 @@ export async function processImageInput(
   try {
     await setStatusReaction(message, "⏳", traceId);
 
-    // ✅ FIX: przekazujemy traceId
     const ocrResult = await runOCR(imageUrl, traceId);
 
     // 🔥 PARSE
     const parsed = parseByType(session.type, ocrResult.lines, traceId);
 
     // =====================================
-    // 🔥 NEW — SAVE TO GOOGLE SHEETS (learning)
-    // =====================================
-    try {
-      if (parsed.length > 0) {
-        const rows = parsed.map((entry) => ({
-          type: session.type,
-          ocr: entry.raw || entry.nickname,
-          final: `${entry.nickname}:${entry.value}`,
-        }));
-
-        await appendQuickAddRows(rows);
-
-        log("quickadd_saved_to_sheet", {
-          count: rows.length,
-          traceId,
-        });
-      }
-    } catch (err) {
-      log.warn("quickadd_save_failed", err);
-    }
-
-    // =====================================
-    // 🔥 VALIDATION LAYER (NEW)
+    // 🔥 VALIDATION LAYER
     // =====================================
     let validated = [];
 
@@ -93,14 +69,13 @@ export async function processImageInput(
     } catch (err) {
       log.warn("validation_failed_fallback_to_parsed", err);
 
-      // fallback → zachowujemy stary flow
       validated = parsed.map((e) => ({
         ...e,
       }));
     }
 
     // =====================================
-    // 🔥 BUFFER (validated instead of raw)
+    // 🔥 BUFFER
     // =====================================
     QuickAddBuffer.addEntries(guildId, validated as any);
 
