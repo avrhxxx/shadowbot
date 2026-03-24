@@ -51,20 +51,35 @@ export async function validateEntries(
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
-    // =============================
+    // =====================================
     // 🔢 VALUE VALIDATION
-    // =============================
+    // =====================================
     if (!entry.value || entry.value <= 0) {
       status = "INVALID_VALUE";
       confidence = 0;
     }
 
-    // =============================
+    // =====================================
     // 🧠 RESOLVE NICKNAME
-    // =============================
+    // =====================================
     let resolved = "";
+    let isMapped = false;
+
     try {
-      resolved = await resolveNickname(entry.nickname);
+      const result = await resolveNickname(entry.nickname);
+
+      if (result) {
+        const cleanedResult = clean(result);
+        const cleanedInput = clean(entry.nickname);
+
+        // 🔥 KEY: detect real mapping vs fallback
+        if (cleanedResult !== cleanedInput) {
+          resolved = result;
+          isMapped = true;
+        } else {
+          resolved = entry.nickname; // fallback
+        }
+      }
     } catch (err) {
       log.warn("resolve_failed", err);
     }
@@ -72,9 +87,9 @@ export async function validateEntries(
     const cleanedInput = clean(entry.nickname);
     const cleanedResolved = clean(resolved);
 
-    // =============================
+    // =====================================
     // 🧠 SIMILARITY (LEVENSHTEIN)
-    // =============================
+    // =====================================
     let similarity = 0;
 
     if (cleanedResolved) {
@@ -84,12 +99,16 @@ export async function validateEntries(
       similarity = maxLen > 0 ? 1 - distance / maxLen : 0;
     }
 
-    // =============================
-    // 🧠 CONFIDENCE + STATUS
-    // =============================
+    // =====================================
+    // 🧠 CONFIDENCE + STATUS (FIXED)
+    // =====================================
     if (!resolved || !cleanedResolved) {
       status = "UNRESOLVED";
       confidence = 0.3;
+    } else if (!isMapped) {
+      // 🔥 NO MAPPING = NEVER TRUST 100%
+      confidence = 0.4;
+      status = "LOW_CONFIDENCE";
     } else {
       confidence = similarity;
 
@@ -104,9 +123,9 @@ export async function validateEntries(
       }
     }
 
-    // =============================
+    // =====================================
     // 🔁 DUPLICATE DETECTION
-    // =============================
+    // =====================================
     const key = `${cleanedResolved || cleanedInput}:${entry.value}`;
 
     if (seen.has(key)) {
@@ -118,7 +137,7 @@ export async function validateEntries(
 
     const validated: ValidatedEntry = {
       id: idCounter++,
-      nickname: entry.nickname,
+      nickname: entry.nickname, // 🔥 NEVER mutate here
       value: entry.value,
       originalNickname,
       status,
@@ -157,9 +176,9 @@ function levenshtein(a: string, b: string): number {
         matrix[i][j] = matrix[i - 1][j - 1];
       } else {
         matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1,     // insertion
-          matrix[i - 1][j] + 1      // deletion
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
         );
       }
     }
@@ -169,7 +188,7 @@ function levenshtein(a: string, b: string): number {
 }
 
 // =====================================
-// 🧼 CLEAN
+// 🧼 CLEAN (ONLY FOR COMPARISON)
 // =====================================
 function clean(input: string): string {
   return input
