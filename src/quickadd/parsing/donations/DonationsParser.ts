@@ -35,7 +35,7 @@ export function parseDonations(
 }
 
 // =====================================
-// 🔥 MAIN — LAYOUT MODE (NEW CORE)
+// 🔥 MAIN — LAYOUT MODE (UPDATED INPUT)
 // =====================================
 
 export function parseDonationsFromLayout(
