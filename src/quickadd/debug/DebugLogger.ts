@@ -28,8 +28,19 @@ export type DebugScope =
   | "LAYOUT";
 
 /**
- * 🎨 Kolory ANSI
+ * 🔥 LOG LEVELS
  */
+type LogLevel = "INFO" | "WARN" | "ERROR";
+
+/**
+ * 🎨 ANSI COLORS
+ */
+const levelColors: Record<LogLevel, string> = {
+  INFO: "\x1b[37m",   // white
+  WARN: "\x1b[33m",   // yellow
+  ERROR: "\x1b[31m",  // red
+};
+
 const scopeColors: Record<DebugScope, string> = {
   OCR: "\x1b[36m",
   PIPELINE: "\x1b[35m",
@@ -51,12 +62,27 @@ const RESET = "\x1b[0m";
 
 /**
  * =====================================
- * 🔥 TRACE + SECTION TRACKING
+ * 🔥 TRACE + FLOW STATE
  * =====================================
  */
 
 let currentTraceId: string | null = null;
 let currentScope: DebugScope | null = null;
+let logCounter = 0;
+
+/**
+ * =====================================
+ * 🧱 HELPERS
+ * =====================================
+ */
+
+function formatObject(obj: any): string {
+  if (typeof obj !== "object" || obj === null) return String(obj);
+
+  return Object.entries(obj)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(" | ");
+}
 
 function printTraceHeader(traceId: string) {
   console.log(`\n══════════ TRACE ${traceId} ══════════`);
@@ -67,21 +93,24 @@ function printScopeSeparator(scope: DebugScope) {
   console.log(`${color}━━━━━━━━━━ ${scope} ━━━━━━━━━━${RESET}`);
 }
 
+function maybePrintSeparator() {
+  logCounter++;
+  if (logCounter % 6 === 0) {
+    console.log("------------------------------");
+  }
+}
+
 function handleGrouping(scope: DebugScope, traceId?: string) {
   if (!traceId) return;
 
-  // 🔁 TRACE change
-  if (currentTraceId && currentTraceId !== traceId) {
-    console.log(""); // spacing
-  }
-
+  // 🔁 new trace
   if (currentTraceId !== traceId) {
     printTraceHeader(traceId);
     currentTraceId = traceId;
-    currentScope = null; // reset scope on new trace
+    currentScope = null;
   }
 
-  // 🔁 Scope change
+  // 🔁 new scope
   if (currentScope !== scope) {
     printScopeSeparator(scope);
     currentScope = scope;
@@ -95,7 +124,7 @@ function handleGrouping(scope: DebugScope, traceId?: string) {
  */
 
 function logMessage(
-  level: "log" | "warn" | "error",
+  level: LogLevel,
   scope: DebugScope,
   tag: string,
   traceId?: string,
@@ -103,62 +132,4 @@ function logMessage(
 ) {
   if (!DEBUG_ENABLED) return;
 
-  const time = new Date().toISOString().split("T")[1].split(".")[0];
-
-  if (!PRETTY_LOGS) {
-    const prefix = traceId
-      ? `[QA:${scope}:${tag}:${traceId}:${time}]`
-      : `[QA:${scope}:${tag}:${time}]`;
-
-    console[level](prefix, ...args);
-    return;
-  }
-
-  // 🔥 GROUPING
-  handleGrouping(scope, traceId);
-
-  // =====================================
-  // 🎨 PRETTY HEADER
-  // =====================================
-  const color = scopeColors[scope] || "";
-  const header = `${color}${scope}${RESET}`;
-  const meta = traceId ? `${tag} #${traceId}` : tag;
-
-  console[level](`${header} ${meta} (${time})`);
-
-  // =====================================
-  // 📦 PAYLOAD
-  // =====================================
-  if (args.length > 0) {
-    for (const arg of args) {
-      console[level]("   ↳", arg);
-    }
-  }
-}
-
-/**
- * =====================================
- * 🧠 MAIN LOGGER FACTORY
- * =====================================
- */
-
-export function createLogger(scope: DebugScope) {
-  return Object.assign(
-    (tag: string, ...args: any[]) => {
-      logMessage("log", scope, tag, undefined, ...args);
-    },
-    {
-      trace: (tag: string, traceId: string, ...args: any[]) => {
-        logMessage("log", scope, tag, traceId, ...args);
-      },
-
-      warn: (tag: string, ...args: any[]) => {
-        logMessage("warn", scope, tag, undefined, ...args);
-      },
-
-      error: (tag: string, error: any, traceId?: string) => {
-        logMessage("error", scope, tag, traceId, error);
-      },
-    }
-  );
-}
+  const time =
