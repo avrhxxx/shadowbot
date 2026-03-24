@@ -11,54 +11,47 @@ const log = createLogger("LAYOUT");
 // 🧱 TYPES
 // =====================================
 
-export type LayoutEntry = {
-  nicknameRaw: string;
-  valueRaw: string;
+export type LayoutRow = {
+  left: OCRToken[];
+  right: OCRToken[];
+  raw: OCRToken[];
 };
 
 // =====================================
-// 🔹 MAIN PARSER (STAGE-BASED)
+// 🔹 MAIN BUILDER (NO PARSING)
 // =====================================
 
-export function extractLayoutEntries(
+export function buildLayout(
   tokens: OCRToken[],
   traceId: string
-): LayoutEntry[] {
+): LayoutRow[] {
   log.trace("layout_start", traceId, {
     tokens: tokens.length,
   });
 
   if (!tokens.length) return [];
 
-  // 🔹 1. FILTER TOKENS
   const filtered = filterTokens(tokens, traceId);
-
-  // 🔹 2. GROUP INTO ROWS
   const rows = groupIntoRows(filtered, traceId);
-
-  // 🔹 3. BUILD ROW STRUCTURE
   const structured = buildRowStructure(rows, traceId);
 
-  // 🔹 4. EXTRACT ENTRIES
-  const entries = extractEntries(structured, traceId);
-
   log.trace("layout_done", traceId, {
-    entries: entries.length,
+    rows: structured.length,
   });
 
-  return entries;
+  return structured;
 }
 
 // =====================================
-// 🔹 STAGE 1 — FILTER TOKENS
+// 🔹 STAGE 1 — FILTER TOKENS (ONLY TECHNICAL)
 // =====================================
 
 function filterTokens(tokens: OCRToken[], traceId: string): OCRToken[] {
   const filtered = tokens.filter(
     (t) =>
       t.text &&
-      t.text.trim().length >= 2 &&
-      t.confidence > 40
+      t.text.trim().length >= 1 && // 🔥 mniej agresywne
+      t.confidence > 20 // 🔥 NIE kasujemy danych!
   );
 
   log.trace("layout_filter_done", traceId, {
@@ -77,7 +70,7 @@ function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
   const sorted = [...tokens].sort((a, b) => a.y - b.y);
 
   const rows: OCRToken[][] = [];
-  const threshold = 12;
+  const threshold = 14; // 🔥 lekko zwiększone
 
   for (const token of sorted) {
     let placed = false;
@@ -101,17 +94,6 @@ function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
     rows: rows.length,
   });
 
-  log.trace("layout_rows_sample", traceId, {
-    sample: rows.slice(0, 5).map((r) =>
-      r.map((t) => ({
-        text: t.text,
-        x: t.x,
-        y: t.y,
-        conf: t.confidence,
-      }))
-    ),
-  });
-
   return rows;
 }
 
@@ -121,17 +103,14 @@ function averageY(row: OCRToken[]): number {
 }
 
 // =====================================
-// 🔹 STAGE 3 — ROW STRUCTURE
+// 🔹 STAGE 3 — BUILD STRUCTURE (COLUMNS)
 // =====================================
 
-type StructuredRow = {
-  left: OCRToken[];
-  right: OCRToken[];
-  raw: OCRToken[];
-};
-
-function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[] {
-  const result: StructuredRow[] = [];
+function buildRowStructure(
+  rows: OCRToken[][],
+  traceId: string
+): LayoutRow[] {
+  const result: LayoutRow[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -164,79 +143,4 @@ function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[]
   });
 
   return result;
-}
-
-// =====================================
-// 🔹 STAGE 4 — EXTRACT ENTRIES
-// =====================================
-
-function extractEntries(
-  rows: StructuredRow[],
-  traceId: string
-): LayoutEntry[] {
-  const entries: LayoutEntry[] = [];
-
-  for (const row of rows) {
-    let nickname = joinTokens(row.left);
-    let value = joinTokens(row.right);
-
-    if (!nickname || !value) continue;
-
-    // 🔥 SWAP if OCR mixed columns
-    if (!looksLikeNumber(value) && looksLikeNumber(nickname)) {
-      const tmp = nickname;
-      nickname = value;
-      value = tmp;
-    }
-
-    // 🔥 FILTER: remove sentences (UI text)
-    if (looksLikeSentence(nickname)) continue;
-
-    // 🔥 FILTER: remove known garbage
-    if (/donations|required|least/i.test(nickname)) continue;
-
-    // 🔥 FILTER: too short nickname
-    if (nickname.length < 3) continue;
-
-    // 🔥 VALID NUMBER CHECK
-    if (!looksLikeNumber(value)) continue;
-
-    entries.push({
-      nicknameRaw: nickname,
-      valueRaw: value,
-    });
-
-    log.trace("layout_entry_built", traceId, {
-      nicknameRaw: nickname,
-      valueRaw: value,
-      fullRow: row.raw.map((t) => t.text),
-    });
-  }
-
-  log.trace("layout_entries_built", traceId, {
-    count: entries.length,
-  });
-
-  return entries;
-}
-
-// =====================================
-// 🔧 HELPERS
-// =====================================
-
-function joinTokens(tokens: OCRToken[]): string {
-  return tokens
-    .sort((a, b) => a.x - b.x)
-    .map((t) => t.text)
-    .join(" ")
-    .trim();
-}
-
-function looksLikeNumber(text: string): boolean {
-  const clean = text.replace(/[^\d]/g, "");
-  return /^\d{3,}$/.test(clean);
-}
-
-function looksLikeSentence(text: string): boolean {
-  return text.split(" ").length >= 4;
 }
