@@ -78,14 +78,19 @@ export async function confirmCommand(
   if (session.stage === "COLLECTING") {
     if (invalidEntries.length > 0) {
       const preview = formatPreview(entries);
+      const invalidCount = invalidEntries.length;
 
       return interaction.editReply({
         content:
-`❌ **Cannot confirm — invalid entries detected**
+`❌ **${invalidCount} entr${invalidCount === 1 ? "y" : "ies"} must be fixed before confirm**
+
+❌ **Cannot confirm — all entries must be valid**
+
+Only entries with status ✅ OK are allowed.
 
 ${preview}
 
-👉 Fix entries using:
+👉 Fix all issues using:
 /q adjust`,
       });
     }
@@ -111,8 +116,13 @@ ${preview}
   // =============================
   if (session.stage === "CONFIRM_PENDING") {
     if (invalidEntries.length > 0) {
+      const invalidCount = invalidEntries.length;
+
       return interaction.editReply({
-        content: "❌ Data invalid — fix before confirming again",
+        content:
+`❌ **${invalidCount} entr${invalidCount === 1 ? "y" : "ies"} still invalid**
+
+Fix all issues before confirming again.`,
       });
     }
 
