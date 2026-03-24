@@ -7,4 +7,5 @@ export { startCommand } from "./start/start";
 export { endCommand } from "./end/end";
 export { adjustCommand } from "./adjust/adjust";
 export { confirmCommand } from "./confirm/confirm";
-export { cancelCommand } from "./cancel/cancel"; // ✅ NEW
+export { cancelCommand } from "./cancel/cancel";
+export { fixCommand } from "./fix/fix"; // ✅ NEW
