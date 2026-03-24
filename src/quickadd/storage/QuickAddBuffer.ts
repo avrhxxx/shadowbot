@@ -63,6 +63,23 @@ export const QuickAddBuffer = {
   },
 
   // =============================
+  // 🔁 SET ENTRIES (REPLACE 🔥)
+  // =============================
+  setEntries(
+    guildId: string,
+    entries: BufferedEntry[]
+  ) {
+    // 🔥 ensure immutability (no external mutations)
+    const cloned = entries.map((e) => ({ ...e }));
+
+    buffer.set(guildId, cloned);
+
+    // 🔥 keep ID counter consistent (max id + 1)
+    const maxId = cloned.reduce((max, e) => (e.id > max ? e.id : max), 0);
+    idCounters.set(guildId, maxId + 1);
+  },
+
+  // =============================
   // 📥 GET ENTRIES
   // =============================
   getEntries(guildId: string): BufferedEntry[] {
