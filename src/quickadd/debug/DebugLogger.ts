@@ -51,7 +51,7 @@ const RESET = "\x1b[0m";
 
 /**
  * =====================================
- * 🔥 TRACE GROUPING (NEW)
+ * 🔥 TRACE GROUPING (IMPROVED)
  * =====================================
  */
 
@@ -60,16 +60,35 @@ let currentTraceId: string | null = null;
 function handleTraceGrouping(traceId?: string) {
   if (!traceId) return;
 
-  // 🔁 zmiana trace → zamykamy poprzedni
   if (currentTraceId && currentTraceId !== traceId) {
     console.groupEnd();
+    console.log("\n"); // odstęp między trace
   }
 
-  // 🆕 nowy trace → otwieramy group
   if (currentTraceId !== traceId) {
+    console.log("======================================");
     console.group(`▼ TRACE ${traceId}`);
     currentTraceId = traceId;
   }
+}
+
+/**
+ * =====================================
+ * 🔹 HELPERS
+ * =====================================
+ */
+
+function isImportantTag(tag: string): boolean {
+  return (
+    tag.includes("start") ||
+    tag.includes("done") ||
+    tag.includes("error") ||
+    tag.includes("failed")
+  );
+}
+
+function printSeparator() {
+  console.log("--------------------------------------------------");
 }
 
 /**
@@ -89,11 +108,11 @@ function logMessage(
 
   const time = new Date().toISOString().split("T")[1].split(".")[0];
 
-  // 🔥 TRACE GROUPING
+  // TRACE GROUPING
   handleTraceGrouping(traceId);
 
   // =====================================
-  // 🧾 COMPACT MODE (fallback)
+  // COMPACT MODE
   // =====================================
   if (!PRETTY_LOGS) {
     const prefix = traceId
@@ -105,16 +124,27 @@ function logMessage(
   }
 
   // =====================================
-  // 🎨 PRETTY MODE
+  // PRETTY MODE
   // =====================================
   const color = scopeColors[scope] || "";
   const header = `${color}${scope}${RESET}`;
   const meta = traceId ? `${tag} #${traceId}` : tag;
 
+  // separator dla ważnych eventów
+  if (isImportantTag(tag)) {
+    printSeparator();
+  }
+
   console[level](`${header} ${meta} (${time})`);
 
   if (args.length > 0) {
-    console[level]("   ", ...args);
+    for (const arg of args) {
+      if (typeof arg === "object") {
+        console.dir(arg, { depth: null, colors: true });
+      } else {
+        console.log("   ", arg);
+      }
+    }
   }
 }
 
