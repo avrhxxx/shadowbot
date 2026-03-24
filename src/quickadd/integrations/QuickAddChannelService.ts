@@ -21,33 +21,50 @@ export async function ensureQuickAddChannel(
   });
 
   // =====================================
-  // 💬 EMBED MESSAGE (NEW)
+  // 💬 EMBED MESSAGE (UPDATED UX + FUTURE MULTI-SCREEN)
   // =====================================
   const embed = new EmbedBuilder()
     .setTitle("🧠 QuickAdd System")
     .setDescription(
-`Automated OCR system for fast point tracking.
+`Read player data from screenshots (nicknames + points) and turn it into clean, ready-to-use data — no manual typing needed.
 
 ━━━━━━━━━━━━━━━━━━
 
-🚀 **How to start**
-Use:
-/q start
+🚀 **How to use**
 
-Then choose a screenshot type and follow instructions in the thread.
+1. Use \`/q start\`  
+2. Choose what type of screenshot you're sending  
+3. Go to the created thread  
+4. Send your screenshots  
 
-━━━━━━━━━━━━━━━━━━
-
-📊 **Supported types**
-• Donations Points  
-• Duel Points  
-• Reservoir Signups  
-• Reservoir Results  
+👉 The system will automatically detect players and their data
 
 ━━━━━━━━━━━━━━━━━━
 
-💡 Tip:
-Each session runs in a private thread`
+📊 **What you can scan**
+
+• Donations rankings  
+• Duel points  
+• Reservoir signups  
+• Reservoir results  
+
+━━━━━━━━━━━━━━━━━━
+
+⚠️ **Review before confirm**
+
+You can review and edit everything before confirming.
+
+━━━━━━━━━━━━━━━━━━
+
+📸 **Screenshots**
+
+You can send multiple screenshots — data will be combined automatically.
+
+━━━━━━━━━━━━━━━━━━
+
+💡 **Tip**
+
+Each session runs in a private thread — just drop screenshots there and you're good to go`
     )
     .setColor(0x5865F2); // Discord blurple
 
