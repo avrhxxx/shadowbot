@@ -31,8 +31,8 @@ import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
 import { registerQuickAddListener } from "./quickadd/QuickAddListener";
 
-// 🔥 NEW — SELF HEALING SHEETS
-import { ensureAllSheets } from "./googleSheetsStorage";
+// 🔥 FIX — PATH
+import { ensureAllSheets } from "./google/googleSheetsStorage";
 
 // 🔥 NEW — QUEUE WORKER
 import { startQuickAddWorker } from "./quickadd/integrations/QuickAddQueueWorker";
@@ -78,10 +78,7 @@ client.once("clientReady", async () => {
   // 🔥 REGISTER SLASH COMMANDS
   // =============================
   try {
-    // 🔥 HARD RESET COMMANDS
     await client.application?.commands.set([]);
-
-    // 🔥 REGISTER NEW COMMANDS
     await client.application?.commands.set([
       qCommand.toJSON(),
     ]);
@@ -91,16 +88,11 @@ client.once("clientReady", async () => {
     console.error("❌ Slash command registration failed:", err);
   }
 
-  // -----------------------------
-  // Init modules
-  // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // 🔥 LISTENER
   registerQuickAddListener(client);
 
-  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     try {
       await ensureQuickAddChannel(guild);
@@ -119,9 +111,6 @@ client.once("clientReady", async () => {
     });
   }
 
-  // =============================
-  // 🔥 GLOBAL HANDLER
-  // =============================
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
