@@ -2,9 +2,15 @@
 // 📁 src/quickadd/debug/DebugLogger.ts
 // =====================================
 
+/**
+ * 🔥 GLOBAL DEBUG SWITCH
+ */
 const DEBUG_ENABLED = true;
-const PRETTY_LOGS = true; // 🔥 NEW
+const PRETTY_LOGS = true;
 
+/**
+ * 🔥 SCOPES – zgodne z architekturą
+ */
 export type DebugScope =
   | "OCR"
   | "PIPELINE"
@@ -21,11 +27,13 @@ export type DebugScope =
   | "QA_SERVICE"
   | "LAYOUT";
 
-// 🎨 kolory per scope (ANSI)
+/**
+ * 🎨 Kolory ANSI
+ */
 const scopeColors: Record<DebugScope, string> = {
-  OCR: "\x1b[36m",        // cyan
-  PIPELINE: "\x1b[35m",   // magenta
-  PARSER: "\x1b[33m",     // yellow
+  OCR: "\x1b[36m",
+  PIPELINE: "\x1b[35m",
+  PARSER: "\x1b[33m",
   DETECT: "\x1b[32m",
   MAPPING: "\x1b[34m",
   INTEGRATION: "\x1b[31m",
@@ -41,6 +49,35 @@ const scopeColors: Record<DebugScope, string> = {
 
 const RESET = "\x1b[0m";
 
+/**
+ * =====================================
+ * 🔥 TRACE GROUPING (NEW)
+ * =====================================
+ */
+
+let currentTraceId: string | null = null;
+
+function handleTraceGrouping(traceId?: string) {
+  if (!traceId) return;
+
+  // 🔁 zmiana trace → zamykamy poprzedni
+  if (currentTraceId && currentTraceId !== traceId) {
+    console.groupEnd();
+  }
+
+  // 🆕 nowy trace → otwieramy group
+  if (currentTraceId !== traceId) {
+    console.group(`▼ TRACE ${traceId}`);
+    currentTraceId = traceId;
+  }
+}
+
+/**
+ * =====================================
+ * 🔧 CORE LOGGER
+ * =====================================
+ */
+
 function logMessage(
   level: "log" | "warn" | "error",
   scope: DebugScope,
@@ -52,6 +89,12 @@ function logMessage(
 
   const time = new Date().toISOString().split("T")[1].split(".")[0];
 
+  // 🔥 TRACE GROUPING
+  handleTraceGrouping(traceId);
+
+  // =====================================
+  // 🧾 COMPACT MODE (fallback)
+  // =====================================
   if (!PRETTY_LOGS) {
     const prefix = traceId
       ? `[QA:${scope}:${tag}:${traceId}:${time}]`
@@ -62,23 +105,24 @@ function logMessage(
   }
 
   // =====================================
-  // 🔥 PRETTY MODE
+  // 🎨 PRETTY MODE
   // =====================================
-
   const color = scopeColors[scope] || "";
-  const idPart = traceId ? `#${traceId}` : "";
-
   const header = `${color}${scope}${RESET}`;
-  const meta = `${tag} ${idPart}`.trim();
+  const meta = traceId ? `${tag} #${traceId}` : tag;
 
-  console[level](
-    `${header} ${meta} ${RESET}(${time})`
-  );
+  console[level](`${header} ${meta} (${time})`);
 
   if (args.length > 0) {
     console[level]("   ", ...args);
   }
 }
+
+/**
+ * =====================================
+ * 🧠 MAIN LOGGER FACTORY
+ * =====================================
+ */
 
 export function createLogger(scope: DebugScope) {
   return Object.assign(
