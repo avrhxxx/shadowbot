@@ -22,7 +22,7 @@ import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { enqueuePoints } from "../../../storage/QuickAddService";
+import { enqueuePoints } from "../../../storage/QuickAddRepository"; // ✅ FIX
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
 import { createLogger } from "../../../debug/DebugLogger";
@@ -53,9 +53,9 @@ export async function handleConfirm(
   // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError) {
+  if (contextError || !session) { // ✅ FIX (safety)
     await interaction.reply({
-      content: contextError,
+      content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -97,7 +97,7 @@ export async function handleConfirm(
     // =====================================
     const payload = validEntries.map((e) => ({
       guildId,
-      category: session!.type,
+      category: session.type, // ✅ FIX (no !)
       week: "CURRENT", // 🔥 TODO: replace later
       nickname: e.nickname,
       points: e.value,
@@ -108,7 +108,7 @@ export async function handleConfirm(
     // =====================================
     await enqueuePoints(payload);
 
-    log("confirm_success", {
+    log.trace("confirm_success", {
       total: entries.length,
       valid: validEntries.length,
     });
