@@ -7,17 +7,11 @@ import { loadNicknameMap } from "./NicknameMapLoader";
 
 const log = createLogger("RESOLVER");
 
-// 🔥 LOCAL FALLBACK (awaryjny)
-const localFallbackMap: Record<string, string> = {
-  // przykłady:
-  // "lunax": "LunaxDragon",
-  // "lnx": "LunaxDragon",
-};
+const localFallbackMap: Record<string, string> = {};
 
-// 🔥 CACHE (kluczowy dla wydajności)
 let cachedMap: Record<string, string> | null = null;
 let lastLoad = 0;
-const CACHE_TTL = 60_000; // 60s
+const CACHE_TTL = 60_000;
 
 export async function resolveNickname(nick: string): Promise<string> {
   if (!nick) return "";
@@ -25,9 +19,6 @@ export async function resolveNickname(nick: string): Promise<string> {
   const cleaned = cleanNickname(nick);
 
   try {
-    // =====================================
-    // 🔥 CACHE LAYER
-    // =====================================
     if (!cachedMap || Date.now() - lastLoad > CACHE_TTL) {
       cachedMap = await loadNicknameMap();
       lastLoad = Date.now();
@@ -40,7 +31,7 @@ export async function resolveNickname(nick: string): Promise<string> {
     const sheetMap = cachedMap;
 
     // =====================================
-    // 🔥 1. GOOGLE SHEETS (priority)
+    // 🔥 1. GOOGLE SHEETS
     // =====================================
     const mappedFromSheet = sheetMap[cleaned];
     if (mappedFromSheet) {
@@ -61,7 +52,6 @@ export async function resolveNickname(nick: string): Promise<string> {
   // 🔥 2. LOCAL FALLBACK
   // =====================================
   const mappedLocal = localFallbackMap[cleaned];
-
   if (mappedLocal) {
     log("nickname_resolved_local", {
       input: nick,
@@ -80,7 +70,8 @@ export async function resolveNickname(nick: string): Promise<string> {
     cleaned,
   });
 
-  return cleaned;
+  // 👉 zamiast cleaned, lepiej zwrócić oryginał
+  return nick;
 }
 
 // =====================================
@@ -89,6 +80,6 @@ export async function resolveNickname(nick: string): Promise<string> {
 function cleanNickname(input: string): string {
   return input
     .toLowerCase()
-    .replace(/[^a-z0-9]/gi, "") // usuwa śmieci z OCR
+    .replace(/[^a-z0-9]/gi, "")
     .trim();
 }
