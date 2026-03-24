@@ -140,7 +140,6 @@ function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[]
 
     const sorted = [...row].sort((a, b) => a.x - b.x);
 
-    // 🔥 REAL COLUMN SPLIT (AVG X instead of midpoint index)
     const avgX =
       sorted.reduce((acc, t) => acc + t.x, 0) / sorted.length;
 
@@ -190,9 +189,16 @@ function extractEntries(
       value = tmp;
     }
 
-    // 🔥 FILTER garbage rows
-    if (/donations/i.test(nickname)) continue;
+    // 🔥 FILTER: remove sentences (UI text)
+    if (looksLikeSentence(nickname)) continue;
 
+    // 🔥 FILTER: remove known garbage
+    if (/donations|required|least/i.test(nickname)) continue;
+
+    // 🔥 FILTER: too short nickname
+    if (nickname.length < 3) continue;
+
+    // 🔥 VALID NUMBER CHECK
     if (!looksLikeNumber(value)) continue;
 
     entries.push({
@@ -227,5 +233,10 @@ function joinTokens(tokens: OCRToken[]): string {
 }
 
 function looksLikeNumber(text: string): boolean {
-  return /\d{2,}/.test(text);
+  const clean = text.replace(/[^\d]/g, "");
+  return /^\d{3,}$/.test(clean);
+}
+
+function looksLikeSentence(text: string): boolean {
+  return text.split(" ").length >= 4;
 }
