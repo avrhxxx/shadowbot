@@ -50,11 +50,28 @@ export async function processImageInput(
       try {
         log("parse_attempt", {
           source: source.source,
-          lines: source.lines.length,
+          lines: "lines" in source ? source.lines.length : undefined,
+          tokens: "tokens" in source ? source.tokens.length : undefined,
           traceId,
         });
 
-        const parsed = parseByType(session.type, source.lines, traceId);
+        let parsed: any[] = [];
+
+        // 🔹 STANDARD (LINES)
+        if ("lines" in source) {
+          parsed = parseByType(session.type, source.lines, traceId);
+        }
+
+        // 🔥 NEW — LAYOUT (TOKENS)
+        if ("tokens" in source) {
+          if (session.type === "DONATIONS_POINTS") {
+            const { parseDonationsFromLayout } = await import(
+              "../parsing/donations/DonationsParser"
+            );
+
+            parsed = parseDonationsFromLayout(source.tokens, traceId);
+          }
+        }
 
         log("parse_result", {
           source: source.source,
@@ -135,8 +152,6 @@ export async function processImageInput(
     }
 
     await setStatusReaction(message, "✅", traceId);
-
-    // ✅ NO AUTO DELETE — screenshots stay in thread
 
   } catch (err) {
     log.error("pipeline_error", err, traceId);
