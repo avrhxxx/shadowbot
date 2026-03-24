@@ -105,7 +105,7 @@ export async function saveLearning(rows: LearningRow[]) {
 
     await writeSheet(NICKNAME_TAB, newData);
 
-    log("learning_saved", {
+    log.trace("learning_saved", {
       count: rows.length,
     });
 
@@ -146,9 +146,9 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
       return;
     }
 
-    let updated = false;
-
     for (const entry of entries) {
+      let updated = false; // ✅ FIX — reset per entry
+
       const cleaned = clean(entry.ocr_raw);
 
       for (let i = 1; i < sheet.length; i++) {
@@ -160,7 +160,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
         if (clean(ocrRaw) === cleaned) {
           await updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted);
 
-          log("adjusted_updated", {
+          log.trace("adjusted_updated", {
             ocr: ocrRaw,
             adjusted: entry.adjusted,
           });
@@ -186,7 +186,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
 
         sheet.push(newRow);
 
-        log("adjusted_added", {
+        log.trace("adjusted_added", {
           ocr: entry.ocr_raw,
           adjusted: entry.adjusted,
         });
@@ -224,7 +224,7 @@ export async function enqueuePoints(entries: PointsQueueEntry[]) {
 
     await writeSheet(POINTS_QUEUE_TAB, newData);
 
-    log("points_enqueued", {
+    log.trace("points_enqueued", {
       count: rows.length,
     });
 
@@ -257,7 +257,7 @@ export async function enqueueEvents(entries: EventsQueueEntry[]) {
 
     await writeSheet(EVENTS_QUEUE_TAB, newData);
 
-    log("events_enqueued", {
+    log.trace("events_enqueued", {
       count: rows.length,
     });
 
@@ -275,7 +275,7 @@ export async function getLearningData(): Promise<any[][]> {
   try {
     const data = await readSheet(NICKNAME_TAB);
 
-    log("learning_loaded", {
+    log.trace("learning_loaded", {
       rows: data.length,
     });
 
