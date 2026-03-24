@@ -1,6 +1,7 @@
 // =====================================
 // 📁 src/quickadd/storage/QuickAddBuffer.ts
 // =====================================
+
 type ParsedEntry = {
   nickname: string;
   value: number;
@@ -10,6 +11,11 @@ type BufferedEntry = {
   id: number;
   nickname: string;
   value: number;
+
+  // 🔥 NEW — VALIDATION (optional, backward compatible)
+  status?: string;
+  confidence?: number;
+  suggestion?: string;
 };
 
 const buffer = new Map<string, BufferedEntry[]>();
@@ -21,7 +27,14 @@ export const QuickAddBuffer = {
   // =============================
   // ➕ ADD ENTRIES
   // =============================
-  addEntries(guildId: string, entries: ParsedEntry[]) {
+  addEntries(
+    guildId: string,
+    entries: (ParsedEntry & {
+      status?: string;
+      confidence?: number;
+      suggestion?: string;
+    })[]
+  ) {
     if (!buffer.has(guildId)) {
       buffer.set(guildId, []);
     }
@@ -38,6 +51,11 @@ export const QuickAddBuffer = {
         id: currentId++,
         nickname: entry.nickname,
         value: entry.value,
+
+        // 🔥 NEW (safe spread)
+        status: entry.status,
+        confidence: entry.confidence,
+        suggestion: entry.suggestion,
       });
     }
 
