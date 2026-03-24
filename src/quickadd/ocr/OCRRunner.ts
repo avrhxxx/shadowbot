@@ -31,8 +31,10 @@ async function runWithPSM(
   log.trace("run_psm_start", traceId, { psm, label });
 
   const result = await Tesseract.recognize(buffer, "eng", {
-    tessedit_pageseg_mode: String(psm),
     logger: () => {},
+    config: {
+      tessedit_pageseg_mode: String(psm), // ✅ FIX
+    },
   });
 
   const text = result.data.text || "";
@@ -91,8 +93,10 @@ export async function runHOCR(buffer: Buffer, traceId: string) {
   log.trace("run_hocr_start", traceId);
 
   const result = await Tesseract.recognize(buffer, "eng", {
-    tessedit_create_hocr: "1",
     logger: () => {},
+    config: {
+      tessedit_create_hocr: "1", // ✅ FIX
+    },
   });
 
   const hocr = result.data.hocr || "";
