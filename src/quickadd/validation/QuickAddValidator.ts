@@ -40,6 +40,8 @@ export async function validateEntries(
   entries: { nickname: string; value: number }[]
 ): Promise<ValidatedEntry[]> {
   const results: ValidatedEntry[] = [];
+
+  // 🔥 duplicate detection WITHOUT cleaning
   const seen = new Set<string>();
 
   let idCounter = 1;
@@ -51,64 +53,40 @@ export async function validateEntries(
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
-    // =====================================
+    // =============================
     // 🔢 VALUE VALIDATION
-    // =====================================
+    // =============================
     if (!entry.value || entry.value <= 0) {
       status = "INVALID_VALUE";
       confidence = 0;
     }
 
-    // =====================================
+    // =============================
     // 🧠 RESOLVE NICKNAME
-    // =====================================
+    // =============================
     let resolved = "";
-    let isMapped = false;
-
     try {
-      const result = await resolveNickname(entry.nickname);
-
-      if (result) {
-        const cleanedResult = clean(result);
-        const cleanedInput = clean(entry.nickname);
-
-        // 🔥 KEY: detect real mapping vs fallback
-        if (cleanedResult !== cleanedInput) {
-          resolved = result;
-          isMapped = true;
-        } else {
-          resolved = entry.nickname; // fallback
-        }
-      }
+      resolved = await resolveNickname(entry.nickname);
     } catch (err) {
       log.warn("resolve_failed", err);
     }
 
-    const cleanedInput = clean(entry.nickname);
-    const cleanedResolved = clean(resolved);
+    // =============================
+    // 🧠 SIMILARITY (SAFE COMPARISON)
+    // =============================
 
-    // =====================================
-    // 🧠 SIMILARITY (LEVENSHTEIN)
-    // =====================================
     let similarity = 0;
 
-    if (cleanedResolved) {
-      const distance = levenshtein(cleanedInput, cleanedResolved);
-      const maxLen = Math.max(cleanedInput.length, cleanedResolved.length);
-
-      similarity = maxLen > 0 ? 1 - distance / maxLen : 0;
+    if (resolved) {
+      similarity = stringSimilarity(entry.nickname, resolved);
     }
 
-    // =====================================
-    // 🧠 CONFIDENCE + STATUS (FIXED)
-    // =====================================
-    if (!resolved || !cleanedResolved) {
+    // =============================
+    // 🧠 CONFIDENCE + STATUS
+    // =============================
+    if (!resolved) {
       status = "UNRESOLVED";
       confidence = 0.3;
-    } else if (!isMapped) {
-      // 🔥 NO MAPPING = NEVER TRUST 100%
-      confidence = 0.4;
-      status = "LOW_CONFIDENCE";
     } else {
       confidence = similarity;
 
@@ -123,10 +101,10 @@ export async function validateEntries(
       }
     }
 
-    // =====================================
+    // =============================
     // 🔁 DUPLICATE DETECTION
-    // =====================================
-    const key = `${cleanedResolved || cleanedInput}:${entry.value}`;
+    // =============================
+    const key = `${entry.nickname}:${entry.value}`;
 
     if (seen.has(key)) {
       status = "DUPLICATE";
@@ -137,7 +115,7 @@ export async function validateEntries(
 
     const validated: ValidatedEntry = {
       id: idCounter++,
-      nickname: entry.nickname, // 🔥 NEVER mutate here
+      nickname: entry.nickname,
       value: entry.value,
       originalNickname,
       status,
@@ -151,6 +129,16 @@ export async function validateEntries(
   }
 
   return results;
+}
+
+// =====================================
+// 🔤 STRING SIMILARITY (SAFE)
+// =====================================
+function stringSimilarity(a: string, b: string): number {
+  const distance = levenshtein(a.toLowerCase(), b.toLowerCase());
+  const maxLen = Math.max(a.length, b.length);
+
+  return maxLen > 0 ? 1 - distance / maxLen : 0;
 }
 
 // =====================================
@@ -185,14 +173,4 @@ function levenshtein(a: string, b: string): number {
   }
 
   return matrix[bLen][aLen];
-}
-
-// =====================================
-// 🧼 CLEAN (ONLY FOR COMPARISON)
-// =====================================
-function clean(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]/gi, "")
-    .trim();
 }
