@@ -4,7 +4,7 @@
 
 import fetch from "node-fetch";
 import { preprocessBase, preprocessForTesseract } from "./OCRPreprocess";
-import { runFullImage, runLineBased } from "./OCRRunner";
+import { runFullImage, runLineBased, runBoxBased } from "./OCRRunner";
 import { createLogger } from "../debug/DebugLogger";
 import { OCRMultiResult } from "./OCRTypes";
 
@@ -36,31 +36,40 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
     const tesseractBuffer = await preprocessForTesseract(base);
 
     // =====================================
-    // 🔹 RUN MULTI OCR
+    // 🔹 RUN MULTI OCR (🔥 UPDATED)
     // =====================================
-    const results = await Promise.all([
+    const [full, line, box] = await Promise.all([
       runFullImage(tesseractBuffer, traceId),
       runLineBased(tesseractBuffer, traceId),
+      runBoxBased(tesseractBuffer, traceId),
     ]);
 
     const sources = [
       {
         source: "TESSERACT_FULL" as const,
-        text: results[0].text,
-        lines: results[0].lines,
+        text: full.text,
+        lines: full.lines,
       },
       {
         source: "TESSERACT_LINE" as const,
-        text: results[1].text,
-        lines: results[1].lines,
+        text: line.text,
+        lines: line.lines,
+      },
+      {
+        source: "TESSERACT_BOX" as const,
+        tokens: box.tokens,
       },
     ];
 
+    // =====================================
+    // 🔥 DEBUG (IMPORTANT)
+    // =====================================
     log.trace("ocr_multi_done", traceId, {
       sources: sources.map((s) => ({
         source: s.source,
-        lines: s.lines.length,
-        textLength: s.text.length,
+        lines: "lines" in s ? s.lines.length : undefined,
+        textLength: "text" in s ? s.text.length : undefined,
+        tokens: "tokens" in s ? s.tokens.length : undefined,
       })),
     });
 
