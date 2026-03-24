@@ -18,113 +18,91 @@ export function formatPreview(entries: ParsedEntry[]): string {
   }
 
   const maxNameLength = Math.max(...entries.map(e => e.nickname.length));
-  const maxValueLength = Math.max(
-    ...entries.map(e => formatNumber(e.value).length)
-  );
 
-  const formattedEntries = entries
+  // =====================================
+  // 🔹 MAIN LIST
+  // =====================================
+  const mainList = entries
     .map((entry) => {
       const id = entry.id;
-
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
-      const formattedValue = formatNumber(entry.value).padStart(maxValueLength, " ");
 
-      // =====================================
-      // 🔥 STATUS MAPPING
-      // =====================================
-      let statusIcon = "❔";
-      let confidenceText = "";
-
-      switch (entry.status) {
-        case "OK":
-          statusIcon = "✅";
-          break;
-
-        case "LOW_CONFIDENCE":
-        case "DUPLICATE":
-          statusIcon = "⚠️";
-          break;
-
-        case "UNRESOLVED":
-        case "INVALID_VALUE":
-          statusIcon = "❌";
-          break;
-      }
-
-      // =====================================
-      // 🔢 CONFIDENCE
-      // =====================================
-      if (entry.confidence !== undefined) {
-        const percent = Math.round(entry.confidence * 100);
-        confidenceText = ` (${percent}%)`;
-      }
-
-      // =====================================
-      // 🧾 MAIN LINE (WITH ALIGN + MIDDLE DOT)
-      // =====================================
-      let line = `[${id}] ${paddedName} → ${formattedValue} · ${statusIcon}${confidenceText}`;
-
-      // =====================================
-      // 💡 SUGGESTION (NEW CLEAN FORMAT)
-      // =====================================
-      if (entry.suggestion && entry.suggestion !== entry.nickname) {
-        line += `\n   ↳ suggestion: ${entry.suggestion}`;
-      }
-
-      return line;
+      return `[${id}] ${paddedName} → ${formatNumber(entry.value)}`;
     })
     .join("\n");
 
-  const hasBlockingIssues = entries.some(
-    e =>
-      e.status === "UNRESOLVED" ||
-      e.status === "INVALID_VALUE"
-  );
+  // =====================================
+  // 🔹 ACCURACY SECTION
+  // =====================================
+  const accuracyList = entries
+    .map((entry) => {
+      if (entry.confidence === undefined) return null;
 
-  const hasWarnings = entries.some(
-    e =>
-      e.status === "LOW_CONFIDENCE" ||
-      e.status === "DUPLICATE"
-  );
+      const percent = Math.round(entry.confidence * 100);
 
-  return `
-📊 **QuickAdd Preview**
-Entries: ${entries.length}
+      let icon = "❔";
+      if (percent >= 90) icon = "✅";
+      else icon = "⚠️";
 
-${formattedEntries}
+      return `[${entry.id}] ${icon} ${percent}%`;
+    })
+    .filter(Boolean)
+    .join("\n");
 
-━━━━━━━━━━━━━━━━━━
+  // =====================================
+  // 🔹 SUGGESTIONS
+  // =====================================
+  const suggestions = entries
+    .filter(
+      (e) =>
+        e.suggestion &&
+        e.suggestion !== e.nickname
+    )
+    .map((e) => `[${e.id}] → ${e.suggestion}`)
+    .join("\n");
 
-📘 **Legend**
-✅ OK — ready  
-⚠️ Needs review  
-❌ Must fix  
+  // =====================================
+  // 🔹 BUILD FINAL OUTPUT
+  // =====================================
+  let output = `
+📊 QuickAdd Preview
 
-━━━━━━━━━━━━━━━━━━
-
-${
-  hasBlockingIssues
-    ? "❌ **Fix errors before confirming**\n\n"
-    : hasWarnings
-    ? "⚠️ **Some entries may need review**\n\n"
-    : "✅ **All entries ready — you can confirm**\n\n"
-}
-
-✏️ **Adjust entry**
-
-Use:
-• id = entry number  
-• field = nickname | value  
-• value = new value  
-
-Command:
-→ /q adjust id:<id> field:<field> value:<value>
+${mainList}
 
 ━━━━━━━━━━━━━━━━━━
-
-🚀 **Next step**
-→ /q confirm
 `.trim();
+
+  if (accuracyList) {
+    output += `
+
+📊 Nickname accuracy
+
+${accuracyList}
+
+━━━━━━━━━━━━━━━━━━`;
+  }
+
+  if (suggestions) {
+    output += `
+
+💡 Suggested fixes
+
+${suggestions}
+
+━━━━━━━━━━━━━━━━━━`;
+  }
+
+  output += `
+
+📘 Legend
+
+✅ Correct entries  
+⚠️ Needs review  
+
+━━━━━━━━━━━━━━━━━━
+`;
+
+  return output.trim();
 }
 
 function formatNumber(value: number): string {
