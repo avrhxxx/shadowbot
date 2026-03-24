@@ -7,7 +7,7 @@ import {
   appendQuickAddAdjusted,
   readSheet,
   updateCell,
-} from "../../googleSheetsStorage";
+} from "../../google/googleSheetsStorage"; // ✅ FIX
 
 import { createLogger } from "../debug/DebugLogger";
 
@@ -123,7 +123,7 @@ async function appendToQueue(values: any[][]) {
 
   const newData = [...existing, ...values];
 
-  const { writeSheet } = await import("../../googleSheetsStorage");
+  const { writeSheet } = await import("../../google/googleSheetsStorage"); // ✅ FIX
 
   await writeSheet(tab, newData);
 }
