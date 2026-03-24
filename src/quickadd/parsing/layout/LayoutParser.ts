@@ -17,20 +17,7 @@ export type LayoutEntry = {
 };
 
 // =====================================
-// 🔹 CONFIG (TUNING POINT)
-// =====================================
-
-const ROW_Y_THRESHOLD = 12;          // grupowanie wierszy
-const MIN_CONFIDENCE = 40;           // filtr OCR śmieci
-
-// kolumny (dopasowane do UI — można później zrobić dynamiczne)
-const NICKNAME_MIN_X = 120;
-const NICKNAME_MAX_X = 700;
-
-const VALUE_MIN_X = 700;
-
-// =====================================
-// 🔹 MAIN PARSER
+// 🔹 MAIN PARSER (PIPELINE VERSION)
 // =====================================
 
 export function extractLayoutEntries(
@@ -43,56 +30,17 @@ export function extractLayoutEntries(
 
   if (!tokens.length) return [];
 
-  // =====================================
-  // 🔹 STEP 0: FILTER BAD TOKENS
-  // =====================================
+  const rows = groupIntoRows(tokens);
+  log.trace("layout_rows_grouped", traceId, { rows: rows.length });
 
-  const filtered = tokens.filter(
-    (t) =>
-      t.text &&
-      t.text.trim().length > 0 &&
-      t.confidence >= MIN_CONFIDENCE
-  );
-
-  // =====================================
-  // 🔹 STEP 1: GROUP INTO ROWS
-  // =====================================
-
-  const rows = groupIntoRows(filtered);
-
-  log.trace("layout_rows_grouped", traceId, {
-    rows: rows.length,
+  const mergedRows = rows.map(mergeRowTokens);
+  log.trace("layout_rows_merged", traceId, {
+    rows: mergedRows.length,
   });
 
-  // =====================================
-  // 🔹 STEP 2: BUILD ENTRIES
-  // =====================================
-
-  const entries: LayoutEntry[] = [];
-
-  for (const row of rows) {
-    if (row.length < 2) continue;
-
-    const nicknameTokens = row.filter(
-      (t) => t.x >= NICKNAME_MIN_X && t.x <= NICKNAME_MAX_X
-    );
-
-    const valueTokens = row.filter(
-      (t) => t.x >= VALUE_MIN_X
-    );
-
-    if (!nicknameTokens.length || !valueTokens.length) continue;
-
-    const nicknameRaw = joinTokens(nicknameTokens);
-    const valueRaw = joinTokens(valueTokens);
-
-    if (!isValidValue(valueRaw)) continue;
-
-    entries.push({
-      nicknameRaw,
-      valueRaw,
-    });
-  }
+  const entries = mergedRows
+    .map(splitRowToEntry)
+    .filter((e): e is LayoutEntry => e !== null);
 
   log.trace("layout_entries_built", traceId, {
     count: entries.length,
@@ -106,13 +54,13 @@ export function extractLayoutEntries(
 }
 
 // =====================================
-// 🔹 GROUPING LOGIC (IMPROVED)
+// 🔹 STEP 1 — GROUP ROWS
 // =====================================
 
 function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
   const sorted = [...tokens].sort((a, b) => a.y - b.y);
-
   const rows: OCRToken[][] = [];
+  const threshold = 12;
 
   for (const token of sorted) {
     let placed = false;
@@ -120,7 +68,7 @@ function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
     for (const row of rows) {
       const avgY = averageY(row);
 
-      if (Math.abs(token.y - avgY) <= ROW_Y_THRESHOLD) {
+      if (Math.abs(token.y - avgY) < threshold) {
         row.push(token);
         placed = true;
         break;
@@ -140,28 +88,43 @@ function averageY(row: OCRToken[]): number {
 }
 
 // =====================================
-// 🔹 TOKEN JOINING
+// 🔹 STEP 2 — MERGE TOKENS IN ROW
 // =====================================
 
-function joinTokens(tokens: OCRToken[]): string {
-  return tokens
-    .sort((a, b) => a.x - b.x)
-    .map((t) => t.text)
-    .join("")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+function mergeRowTokens(row: OCRToken[]): string {
+  const sorted = [...row].sort((a, b) => a.x - b.x);
+
+  const parts = sorted
+    .filter((t) => t.confidence > 40) // 🔥 filtr śmieci
+    .map((t) => t.text.trim())
+    .filter((t) => t.length > 0);
+
+  return parts.join(" ");
 }
 
 // =====================================
-// 🔹 VALUE VALIDATION
+// 🔹 STEP 3 — SPLIT INTO ENTRY
 // =====================================
 
-function isValidValue(value: string): boolean {
-  // musi zawierać cyfry
-  if (!/\d{2,}/.test(value)) return false;
+function splitRowToEntry(rowText: string): LayoutEntry | null {
+  if (!rowText) return null;
 
-  // nie może być śmieciem typu "|", "-"
-  if (value.length < 3) return false;
+  // 🔥 szukamy liczby na końcu
+  const match = rowText.match(/(.+?)\s+([\d\s,]+)$/);
 
-  return true;
+  if (!match) return null;
+
+  const nicknameRaw = match[1].trim();
+  const valueRaw = match[2].trim();
+
+  if (!nicknameRaw || !valueRaw) return null;
+
+  // 🔥 szybka walidacja
+  if (!/[a-zA-Z]/.test(nicknameRaw)) return null;
+  if (!/\d/.test(valueRaw)) return null;
+
+  return {
+    nicknameRaw,
+    valueRaw,
+  };
 }
