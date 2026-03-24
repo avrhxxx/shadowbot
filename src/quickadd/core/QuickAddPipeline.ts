@@ -25,16 +25,8 @@ async function setStatusReaction(message: Message, emoji: string, traceId?: stri
   }
 }
 
-function scheduleSafeDelete(message: Message, traceId: string, delay = 15000) {
-  setTimeout(async () => {
-    try {
-      if (!message.deletable) return;
-      await message.delete();
-    } catch (err) {
-      log.warn("message_delete_failed", err);
-    }
-  }, delay);
-}
+// ❌ REMOVED AUTO DELETE (screenshots should persist in thread)
+// function scheduleSafeDelete(...) { ... }
 
 export async function processImageInput(
   message: Message,
@@ -108,9 +100,7 @@ export async function processImageInput(
 
     await setStatusReaction(message, "✅", traceId);
 
-    if (parsed.length > 0) {
-      scheduleSafeDelete(message, traceId);
-    }
+    // ✅ NO AUTO DELETE — screenshots stay in thread
 
   } catch (err) {
     log.error("pipeline_error", err, traceId);
