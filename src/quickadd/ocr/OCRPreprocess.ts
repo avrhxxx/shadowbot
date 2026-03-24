@@ -15,7 +15,8 @@ export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
       .grayscale()
       .normalize()
       .sharpen()
-      .resize({ width: 1500 })
+      // 🔥 FIX — preserve proportions, avoid distortion
+      .resize({ width: 1500, withoutEnlargement: true })
       .toBuffer();
 
     log("preprocess_done");
