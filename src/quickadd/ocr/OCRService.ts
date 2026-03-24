@@ -9,6 +9,10 @@ import { OCRMultiResult, OCRSourceResult } from "./OCRTypes";
 
 const log = createLogger("OCR");
 
+// 🔥 FEATURE FLAGS
+const USE_PREPROCESS = false; // toggle ON later
+const ENABLE_HOCR = true;
+
 export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMultiResult> {
   log.trace("ocr_start", traceId, imageUrl);
 
@@ -24,16 +28,43 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
 
     log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    // 🔥 WYŁĄCZONY PREPROCESS (TEST RAW OCR)
-    const tesseractBuffer = buffer;
+    // =====================================
+    // 🔹 BUFFER SELECTION
+    // =====================================
+    let tesseractBuffer = buffer;
 
-    const [full, line, box, hocr] = await Promise.all([
+    if (USE_PREPROCESS) {
+      // lazy import → nie psujemy flow gdy wyłączone
+      const { preprocessBase, preprocessForTesseract } = await import("./OCRPreprocess");
+
+      const base = await preprocessBase(buffer);
+      tesseractBuffer = await preprocessForTesseract(base);
+
+      log.trace("preprocess_enabled", traceId);
+    } else {
+      log.trace("preprocess_disabled", traceId);
+    }
+
+    // =====================================
+    // 🔹 OCR RUNS
+    // =====================================
+    const tasks: Promise<any>[] = [
       runFullImage(tesseractBuffer, traceId),
       runLineBased(tesseractBuffer, traceId),
       runBoxBased(tesseractBuffer, traceId),
-      runHOCR(tesseractBuffer, traceId),
-    ]);
+    ];
 
+    if (ENABLE_HOCR) {
+      tasks.push(runHOCR(tesseractBuffer, traceId));
+    }
+
+    const results = await Promise.all(tasks);
+
+    const [full, line, box, hocr] = results;
+
+    // =====================================
+    // 🔹 SOURCES BUILD
+    // =====================================
     const sources: OCRSourceResult[] = [
       {
         source: "TESSERACT_FULL",
@@ -49,13 +80,19 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
         source: "TESSERACT_BOX",
         tokens: box.tokens,
       },
-      {
-        source: "TESSERACT_HOCR" as any,
-        text: hocr.hocr,
-        lines: [],
-      },
     ];
 
+    if (ENABLE_HOCR && hocr) {
+      sources.push({
+        source: "TESSERACT_HOCR" as any, // 🔥 tym zajmiemy się w OCRTypes później
+        text: hocr.hocr,
+        lines: [],
+      });
+    }
+
+    // =====================================
+    // 🔥 DEBUG SUMMARY
+    // =====================================
     log.trace(
       "ocr_multi_done",
       traceId,
