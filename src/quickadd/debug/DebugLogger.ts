@@ -19,7 +19,11 @@ export type DebugScope =
   | "INTEGRATION"
   | "SESSION"
   | "LISTENER"
-  | "COMMAND";
+  | "COMMAND"
+  | "MAP_LOADER"   // ✅ NEW
+  | "RESOLVER"     // ✅ NEW
+  | "VALIDATION"   // ✅ NEW
+  | "QA_SERVICE";  // ✅ NEW
 
 /**
  * =====================================
@@ -49,15 +53,10 @@ function logMessage(
  * =====================================
  * 🧠 MAIN LOGGER FACTORY
  * =====================================
- *
- * 🔥 UŻYCIE:
- * const log = createLogger("COMMAND");
- * log("INIT", "something");
  */
 
 export function createLogger(scope: DebugScope) {
   return Object.assign(
-    // 🔥 DEFAULT = log()
     (tag: string, ...args: any[]) => {
       logMessage("log", scope, tag, undefined, ...args);
     },
