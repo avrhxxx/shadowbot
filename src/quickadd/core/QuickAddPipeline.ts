@@ -25,9 +25,6 @@ async function setStatusReaction(message: Message, emoji: string, traceId?: stri
   }
 }
 
-// ❌ REMOVED AUTO DELETE (screenshots should persist in thread)
-// function scheduleSafeDelete(...) { ... }
-
 export async function processImageInput(
   message: Message,
   session: any,
@@ -43,8 +40,47 @@ export async function processImageInput(
 
     const ocrResult = await runOCR(imageUrl, traceId);
 
-    // 🔥 PARSE
-    const parsed = parseByType(session.type, ocrResult.lines, traceId);
+    // =====================================
+    // 🔥 MULTI SOURCE PARSING
+    // =====================================
+    let bestParsed: any[] = [];
+    let bestSource = "none";
+
+    for (const source of ocrResult.sources) {
+      try {
+        log("parse_attempt", {
+          source: source.source,
+          lines: source.lines.length,
+          traceId,
+        });
+
+        const parsed = parseByType(session.type, source.lines, traceId);
+
+        log("parse_result", {
+          source: source.source,
+          parsed: parsed.length,
+          traceId,
+        });
+
+        if (parsed.length > bestParsed.length) {
+          bestParsed = parsed;
+          bestSource = source.source;
+        }
+      } catch (err) {
+        log.warn("parse_failed_for_source", {
+          source: source.source,
+          err,
+        });
+      }
+    }
+
+    log("parse_best_selected", {
+      source: bestSource,
+      count: bestParsed.length,
+      traceId,
+    });
+
+    const parsed = bestParsed;
 
     // =====================================
     // 🔥 VALIDATION LAYER
