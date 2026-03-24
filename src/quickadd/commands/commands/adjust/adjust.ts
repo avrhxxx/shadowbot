@@ -60,6 +60,8 @@ export async function adjustCommand(
     case "nickname":
       oldValueDisplay = entry.nickname;
 
+      const original = entry.nickname; // 🔥 ważne — BEFORE change
+
       // 🔥 RESOLVE
       const resolved = await resolveNickname(newValue);
 
@@ -73,17 +75,15 @@ export async function adjustCommand(
       });
 
       // =====================================
-      // 🔥 SAVE ONLY NICKNAME (LEARNING) — FIXED
+      // 🔥 SAVE LEARNING (OCR → ADJUSTED)
       // =====================================
       try {
-        if (session?.type) {
-          await saveAdjusted([
-            {
-              type: session.type,
-              nickname: resolved,
-            },
-          ]);
-        }
+        await saveAdjusted([
+          {
+            ocr_raw: original,     // 🔥 co było wcześniej
+            adjusted: resolved,    // 🔥 poprawiona wartość
+          },
+        ]);
       } catch (err) {
         log.warn("adjust_save_failed", err);
       }
