@@ -16,7 +16,8 @@ const log = createLogger("QA_SERVICE");
 // 📌 CONFIG
 // =====================================
 const NICKNAME_TAB = "quickadd_nicknames";
-const QUEUE_TAB = "quickadd_points_queue";
+const POINTS_QUEUE_TAB = "quickadd_points_queue";
+const EVENTS_QUEUE_TAB = "quickadd_events_queue";
 
 // =====================================
 // TYPES (UPDATED)
@@ -33,11 +34,19 @@ type AdjustedEntry = {
   adjusted: string;
 };
 
-type QueueEntry = {
+type PointsQueueEntry = {
   guildId: string;
+  category: string;
+  week: string;
+  nickname: string;
+  points: number;
+};
+
+type EventsQueueEntry = {
+  guildId: string;
+  eventId: string;
   type: string;
   nickname: string;
-  value: number;
 };
 
 // =====================================
@@ -117,32 +126,64 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
 }
 
 // =====================================
-// 📥 QUEUE (CONFIRM → SHEETS)
+// 📥 QUEUE — POINTS
 // =====================================
-export async function enqueue(entries: QueueEntry[]) {
+export async function enqueuePoints(entries: PointsQueueEntry[]) {
   if (!entries.length) return;
 
   try {
-    const existing = await readSheet(QUEUE_TAB);
+    const existing = await readSheet(POINTS_QUEUE_TAB);
 
     const rows = entries.map((e) => [
       e.guildId,
-      e.type,
+      e.category,
+      e.week,
       e.nickname,
-      e.value,
+      e.points,
       "PENDING",
       Date.now(),
     ]);
 
     const newData = [...existing, ...rows];
 
-    await writeSheet(QUEUE_TAB, newData);
+    await writeSheet(POINTS_QUEUE_TAB, newData);
 
-    log("queue_saved", {
+    log("points_queue_saved", {
       count: rows.length,
     });
   } catch (err) {
-    log.error("queue_failed", err);
+    log.error("points_queue_failed", err);
+    throw err;
+  }
+}
+
+// =====================================
+// 📥 QUEUE — EVENTS
+// =====================================
+export async function enqueueEvents(entries: EventsQueueEntry[]) {
+  if (!entries.length) return;
+
+  try {
+    const existing = await readSheet(EVENTS_QUEUE_TAB);
+
+    const rows = entries.map((e) => [
+      e.guildId,
+      e.eventId,
+      e.type,
+      e.nickname,
+      "PENDING",
+      Date.now(),
+    ]);
+
+    const newData = [...existing, ...rows];
+
+    await writeSheet(EVENTS_QUEUE_TAB, newData);
+
+    log("events_queue_saved", {
+      count: rows.length,
+    });
+  } catch (err) {
+    log.error("events_queue_failed", err);
     throw err;
   }
 }
