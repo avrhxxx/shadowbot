@@ -206,6 +206,7 @@ export async function finalizeEvent(
     status: "ACTIVE",
     participants: [],
     absent: [],
+    results: [], // ✅ FIX
     createdAt: Date.now(),
     reminderSent: false,
     started: false,
