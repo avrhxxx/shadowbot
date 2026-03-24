@@ -8,32 +8,30 @@ export type OCRSourceType =
   | "TESSERACT_FULL"
   | "TESSERACT_LINE"
   | "TESSERACT_BOX"
+  | "TESSERACT_HOCR"
   | "OCRSPACE_FULL"
   | "OCRSPACE_LINE";
 
-// 🔹 BASE (dla text OCR)
 export interface OCRTextSourceResult {
   source:
     | "TESSERACT_FULL"
     | "TESSERACT_LINE"
     | "OCRSPACE_FULL"
-    | "OCRSPACE_LINE";
+    | "OCRSPACE_LINE"
+    | "TESSERACT_HOCR";
   text: string;
   lines: string[];
 }
 
-// 🔹 BOX (layout OCR)
 export interface OCRBoxSourceResult {
   source: "TESSERACT_BOX";
   tokens: OCRToken[];
 }
 
-// 🔹 UNION
 export type OCRSourceResult =
   | OCRTextSourceResult
   | OCRBoxSourceResult;
 
-// 🔹 FINAL
 export interface OCRMultiResult {
   sources: OCRSourceResult[];
 }
