@@ -35,7 +35,7 @@ export function parseDonations(
 }
 
 // =====================================
-// 🔥 MAIN — LAYOUT MODE (UPDATED INPUT)
+// 🔥 MAIN — LAYOUT MODE (CELLS BASED)
 // =====================================
 
 export function parseDonationsFromLayout(
@@ -49,10 +49,33 @@ export function parseDonationsFromLayout(
   const extracted: { nickname: string; valueRaw: string }[] = [];
 
   for (const row of layout) {
-    const nickname = joinTokens(row.left);
-    const valueRaw = joinTokens(row.right);
+    const cellTexts = row.cells.map((c) => c.text).filter(Boolean);
 
-    if (!nickname || !valueRaw) continue;
+    if (!cellTexts.length) continue;
+
+    // =====================================
+    // 🔍 FIND VALUE CELL (last numeric-like)
+    // =====================================
+    let valueRaw = "";
+    let valueIndex = -1;
+
+    for (let i = cellTexts.length - 1; i >= 0; i--) {
+      if (looksLikeNumber(cellTexts[i])) {
+        valueRaw = cellTexts[i];
+        valueIndex = i;
+        break;
+      }
+    }
+
+    if (!valueRaw) continue;
+
+    // =====================================
+    // 🔍 BUILD NICKNAME (everything except value)
+    // =====================================
+    const nicknameParts = cellTexts.filter((_, idx) => idx !== valueIndex);
+    const nickname = nicknameParts.join(" ").trim();
+
+    if (!nickname) continue;
 
     extracted.push({
       nickname,
@@ -60,9 +83,9 @@ export function parseDonationsFromLayout(
     });
 
     log.trace("layout_row_used", traceId, {
+      cells: cellTexts,
       nickname,
       valueRaw,
-      raw: row.raw.map((t) => t.text),
     });
   }
 
@@ -200,12 +223,8 @@ function finalizeEntries(
 // 🔧 HELPERS
 // =====================================
 
-function joinTokens(tokens: any[]): string {
-  return tokens
-    .sort((a, b) => a.x - b.x)
-    .map((t) => t.text)
-    .join(" ")
-    .trim();
+function looksLikeNumber(text: string): boolean {
+  return /[\d]/.test(text) && /[\d,.\s]/.test(text);
 }
 
 function parseNumber(raw: string): number {
