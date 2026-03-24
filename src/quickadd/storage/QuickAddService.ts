@@ -29,9 +29,11 @@ type LearningRow = {
   parser_output: string;
 };
 
+// 🔥 FIX — type opcjonalny (kompatybilność z adjust.ts)
 type AdjustedEntry = {
   ocr_raw: string;
   adjusted: string;
+  type?: string;
 };
 
 type PointsQueueEntry = {
@@ -56,15 +58,27 @@ export async function saveLearning(rows: LearningRow[]) {
   if (!rows.length) return;
 
   try {
-    const existing = await readSheet(NICKNAME_TAB);
+    let existing = await readSheet(NICKNAME_TAB);
+
+    if (!existing || existing.length === 0) {
+      existing = [[
+        "type",
+        "ocr_raw",
+        "layout_text",
+        "parser_output",
+        "adjusted",
+        "override",
+        "createdAt",
+      ]];
+    }
 
     const values = rows.map((r) => [
       r.type,
       r.ocr_raw,
       r.layout_text,
       r.parser_output,
-      "", // adjusted
-      "", // override
+      "",
+      "",
       Date.now(),
     ]);
 
