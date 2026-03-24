@@ -6,6 +6,11 @@ type ParsedEntry = {
   nickname: string;
   value: number;
   id: number;
+
+  // 🔥 NEW (optional)
+  status?: string;
+  confidence?: number;
+  suggestion?: string;
 };
 
 export function formatPreview(entries: ParsedEntry[]): string {
@@ -21,9 +26,24 @@ export function formatPreview(entries: ParsedEntry[]): string {
 
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
 
-      return `[${id}] ${paddedName} → ${formatNumber(entry.value)}`;
+      // 🔥 STATUS ICON
+      let statusIcon = "";
+      if (entry.status === "ERROR") statusIcon = "❌";
+      else if (entry.status === "WARNING") statusIcon = "⚠️";
+      else if (entry.status === "OK") statusIcon = "✅";
+
+      let line = `[${id}] ${paddedName} → ${formatNumber(entry.value)} ${statusIcon}`;
+
+      // 🔥 SUGGESTION
+      if (entry.suggestion && entry.suggestion !== entry.nickname) {
+        line += `\n   💡 suggestion: ${entry.suggestion}`;
+      }
+
+      return line;
     })
     .join("\n");
+
+  const hasIssues = entries.some(e => e.status && e.status !== "OK");
 
   return `
 📊 **QuickAdd Preview**
@@ -33,7 +53,7 @@ ${formattedEntries}
 
 ━━━━━━━━━━━━━━━━━━
 
-✏️ **Adjust entry**
+${hasIssues ? "⚠️ **Some entries require attention before confirm**\n\n" : ""}✏️ **Adjust entry**
 
 Use:
 • id = entry number  
