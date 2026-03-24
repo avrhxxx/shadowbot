@@ -8,6 +8,7 @@ import {
   endCommand,
   adjustCommand,
 } from "./commands";
+import { confirmCommand } from "./confirm/confirm";
 import { ChatInputCommandInteraction } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 
@@ -23,6 +24,7 @@ export const CommandRegistry: Record<string, CommandHandler> = {
   end: endCommand,
   preview: previewCommand,
   adjust: adjustCommand,
+  confirm: confirmCommand, // ✅ ADDED
 };
 
 log("registry_init", Object.keys(CommandRegistry));
