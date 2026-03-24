@@ -11,14 +11,19 @@ const log = createLogger("LAYOUT");
 // 🧱 TYPES
 // =====================================
 
+export type NormalizedToken = OCRToken & {
+  nx: number;
+  ny: number;
+};
+
 export type LayoutRow = {
-  left: OCRToken[];
-  right: OCRToken[];
-  raw: OCRToken[];
+  left: NormalizedToken[];
+  right: NormalizedToken[];
+  raw: NormalizedToken[];
 };
 
 // =====================================
-// 🔹 MAIN BUILDER (NO PARSING)
+// 🔹 MAIN BUILDER (PURE LAYOUT)
 // =====================================
 
 export function buildLayout(
@@ -31,8 +36,16 @@ export function buildLayout(
 
   if (!tokens.length) return [];
 
-  const filtered = filterTokens(tokens, traceId);
+  // 🔹 0. NORMALIZE
+  const normalized = normalizeTokens(tokens, traceId);
+
+  // 🔹 1. FILTER (minimal)
+  const filtered = filterTokens(normalized, traceId);
+
+  // 🔹 2. GROUP ROWS
   const rows = groupIntoRows(filtered, traceId);
+
+  // 🔹 3. BUILD STRUCTURE
   const structured = buildRowStructure(rows, traceId);
 
   log.trace("layout_done", traceId, {
@@ -43,15 +56,36 @@ export function buildLayout(
 }
 
 // =====================================
-// 🔹 STAGE 1 — FILTER TOKENS (ONLY TECHNICAL)
+// 🔹 NORMALIZATION (CRITICAL)
 // =====================================
 
-function filterTokens(tokens: OCRToken[], traceId: string): OCRToken[] {
+function normalizeTokens(tokens: OCRToken[], traceId: string): NormalizedToken[] {
+  const maxX = Math.max(...tokens.map((t) => t.x + t.width));
+  const maxY = Math.max(...tokens.map((t) => t.y + t.height));
+
+  const normalized = tokens.map((t) => ({
+    ...t,
+    nx: maxX ? t.x / maxX : 0,
+    ny: maxY ? t.y / maxY : 0,
+  }));
+
+  log.trace("layout_normalized", traceId, {
+    count: normalized.length,
+  });
+
+  return normalized;
+}
+
+// =====================================
+// 🔹 FILTER (KEEP DATA)
+// =====================================
+
+function filterTokens(tokens: NormalizedToken[], traceId: string): NormalizedToken[] {
   const filtered = tokens.filter(
     (t) =>
       t.text &&
-      t.text.trim().length >= 1 && // 🔥 mniej agresywne
-      t.confidence > 20 // 🔥 NIE kasujemy danych!
+      t.text.trim().length >= 1 &&
+      t.confidence > 20
   );
 
   log.trace("layout_filter_done", traceId, {
@@ -63,22 +97,22 @@ function filterTokens(tokens: OCRToken[], traceId: string): OCRToken[] {
 }
 
 // =====================================
-// 🔹 STAGE 2 — GROUP INTO ROWS
+// 🔹 GROUP INTO ROWS (USING ny)
 // =====================================
 
-function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
-  const sorted = [...tokens].sort((a, b) => a.y - b.y);
+function groupIntoRows(tokens: NormalizedToken[], traceId: string): NormalizedToken[][] {
+  const sorted = [...tokens].sort((a, b) => a.ny - b.ny);
 
-  const rows: OCRToken[][] = [];
-  const threshold = 14; // 🔥 lekko zwiększone
+  const rows: NormalizedToken[][] = [];
+  const threshold = 0.015; // 🔥 normalized threshold
 
   for (const token of sorted) {
     let placed = false;
 
     for (const row of rows) {
-      const avgY = averageY(row);
+      const avgY = averageNY(row);
 
-      if (Math.abs(token.y - avgY) < threshold) {
+      if (Math.abs(token.ny - avgY) < threshold) {
         row.push(token);
         placed = true;
         break;
@@ -97,17 +131,17 @@ function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
   return rows;
 }
 
-function averageY(row: OCRToken[]): number {
-  const sum = row.reduce((acc, t) => acc + t.y, 0);
+function averageNY(row: NormalizedToken[]): number {
+  const sum = row.reduce((acc, t) => acc + t.ny, 0);
   return sum / row.length;
 }
 
 // =====================================
-// 🔹 STAGE 3 — BUILD STRUCTURE (COLUMNS)
+// 🔹 BUILD ROW STRUCTURE (GAP SPLIT)
 // =====================================
 
 function buildRowStructure(
-  rows: OCRToken[][],
+  rows: NormalizedToken[][],
   traceId: string
 ): LayoutRow[] {
   const result: LayoutRow[] = [];
@@ -117,13 +151,23 @@ function buildRowStructure(
 
     if (row.length < 2) continue;
 
-    const sorted = [...row].sort((a, b) => a.x - b.x);
+    const sorted = [...row].sort((a, b) => a.nx - b.nx);
 
-    const avgX =
-      sorted.reduce((acc, t) => acc + t.x, 0) / sorted.length;
+    // 🔥 FIND BIGGEST GAP (COLUMN SPLIT)
+    let maxGap = 0;
+    let splitIndex = 1;
 
-    const left = sorted.filter((t) => t.x < avgX);
-    const right = sorted.filter((t) => t.x >= avgX);
+    for (let j = 1; j < sorted.length; j++) {
+      const gap = sorted[j].nx - sorted[j - 1].nx;
+
+      if (gap > maxGap) {
+        maxGap = gap;
+        splitIndex = j;
+      }
+    }
+
+    const left = sorted.slice(0, splitIndex);
+    const right = sorted.slice(splitIndex);
 
     result.push({
       left,
@@ -133,6 +177,7 @@ function buildRowStructure(
 
     log.trace("layout_row_structure", traceId, {
       rowIndex: i,
+      gap: maxGap,
       left: left.map((t) => t.text),
       right: right.map((t) => t.text),
     });
