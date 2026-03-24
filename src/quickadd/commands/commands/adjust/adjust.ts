@@ -12,7 +12,7 @@ import { validateQuickAddContext } from "../../../rules/quickAddRules";
 import { resolveNickname } from "../../../mapping/NicknameResolver";
 
 // 🔥 zapis adjusted (TYLKO NICK)
-import { appendQuickAddAdjusted } from "../../../../googleSheetsStorage";
+import { appendQuickAddAdjusted } from "../../../googleSheetsStorage";
 
 const log = createLogger("COMMAND");
 
