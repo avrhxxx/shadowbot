@@ -13,14 +13,18 @@ export type OCRSourceType =
 
 // 🔹 BASE (dla text OCR)
 export interface OCRTextSourceResult {
-  source: OCRSourceType;
+  source:
+    | "TESSERACT_FULL"
+    | "TESSERACT_LINE"
+    | "OCRSPACE_FULL"
+    | "OCRSPACE_LINE";
   text: string;
   lines: string[];
 }
 
 // 🔹 BOX (layout OCR)
 export interface OCRBoxSourceResult {
-  source: OCRSourceType;
+  source: "TESSERACT_BOX";
   tokens: OCRToken[];
 }
 
