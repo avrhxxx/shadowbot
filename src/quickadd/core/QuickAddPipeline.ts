@@ -159,21 +159,24 @@ export async function processImageInput(
     });
 
     // =====================================
-    // 🔥 LEARNING (POPRAWIONE)
+    // 🔥 LEARNING (WITH MATCHING)
     // =====================================
     try {
       const learningRows = bestLayout.map((row: any) => {
         const raw = row.raw.map((t: any) => t.text).join(" ");
+
         const layoutText = [
           ...row.left.map((t: any) => t.text),
           ...row.right.map((t: any) => t.text),
         ].join(" ");
 
+        const matched = findBestMatch(layoutText, bestParsed);
+
         return {
           type: session.type,
           ocr_raw: raw,
           layout_text: layoutText,
-          parser_output: "", // ❗ parser NIE jest 1:1 z row → zostawiamy puste lub rozszerzymy później
+          parser_output: matched || "",
         };
       });
 
@@ -260,4 +263,36 @@ export async function processImageInput(
     log.error("pipeline_error", err, traceId);
     await setStatusReaction(message, "❌", traceId);
   }
+}
+
+// =====================================
+// 🔍 MATCHING
+// =====================================
+function findBestMatch(layoutText: string, parsed: any[]): string {
+  const cleanLayout = clean(layoutText);
+
+  let best: string | null = null;
+
+  for (const p of parsed) {
+    const cleanParsed = clean(p.nickname);
+
+    if (!cleanParsed) continue;
+
+    if (cleanLayout === cleanParsed) {
+      return p.nickname;
+    }
+
+    if (cleanLayout.includes(cleanParsed)) {
+      best = p.nickname;
+    }
+  }
+
+  return best;
+}
+
+function clean(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, "")
+    .trim();
 }
