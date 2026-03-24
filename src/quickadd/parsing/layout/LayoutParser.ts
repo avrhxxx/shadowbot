@@ -17,6 +17,19 @@ export type LayoutEntry = {
 };
 
 // =====================================
+// 🔹 CONFIG (TUNING POINT)
+// =====================================
+
+const ROW_Y_THRESHOLD = 12;          // grupowanie wierszy
+const MIN_CONFIDENCE = 40;           // filtr OCR śmieci
+
+// kolumny (dopasowane do UI — można później zrobić dynamiczne)
+const NICKNAME_MIN_X = 120;
+const NICKNAME_MAX_X = 700;
+
+const VALUE_MIN_X = 700;
+
+// =====================================
 // 🔹 MAIN PARSER
 // =====================================
 
@@ -31,10 +44,21 @@ export function extractLayoutEntries(
   if (!tokens.length) return [];
 
   // =====================================
-  // 🔹 STEP 1: GROUP INTO ROWS (by Y)
+  // 🔹 STEP 0: FILTER BAD TOKENS
   // =====================================
 
-  const rows = groupIntoRows(tokens);
+  const filtered = tokens.filter(
+    (t) =>
+      t.text &&
+      t.text.trim().length > 0 &&
+      t.confidence >= MIN_CONFIDENCE
+  );
+
+  // =====================================
+  // 🔹 STEP 1: GROUP INTO ROWS
+  // =====================================
+
+  const rows = groupIntoRows(filtered);
 
   log.trace("layout_rows_grouped", traceId, {
     rows: rows.length,
@@ -49,16 +73,20 @@ export function extractLayoutEntries(
   for (const row of rows) {
     if (row.length < 2) continue;
 
-    // sort left → right
-    const sorted = row.sort((a, b) => a.x - b.x);
+    const nicknameTokens = row.filter(
+      (t) => t.x >= NICKNAME_MIN_X && t.x <= NICKNAME_MAX_X
+    );
 
-    const left = sorted[0];
-    const right = sorted[sorted.length - 1];
+    const valueTokens = row.filter(
+      (t) => t.x >= VALUE_MIN_X
+    );
 
-    const nicknameRaw = left.text;
-    const valueRaw = right.text;
+    if (!nicknameTokens.length || !valueTokens.length) continue;
 
-    if (!nicknameRaw || !valueRaw) continue;
+    const nicknameRaw = joinTokens(nicknameTokens);
+    const valueRaw = joinTokens(valueTokens);
+
+    if (!isValidValue(valueRaw)) continue;
 
     entries.push({
       nicknameRaw,
@@ -70,7 +98,6 @@ export function extractLayoutEntries(
     count: entries.length,
   });
 
-  // 🔥 DEBUG SAMPLE
   log.trace("layout_sample", traceId, {
     sample: entries.slice(0, 5),
   });
@@ -79,7 +106,7 @@ export function extractLayoutEntries(
 }
 
 // =====================================
-// 🔹 GROUPING LOGIC
+// 🔹 GROUPING LOGIC (IMPROVED)
 // =====================================
 
 function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
@@ -87,15 +114,13 @@ function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
 
   const rows: OCRToken[][] = [];
 
-  const threshold = 10; // 🔥 do tuningu
-
   for (const token of sorted) {
     let placed = false;
 
     for (const row of rows) {
       const avgY = averageY(row);
 
-      if (Math.abs(token.y - avgY) < threshold) {
+      if (Math.abs(token.y - avgY) <= ROW_Y_THRESHOLD) {
         row.push(token);
         placed = true;
         break;
@@ -111,6 +136,32 @@ function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
 }
 
 function averageY(row: OCRToken[]): number {
-  const sum = row.reduce((acc, t) => acc + t.y, 0);
-  return sum / row.length;
+  return row.reduce((acc, t) => acc + t.y, 0) / row.length;
+}
+
+// =====================================
+// 🔹 TOKEN JOINING
+// =====================================
+
+function joinTokens(tokens: OCRToken[]): string {
+  return tokens
+    .sort((a, b) => a.x - b.x)
+    .map((t) => t.text)
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+// =====================================
+// 🔹 VALUE VALIDATION
+// =====================================
+
+function isValidValue(value: string): boolean {
+  // musi zawierać cyfry
+  if (!/\d{2,}/.test(value)) return false;
+
+  // nie może być śmieciem typu "|", "-"
+  if (value.length < 3) return false;
+
+  return true;
 }
