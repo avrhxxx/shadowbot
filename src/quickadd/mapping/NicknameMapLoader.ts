@@ -2,15 +2,13 @@
 // 📁 src/quickadd/mapping/NicknameMapLoader.ts
 // =====================================
 
-import { getLearningData } from "../storage/QuickAddService"; // ✅ FIX
+import { getLearningData } from "../storage/QuickAddService";
 import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("MAP_LOADER");
 
-const QUICKADD_TAB = "quickadd";
-
 // =====================================
-// 🔥 LOAD + BUILD MAP
+// 🔥 LOAD + BUILD MAP (FIXED)
 // =====================================
 export async function loadNicknameMap(): Promise<Record<string, string>> {
   try {
@@ -24,25 +22,38 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
+    const ocrIndex = headers.indexOf("ocr_raw");
+    const parserIndex = headers.indexOf("parser_output");
     const adjustedIndex = headers.indexOf("adjusted");
+    const overrideIndex = headers.indexOf("override");
 
-    if (adjustedIndex === -1) {
-      log.warn("missing_adjusted_column");
+    if (ocrIndex === -1) {
+      log.warn("missing_ocr_column");
       return {};
     }
 
     const map: Record<string, string> = {};
 
     for (const row of dataRows) {
-      const adjusted = row[adjustedIndex];
+      const ocrRaw = row[ocrIndex];
+      const parser = parserIndex !== -1 ? row[parserIndex] : undefined;
+      const adjusted = adjustedIndex !== -1 ? row[adjustedIndex] : undefined;
+      const override = overrideIndex !== -1 ? row[overrideIndex] : undefined;
 
-      if (!adjusted || typeof adjusted !== "string") continue;
+      if (!ocrRaw || typeof ocrRaw !== "string") continue;
 
-      const cleaned = cleanNickname(adjusted);
+      const key = cleanNickname(ocrRaw);
+      if (!key) continue;
 
-      if (!cleaned) continue;
+      // 🔥 PRIORITY CHAIN
+      const finalValue =
+        (override && override.trim()) ||
+        (adjusted && adjusted.trim()) ||
+        (parser && parser.trim());
 
-      map[cleaned] = adjusted;
+      if (!finalValue) continue;
+
+      map[key] = finalValue;
     }
 
     log("map_built", {
