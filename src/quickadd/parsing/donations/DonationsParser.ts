@@ -6,94 +6,165 @@ import { createLogger } from "../../debug/DebugLogger";
 
 const log = createLogger("PARSER");
 
+type Candidate = {
+  type: "nickname" | "value";
+  raw: string;
+  index: number;
+};
+
 type ParsedEntry = {
   nickname: string;
   value: number;
 };
 
-export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
-  const results: ParsedEntry[] = [];
+// =====================================
+// 🧠 MAIN PARSER (PIPELINE)
+// =====================================
 
-  log.trace("parse_start", traceId, {
-    lines: lines.length,
+export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
+  log.trace("parse_start", traceId, { lines: lines.length });
+
+  const candidates = extractCandidates(lines, traceId);
+  const paired = pairEntries(candidates, traceId);
+  const cleaned = cleanEntries(paired, traceId);
+  const final = finalizeEntries(cleaned, traceId);
+
+  log.trace("parse_done", traceId, {
+    parsed: final.length,
   });
+
+  return final;
+}
+
+// =====================================
+// 🔍 STAGE 1 — EXTRACT
+// =====================================
+
+function extractCandidates(lines: string[], traceId: string): Candidate[] {
+  const results: Candidate[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const match = line.match(/Donations:\s*([\d\s,]+)/i);
-
-    if (!match) continue;
-
-    const rawValue = match[1];
-    const value = parseNumber(rawValue);
-
-    const nicknameRaw = findNickname(lines, i);
-    const nickname = cleanNickname(nicknameRaw);
-
-    if (!isValidNickname(nickname) || isNaN(value)) {
-      log.trace("skipped_entry", traceId, {
-        line,
-        nicknameRaw,
-        rawValue,
-        cleanedNickname: nickname,
+    // VALUE
+    const valueMatch = line.match(/Donations:\s*([\d\s,]+)/i);
+    if (valueMatch) {
+      results.push({
+        type: "value",
+        raw: valueMatch[1],
+        index: i,
       });
       continue;
     }
 
-    results.push({
-      nickname,
-      value,
-    });
-
-    log.trace("parsed_entry", traceId, {
-      nickname,
-      value,
-    });
+    // NICKNAME (luźne — wszystko co nie jest oczywistym śmieciem)
+    if (line && line.length >= 3) {
+      results.push({
+        type: "nickname",
+        raw: line,
+        index: i,
+      });
+    }
   }
 
-  log.trace("parse_done", traceId, {
-    parsed: results.length,
-  });
+  log.trace("extract_done", traceId, { count: results.length });
 
   return results;
 }
 
 // =====================================
-// 🔍 FIND NICKNAME AROUND
+// 🔗 STAGE 2 — PAIR
 // =====================================
-function findNickname(lines: string[], index: number): string {
-  const candidates = [
-    lines[index - 1],
-    lines[index - 2],
-    lines[index + 1],
-  ];
 
-  for (const candidate of candidates) {
-    if (!candidate) continue;
+function pairEntries(candidates: Candidate[], traceId: string) {
+  const results: { nickname: string; valueRaw: string }[] = [];
 
-    const cleaned = cleanNickname(candidate);
+  for (const c of candidates) {
+    if (c.type !== "value") continue;
 
-    if (isValidNickname(cleaned)) {
-      return candidate;
-    }
+    // szukamy nickname w pobliżu
+    const nearby = candidates.filter(
+      (x) =>
+        x.type === "nickname" &&
+        Math.abs(x.index - c.index) <= 2
+    );
+
+    if (nearby.length === 0) continue;
+
+    const best = nearby[0]; // 🔥 na razie pierwszy — później można scoring
+
+    results.push({
+      nickname: best.raw,
+      valueRaw: c.raw,
+    });
   }
 
-  return "";
+  log.trace("pair_done", traceId, { count: results.length });
+
+  return results;
 }
 
 // =====================================
-// 🧠 NUMBER PARSER
+// 🧼 STAGE 3 — CLEAN
 // =====================================
+
+function cleanEntries(
+  entries: { nickname: string; valueRaw: string }[],
+  traceId: string
+) {
+  const results: { nickname: string; value: number }[] = [];
+
+  for (const e of entries) {
+    const nickname = cleanNickname(e.nickname);
+    const value = parseNumber(e.valueRaw);
+
+    results.push({
+      nickname,
+      value,
+    });
+  }
+
+  log.trace("clean_done", traceId, { count: results.length });
+
+  return results;
+}
+
+// =====================================
+// ✅ STAGE 4 — FINAL FILTER
+// =====================================
+
+function finalizeEntries(
+  entries: { nickname: string; value: number }[],
+  traceId: string
+): ParsedEntry[] {
+  const results: ParsedEntry[] = [];
+
+  for (const e of entries) {
+    if (!isValidNickname(e.nickname)) continue;
+    if (isNaN(e.value) || e.value <= 0) continue;
+
+    results.push(e);
+
+    log.trace("parsed_entry", traceId, e);
+  }
+
+  log.trace("final_done", traceId, { count: results.length });
+
+  return results;
+}
+
+// =====================================
+// 🔢 NUMBER PARSER
+// =====================================
+
 function parseNumber(raw: string): number {
-  return parseInt(
-    raw.replace(/[^\d]/g, "")
-  );
+  return parseInt(raw.replace(/[^\d]/g, ""));
 }
 
 // =====================================
-// 🧼 CLEAN FUNCTION
+// 🧼 CLEAN NICKNAME (TYLKO TUTAJ!)
 // =====================================
+
 function cleanNickname(name: string): string {
   return name
     .replace(/^\d+\s*/, "")
@@ -104,24 +175,20 @@ function cleanNickname(name: string): string {
 }
 
 // =====================================
-// ✅ VALIDATION (IMPROVED)
+// 🧠 VALIDATION (LIGHT)
 // =====================================
+
 function isValidNickname(name: string): boolean {
   if (!name) return false;
-
   if (name.length < 3) return false;
-
   if (!/[a-zA-Z]/.test(name)) return false;
 
-  if (/^[^a-zA-Z]+$/.test(name)) return false;
-
-  // ❌ ALL CAPS (OCR headers typu RANKINGIREWARDS)
+  // ❌ ALL CAPS (OCR headers)
   if (name === name.toUpperCase()) return false;
 
-  // ❌ zawiera dużo symboli i jest krótki (OCR garbage)
+  // ❌ garbage
   if (/[^a-zA-Z0-9\s]/.test(name) && name.length < 5) return false;
 
-  // ❌ znane śmieci systemowe
   const blacklist = ["REWARDS", "DONATIONS", "RANKING"];
   for (const word of blacklist) {
     if (name.toUpperCase().includes(word)) return false;
