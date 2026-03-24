@@ -40,7 +40,6 @@ export async function validateEntries(
   entries: { nickname: string; value: number }[]
 ): Promise<ValidatedEntry[]> {
   const results: ValidatedEntry[] = [];
-
   const seen = new Set<string>();
 
   let idCounter = 1;
@@ -48,7 +47,7 @@ export async function validateEntries(
   for (const entry of entries) {
     const originalNickname = entry.nickname;
 
-    let confidence = 0.3;
+    let confidence = 0;
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
@@ -74,29 +73,35 @@ export async function validateEntries(
     const cleanedResolved = clean(resolved);
 
     // =============================
-    // 🧠 CONFIDENCE + SUGGESTION
+    // 🧠 SIMILARITY (LEVENSHTEIN)
     // =============================
-    if (cleanedInput === cleanedResolved && resolved) {
-      confidence = 1.0;
-    } else if (resolved) {
-      confidence = 0.75;
-      suggestion = resolved;
-    } else {
-      confidence = 0.3;
+    let similarity = 0;
+
+    if (cleanedResolved) {
+      const distance = levenshtein(cleanedInput, cleanedResolved);
+      const maxLen = Math.max(cleanedInput.length, cleanedResolved.length);
+
+      similarity = maxLen > 0 ? 1 - distance / maxLen : 0;
     }
 
     // =============================
-    // ❌ UNRESOLVED
+    // 🧠 CONFIDENCE + STATUS
     // =============================
     if (!resolved || !cleanedResolved) {
       status = "UNRESOLVED";
-    }
+      confidence = 0.3;
+    } else {
+      confidence = similarity;
 
-    // =============================
-    // ⚠️ LOW CONFIDENCE
-    // =============================
-    else if (confidence < 0.8 && status === "OK") {
-      status = "LOW_CONFIDENCE";
+      if (similarity >= 0.9) {
+        status = "OK";
+      } else if (similarity >= 0.7) {
+        status = "LOW_CONFIDENCE";
+        suggestion = resolved;
+      } else {
+        status = "UNRESOLVED";
+        suggestion = resolved;
+      }
     }
 
     // =============================
@@ -106,6 +111,7 @@ export async function validateEntries(
 
     if (seen.has(key)) {
       status = "DUPLICATE";
+      confidence = Math.min(confidence, 0.5);
     } else {
       seen.add(key);
     }
@@ -126,6 +132,40 @@ export async function validateEntries(
   }
 
   return results;
+}
+
+// =====================================
+// 🔤 LEVENSHTEIN
+// =====================================
+function levenshtein(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  const aLen = a.length;
+  const bLen = b.length;
+
+  for (let i = 0; i <= bLen; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= aLen; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= bLen; i++) {
+    for (let j = 1; j <= aLen; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[bLen][aLen];
 }
 
 // =====================================
