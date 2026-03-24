@@ -132,4 +132,60 @@ function logMessage(
 ) {
   if (!DEBUG_ENABLED) return;
 
-  const time =
+  const time = new Date().toISOString().split("T")[1].split(".")[0];
+
+  if (!PRETTY_LOGS) {
+    const prefix = traceId
+      ? `[QA:${scope}:${tag}:${traceId}:${time}]`
+      : `[QA:${scope}:${tag}:${time}]`;
+
+    console.log(prefix, ...args);
+    return;
+  }
+
+  // 🔥 grouping
+  handleGrouping(scope, traceId);
+
+  // 🔥 header
+  const levelColor = levelColors[level];
+  const scopeColor = scopeColors[scope];
+
+  const header = `${levelColor}[${level}]${RESET}${scopeColor}[${scope}]${RESET}`;
+  const meta = traceId ? `${tag} #${traceId}` : tag;
+
+  console.log(`${header} ${meta} (${time})`);
+
+  // 🔥 payload
+  for (const arg of args) {
+    console.log("   ↳", formatObject(arg));
+  }
+
+  maybePrintSeparator();
+}
+
+/**
+ * =====================================
+ * 🧠 LOGGER FACTORY
+ * =====================================
+ */
+
+export function createLogger(scope: DebugScope) {
+  return Object.assign(
+    (tag: string, ...args: any[]) => {
+      logMessage("INFO", scope, tag, undefined, ...args);
+    },
+    {
+      trace: (tag: string, traceId: string, ...args: any[]) => {
+        logMessage("INFO", scope, tag, traceId, ...args);
+      },
+
+      warn: (tag: string, ...args: any[]) => {
+        logMessage("WARN", scope, tag, undefined, ...args);
+      },
+
+      error: (tag: string, error: any, traceId?: string) => {
+        logMessage("ERROR", scope, tag, traceId, error);
+      },
+    }
+  );
+}
