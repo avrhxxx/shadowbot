@@ -36,9 +36,9 @@ type LogLevel = "INFO" | "WARN" | "ERROR";
  * 🎨 ANSI COLORS
  */
 const levelColors: Record<LogLevel, string> = {
-  INFO: "\x1b[37m",   // white
-  WARN: "\x1b[33m",   // yellow
-  ERROR: "\x1b[31m",  // red
+  INFO: "\x1b[37m",
+  WARN: "\x1b[33m",
+  ERROR: "\x1b[31m",
 };
 
 const scopeColors: Record<DebugScope, string> = {
@@ -68,7 +68,6 @@ const RESET = "\x1b[0m";
 
 let currentTraceId: string | null = null;
 let currentScope: DebugScope | null = null;
-let logCounter = 0;
 
 /**
  * =====================================
@@ -76,41 +75,39 @@ let logCounter = 0;
  * =====================================
  */
 
-function formatObject(obj: any): string {
-  if (typeof obj !== "object" || obj === null) return String(obj);
+function formatObjectLines(obj: any): string[] {
+  if (typeof obj !== "object" || obj === null) {
+    return [String(obj)];
+  }
 
-  return Object.entries(obj)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join(" | ");
+  return Object.entries(obj).map(([k, v]) => {
+    if (typeof v === "object") return `${k}: [object]`;
+    return `${k}: ${v}`;
+  });
 }
 
 function printTraceHeader(traceId: string) {
-  console.log(`\n══════════ TRACE ${traceId} ══════════`);
+  console.log(`\n========== TRACE ${traceId} ==========`);
 }
 
 function printScopeSeparator(scope: DebugScope) {
   const color = scopeColors[scope] || "";
-  console.log(`${color}━━━━━━━━━━ ${scope} ━━━━━━━━━━${RESET}`);
+  console.log(`${color}---- ${scope} ----${RESET}`);
 }
 
-function maybePrintSeparator() {
-  logCounter++;
-  if (logCounter % 6 === 0) {
-    console.log("------------------------------");
-  }
+function printBlockSeparator() {
+  console.log("────────────────────────────");
 }
 
 function handleGrouping(scope: DebugScope, traceId?: string) {
   if (!traceId) return;
 
-  // 🔁 new trace
   if (currentTraceId !== traceId) {
     printTraceHeader(traceId);
     currentTraceId = traceId;
     currentScope = null;
   }
 
-  // 🔁 new scope
   if (currentScope !== scope) {
     printScopeSeparator(scope);
     currentScope = scope;
@@ -146,21 +143,27 @@ function logMessage(
   // 🔥 grouping
   handleGrouping(scope, traceId);
 
-  // 🔥 header
   const levelColor = levelColors[level];
   const scopeColor = scopeColors[scope];
 
   const header = `${levelColor}[${level}]${RESET}${scopeColor}[${scope}]${RESET}`;
   const meta = traceId ? `${tag} #${traceId}` : tag;
 
+  // 🔹 HEADER
   console.log(`${header} ${meta} (${time})`);
 
-  // 🔥 payload
-  for (const arg of args) {
-    console.log("   ↳", formatObject(arg));
+  // 🔹 BODY (ładny blok)
+  if (args.length > 0) {
+    for (const arg of args) {
+      const lines = formatObjectLines(arg);
+      for (const line of lines) {
+        console.log(`   ${line}`);
+      }
+    }
   }
 
-  maybePrintSeparator();
+  // 🔹 SEPARATOR
+  printBlockSeparator();
 }
 
 /**
