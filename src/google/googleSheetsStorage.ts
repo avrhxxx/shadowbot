@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/googleSheetsStorage.ts
+// 📁 src/google/googleSheetsStorage.ts
 // =====================================
 
 import { google } from "googleapis";
@@ -25,10 +25,10 @@ const ABSENCE_CONFIG_TAB = "absence_config";
 const TRANSLATE_TAB = "translate";
 const TRANSLATE_CONFIG_TAB = "translate_config";
 
-// 🔥 QUICKADD
-const QUICKADD_TAB = "quickadd";
+// 🔥 QUICKADD (UPDATED)
+const QUICKADD_NICKNAMES_TAB = "quickadd_nicknames";
 
-// 🔥 NEW QUEUES
+// 🔥 QUEUES
 const QUICKADD_EVENTS_QUEUE_TAB = "quickadd_events_queue";
 const QUICKADD_POINTS_QUEUE_TAB = "quickadd_points_queue";
 
@@ -36,7 +36,8 @@ const QUICKADD_POINTS_QUEUE_TAB = "quickadd_points_queue";
 // ENV VALIDATION
 // --------------------------
 if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
+if (!process.env.GOOGLE_SERVICE_ACCOUNT)
+  throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
 
 const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
@@ -68,7 +69,7 @@ async function writeSheet(tab: string, values: any[][]) {
 }
 
 // --------------------------
-// 🔥 SELF HEALING (NEW)
+// 🔥 SELF HEALING
 // --------------------------
 async function getAllSheets() {
   const res = await sheets.spreadsheets.get({
@@ -80,9 +81,9 @@ async function getAllSheets() {
 
 async function ensureSheetExists(tab: string, headers: any[][]) {
   const allSheets = await getAllSheets();
-  const exists = allSheets.some(s => s.properties?.title === tab);
+  const exists = allSheets.some((s) => s.properties?.title === tab);
 
-  // 🔥 CREATE TAB IF NOT EXISTS
+  // CREATE TAB
   if (!exists) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SHEET_ID,
@@ -100,7 +101,7 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
     });
   }
 
-  // 🔥 ENSURE HEADERS
+  // ENSURE HEADERS
   const rows = await readSheet(tab);
 
   if (!rows || rows.length === 0 || rows[0].length === 0) {
@@ -108,7 +109,7 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
   }
 }
 
-// 🔥 MAIN INIT (CALL ON BOT START)
+// 🔥 INIT
 export async function ensureAllSheets() {
   await ensureSheetExists(QUICKADD_EVENTS_QUEUE_TAB, [
     ["guildId", "eventId", "type", "nickname", "createdAt"],
@@ -117,15 +118,29 @@ export async function ensureAllSheets() {
   await ensureSheetExists(QUICKADD_POINTS_QUEUE_TAB, [
     ["guildId", "category", "week", "nickname", "points", "createdAt"],
   ]);
+
+  // 🔥 NEW LEARNING SHEET
+  await ensureSheetExists(QUICKADD_NICKNAMES_TAB, [
+    [
+      "type",
+      "ocr_raw",
+      "layout_text",
+      "parser_output",
+      "adjusted",
+      "override",
+      "created_at",
+    ],
+  ]);
 }
 
 // --------------------------
-// GENERIC HELPERS
+// HELPERS
 // --------------------------
 async function getSheetId(tab: string): Promise<number> {
   const res = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const sheet = res.data.sheets?.find(s => s.properties?.title === tab);
-  if (!sheet?.properties?.sheetId) throw new Error(`Sheet "${tab}" not found`);
+  const sheet = res.data.sheets?.find((s) => s.properties?.title === tab);
+  if (!sheet?.properties?.sheetId)
+    throw new Error(`Sheet "${tab}" not found`);
   return sheet.properties.sheetId;
 }
 
@@ -147,7 +162,12 @@ async function deleteRow(tab: string, row: number) {
       requests: [
         {
           deleteDimension: {
-            range: { sheetId, dimension: "ROWS", startIndex: row - 1, endIndex: row },
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: row - 1,
+              endIndex: row,
+            },
           },
         },
       ],
@@ -156,62 +176,14 @@ async function deleteRow(tab: string, row: number) {
 }
 
 // --------------------------
-// 🔥 QUICKADD STORAGE
+// 🔥 APPEND (LEARNING)
 // --------------------------
-export async function ensureQuickAddHeaders() {
-  const rows = await readSheet(QUICKADD_TAB);
-
-  if (!rows || rows.length === 0 || rows[0].length === 0) {
-    const headers = [["type", "ocr", "final", "adjusted", "override", "createdAt"]];
-    await writeSheet(`${QUICKADD_TAB}!A1:F1`, headers);
-  }
-}
-
-export async function appendQuickAddRows(
-  rows: { type: string; ocr: string; final: string }[]
-) {
-  if (!rows.length) return;
-
-  await ensureQuickAddHeaders();
-
-  const values = rows.map(r => [
-    r.type,
-    r.ocr,
-    r.final,
-    "",
-    "",
-    Date.now(),
-  ]);
+export async function appendLearningRows(values: any[][]) {
+  if (!values.length) return;
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: QUICKADD_TAB,
-    valueInputOption: "RAW",
-    requestBody: {
-      values,
-    },
-  });
-}
-
-export async function appendQuickAddAdjusted(
-  entries: { type: string; nickname: string }[]
-) {
-  if (!entries.length) return;
-
-  await ensureQuickAddHeaders();
-
-  const values = entries.map(e => [
-    e.type,
-    "",
-    "",
-    e.nickname,
-    "",
-    Date.now(),
-  ]);
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
-    range: QUICKADD_TAB,
+    range: QUICKADD_NICKNAMES_TAB,
     valueInputOption: "RAW",
     requestBody: {
       values,
