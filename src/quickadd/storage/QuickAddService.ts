@@ -6,6 +6,7 @@ import {
   appendQuickAddRows,
   appendQuickAddAdjusted,
   readSheet,
+  writeSheet, // ✅ FIX: normal import
   updateCell,
 } from "../../googleSheetsStorage";
 
@@ -99,18 +100,13 @@ export async function enqueue(entries: QueueEntry[]) {
 // 🔧 INTERNAL QUEUE APPEND
 // =====================================
 async function appendToQueue(values: any[][]) {
-  // 🔥 używamy bezpośrednio read/write (brak helpera w storage)
-  // możesz później wydzielić do googleSheetsStorage
-
-  const tab = "quickadd_points_queue"; // 🔥 na start tylko points
+  const tab = "quickadd_points_queue"; // 🔥 MVP (points only)
 
   const existing = await readSheet(tab);
 
   const newData = [...existing, ...values];
 
-  // ⚠️ writeSheet nadpisuje → OK dla MVP
-  const { writeSheet } = await import("../../googleSheetsStorage");
-
+  // ✅ FIX: no dynamic import
   await writeSheet(tab, newData);
 }
 
