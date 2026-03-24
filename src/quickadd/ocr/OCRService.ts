@@ -3,8 +3,7 @@
 // =====================================
 
 import fetch from "node-fetch";
-import { preprocessBase, preprocessForTesseract } from "./OCRPreprocess";
-import { runFullImage, runLineBased, runBoxBased } from "./OCRRunner";
+import { runFullImage, runLineBased, runBoxBased, runHOCR } from "./OCRRunner";
 import { createLogger } from "../debug/DebugLogger";
 import { OCRMultiResult, OCRSourceResult } from "./OCRTypes";
 
@@ -25,13 +24,14 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
 
     log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    const base = await preprocessBase(buffer);
-    const tesseractBuffer = await preprocessForTesseract(base);
+    // 🔥 WYŁĄCZONY PREPROCESS (TEST RAW OCR)
+    const tesseractBuffer = buffer;
 
-    const [full, line, box] = await Promise.all([
+    const [full, line, box, hocr] = await Promise.all([
       runFullImage(tesseractBuffer, traceId),
       runLineBased(tesseractBuffer, traceId),
       runBoxBased(tesseractBuffer, traceId),
+      runHOCR(tesseractBuffer, traceId),
     ]);
 
     const sources: OCRSourceResult[] = [
@@ -49,11 +49,13 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
         source: "TESSERACT_BOX",
         tokens: box.tokens,
       },
+      {
+        source: "TESSERACT_HOCR" as any,
+        text: hocr.hocr,
+        lines: [],
+      },
     ];
 
-    // =====================================
-    // 🔥 SAFE DEBUG (FIXED)
-    // =====================================
     log.trace(
       "ocr_multi_done",
       traceId,
@@ -73,7 +75,6 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
           };
         }
 
-        // 🔥 TS FIX — wymuszenie typu
         return {
           source: (s as OCRSourceResult).source,
         };
