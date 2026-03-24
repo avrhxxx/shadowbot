@@ -20,7 +20,10 @@ import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { formatPreview } from "../../../utils/formatPreview";
+
+// ✅ FIX — correct file name
+import { formatPreview } from "../../../utils/PreviewFormatter";
+
 import {
   validateQuickAddContext,
 } from "../../../rules/QuickAddGuards";
@@ -67,7 +70,8 @@ export async function handlePreview(
     // =====================================
     const entries = QuickAddBuffer.getEntries(guildId);
 
-    log("preview_requested", {
+    // ✅ FIX — consistent logger usage
+    log.trace("preview_requested", {
       guildId,
       count: entries.length,
     });
