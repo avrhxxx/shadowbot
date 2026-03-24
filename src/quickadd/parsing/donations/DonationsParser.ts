@@ -3,6 +3,8 @@
 // =====================================
 
 import { createLogger } from "../../debug/DebugLogger";
+import { extractLayoutEntries } from "../layout/LayoutParser";
+import { OCRToken } from "../../ocr/OCRRunner";
 
 const log = createLogger("PARSER");
 
@@ -18,7 +20,7 @@ type ParsedEntry = {
 };
 
 // =====================================
-// 🧠 MAIN PARSER (PIPELINE)
+// 🧠 MAIN PARSER (LINES PIPELINE)
 // =====================================
 
 export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
@@ -37,6 +39,40 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
 }
 
 // =====================================
+// 🔥 NEW — LAYOUT MODE
+// =====================================
+
+export function parseDonationsFromLayout(
+  tokens: OCRToken[],
+  traceId: string
+): ParsedEntry[] {
+  log.trace("parse_layout_start", traceId, {
+    tokens: tokens.length,
+  });
+
+  // 🔹 1. Layout extraction
+  const layoutEntries = extractLayoutEntries(tokens, traceId);
+
+  // 🔹 2. Reuse clean stage
+  const cleaned = cleanEntries(
+    layoutEntries.map((e) => ({
+      nickname: e.nicknameRaw,
+      valueRaw: e.valueRaw,
+    })),
+    traceId
+  );
+
+  // 🔹 3. Final validation
+  const final = finalizeEntries(cleaned, traceId);
+
+  log.trace("parse_layout_done", traceId, {
+    parsed: final.length,
+  });
+
+  return final;
+}
+
+// =====================================
 // 🔍 STAGE 1 — EXTRACT
 // =====================================
 
@@ -46,7 +82,6 @@ function extractCandidates(lines: string[], traceId: string): Candidate[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // VALUE
     const valueMatch = line.match(/Donations:\s*([\d\s,]+)/i);
     if (valueMatch) {
       results.push({
@@ -57,7 +92,6 @@ function extractCandidates(lines: string[], traceId: string): Candidate[] {
       continue;
     }
 
-    // NICKNAME (luźne — wszystko co nie jest oczywistym śmieciem)
     if (line && line.length >= 3) {
       results.push({
         type: "nickname",
@@ -82,7 +116,6 @@ function pairEntries(candidates: Candidate[], traceId: string) {
   for (const c of candidates) {
     if (c.type !== "value") continue;
 
-    // szukamy nickname w pobliżu
     const nearby = candidates.filter(
       (x) =>
         x.type === "nickname" &&
@@ -91,7 +124,7 @@ function pairEntries(candidates: Candidate[], traceId: string) {
 
     if (nearby.length === 0) continue;
 
-    const best = nearby[0]; // 🔥 na razie pierwszy — później można scoring
+    const best = nearby[0];
 
     results.push({
       nickname: best.raw,
@@ -162,7 +195,7 @@ function parseNumber(raw: string): number {
 }
 
 // =====================================
-// 🧼 CLEAN NICKNAME (TYLKO TUTAJ!)
+// 🧼 CLEAN NICKNAME
 // =====================================
 
 function cleanNickname(name: string): string {
@@ -175,7 +208,7 @@ function cleanNickname(name: string): string {
 }
 
 // =====================================
-// 🧠 VALIDATION (LIGHT)
+// 🧠 VALIDATION
 // =====================================
 
 function isValidNickname(name: string): boolean {
@@ -183,10 +216,8 @@ function isValidNickname(name: string): boolean {
   if (name.length < 3) return false;
   if (!/[a-zA-Z]/.test(name)) return false;
 
-  // ❌ ALL CAPS (OCR headers)
   if (name === name.toUpperCase()) return false;
 
-  // ❌ garbage
   if (/[^a-zA-Z0-9\s]/.test(name) && name.length < 5) return false;
 
   const blacklist = ["REWARDS", "DONATIONS", "RANKING"];
