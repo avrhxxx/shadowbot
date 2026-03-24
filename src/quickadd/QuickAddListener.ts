@@ -84,10 +84,34 @@ export function registerQuickAddListener(client: Client) {
 
       log.trace("image_detected", traceId, imageUrl);
 
+      // =====================================
+      // 📥 UX: FEEDBACK (processing)
+      // =====================================
+      try {
+        await message.react("⏳");
+      } catch {}
+
+      // =====================================
+      // 🔥 PROCESS IMAGE
+      // =====================================
       await processImageInput(message, session, imageUrl, traceId);
+
+      // =====================================
+      // 📥 UX: FEEDBACK (done)
+      // =====================================
+      try {
+        await message.react("✅");
+      } catch {}
+
+      // ❗ NIE USUWAMY WIADOMOŚCI
+      // message.delete() ❌ — intentionally removed (history = valuable)
 
     } catch (err) {
       log.error("listener_error", err);
+
+      try {
+        await message.react("❌");
+      } catch {}
     }
   });
 }
