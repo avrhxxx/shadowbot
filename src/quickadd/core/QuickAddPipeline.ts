@@ -9,6 +9,7 @@ import { parseByType } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 import { validateEntries } from "../validation/QuickAddValidator";
+import { buildLayout } from "../parsing/layout/LayoutParser"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -92,7 +93,7 @@ export async function processImageInput(
         let parsed: any[] = [];
 
         // =====================================
-        // 🔹 TYPE SAFE INPUT
+        // 🔹 TEXT SOURCES
         // =====================================
         if ("lines" in source) {
           log("parse_attempt", {
@@ -104,6 +105,9 @@ export async function processImageInput(
           parsed = parseByType(session.type, { lines: source.lines }, traceId);
         }
 
+        // =====================================
+        // 🔹 TOKEN SOURCES → LAYOUT
+        // =====================================
         if ("tokens" in source) {
           log("parse_attempt", {
             source: source.source,
@@ -111,7 +115,20 @@ export async function processImageInput(
             traceId,
           });
 
-          parsed = parseByType(session.type, { tokens: source.tokens }, traceId);
+          // 🔥 BUILD LAYOUT (NEW CORE STEP)
+          const layout = buildLayout(source.tokens, traceId);
+
+          log("layout_built", {
+            source: source.source,
+            rows: layout.length,
+            traceId,
+          });
+
+          parsed = parseByType(
+            session.type,
+            { layout }, // 🔥 KEY CHANGE
+            traceId
+          );
         }
 
         // =====================================
@@ -129,7 +146,7 @@ export async function processImageInput(
         });
 
         // =====================================
-        // 🔥 BEST SELECTION (FIXED)
+        // 🔥 BEST SELECTION
         // =====================================
         if (score > bestScore) {
           bestParsed = parsed;
