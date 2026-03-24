@@ -67,14 +67,13 @@ export async function handleQuickAddInteraction(
   // 🔒 RESZTA — rules system (SSOT)
   // =====================================
 
-  // 1. session + context
   const contextError = validateQuickAddContext(interaction, session);
   if (contextError) {
     log.warn("blocked_context", contextError);
     return interaction.editReply({ content: contextError });
   }
 
-  // 2. owner (END + CONFIRM + CANCEL 🔥)
+  // 🔥 OWNER REQUIRED (END + CONFIRM + CANCEL)
   if (sub === "end" || sub === "confirm" || sub === "cancel") {
     const ownerError = validateSessionOwner(interaction, session);
     if (ownerError) {
