@@ -65,22 +65,31 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
     // 🔥 OCR SPACE (PLACEHOLDER - FUTURE)
     // =====================================
     // TODO: add OCR Space integration here
-    // sources.push({
-    //   source: "OCRSPACE_FULL",
-    //   text: "...",
-    //   lines: [...]
-    // });
 
     // =====================================
-    // 🔥 DEBUG
+    // 🔥 DEBUG (FIXED TYPE NARROWING)
     // =====================================
     log.trace("ocr_multi_done", traceId, {
-      sources: sources.map((s) => ({
-        source: s.source,
-        lines: "lines" in s ? s.lines.length : undefined,
-        textLength: "text" in s ? s.text.length : undefined,
-        tokens: "tokens" in s ? s.tokens.length : undefined,
-      })),
+      sources: sources.map((s) => {
+        if ("lines" in s) {
+          return {
+            source: s.source,
+            lines: s.lines.length,
+            textLength: s.text.length,
+          };
+        }
+
+        if ("tokens" in s) {
+          return {
+            source: s.source,
+            tokens: s.tokens.length,
+          };
+        }
+
+        return {
+          source: s.source,
+        };
+      }),
     });
 
     return { sources };
