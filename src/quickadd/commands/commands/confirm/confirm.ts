@@ -8,10 +8,20 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { formatPreview } from "../../../utils/formatPreview";
 import { createLogger } from "../../../debug/DebugLogger";
 
-// 🔥 FIX — USE SERVICE INSTEAD OF DIRECT SHEETS
-import { enqueue } from "../../../storage/QuickAddService";
+import {
+  enqueuePoints,
+  enqueueEvents,
+} from "../../../storage/QuickAddService";
+
+import { readSheet } from "../../../../google/googleSheetsStorage";
 
 const log = createLogger("COMMAND");
+
+// =====================================
+// 📌 CONFIG
+// =====================================
+const EVENTS_TAB = "events";
+const POINTS_WEEKS_TAB = "points_weeks";
 
 export async function confirmCommand(
   interaction: ChatInputCommandInteraction
@@ -29,32 +39,18 @@ export async function confirmCommand(
   const session = QuickAddSession.get(guildId);
 
   if (!session) {
-    log.warn("confirm_no_session", { guildId });
-
     return interaction.editReply({
       content: "❌ No active session",
     });
   }
 
   if (!QuickAddSession.isInSession(guildId, channelId)) {
-    log.warn("confirm_wrong_channel", {
-      guildId,
-      channelId,
-      expected: session.threadId,
-    });
-
     return interaction.editReply({
       content: "❌ This command must be used inside the session thread",
     });
   }
 
   if (!QuickAddSession.isOwner(guildId, userId)) {
-    log.warn("confirm_not_owner", {
-      guildId,
-      userId,
-      owner: session.ownerId,
-    });
-
     return interaction.editReply({
       content: "❌ Only session owner can confirm",
     });
@@ -68,8 +64,11 @@ export async function confirmCommand(
     });
   }
 
+  // =====================================
+  // 🔥 HARD GATE
+  // =====================================
   const invalidEntries = entries.filter(
-    (e: any) => e.status && e.status !== "OK"
+    (e: any) => e.status !== "OK"
   );
 
   // =============================
@@ -78,19 +77,14 @@ export async function confirmCommand(
   if (session.stage === "COLLECTING") {
     if (invalidEntries.length > 0) {
       const preview = formatPreview(entries);
-      const invalidCount = invalidEntries.length;
 
       return interaction.editReply({
         content:
-`❌ **${invalidCount} entr${invalidCount === 1 ? "y" : "ies"} must be fixed before confirm**
-
-❌ **Cannot confirm — all entries must be valid**
-
-Only entries with status ✅ OK are allowed.
+`❌ **All entries must be valid (status ✅ OK)**
 
 ${preview}
 
-👉 Fix all issues using:
+👉 Fix using:
 /q adjust`,
       });
     }
@@ -116,33 +110,87 @@ ${preview}
   // =============================
   if (session.stage === "CONFIRM_PENDING") {
     if (invalidEntries.length > 0) {
-      const invalidCount = invalidEntries.length;
-
       return interaction.editReply({
         content:
-`❌ **${invalidCount} entr${invalidCount === 1 ? "y" : "ies"} still invalid**
+`❌ Still invalid entries present
 
-Fix all issues before confirming again.`,
+Fix all issues before confirming.`,
       });
     }
 
-    // =====================================
-    // 🔥 QUEUE BUILD (DELEGATED)
-    // =====================================
     try {
-      await enqueue(
-        entries.map((e) => ({
-          guildId,
-          type: session.type,
-          nickname: e.nickname,
-          value: e.value,
-        }))
-      );
+      // =====================================
+      // 🔥 EVENTS FLOW
+      // =====================================
+      if (session.type.startsWith("RR_")) {
+        const events = await readSheet(EVENTS_TAB);
+        const headers = events[0];
 
-      log("queue_enqueued", {
-        count: entries.length,
-        type: session.type,
-      });
+        const idxId = headers.indexOf("eventId");
+        const idxType = headers.indexOf("eventType");
+
+        const matching = events
+          .slice(1)
+          .filter((row: any[]) => row[idxType] === session.type);
+
+        if (!matching.length) {
+          return interaction.editReply({
+            content: "❌ No matching event found",
+          });
+        }
+
+        // 🔥 NAJNOWSZY EVENT (last row)
+        const selected = matching[matching.length - 1];
+        const eventId = selected[idxId];
+
+        await enqueueEvents(
+          entries.map((e: any) => ({
+            guildId,
+            eventId,
+            type: session.type,
+            nickname: e.nickname,
+          }))
+        );
+
+        log("events_enqueued", {
+          eventId,
+          count: entries.length,
+        });
+      }
+
+      // =====================================
+      // 🔥 POINTS FLOW
+      // =====================================
+      else {
+        const weeks = await readSheet(POINTS_WEEKS_TAB);
+        const headers = weeks[0];
+
+        const idxWeek = headers.indexOf("week");
+
+        if (idxWeek === -1) {
+          return interaction.editReply({
+            content: "❌ Invalid weeks config",
+          });
+        }
+
+        const lastRow = weeks[weeks.length - 1];
+        const week = lastRow[idxWeek];
+
+        await enqueuePoints(
+          entries.map((e: any) => ({
+            guildId,
+            category: session.type,
+            week,
+            nickname: e.nickname,
+            points: e.value,
+          }))
+        );
+
+        log("points_enqueued", {
+          week,
+          count: entries.length,
+        });
+      }
 
     } catch (err) {
       log.error("queue_failed", err);
@@ -166,11 +214,6 @@ Fix all issues before confirming again.`,
 ⚙️ Worker will process it shortly`,
     });
   }
-
-  log.warn("confirm_invalid_stage", {
-    guildId,
-    stage: session.stage,
-  });
 
   return interaction.editReply({
     content: "❌ Invalid session state",
