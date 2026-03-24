@@ -18,14 +18,19 @@ export function formatPreview(entries: ParsedEntry[]): string {
   }
 
   const maxNameLength = Math.max(...entries.map(e => e.nickname.length));
+  const maxValueLength = Math.max(
+    ...entries.map(e => formatNumber(e.value).length)
+  );
 
   const formattedEntries = entries
     .map((entry) => {
       const id = entry.id;
+
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
+      const formattedValue = formatNumber(entry.value).padStart(maxValueLength, " ");
 
       // =====================================
-      // 🔥 STATUS MAPPING (FIX)
+      // 🔥 STATUS MAPPING
       // =====================================
       let statusIcon = "❔";
       let confidenceText = "";
@@ -36,6 +41,7 @@ export function formatPreview(entries: ParsedEntry[]): string {
           break;
 
         case "LOW_CONFIDENCE":
+        case "DUPLICATE":
           statusIcon = "⚠️";
           break;
 
@@ -43,27 +49,26 @@ export function formatPreview(entries: ParsedEntry[]): string {
         case "INVALID_VALUE":
           statusIcon = "❌";
           break;
-
-        case "DUPLICATE":
-          statusIcon = "⚠️";
-          break;
       }
 
       // =====================================
-      // 🔢 CONFIDENCE (NEW)
+      // 🔢 CONFIDENCE
       // =====================================
       if (entry.confidence !== undefined) {
         const percent = Math.round(entry.confidence * 100);
         confidenceText = ` (${percent}%)`;
       }
 
-      let line = `[${id}] ${paddedName} → ${formatNumber(entry.value)} ${statusIcon}${confidenceText}`;
+      // =====================================
+      // 🧾 MAIN LINE (WITH ALIGN + MIDDLE DOT)
+      // =====================================
+      let line = `[${id}] ${paddedName} → ${formattedValue} · ${statusIcon}${confidenceText}`;
 
       // =====================================
-      // 💡 SUGGESTION
+      // 💡 SUGGESTION (NEW CLEAN FORMAT)
       // =====================================
       if (entry.suggestion && entry.suggestion !== entry.nickname) {
-        line += `\n   💡 Suggestion → ${entry.suggestion}`;
+        line += `\n   ↳ suggestion: ${entry.suggestion}`;
       }
 
       return line;
