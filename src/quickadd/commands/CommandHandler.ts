@@ -74,8 +74,8 @@ export async function handleQuickAddInteraction(
     return interaction.editReply({ content: contextError });
   }
 
-  // 2. owner (END + CONFIRM 🔥)
-  if (sub === "end" || sub === "confirm") {
+  // 2. owner (END + CONFIRM + CANCEL 🔥)
+  if (sub === "end" || sub === "confirm" || sub === "cancel") {
     const ownerError = validateSessionOwner(interaction, session);
     if (ownerError) {
       log.warn("blocked_owner", ownerError);
