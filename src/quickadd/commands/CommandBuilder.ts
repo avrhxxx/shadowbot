@@ -68,6 +68,13 @@ function applySubcommands(builder: SlashCommandBuilder) {
             .setDescription("New value")
             .setRequired(true)
         )
+    )
+
+    // ✅ CONFIRM (NEW)
+    .addSubcommand((sub) =>
+      sub
+        .setName("confirm")
+        .setDescription("Confirm and send data to queue")
     );
 }
 
