@@ -23,6 +23,51 @@ async function setStatusReaction(message: Message, emoji: string, traceId?: stri
   }
 }
 
+// =====================================
+// 🔥 SCORING SYSTEM (NEW)
+// =====================================
+
+function scoreParsed(entries: any[]): number {
+  if (!entries.length) return 0;
+
+  let score = 0;
+
+  for (const e of entries) {
+    // valid value
+    if (e.value > 0) score += 2;
+
+    // nickname length
+    if (e.nickname && e.nickname.length >= 4) score += 1;
+
+    // contains letters
+    if (/[a-zA-Z]/.test(e.nickname)) score += 1;
+
+    // penalize garbage
+    if (/[^a-zA-Z0-9\s]/.test(e.nickname)) score -= 0.5;
+  }
+
+  return score;
+}
+
+function analyzeQuality(entries: any[]) {
+  if (!entries.length) {
+    return {
+      avgNameLength: 0,
+      invalidValues: 0,
+    };
+  }
+
+  return {
+    avgNameLength:
+      entries.reduce((a, e) => a + (e.nickname?.length || 0), 0) / entries.length,
+    invalidValues: entries.filter((e) => !e.value || e.value <= 0).length,
+  };
+}
+
+// =====================================
+// 🚀 MAIN PIPELINE
+// =====================================
+
 export async function processImageInput(
   message: Message,
   session: any,
@@ -40,13 +85,14 @@ export async function processImageInput(
 
     let bestParsed: any[] = [];
     let bestSource = "none";
+    let bestScore = -Infinity;
 
     for (const source of ocrResult.sources) {
       try {
         let parsed: any[] = [];
 
         // =====================================
-        // 🔥 TYPE SAFE INPUT (FIX)
+        // 🔹 TYPE SAFE INPUT
         // =====================================
         if ("lines" in source) {
           log("parse_attempt", {
@@ -68,16 +114,29 @@ export async function processImageInput(
           parsed = parseByType(session.type, { tokens: source.tokens }, traceId);
         }
 
+        // =====================================
+        // 🔥 QUALITY ANALYSIS
+        // =====================================
+        const score = scoreParsed(parsed);
+        const quality = analyzeQuality(parsed);
+
         log("parse_result", {
           source: source.source,
           parsed: parsed.length,
+          score,
+          ...quality,
           traceId,
         });
 
-        if (parsed.length > bestParsed.length) {
+        // =====================================
+        // 🔥 BEST SELECTION (FIXED)
+        // =====================================
+        if (score > bestScore) {
           bestParsed = parsed;
           bestSource = source.source;
+          bestScore = score;
         }
+
       } catch (err) {
         log.warn("parse_failed_for_source", {
           source: source.source,
@@ -89,6 +148,7 @@ export async function processImageInput(
     log("parse_best_selected", {
       source: bestSource,
       count: bestParsed.length,
+      score: bestScore,
       traceId,
     });
 
