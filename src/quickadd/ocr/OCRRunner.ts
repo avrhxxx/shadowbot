@@ -30,12 +30,16 @@ async function runWithPSM(
 ) {
   log.trace("run_psm_start", traceId, { psm, label });
 
-  const result = await Tesseract.recognize(buffer, "eng", {
-    logger: () => {},
-    config: {
-      tessedit_pageseg_mode: String(psm), // ✅ FIX
-    },
-  });
+  const result = await Tesseract.recognize(
+    buffer,
+    "eng",
+    {
+      logger: () => {},
+      config: {
+        tessedit_pageseg_mode: String(psm),
+      },
+    } as any // ✅ FIX
+  );
 
   const text = result.data.text || "";
   const lines = text.split("\n");
@@ -73,31 +77,35 @@ export async function runFullImage(buffer: Buffer, traceId: string) {
 }
 
 // =====================================
-// 🔹 LINE OCR (PSM 11 - SPARSE 🔥)
+// 🔹 LINE OCR (PSM 11)
 // =====================================
 export async function runLineBased(buffer: Buffer, traceId: string) {
   return runWithPSM(buffer, traceId, 11, "SPARSE_PSM11");
 }
 
 // =====================================
-// 🔹 BOX OCR (PSM 4 - COLUMNS)
+// 🔹 BOX OCR (PSM 4)
 // =====================================
 export async function runBoxBased(buffer: Buffer, traceId: string) {
   return runWithPSM(buffer, traceId, 4, "BLOCK_PSM4");
 }
 
 // =====================================
-// 🔹 HOCR (STRUCTURE)
+// 🔹 HOCR
 // =====================================
 export async function runHOCR(buffer: Buffer, traceId: string) {
   log.trace("run_hocr_start", traceId);
 
-  const result = await Tesseract.recognize(buffer, "eng", {
-    logger: () => {},
-    config: {
-      tessedit_create_hocr: "1", // ✅ FIX
-    },
-  });
+  const result = await Tesseract.recognize(
+    buffer,
+    "eng",
+    {
+      logger: () => {},
+      config: {
+        tessedit_create_hocr: "1",
+      },
+    } as any // ✅ FIX
+  );
 
   const hocr = result.data.hocr || "";
 
