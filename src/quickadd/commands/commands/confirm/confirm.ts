@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/commands/confirm/confirm.ts
+// 📁 src/quickadd/commands/commands/confirm/confirm.ts
 // =====================================
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -30,10 +30,17 @@ export async function confirmCommand(
   const userId = interaction.user.id;
   const channelId = interaction.channelId;
 
+  const mode = interaction.options.getString("mode", true);
+  const manualEventId = interaction.options.getString("eventid");
+  const manualWeek = interaction.options.getString("week");
+
   log("confirm_attempt", {
     guildId,
     userId,
     channelId,
+    mode,
+    manualEventId,
+    manualWeek,
   });
 
   const session = QuickAddSession.get(guildId);
@@ -64,15 +71,12 @@ export async function confirmCommand(
     });
   }
 
-  // =====================================
-  // 🔥 HARD GATE
-  // =====================================
   const invalidEntries = entries.filter(
     (e: any) => e.status !== "OK"
   );
 
   // =============================
-  // 🧠 STAGE 1
+  // STAGE 1
   // =============================
   if (session.stage === "COLLECTING") {
     if (invalidEntries.length > 0) {
@@ -80,68 +84,61 @@ export async function confirmCommand(
 
       return interaction.editReply({
         content:
-`❌ **All entries must be valid (status ✅ OK)**
+`❌ All entries must be valid
 
-${preview}
-
-👉 Fix using:
-/q adjust`,
+${preview}`,
       });
     }
 
     const preview = formatPreview(entries);
 
     session.stage = "CONFIRM_PENDING";
-    session.finalPreview = preview;
-    session.confirmStartedAt = Date.now();
 
     return interaction.editReply({
       content:
-`⚠️ **CONFIRMATION REQUIRED**
+`⚠️ CONFIRM AGAIN TO FINALIZE
 
-${preview}
-
-👉 Type \`/q confirm\` again to finalize`,
+${preview}`,
     });
   }
 
   // =============================
-  // 🧠 STAGE 2 — FINAL
+  // STAGE 2
   // =============================
   if (session.stage === "CONFIRM_PENDING") {
-    if (invalidEntries.length > 0) {
-      return interaction.editReply({
-        content:
-`❌ Still invalid entries present
-
-Fix all issues before confirming.`,
-      });
-    }
-
     try {
       // =====================================
-      // 🔥 EVENTS FLOW
+      // EVENTS
       // =====================================
       if (session.type.startsWith("RR_")) {
-        const events = await readSheet(EVENTS_TAB);
-        const headers = events[0];
+        let eventId = manualEventId;
 
-        const idxId = headers.indexOf("eventId");
-        const idxType = headers.indexOf("eventType");
+        if (mode === "auto") {
+          const events = await readSheet(EVENTS_TAB);
+          const headers = events[0];
 
-        const matching = events
-          .slice(1)
-          .filter((row: any[]) => row[idxType] === session.type);
+          const idxId = headers.indexOf("eventId");
+          const idxType = headers.indexOf("eventType");
 
-        if (!matching.length) {
-          return interaction.editReply({
-            content: "❌ No matching event found",
-          });
+          const matching = events
+            .slice(1)
+            .filter((row: any[]) => row[idxType] === session.type);
+
+          if (!matching.length) {
+            return interaction.editReply({
+              content: "❌ No matching event found",
+            });
+          }
+
+          const selected = matching[matching.length - 1];
+          eventId = selected[idxId];
         }
 
-        // 🔥 NAJNOWSZY EVENT (last row)
-        const selected = matching[matching.length - 1];
-        const eventId = selected[idxId];
+        if (!eventId) {
+          return interaction.editReply({
+            content: "❌ Missing eventId",
+          });
+        }
 
         await enqueueEvents(
           entries.map((e: any) => ({
@@ -151,30 +148,29 @@ Fix all issues before confirming.`,
             nickname: e.nickname,
           }))
         );
-
-        log("events_enqueued", {
-          eventId,
-          count: entries.length,
-        });
       }
 
       // =====================================
-      // 🔥 POINTS FLOW
+      // POINTS
       // =====================================
       else {
-        const weeks = await readSheet(POINTS_WEEKS_TAB);
-        const headers = weeks[0];
+        let week = manualWeek;
 
-        const idxWeek = headers.indexOf("week");
+        if (mode === "auto") {
+          const weeks = await readSheet(POINTS_WEEKS_TAB);
+          const headers = weeks[0];
 
-        if (idxWeek === -1) {
-          return interaction.editReply({
-            content: "❌ Invalid weeks config",
-          });
+          const idxWeek = headers.indexOf("week");
+
+          const lastRow = weeks[weeks.length - 1];
+          week = lastRow[idxWeek];
         }
 
-        const lastRow = weeks[weeks.length - 1];
-        const week = lastRow[idxWeek];
+        if (!week) {
+          return interaction.editReply({
+            content: "❌ Missing week",
+          });
+        }
 
         await enqueuePoints(
           entries.map((e: any) => ({
@@ -185,11 +181,6 @@ Fix all issues before confirming.`,
             points: e.value,
           }))
         );
-
-        log("points_enqueued", {
-          week,
-          count: entries.length,
-        });
       }
 
     } catch (err) {
@@ -200,18 +191,10 @@ Fix all issues before confirming.`,
       });
     }
 
-    // =====================================
-    // 🔥 RESET
-    // =====================================
     session.stage = "COLLECTING";
-    session.finalPreview = undefined;
-    session.confirmStartedAt = undefined;
 
     return interaction.editReply({
-      content:
-`✅ **Data sent to queue**
-
-⚙️ Worker will process it shortly`,
+      content: "✅ Data sent",
     });
   }
 
