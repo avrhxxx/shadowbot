@@ -2,6 +2,21 @@
 // 📁 src/index.ts
 // =====================================
 
+/**
+ * 🧠 ROLE:
+ * Main application entry point.
+ *
+ * Responsible for:
+ * - bootstrapping Discord client
+ * - initializing modules
+ * - registering QuickAdd system (commands + listener + worker)
+ * - wiring global interaction handlers
+ *
+ * ❗ RULES:
+ * - no business logic here
+ * - only orchestration / initialization
+ */
+
 // 🔥 INIT GOOGLE CLIENT
 import "./google/googleSheetsClient";
 
@@ -24,12 +39,15 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
 
-// ✅ FIX: tylko qCommand
-import { qCommand } from "./quickadd/commands/CommandBuilder";
-import { handleQuickAddInteraction } from "./quickadd/commands/CommandHandler";
+// ✅ FIX — updated paths (commands → discord)
+import { qCommand } from "./quickadd/discord/CommandBuilder";
+import { handleQuickAddInteraction } from "./quickadd/discord/CommandRouter";
 
-import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelService";
-import { registerQuickAddListener } from "./quickadd/QuickAddListener";
+// ✅ FIX — renamed service → manager
+import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelManager";
+
+// ✅ FIX — listener moved to discord layer
+import { registerQuickAddListener } from "./quickadd/discord/QuickAddListener";
 
 // 🔥 FIX — PATH
 import { ensureAllSheets } from "./google/googleSheetsStorage";
