@@ -10,6 +10,9 @@ import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 import { appendQuickAddRows } from "../../googleSheetsStorage"; // 🔥 NEW
 
+// 🔥 NEW
+import { validateEntries } from "../validation/QuickAddValidator";
+
 const log = createLogger("PIPELINE");
 
 const previewMessages = new Map<string, string>();
@@ -60,7 +63,7 @@ export async function processImageInput(
       if (parsed.length > 0) {
         const rows = parsed.map((entry) => ({
           type: session.type,
-          ocr: entry.raw || entry.nickname, // fallback jeśli brak raw
+          ocr: entry.raw || entry.nickname,
           final: `${entry.nickname}:${entry.value}`,
         }));
 
@@ -76,8 +79,30 @@ export async function processImageInput(
     }
 
     // =====================================
+    // 🔥 VALIDATION LAYER (NEW)
+    // =====================================
+    let validated = [];
 
-    QuickAddBuffer.addEntries(guildId, parsed);
+    try {
+      validated = await validateEntries(parsed);
+
+      log("validation_done", {
+        count: validated.length,
+        traceId,
+      });
+    } catch (err) {
+      log.warn("validation_failed_fallback_to_parsed", err);
+
+      // fallback → zachowujemy stary flow
+      validated = parsed.map((e) => ({
+        ...e,
+      }));
+    }
+
+    // =====================================
+    // 🔥 BUFFER (validated instead of raw)
+    // =====================================
+    QuickAddBuffer.addEntries(guildId, validated as any);
 
     if (message.channel && "send" in message.channel) {
       const allData = QuickAddBuffer.getEntries(guildId);
