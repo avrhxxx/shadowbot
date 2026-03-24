@@ -8,6 +8,18 @@ import { createLogger } from "../debug/DebugLogger";
 const log = createLogger("OCR");
 
 // =====================================
+// 🧱 TYPES
+// =====================================
+export type OCRToken = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+};
+
+// =====================================
 // 🔹 FULL IMAGE OCR
 // =====================================
 export async function runFullImage(buffer: Buffer, traceId: string) {
@@ -18,8 +30,6 @@ export async function runFullImage(buffer: Buffer, traceId: string) {
   });
 
   const text = result.data.text || "";
-
-  // 🔥 RAW — NO CLEANING
   const lines = text.split("\n");
 
   log.trace("run_full_result", traceId, {
@@ -31,7 +41,7 @@ export async function runFullImage(buffer: Buffer, traceId: string) {
 }
 
 // =====================================
-// 🔹 LINE BASED OCR (fallback variant)
+// 🔹 LINE BASED OCR (fallback)
 // =====================================
 export async function runLineBased(buffer: Buffer, traceId: string) {
   log.trace("run_line_start", traceId);
@@ -52,8 +62,37 @@ export async function runLineBased(buffer: Buffer, traceId: string) {
 }
 
 // =====================================
-// 🔹 BLOCK (NOT USED YET)
+// 🔥 BOX BASED OCR (NEW - LAYOUT)
 // =====================================
-export async function runBlockBased(_buffer: Buffer) {
-  return { text: "", lines: [] };
+export async function runBoxBased(buffer: Buffer, traceId: string) {
+  log.trace("run_box_start", traceId);
+
+  const result = await Tesseract.recognize(buffer, "eng", {
+    logger: () => {},
+  });
+
+  const words = result.data.words || [];
+
+  const tokens: OCRToken[] = words.map((w: any) => ({
+    text: w.text,
+    x: w.bbox.x0,
+    y: w.bbox.y0,
+    width: w.bbox.x1 - w.bbox.x0,
+    height: w.bbox.y1 - w.bbox.y0,
+    confidence: w.confidence,
+  }));
+
+  // 🔥 DEBUG: podstawowe statystyki
+  log.trace("run_box_result", traceId, {
+    tokens: tokens.length,
+  });
+
+  // 🔥 DEBUG: sample (żeby nie spamować)
+  log.trace("run_box_sample", traceId, {
+    sample: tokens.slice(0, 5),
+  });
+
+  return {
+    tokens,
+  };
 }
