@@ -2,11 +2,11 @@
 // 📁 src/quickadd/integrations/QuickAddQueueWorker.ts
 // =====================================
 
-import { createLogger } from "../../debug/DebugLogger";
-import { readSheet, updateCell } from "../../../googleSheetsStorage";
+import { createLogger } from "../debug/DebugLogger"; // ✅ FIX
+import { readSheet, updateCell } from "../../../google/googleSheetsStorage"; // ✅ FIX
 
-import { addParticipants } from "../../eventsPanel/eventService";
-import { addPoints } from "../../pointsPanel/pointsService";
+import { addParticipants } from "../../eventsPanel/eventService"; // ✅ FIX
+import { addPoints } from "../../pointsPanel/pointsService"; // ✅ FIX
 
 const log = createLogger("QA_WORKER");
 
@@ -81,7 +81,7 @@ async function processEventsQueue() {
     if (status !== "PENDING") continue;
 
     const entry: EventQueueRow = {
-      rowIndex: i + 1, // sheets index
+      rowIndex: i + 1,
       guildId: row[idxGuild],
       eventId: row[idxEvent],
       type: row[idxType],
@@ -90,21 +90,18 @@ async function processEventsQueue() {
     };
 
     try {
-      // 🔥 tylko RR → participants
       if (entry.type === "RR_SIGNUPS") {
         await addParticipants(entry.guildId, entry.eventId, [
           entry.nickname,
         ]);
       }
 
-      // 🔥 RR_RESULTS → na razie też participants (logika absent później)
       if (entry.type === "RR_RESULTS") {
         await addParticipants(entry.guildId, entry.eventId, [
           entry.nickname,
         ]);
       }
 
-      // ✅ MARK PROCESSED
       await updateCell(EVENTS_QUEUE_TAB, entry.rowIndex, idxStatus + 1, "PROCESSED");
       await updateCell(EVENTS_QUEUE_TAB, entry.rowIndex, idxProcessedAt + 1, Date.now());
 
@@ -144,7 +141,7 @@ async function processPointsQueue() {
 
     const entry: PointsQueueRow = {
       rowIndex: i + 1,
-      guildId: "", // nieużywane tutaj
+      guildId: "",
       category: row[idxCategory],
       week: row[idxWeek],
       nickname: row[idxNick],
@@ -160,7 +157,6 @@ async function processPointsQueue() {
         points: entry.points,
       });
 
-      // ✅ MARK PROCESSED
       await updateCell(POINTS_QUEUE_TAB, entry.rowIndex, idxStatus + 1, "PROCESSED");
       await updateCell(POINTS_QUEUE_TAB, entry.rowIndex, idxProcessedAt + 1, Date.now());
 
