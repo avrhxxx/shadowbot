@@ -26,17 +26,21 @@ export function formatPreview(entries: ParsedEntry[]): string {
 
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
 
+      // =====================================
       // 🔥 STATUS ICON
-      let statusIcon = "";
+      // =====================================
+      let statusIcon = "❔";
       if (entry.status === "ERROR") statusIcon = "❌";
       else if (entry.status === "WARNING") statusIcon = "⚠️";
       else if (entry.status === "OK") statusIcon = "✅";
 
       let line = `[${id}] ${paddedName} → ${formatNumber(entry.value)} ${statusIcon}`;
 
-      // 🔥 SUGGESTION
+      // =====================================
+      // 💡 SUGGESTION (BETTER VISIBILITY)
+      // =====================================
       if (entry.suggestion && entry.suggestion !== entry.nickname) {
-        line += `\n   💡 suggestion: ${entry.suggestion}`;
+        line += `\n   💡 Suggestion → ${entry.suggestion}`;
       }
 
       return line;
@@ -53,7 +57,18 @@ ${formattedEntries}
 
 ━━━━━━━━━━━━━━━━━━
 
-${hasIssues ? "⚠️ **Some entries require attention before confirm**\n\n" : ""}✏️ **Adjust entry**
+📘 **Legend**
+✅ OK — ready to confirm  
+⚠️ Warning — review recommended  
+❌ Error — must fix  
+❔ Unknown — not validated  
+
+━━━━━━━━━━━━━━━━━━
+
+${hasIssues 
+  ? "⚠️ **Some entries require attention before confirm**\n\n" 
+  : "✅ **All entries ready — you can confirm**\n\n"
+}✏️ **Adjust entry**
 
 Use:
 • id = entry number  
@@ -62,6 +77,11 @@ Use:
 
 Command:
 → /q adjust id:<id> field:<field> value:<value>
+
+━━━━━━━━━━━━━━━━━━
+
+🚀 **Next step**
+→ /q confirm
 `.trim();
 }
 
