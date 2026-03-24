@@ -3,13 +3,14 @@
 // =====================================
 
 import fetch from "node-fetch";
-import { preprocessImage } from "./OCRPreprocess";
-import { runFullImage } from "./OCRRunner";
+import { preprocessBase, preprocessForTesseract } from "./OCRPreprocess";
+import { runFullImage, runLineBased } from "./OCRRunner";
 import { createLogger } from "../debug/DebugLogger";
+import { OCRMultiResult } from "./OCRTypes";
 
 const log = createLogger("OCR");
 
-export async function runOCR(imageUrl: string, traceId: string) {
+export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMultiResult> {
   log.trace("ocr_start", traceId, imageUrl);
 
   try {
@@ -24,23 +25,51 @@ export async function runOCR(imageUrl: string, traceId: string) {
 
     log.trace("image_downloaded", traceId, { size: buffer.length });
 
-    const processed = await preprocessImage(buffer);
+    // =====================================
+    // 🔹 BASE PREPROCESS
+    // =====================================
+    const base = await preprocessBase(buffer);
 
-    // ✅ FIX: dodany traceId
-    const result = await runFullImage(processed, traceId);
+    // =====================================
+    // 🔹 ENGINE PREPROCESS
+    // =====================================
+    const tesseractBuffer = await preprocessForTesseract(base);
 
-    log.trace("ocr_done", traceId, {
-      textLength: result.text.length,
-      lines: result.lines.length,
+    // =====================================
+    // 🔹 RUN MULTI OCR
+    // =====================================
+    const results = await Promise.all([
+      runFullImage(tesseractBuffer, traceId),
+      runLineBased(tesseractBuffer, traceId),
+    ]);
+
+    const sources = [
+      {
+        source: "TESSERACT_FULL" as const,
+        text: results[0].text,
+        lines: results[0].lines,
+      },
+      {
+        source: "TESSERACT_LINE" as const,
+        text: results[1].text,
+        lines: results[1].lines,
+      },
+    ];
+
+    log.trace("ocr_multi_done", traceId, {
+      sources: sources.map((s) => ({
+        source: s.source,
+        lines: s.lines.length,
+        textLength: s.text.length,
+      })),
     });
 
-    return result;
+    return { sources };
   } catch (err) {
     log.error("ocr_error", err, traceId);
 
     return {
-      text: "",
-      lines: [],
+      sources: [],
     };
   }
 }
