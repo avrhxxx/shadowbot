@@ -70,11 +70,18 @@ function applySubcommands(builder: SlashCommandBuilder) {
         )
     )
 
-    // ✅ CONFIRM (NEW)
+    // ✅ CONFIRM
     .addSubcommand((sub) =>
       sub
         .setName("confirm")
         .setDescription("Confirm and send data to queue")
+    )
+
+    // ❌ CANCEL (NEW)
+    .addSubcommand((sub) =>
+      sub
+        .setName("cancel")
+        .setDescription("Cancel session without saving")
     );
 }
 
