@@ -7,7 +7,6 @@ type ParsedEntry = {
   value: number;
   id: number;
 
-  // 🔥 NEW (optional)
   status?: string;
   confidence?: number;
   suggestion?: string;
@@ -23,21 +22,45 @@ export function formatPreview(entries: ParsedEntry[]): string {
   const formattedEntries = entries
     .map((entry) => {
       const id = entry.id;
-
       const paddedName = entry.nickname.padEnd(maxNameLength, " ");
 
       // =====================================
-      // 🔥 STATUS ICON
+      // 🔥 STATUS MAPPING (FIX)
       // =====================================
       let statusIcon = "❔";
-      if (entry.status === "ERROR") statusIcon = "❌";
-      else if (entry.status === "WARNING") statusIcon = "⚠️";
-      else if (entry.status === "OK") statusIcon = "✅";
+      let confidenceText = "";
 
-      let line = `[${id}] ${paddedName} → ${formatNumber(entry.value)} ${statusIcon}`;
+      switch (entry.status) {
+        case "OK":
+          statusIcon = "✅";
+          break;
+
+        case "LOW_CONFIDENCE":
+          statusIcon = "⚠️";
+          break;
+
+        case "UNRESOLVED":
+        case "INVALID_VALUE":
+          statusIcon = "❌";
+          break;
+
+        case "DUPLICATE":
+          statusIcon = "⚠️";
+          break;
+      }
 
       // =====================================
-      // 💡 SUGGESTION (BETTER VISIBILITY)
+      // 🔢 CONFIDENCE (NEW)
+      // =====================================
+      if (entry.confidence !== undefined) {
+        const percent = Math.round(entry.confidence * 100);
+        confidenceText = ` (${percent}%)`;
+      }
+
+      let line = `[${id}] ${paddedName} → ${formatNumber(entry.value)} ${statusIcon}${confidenceText}`;
+
+      // =====================================
+      // 💡 SUGGESTION
       // =====================================
       if (entry.suggestion && entry.suggestion !== entry.nickname) {
         line += `\n   💡 Suggestion → ${entry.suggestion}`;
@@ -47,7 +70,17 @@ export function formatPreview(entries: ParsedEntry[]): string {
     })
     .join("\n");
 
-  const hasIssues = entries.some(e => e.status && e.status !== "OK");
+  const hasBlockingIssues = entries.some(
+    e =>
+      e.status === "UNRESOLVED" ||
+      e.status === "INVALID_VALUE"
+  );
+
+  const hasWarnings = entries.some(
+    e =>
+      e.status === "LOW_CONFIDENCE" ||
+      e.status === "DUPLICATE"
+  );
 
   return `
 📊 **QuickAdd Preview**
@@ -58,17 +91,21 @@ ${formattedEntries}
 ━━━━━━━━━━━━━━━━━━
 
 📘 **Legend**
-✅ OK — ready to confirm  
-⚠️ Warning — review recommended  
-❌ Error — must fix  
-❔ Unknown — not validated  
+✅ OK — ready  
+⚠️ Needs review  
+❌ Must fix  
 
 ━━━━━━━━━━━━━━━━━━
 
-${hasIssues 
-  ? "⚠️ **Some entries require attention before confirm**\n\n" 
-  : "✅ **All entries ready — you can confirm**\n\n"
-}✏️ **Adjust entry**
+${
+  hasBlockingIssues
+    ? "❌ **Fix errors before confirming**\n\n"
+    : hasWarnings
+    ? "⚠️ **Some entries may need review**\n\n"
+    : "✅ **All entries ready — you can confirm**\n\n"
+}
+
+✏️ **Adjust entry**
 
 Use:
 • id = entry number  
