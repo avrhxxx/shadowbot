@@ -2,25 +2,24 @@
 // 📁 src/quickadd/storage/QuickAddService.ts
 // =====================================
 
-import { createLogger } from "../debug/DebugLogger";
-
-// 🔥 LOW LEVEL STORAGE (ONLY HERE)
 import {
+  appendQuickAddRows,
   appendQuickAddAdjusted,
   readSheet,
   updateCell,
 } from "../../googleSheetsStorage";
+
+import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("QA_SERVICE");
 
 // =====================================
 // TYPES
 // =====================================
-type QueueEntry = {
-  guildId: string;
+type LearningRow = {
   type: string;
-  nickname: string;
-  value?: number;
+  ocr: string;
+  final: string;
 };
 
 type AdjustedEntry = {
@@ -28,8 +27,32 @@ type AdjustedEntry = {
   nickname: string;
 };
 
+type QueueEntry = {
+  guildId: string;
+  type: string;
+  nickname: string;
+  value: number;
+};
+
 // =====================================
-// 🔥 ADJUSTED (LEARNING)
+// 📊 LEARNING (RAW OCR → SHEET)
+// =====================================
+export async function saveLearning(rows: LearningRow[]) {
+  if (!rows.length) return;
+
+  try {
+    await appendQuickAddRows(rows);
+
+    log("learning_saved", {
+      count: rows.length,
+    });
+  } catch (err) {
+    log.warn("learning_failed", err);
+  }
+}
+
+// =====================================
+// ✏️ ADJUSTED (NICKNAME LEARNING)
 // =====================================
 export async function saveAdjusted(entries: AdjustedEntry[]) {
   if (!entries.length) return;
@@ -41,82 +64,69 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
       count: entries.length,
     });
   } catch (err) {
-    log.warn("adjusted_save_failed", err);
+    log.warn("adjusted_failed", err);
   }
 }
 
 // =====================================
-// 🔥 EVENTS QUEUE (READ)
+// 📥 QUEUE (CONFIRM → SHEETS)
 // =====================================
-export async function getEventsQueue() {
+export async function enqueue(entries: QueueEntry[]) {
+  if (!entries.length) return;
+
   try {
-    const rows = await readSheet("quickadd_events_queue");
+    const rows = entries.map((e) => [
+      e.guildId,
+      e.type,
+      e.nickname,
+      e.value,
+      "PENDING",
+      Date.now(),
+    ]);
 
-    if (!rows || rows.length < 2) return [];
+    await appendToQueue(rows);
 
-    const headers = rows[0];
-
-    const idx = (name: string) => headers.indexOf(name);
-
-    return rows.slice(1).map((row, i) => ({
-      rowIndex: i + 2,
-      guildId: row[idx("guildId")],
-      eventId: row[idx("eventId")],
-      type: row[idx("type")],
-      nickname: row[idx("nickname")],
-      status: row[idx("status")],
-    }));
+    log("queue_saved", {
+      count: rows.length,
+    });
   } catch (err) {
-    log.warn("events_queue_read_failed", err);
-    return [];
+    log.error("queue_failed", err);
+    throw err;
   }
 }
 
 // =====================================
-// 🔥 POINTS QUEUE (READ)
+// 🔧 INTERNAL QUEUE APPEND
 // =====================================
-export async function getPointsQueue() {
-  try {
-    const rows = await readSheet("quickadd_points_queue");
+async function appendToQueue(values: any[][]) {
+  // 🔥 używamy bezpośrednio read/write (brak helpera w storage)
+  // możesz później wydzielić do googleSheetsStorage
 
-    if (!rows || rows.length < 2) return [];
+  const tab = "quickadd_points_queue"; // 🔥 na start tylko points
 
-    const headers = rows[0];
+  const existing = await readSheet(tab);
 
-    const idx = (name: string) => headers.indexOf(name);
+  const newData = [...existing, ...values];
 
-    return rows.slice(1).map((row, i) => ({
-      rowIndex: i + 2,
-      category: row[idx("category")],
-      week: row[idx("week")],
-      nickname: row[idx("nickname")],
-      points: row[idx("points")],
-      status: row[idx("status")],
-    }));
-  } catch (err) {
-    log.warn("points_queue_read_failed", err);
-    return [];
-  }
+  // ⚠️ writeSheet nadpisuje → OK dla MVP
+  const { writeSheet } = await import("../../googleSheetsStorage");
+
+  await writeSheet(tab, newData);
 }
 
 // =====================================
-// 🔥 MARK PROCESSED
+// 📤 WORKER HELPERS (OPTIONAL)
 // =====================================
+export async function getQueue(tab: string) {
+  return readSheet(tab);
+}
+
 export async function markProcessed(
   tab: string,
   rowIndex: number,
   statusCol: number,
   processedAtCol: number
 ) {
-  try {
-    await updateCell(tab, rowIndex, statusCol, "PROCESSED");
-    await updateCell(tab, rowIndex, processedAtCol, Date.now());
-
-    log("row_marked_processed", {
-      tab,
-      rowIndex,
-    });
-  } catch (err) {
-    log.warn("mark_processed_failed", err);
-  }
+  await updateCell(tab, rowIndex, statusCol, "PROCESSED");
+  await updateCell(tab, rowIndex, processedAtCol, Date.now());
 }
