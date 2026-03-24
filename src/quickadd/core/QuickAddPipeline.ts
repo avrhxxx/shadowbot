@@ -125,9 +125,6 @@ export async function processImageInput(
           );
         }
 
-        // =====================================
-        // 🔥 QUALITY ANALYSIS
-        // =====================================
         const score = scoreParsed(parsed);
         const quality = analyzeQuality(parsed);
 
@@ -162,22 +159,21 @@ export async function processImageInput(
     });
 
     // =====================================
-    // 🔥 LEARNING (OCR → LAYOUT → PARSER)
+    // 🔥 LEARNING (POPRAWIONE)
     // =====================================
     try {
-      const learningRows = bestParsed.map((e, i) => {
-        const layoutRow = bestLayout?.[i];
+      const learningRows = bestLayout.map((row: any) => {
+        const raw = row.raw.map((t: any) => t.text).join(" ");
+        const layoutText = [
+          ...row.left.map((t: any) => t.text),
+          ...row.right.map((t: any) => t.text),
+        ].join(" ");
 
         return {
           type: session.type,
-          ocr_raw: e.nickname,
-          layout_text: layoutRow
-            ? [
-                ...layoutRow.left.map((t: any) => t.text),
-                ...layoutRow.right.map((t: any) => t.text),
-              ].join(" ")
-            : "",
-          parser_output: e.nickname,
+          ocr_raw: raw,
+          layout_text: layoutText,
+          parser_output: "", // ❗ parser NIE jest 1:1 z row → zostawiamy puste lub rozszerzymy później
         };
       });
 
@@ -187,7 +183,7 @@ export async function processImageInput(
     }
 
     // =====================================
-    // 🔥 MAPPING (RESOLVE NICKNAMES)
+    // 🔥 MAPPING
     // =====================================
     let mapped: any[] = [];
 
