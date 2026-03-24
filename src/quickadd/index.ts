@@ -52,7 +52,8 @@ export * from "./mapping/NicknameResolver";
 // 🔹 VALIDATION
 // =====================================
 
-export * from "./validation/QuickAddValidator";
+// ✅ FIX — avoid export collision with QuickAddTypes
+export { validateEntries } from "./validation/QuickAddValidator";
 
 // =====================================
 // 🔹 STORAGE
