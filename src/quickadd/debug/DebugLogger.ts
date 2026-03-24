@@ -51,44 +51,41 @@ const RESET = "\x1b[0m";
 
 /**
  * =====================================
- * 🔥 TRACE GROUPING (IMPROVED)
+ * 🔥 TRACE + SECTION TRACKING
  * =====================================
  */
 
 let currentTraceId: string | null = null;
+let currentScope: DebugScope | null = null;
 
-function handleTraceGrouping(traceId?: string) {
+function printTraceHeader(traceId: string) {
+  console.log(`\n══════════ TRACE ${traceId} ══════════`);
+}
+
+function printScopeSeparator(scope: DebugScope) {
+  const color = scopeColors[scope] || "";
+  console.log(`${color}━━━━━━━━━━ ${scope} ━━━━━━━━━━${RESET}`);
+}
+
+function handleGrouping(scope: DebugScope, traceId?: string) {
   if (!traceId) return;
 
+  // 🔁 TRACE change
   if (currentTraceId && currentTraceId !== traceId) {
-    console.groupEnd();
-    console.log("\n"); // odstęp między trace
+    console.log(""); // spacing
   }
 
   if (currentTraceId !== traceId) {
-    console.log("======================================");
-    console.group(`▼ TRACE ${traceId}`);
+    printTraceHeader(traceId);
     currentTraceId = traceId;
+    currentScope = null; // reset scope on new trace
   }
-}
 
-/**
- * =====================================
- * 🔹 HELPERS
- * =====================================
- */
-
-function isImportantTag(tag: string): boolean {
-  return (
-    tag.includes("start") ||
-    tag.includes("done") ||
-    tag.includes("error") ||
-    tag.includes("failed")
-  );
-}
-
-function printSeparator() {
-  console.log("--------------------------------------------------");
+  // 🔁 Scope change
+  if (currentScope !== scope) {
+    printScopeSeparator(scope);
+    currentScope = scope;
+  }
 }
 
 /**
@@ -108,12 +105,6 @@ function logMessage(
 
   const time = new Date().toISOString().split("T")[1].split(".")[0];
 
-  // TRACE GROUPING
-  handleTraceGrouping(traceId);
-
-  // =====================================
-  // COMPACT MODE
-  // =====================================
   if (!PRETTY_LOGS) {
     const prefix = traceId
       ? `[QA:${scope}:${tag}:${traceId}:${time}]`
@@ -123,27 +114,24 @@ function logMessage(
     return;
   }
 
+  // 🔥 GROUPING
+  handleGrouping(scope, traceId);
+
   // =====================================
-  // PRETTY MODE
+  // 🎨 PRETTY HEADER
   // =====================================
   const color = scopeColors[scope] || "";
   const header = `${color}${scope}${RESET}`;
   const meta = traceId ? `${tag} #${traceId}` : tag;
 
-  // separator dla ważnych eventów
-  if (isImportantTag(tag)) {
-    printSeparator();
-  }
-
   console[level](`${header} ${meta} (${time})`);
 
+  // =====================================
+  // 📦 PAYLOAD
+  // =====================================
   if (args.length > 0) {
     for (const arg of args) {
-      if (typeof arg === "object") {
-        console.dir(arg, { depth: null, colors: true });
-      } else {
-        console.log("   ", arg);
-      }
+      console[level]("   ↳", arg);
     }
   }
 }
