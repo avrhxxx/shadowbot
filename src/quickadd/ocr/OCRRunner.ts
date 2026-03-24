@@ -20,7 +20,7 @@ export type OCRToken = {
 };
 
 // =====================================
-// 🔹 INTERNAL HELPER (PSM RUN)
+// 🔹 INTERNAL RUN WITH PSM
 // =====================================
 async function runWithPSM(
   buffer: Buffer,
@@ -31,79 +31,12 @@ async function runWithPSM(
   log.trace("run_psm_start", traceId, { psm, label });
 
   const result = await Tesseract.recognize(buffer, "eng", {
-    tessedit_pageseg_mode: psm,
+    tessedit_pageseg_mode: String(psm),
     logger: () => {},
   });
 
   const text = result.data.text || "";
   const lines = text.split("\n");
-
-  log.trace("run_psm_result", traceId, {
-    label,
-    psm,
-    length: text.length,
-    lines: lines.length,
-  });
-
-  return { text, lines };
-}
-
-// =====================================
-// 🔹 FULL IMAGE OCR (MULTI PSM)
-// =====================================
-export async function runFullImage(buffer: Buffer, traceId: string) {
-  const runs = await Promise.all([
-    runWithPSM(buffer, traceId, Tesseract.PSM.SPARSE_TEXT, "SPARSE"),
-    runWithPSM(buffer, traceId, Tesseract.PSM.AUTO, "AUTO"),
-    runWithPSM(buffer, traceId, Tesseract.PSM.SINGLE_BLOCK, "BLOCK"),
-  ]);
-
-  const mergedText = runs.map((r) => r.text).join("\n");
-  const mergedLines = mergedText.split("\n");
-
-  log.trace("run_full_merged", traceId, {
-    totalLines: mergedLines.length,
-  });
-
-  return {
-    text: mergedText,
-    lines: mergedLines,
-  };
-}
-
-// =====================================
-// 🔹 LINE BASED OCR (fallback)
-// =====================================
-export async function runLineBased(buffer: Buffer, traceId: string) {
-  log.trace("run_line_start", traceId);
-
-  const result = await Tesseract.recognize(buffer, "eng", {
-    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-    logger: () => {},
-  });
-
-  const text = result.data.text || "";
-  const lines = text.split("\n");
-
-  log.trace("run_line_result", traceId, {
-    length: text.length,
-    lines: lines.length,
-  });
-
-  return { text, lines };
-}
-
-// =====================================
-// 🔥 BOX BASED OCR (TOKENS)
-// =====================================
-export async function runBoxBased(buffer: Buffer, traceId: string) {
-  log.trace("run_box_start", traceId);
-
-  const result = await Tesseract.recognize(buffer, "eng", {
-    tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
-    logger: () => {},
-  });
-
   const words = result.data.words || [];
 
   const tokens: OCRToken[] = words.map((w: any) => ({
@@ -115,28 +48,50 @@ export async function runBoxBased(buffer: Buffer, traceId: string) {
     confidence: w.confidence,
   }));
 
-  log.trace("run_box_result", traceId, {
+  log.trace("run_psm_result", traceId, {
+    label,
+    psm,
+    textLength: text.length,
+    lines: lines.length,
     tokens: tokens.length,
   });
 
-  log.trace("run_box_sample", traceId, {
-    sample: tokens.slice(0, 10),
-  });
-
   return {
+    text,
+    lines,
     tokens,
   };
 }
 
 // =====================================
-// 🔥 HOCR (STRUCTURE)
+// 🔹 FULL IMAGE OCR (PSM 6)
+// =====================================
+export async function runFullImage(buffer: Buffer, traceId: string) {
+  return runWithPSM(buffer, traceId, 6, "FULL_PSM6");
+}
+
+// =====================================
+// 🔹 LINE OCR (PSM 11 - SPARSE 🔥)
+// =====================================
+export async function runLineBased(buffer: Buffer, traceId: string) {
+  return runWithPSM(buffer, traceId, 11, "SPARSE_PSM11");
+}
+
+// =====================================
+// 🔹 BOX OCR (PSM 4 - COLUMNS)
+// =====================================
+export async function runBoxBased(buffer: Buffer, traceId: string) {
+  return runWithPSM(buffer, traceId, 4, "BLOCK_PSM4");
+}
+
+// =====================================
+// 🔹 HOCR (STRUCTURE)
 // =====================================
 export async function runHOCR(buffer: Buffer, traceId: string) {
   log.trace("run_hocr_start", traceId);
 
   const result = await Tesseract.recognize(buffer, "eng", {
-    tessjs_create_hocr: "1",
-    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+    tessedit_create_hocr: "1",
     logger: () => {},
   });
 
