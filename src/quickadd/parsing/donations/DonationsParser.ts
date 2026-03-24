@@ -3,16 +3,9 @@
 // =====================================
 
 import { createLogger } from "../../debug/DebugLogger";
-import { extractLayoutEntries } from "../layout/LayoutParser";
-import { OCRToken } from "../../ocr/OCRRunner";
+import { LayoutRow } from "../layout/LayoutParser";
 
 const log = createLogger("PARSER");
-
-type Candidate = {
-  type: "nickname" | "value";
-  raw: string;
-  index: number;
-};
 
 type ParsedEntry = {
   nickname: string;
@@ -20,10 +13,13 @@ type ParsedEntry = {
 };
 
 // =====================================
-// 🧠 MAIN PARSER (LINES PIPELINE)
+// 🧠 MAIN — LINES (OLD MODE)
 // =====================================
 
-export function parseDonations(lines: string[], traceId: string): ParsedEntry[] {
+export function parseDonations(
+  lines: string[],
+  traceId: string
+): ParsedEntry[] {
   log.trace("parse_start", traceId, { lines: lines.length });
 
   const candidates = extractCandidates(lines, traceId);
@@ -39,30 +35,38 @@ export function parseDonations(lines: string[], traceId: string): ParsedEntry[] 
 }
 
 // =====================================
-// 🔥 NEW — LAYOUT MODE
+// 🔥 MAIN — LAYOUT MODE (NEW CORE)
 // =====================================
 
 export function parseDonationsFromLayout(
-  tokens: OCRToken[],
+  layout: LayoutRow[],
   traceId: string
 ): ParsedEntry[] {
   log.trace("parse_layout_start", traceId, {
-    tokens: tokens.length,
+    rows: layout.length,
   });
 
-  // 🔹 1. Layout extraction
-  const layoutEntries = extractLayoutEntries(tokens, traceId);
+  const extracted: { nickname: string; valueRaw: string }[] = [];
 
-  // 🔹 2. Reuse clean stage
-  const cleaned = cleanEntries(
-    layoutEntries.map((e) => ({
-      nickname: e.nicknameRaw,
-      valueRaw: e.valueRaw,
-    })),
-    traceId
-  );
+  for (const row of layout) {
+    const nickname = joinTokens(row.left);
+    const valueRaw = joinTokens(row.right);
 
-  // 🔹 3. Final validation
+    if (!nickname || !valueRaw) continue;
+
+    extracted.push({
+      nickname,
+      valueRaw,
+    });
+
+    log.trace("layout_row_used", traceId, {
+      nickname,
+      valueRaw,
+      raw: row.raw.map((t) => t.text),
+    });
+  }
+
+  const cleaned = cleanEntries(extracted, traceId);
   const final = finalizeEntries(cleaned, traceId);
 
   log.trace("parse_layout_done", traceId, {
@@ -73,8 +77,14 @@ export function parseDonationsFromLayout(
 }
 
 // =====================================
-// 🔍 STAGE 1 — EXTRACT
+// 🔍 STAGE 1 — EXTRACT (LINES MODE)
 // =====================================
+
+type Candidate = {
+  type: "nickname" | "value";
+  raw: string;
+  index: number;
+};
 
 function extractCandidates(lines: string[], traceId: string): Candidate[] {
   const results: Candidate[] = [];
@@ -107,7 +117,7 @@ function extractCandidates(lines: string[], traceId: string): Candidate[] {
 }
 
 // =====================================
-// 🔗 STAGE 2 — PAIR
+// 🔗 STAGE 2 — PAIR (LINES MODE)
 // =====================================
 
 function pairEntries(candidates: Candidate[], traceId: string) {
@@ -187,16 +197,20 @@ function finalizeEntries(
 }
 
 // =====================================
-// 🔢 NUMBER PARSER
+// 🔧 HELPERS
 // =====================================
+
+function joinTokens(tokens: any[]): string {
+  return tokens
+    .sort((a, b) => a.x - b.x)
+    .map((t) => t.text)
+    .join(" ")
+    .trim();
+}
 
 function parseNumber(raw: string): number {
   return parseInt(raw.replace(/[^\d]/g, ""));
 }
-
-// =====================================
-// 🧼 CLEAN NICKNAME
-// =====================================
 
 function cleanNickname(name: string): string {
   return name
@@ -206,10 +220,6 @@ function cleanNickname(name: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 }
-
-// =====================================
-// 🧠 VALIDATION
-// =====================================
 
 function isValidNickname(name: string): boolean {
   if (!name) return false;
