@@ -176,7 +176,7 @@ export async function processImageInput(
           type: session.type,
           ocr_raw: raw,
           layout_text: layoutText,
-          parser_output: matched || "",
+          parser_output: matched ?? "", // ✅ FIX (no null)
         };
       });
 
@@ -271,7 +271,7 @@ export async function processImageInput(
 function findBestMatch(layoutText: string, parsed: any[]): string {
   const cleanLayout = clean(layoutText);
 
-  let best: string | null = null;
+  let best: string = ""; // ✅ FIX (no null)
 
   for (const p of parsed) {
     const cleanParsed = clean(p.nickname);
@@ -287,7 +287,7 @@ function findBestMatch(layoutText: string, parsed: any[]): string {
     }
   }
 
-  return best;
+  return best; // ✅ always string
 }
 
 function clean(input: string): string {
