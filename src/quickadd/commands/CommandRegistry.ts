@@ -9,6 +9,7 @@ import {
   adjustCommand,
   confirmCommand,
   cancelCommand,
+  fixCommand, // ✅ NEW
 } from "./commands";
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -26,6 +27,7 @@ export const CommandRegistry: Record<string, CommandHandler> = {
   end: endCommand,
   preview: previewCommand,
   adjust: adjustCommand,
+  fix: fixCommand, // ✅ NEW
   confirm: confirmCommand,
   cancel: cancelCommand,
 };
