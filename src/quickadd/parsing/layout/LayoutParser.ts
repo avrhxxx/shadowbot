@@ -36,16 +36,9 @@ export function buildLayout(
 
   if (!tokens.length) return [];
 
-  // 🔹 0. NORMALIZE
   const normalized = normalizeTokens(tokens, traceId);
-
-  // 🔹 1. FILTER (minimal)
   const filtered = filterTokens(normalized, traceId);
-
-  // 🔹 2. GROUP ROWS
   const rows = groupIntoRows(filtered, traceId);
-
-  // 🔹 3. BUILD STRUCTURE
   const structured = buildRowStructure(rows, traceId);
 
   log.trace("layout_done", traceId, {
@@ -56,7 +49,7 @@ export function buildLayout(
 }
 
 // =====================================
-// 🔹 NORMALIZATION (CRITICAL)
+// 🔹 NORMALIZATION
 // =====================================
 
 function normalizeTokens(tokens: OCRToken[], traceId: string): NormalizedToken[] {
@@ -77,7 +70,7 @@ function normalizeTokens(tokens: OCRToken[], traceId: string): NormalizedToken[]
 }
 
 // =====================================
-// 🔹 FILTER (KEEP DATA)
+// 🔹 FILTER
 // =====================================
 
 function filterTokens(tokens: NormalizedToken[], traceId: string): NormalizedToken[] {
@@ -97,14 +90,14 @@ function filterTokens(tokens: NormalizedToken[], traceId: string): NormalizedTok
 }
 
 // =====================================
-// 🔹 GROUP INTO ROWS (USING ny)
+// 🔹 GROUP INTO ROWS
 // =====================================
 
 function groupIntoRows(tokens: NormalizedToken[], traceId: string): NormalizedToken[][] {
   const sorted = [...tokens].sort((a, b) => a.ny - b.ny);
 
   const rows: NormalizedToken[][] = [];
-  const threshold = 0.015; // 🔥 normalized threshold
+  const threshold = 0.015;
 
   for (const token of sorted) {
     let placed = false;
@@ -137,7 +130,7 @@ function averageNY(row: NormalizedToken[]): number {
 }
 
 // =====================================
-// 🔹 BUILD ROW STRUCTURE (GAP SPLIT)
+// 🔹 BUILD STRUCTURE (GAP SPLIT)
 // =====================================
 
 function buildRowStructure(
@@ -153,7 +146,6 @@ function buildRowStructure(
 
     const sorted = [...row].sort((a, b) => a.nx - b.nx);
 
-    // 🔥 FIND BIGGEST GAP (COLUMN SPLIT)
     let maxGap = 0;
     let splitIndex = 1;
 
