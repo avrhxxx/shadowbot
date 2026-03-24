@@ -16,10 +16,18 @@
  */
 
 import { QuickAddType } from "../core/QuickAddTypes";
-import { parseDonations } from "./donations/DonationsParser";
-import { parseDonationsFromLayout } from "./donations/DonationsParser";
+
+// ✅ FIX — merged import
+import {
+  parseDonations,
+  parseDonationsFromLayout,
+} from "./donations/DonationsParser";
+
 import { buildLayout, LayoutRow } from "../ocr/layout/LayoutBuilder";
-import { OCRToken } from "../ocr/OCREngine";
+
+// ✅ FIX — import from OCRTypes (not engine)
+import { OCRToken } from "../ocr/OCRTypes";
+
 import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("PARSER");
