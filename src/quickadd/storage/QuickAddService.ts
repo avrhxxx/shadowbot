@@ -3,28 +3,34 @@
 // =====================================
 
 import {
-  appendQuickAddRows,
-  appendQuickAddAdjusted,
   readSheet,
   updateCell,
-} from "../../google/googleSheetsStorage"; // ✅ FIX
+  writeSheet,
+} from "../../google/googleSheetsStorage";
 
 import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("QA_SERVICE");
 
 // =====================================
-// TYPES
+// 📌 CONFIG
+// =====================================
+const NICKNAME_TAB = "quickadd_nicknames";
+const QUEUE_TAB = "quickadd_points_queue";
+
+// =====================================
+// TYPES (UPDATED)
 // =====================================
 type LearningRow = {
   type: string;
-  ocr: string;
-  final: string;
+  ocr_raw: string;
+  layout_text: string;
+  parser_output: string;
 };
 
 type AdjustedEntry = {
-  type: string;
-  nickname: string;
+  ocr_raw: string;
+  adjusted: string;
 };
 
 type QueueEntry = {
@@ -35,13 +41,27 @@ type QueueEntry = {
 };
 
 // =====================================
-// 📊 LEARNING (RAW OCR → SHEET)
+// 📊 LEARNING (OCR → LAYOUT → PARSER)
 // =====================================
 export async function saveLearning(rows: LearningRow[]) {
   if (!rows.length) return;
 
   try {
-    await appendQuickAddRows(rows);
+    const existing = await readSheet(NICKNAME_TAB);
+
+    const values = rows.map((r) => [
+      r.type,
+      r.ocr_raw,
+      r.layout_text,
+      r.parser_output,
+      "", // adjusted
+      "", // override
+      Date.now(),
+    ]);
+
+    const newData = [...existing, ...values];
+
+    await writeSheet(NICKNAME_TAB, newData);
 
     log("learning_saved", {
       count: rows.length,
@@ -52,17 +72,45 @@ export async function saveLearning(rows: LearningRow[]) {
 }
 
 // =====================================
-// ✏️ ADJUSTED (NICKNAME LEARNING)
+// ✏️ ADJUSTED (USER CORRECTION)
 // =====================================
 export async function saveAdjusted(entries: AdjustedEntry[]) {
   if (!entries.length) return;
 
   try {
-    await appendQuickAddAdjusted(entries);
+    const sheet = await readSheet(NICKNAME_TAB);
+    const headers = sheet[0];
 
-    log("adjusted_saved", {
-      count: entries.length,
-    });
+    const ocrIndex = headers.indexOf("ocr_raw");
+    const adjustedIndex = headers.indexOf("adjusted");
+
+    if (ocrIndex === -1 || adjustedIndex === -1) {
+      log.warn("missing_columns_adjusted");
+      return;
+    }
+
+    for (const entry of entries) {
+      const cleaned = clean(entry.ocr_raw);
+
+      for (let i = 1; i < sheet.length; i++) {
+        const row = sheet[i];
+        const ocrRaw = row[ocrIndex];
+
+        if (!ocrRaw) continue;
+
+        if (clean(ocrRaw) === cleaned) {
+          await updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted);
+
+          log("adjusted_applied", {
+            ocr: ocrRaw,
+            adjusted: entry.adjusted,
+          });
+
+          break;
+        }
+      }
+    }
+
   } catch (err) {
     log.warn("adjusted_failed", err);
   }
@@ -75,6 +123,8 @@ export async function enqueue(entries: QueueEntry[]) {
   if (!entries.length) return;
 
   try {
+    const existing = await readSheet(QUEUE_TAB);
+
     const rows = entries.map((e) => [
       e.guildId,
       e.type,
@@ -84,7 +134,9 @@ export async function enqueue(entries: QueueEntry[]) {
       Date.now(),
     ]);
 
-    await appendToQueue(rows);
+    const newData = [...existing, ...rows];
+
+    await writeSheet(QUEUE_TAB, newData);
 
     log("queue_saved", {
       count: rows.length,
@@ -96,11 +148,11 @@ export async function enqueue(entries: QueueEntry[]) {
 }
 
 // =====================================
-// 📖 READ LEARNING DATA (NEW)
+// 📖 READ LEARNING DATA
 // =====================================
 export async function getLearningData(): Promise<any[][]> {
   try {
-    const data = await readSheet("quickadd");
+    const data = await readSheet(NICKNAME_TAB);
 
     log("learning_loaded", {
       rows: data.length,
@@ -114,22 +166,7 @@ export async function getLearningData(): Promise<any[][]> {
 }
 
 // =====================================
-// 🔧 INTERNAL QUEUE APPEND
-// =====================================
-async function appendToQueue(values: any[][]) {
-  const tab = "quickadd_points_queue";
-
-  const existing = await readSheet(tab);
-
-  const newData = [...existing, ...values];
-
-  const { writeSheet } = await import("../../google/googleSheetsStorage"); // ✅ FIX
-
-  await writeSheet(tab, newData);
-}
-
-// =====================================
-// 📤 WORKER HELPERS (OPTIONAL)
+// 🔧 WORKER HELPERS
 // =====================================
 export async function getQueue(tab: string) {
   return readSheet(tab);
@@ -143,4 +180,14 @@ export async function markProcessed(
 ) {
   await updateCell(tab, rowIndex, statusCol, "PROCESSED");
   await updateCell(tab, rowIndex, processedAtCol, Date.now());
+}
+
+// =====================================
+// 🧼 CLEAN
+// =====================================
+function clean(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, "")
+    .trim();
 }
