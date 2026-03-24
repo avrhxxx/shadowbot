@@ -58,7 +58,7 @@ function filterTokens(tokens: OCRToken[], traceId: string): OCRToken[] {
     (t) =>
       t.text &&
       t.text.trim().length >= 2 &&
-      t.confidence > 40 // 🔥 threshold do tuningu
+      t.confidence > 40
   );
 
   log.trace("layout_filter_done", traceId, {
@@ -77,7 +77,7 @@ function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
   const sorted = [...tokens].sort((a, b) => a.y - b.y);
 
   const rows: OCRToken[][] = [];
-  const threshold = 12; // 🔥 trochę większy niż wcześniej
+  const threshold = 12;
 
   for (const token of sorted) {
     let placed = false;
@@ -101,7 +101,6 @@ function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
     rows: rows.length,
   });
 
-  // 🔥 DEBUG: pokaż kilka pierwszych rzędów
   log.trace("layout_rows_sample", traceId, {
     sample: rows.slice(0, 5).map((r) =>
       r.map((t) => ({
@@ -141,11 +140,12 @@ function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[]
 
     const sorted = [...row].sort((a, b) => a.x - b.x);
 
-    // 🔥 split row na 2 kolumny (heurystyka)
-    const midX = sorted[Math.floor(sorted.length / 2)].x;
+    // 🔥 REAL COLUMN SPLIT (AVG X instead of midpoint index)
+    const avgX =
+      sorted.reduce((acc, t) => acc + t.x, 0) / sorted.length;
 
-    const left = sorted.filter((t) => t.x <= midX);
-    const right = sorted.filter((t) => t.x > midX);
+    const left = sorted.filter((t) => t.x < avgX);
+    const right = sorted.filter((t) => t.x >= avgX);
 
     result.push({
       left,
@@ -153,7 +153,6 @@ function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[]
       raw: sorted,
     });
 
-    // 🔥 DEBUG (kluczowy)
     log.trace("layout_row_structure", traceId, {
       rowIndex: i,
       left: left.map((t) => t.text),
@@ -179,23 +178,31 @@ function extractEntries(
   const entries: LayoutEntry[] = [];
 
   for (const row of rows) {
-    const nicknameRaw = joinTokens(row.left);
-    const valueRaw = joinTokens(row.right);
+    let nickname = joinTokens(row.left);
+    let value = joinTokens(row.right);
 
-    if (!nicknameRaw || !valueRaw) continue;
+    if (!nickname || !value) continue;
 
-    // 🔥 VALIDATION (basic)
-    if (!looksLikeNumber(valueRaw)) continue;
+    // 🔥 SWAP if OCR mixed columns
+    if (!looksLikeNumber(value) && looksLikeNumber(nickname)) {
+      const tmp = nickname;
+      nickname = value;
+      value = tmp;
+    }
+
+    // 🔥 FILTER garbage rows
+    if (/donations/i.test(nickname)) continue;
+
+    if (!looksLikeNumber(value)) continue;
 
     entries.push({
-      nicknameRaw,
-      valueRaw,
+      nicknameRaw: nickname,
+      valueRaw: value,
     });
 
-    // 🔥 DEBUG (najważniejsze)
     log.trace("layout_entry_built", traceId, {
-      nicknameRaw,
-      valueRaw,
+      nicknameRaw: nickname,
+      valueRaw: value,
       fullRow: row.raw.map((t) => t.text),
     });
   }
@@ -212,9 +219,13 @@ function extractEntries(
 // =====================================
 
 function joinTokens(tokens: OCRToken[]): string {
-  return tokens.map((t) => t.text).join(" ").trim();
+  return tokens
+    .sort((a, b) => a.x - b.x)
+    .map((t) => t.text)
+    .join(" ")
+    .trim();
 }
 
 function looksLikeNumber(text: string): boolean {
-  return /[\d]/.test(text);
+  return /\d{2,}/.test(text);
 }
