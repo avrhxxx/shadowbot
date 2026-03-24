@@ -9,7 +9,6 @@ import { parseByType } from "../parsing";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { formatPreview } from "../utils/formatPreview";
 import { validateEntries } from "../validation/QuickAddValidator";
-import { buildLayout } from "../parsing/layout/LayoutParser"; // 🔥 NEW
 
 const log = createLogger("PIPELINE");
 
@@ -25,7 +24,7 @@ async function setStatusReaction(message: Message, emoji: string, traceId?: stri
 }
 
 // =====================================
-// 🔥 SCORING SYSTEM (NEW)
+// 🔥 SCORING SYSTEM
 // =====================================
 
 function scoreParsed(entries: any[]): number {
@@ -34,16 +33,9 @@ function scoreParsed(entries: any[]): number {
   let score = 0;
 
   for (const e of entries) {
-    // valid value
     if (e.value > 0) score += 2;
-
-    // nickname length
     if (e.nickname && e.nickname.length >= 4) score += 1;
-
-    // contains letters
     if (/[a-zA-Z]/.test(e.nickname)) score += 1;
-
-    // penalize garbage
     if (/[^a-zA-Z0-9\s]/.test(e.nickname)) score -= 0.5;
   }
 
@@ -93,40 +85,35 @@ export async function processImageInput(
         let parsed: any[] = [];
 
         // =====================================
-        // 🔹 TEXT SOURCES
+        // 🔥 UNIFIED FLOW (tokens first)
         // =====================================
-        if ("lines" in source) {
-          log("parse_attempt", {
-            source: source.source,
-            lines: source.lines.length,
-            traceId,
-          });
-
-          parsed = parseByType(session.type, { lines: source.lines }, traceId);
-        }
-
-        // =====================================
-        // 🔹 TOKEN SOURCES → LAYOUT
-        // =====================================
-        if ("tokens" in source) {
+        if ("tokens" in source && source.tokens?.length > 0) {
           log("parse_attempt", {
             source: source.source,
             tokens: source.tokens.length,
             traceId,
           });
 
-          // 🔥 BUILD LAYOUT (NEW CORE STEP)
-          const layout = buildLayout(source.tokens, traceId);
+          parsed = parseByType(
+            session.type,
+            { tokens: source.tokens }, // ✅ FIX
+            traceId
+          );
+        }
 
-          log("layout_built", {
+        // =====================================
+        // 🔹 FALLBACK (lines)
+        // =====================================
+        else if ("lines" in source && source.lines?.length > 0) {
+          log("parse_attempt", {
             source: source.source,
-            rows: layout.length,
+            lines: source.lines.length,
             traceId,
           });
 
           parsed = parseByType(
             session.type,
-            { layout }, // 🔥 KEY CHANGE
+            { lines: source.lines },
             traceId
           );
         }
@@ -145,9 +132,6 @@ export async function processImageInput(
           traceId,
         });
 
-        // =====================================
-        // 🔥 BEST SELECTION
-        // =====================================
         if (score > bestScore) {
           bestParsed = parsed;
           bestSource = source.source;
@@ -169,12 +153,10 @@ export async function processImageInput(
       traceId,
     });
 
-    const parsed = bestParsed;
-
     let validated = [];
 
     try {
-      validated = await validateEntries(parsed);
+      validated = await validateEntries(bestParsed);
 
       log("validation_done", {
         count: validated.length,
@@ -183,7 +165,7 @@ export async function processImageInput(
     } catch (err) {
       log.warn("validation_failed_fallback_to_parsed", err);
 
-      validated = parsed.map((e) => ({
+      validated = bestParsed.map((e) => ({
         ...e,
       }));
     }
