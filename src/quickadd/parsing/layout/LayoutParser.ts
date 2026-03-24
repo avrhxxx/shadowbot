@@ -17,7 +17,7 @@ export type LayoutEntry = {
 };
 
 // =====================================
-// 🔹 MAIN PARSER (PIPELINE VERSION)
+// 🔹 MAIN PARSER (STAGE-BASED)
 // =====================================
 
 export function extractLayoutEntries(
@@ -30,37 +30,54 @@ export function extractLayoutEntries(
 
   if (!tokens.length) return [];
 
-  const rows = groupIntoRows(tokens);
-  log.trace("layout_rows_grouped", traceId, { rows: rows.length });
+  // 🔹 1. FILTER TOKENS
+  const filtered = filterTokens(tokens, traceId);
 
-  const mergedRows = rows.map(mergeRowTokens);
-  log.trace("layout_rows_merged", traceId, {
-    rows: mergedRows.length,
-  });
+  // 🔹 2. GROUP INTO ROWS
+  const rows = groupIntoRows(filtered, traceId);
 
-  const entries = mergedRows
-    .map(splitRowToEntry)
-    .filter((e): e is LayoutEntry => e !== null);
+  // 🔹 3. BUILD ROW STRUCTURE
+  const structured = buildRowStructure(rows, traceId);
 
-  log.trace("layout_entries_built", traceId, {
-    count: entries.length,
-  });
+  // 🔹 4. EXTRACT ENTRIES
+  const entries = extractEntries(structured, traceId);
 
-  log.trace("layout_sample", traceId, {
-    sample: entries.slice(0, 5),
+  log.trace("layout_done", traceId, {
+    entries: entries.length,
   });
 
   return entries;
 }
 
 // =====================================
-// 🔹 STEP 1 — GROUP ROWS
+// 🔹 STAGE 1 — FILTER TOKENS
 // =====================================
 
-function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
+function filterTokens(tokens: OCRToken[], traceId: string): OCRToken[] {
+  const filtered = tokens.filter(
+    (t) =>
+      t.text &&
+      t.text.trim().length >= 2 &&
+      t.confidence > 40 // 🔥 threshold do tuningu
+  );
+
+  log.trace("layout_filter_done", traceId, {
+    before: tokens.length,
+    after: filtered.length,
+  });
+
+  return filtered;
+}
+
+// =====================================
+// 🔹 STAGE 2 — GROUP INTO ROWS
+// =====================================
+
+function groupIntoRows(tokens: OCRToken[], traceId: string): OCRToken[][] {
   const sorted = [...tokens].sort((a, b) => a.y - b.y);
+
   const rows: OCRToken[][] = [];
-  const threshold = 12;
+  const threshold = 12; // 🔥 trochę większy niż wcześniej
 
   for (const token of sorted) {
     let placed = false;
@@ -80,51 +97,124 @@ function groupIntoRows(tokens: OCRToken[]): OCRToken[][] {
     }
   }
 
+  log.trace("layout_rows_grouped", traceId, {
+    rows: rows.length,
+  });
+
+  // 🔥 DEBUG: pokaż kilka pierwszych rzędów
+  log.trace("layout_rows_sample", traceId, {
+    sample: rows.slice(0, 5).map((r) =>
+      r.map((t) => ({
+        text: t.text,
+        x: t.x,
+        y: t.y,
+        conf: t.confidence,
+      }))
+    ),
+  });
+
   return rows;
 }
 
 function averageY(row: OCRToken[]): number {
-  return row.reduce((acc, t) => acc + t.y, 0) / row.length;
+  const sum = row.reduce((acc, t) => acc + t.y, 0);
+  return sum / row.length;
 }
 
 // =====================================
-// 🔹 STEP 2 — MERGE TOKENS IN ROW
+// 🔹 STAGE 3 — ROW STRUCTURE
 // =====================================
 
-function mergeRowTokens(row: OCRToken[]): string {
-  const sorted = [...row].sort((a, b) => a.x - b.x);
+type StructuredRow = {
+  left: OCRToken[];
+  right: OCRToken[];
+  raw: OCRToken[];
+};
 
-  const parts = sorted
-    .filter((t) => t.confidence > 40) // 🔥 filtr śmieci
-    .map((t) => t.text.trim())
-    .filter((t) => t.length > 0);
+function buildRowStructure(rows: OCRToken[][], traceId: string): StructuredRow[] {
+  const result: StructuredRow[] = [];
 
-  return parts.join(" ");
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+
+    if (row.length < 2) continue;
+
+    const sorted = [...row].sort((a, b) => a.x - b.x);
+
+    // 🔥 split row na 2 kolumny (heurystyka)
+    const midX = sorted[Math.floor(sorted.length / 2)].x;
+
+    const left = sorted.filter((t) => t.x <= midX);
+    const right = sorted.filter((t) => t.x > midX);
+
+    result.push({
+      left,
+      right,
+      raw: sorted,
+    });
+
+    // 🔥 DEBUG (kluczowy)
+    log.trace("layout_row_structure", traceId, {
+      rowIndex: i,
+      left: left.map((t) => t.text),
+      right: right.map((t) => t.text),
+    });
+  }
+
+  log.trace("layout_structure_done", traceId, {
+    rows: result.length,
+  });
+
+  return result;
 }
 
 // =====================================
-// 🔹 STEP 3 — SPLIT INTO ENTRY
+// 🔹 STAGE 4 — EXTRACT ENTRIES
 // =====================================
 
-function splitRowToEntry(rowText: string): LayoutEntry | null {
-  if (!rowText) return null;
+function extractEntries(
+  rows: StructuredRow[],
+  traceId: string
+): LayoutEntry[] {
+  const entries: LayoutEntry[] = [];
 
-  // 🔥 szukamy liczby na końcu
-  const match = rowText.match(/(.+?)\s+([\d\s,]+)$/);
+  for (const row of rows) {
+    const nicknameRaw = joinTokens(row.left);
+    const valueRaw = joinTokens(row.right);
 
-  if (!match) return null;
+    if (!nicknameRaw || !valueRaw) continue;
 
-  const nicknameRaw = match[1].trim();
-  const valueRaw = match[2].trim();
+    // 🔥 VALIDATION (basic)
+    if (!looksLikeNumber(valueRaw)) continue;
 
-  if (!nicknameRaw || !valueRaw) return null;
+    entries.push({
+      nicknameRaw,
+      valueRaw,
+    });
 
-  // 🔥 szybka walidacja
-  if (!/[a-zA-Z]/.test(nicknameRaw)) return null;
-  if (!/\d/.test(valueRaw)) return null;
+    // 🔥 DEBUG (najważniejsze)
+    log.trace("layout_entry_built", traceId, {
+      nicknameRaw,
+      valueRaw,
+      fullRow: row.raw.map((t) => t.text),
+    });
+  }
 
-  return {
-    nicknameRaw,
-    valueRaw,
-  };
+  log.trace("layout_entries_built", traceId, {
+    count: entries.length,
+  });
+
+  return entries;
+}
+
+// =====================================
+// 🔧 HELPERS
+// =====================================
+
+function joinTokens(tokens: OCRToken[]): string {
+  return tokens.map((t) => t.text).join(" ").trim();
+}
+
+function looksLikeNumber(text: string): boolean {
+  return /[\d]/.test(text);
 }
