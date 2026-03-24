@@ -11,8 +11,8 @@ import { validateQuickAddContext } from "../../../rules/quickAddRules";
 // 🔥 resolver
 import { resolveNickname } from "../../../mapping/NicknameResolver";
 
-// 🔥 zapis adjusted (TYLKO NICK)
-import { appendQuickAddAdjusted } from "../../../googleSheetsStorage";
+// 🔥 SERVICE (FIX)
+import { saveAdjusted } from "../../../storage/QuickAddService";
 
 const log = createLogger("COMMAND");
 
@@ -73,11 +73,11 @@ export async function adjustCommand(
       });
 
       // =====================================
-      // 🔥 SAVE ONLY NICKNAME (LEARNING)
+      // 🔥 SAVE ONLY NICKNAME (LEARNING) — FIXED
       // =====================================
       try {
         if (session?.type) {
-          await appendQuickAddAdjusted([
+          await saveAdjusted([
             {
               type: session.type,
               nickname: resolved,
