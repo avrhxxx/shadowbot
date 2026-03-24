@@ -70,18 +70,43 @@ function applySubcommands(builder: SlashCommandBuilder) {
         )
     )
 
-    // 🛠️ FIX (NEW)
+    // 🛠️ FIX
     .addSubcommand((sub) =>
       sub
         .setName("fix")
         .setDescription("Auto-fix entries using suggestions")
     )
 
-    // ✅ CONFIRM
+    // ✅ CONFIRM (🔥 FIXED)
     .addSubcommand((sub) =>
       sub
         .setName("confirm")
         .setDescription("Confirm and send data to queue")
+
+        .addStringOption((opt) =>
+          opt
+            .setName("mode")
+            .setDescription("Auto or manual selection")
+            .setRequired(true)
+            .addChoices(
+              { name: "Auto (latest)", value: "auto" },
+              { name: "Manual", value: "manual" }
+            )
+        )
+
+        .addStringOption((opt) =>
+          opt
+            .setName("eventid")
+            .setDescription("Manual event ID (RR only)")
+            .setRequired(false)
+        )
+
+        .addStringOption((opt) =>
+          opt
+            .setName("week")
+            .setDescription("Manual week (points only)")
+            .setRequired(false)
+        )
     )
 
     // ❌ CANCEL
