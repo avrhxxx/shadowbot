@@ -16,9 +16,15 @@ export type NormalizedToken = OCRToken & {
   ny: number;
 };
 
+export type LayoutCell = {
+  tokens: NormalizedToken[];
+  text: string;
+  xStart: number;
+  xEnd: number;
+};
+
 export type LayoutRow = {
-  left: NormalizedToken[];
-  right: NormalizedToken[];
+  cells: LayoutCell[];
   raw: NormalizedToken[];
 };
 
@@ -130,7 +136,7 @@ function averageNY(row: NormalizedToken[]): number {
 }
 
 // =====================================
-// 🔹 BUILD STRUCTURE (GAP SPLIT)
+// 🔹 BUILD STRUCTURE (MULTI-COLUMN 🔥)
 // =====================================
 
 function buildRowStructure(
@@ -139,39 +145,46 @@ function buildRowStructure(
 ): LayoutRow[] {
   const result: LayoutRow[] = [];
 
+  const GAP_THRESHOLD = 0.05; // 🔥 kluczowy parametr (możemy tuningować)
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
 
-    if (row.length < 2) continue;
+    if (row.length < 1) continue;
 
     const sorted = [...row].sort((a, b) => a.nx - b.nx);
 
-    let maxGap = 0;
-    let splitIndex = 1;
+    const cells: LayoutCell[] = [];
+    let currentTokens: NormalizedToken[] = [sorted[0]];
 
     for (let j = 1; j < sorted.length; j++) {
-      const gap = sorted[j].nx - sorted[j - 1].nx;
+      const prev = sorted[j - 1];
+      const curr = sorted[j];
 
-      if (gap > maxGap) {
-        maxGap = gap;
-        splitIndex = j;
+      const gap = curr.nx - prev.nx;
+
+      // 🔥 jeśli duża przerwa → nowa komórka
+      if (gap > GAP_THRESHOLD) {
+        cells.push(buildCell(currentTokens));
+        currentTokens = [curr];
+      } else {
+        currentTokens.push(curr);
       }
     }
 
-    const left = sorted.slice(0, splitIndex);
-    const right = sorted.slice(splitIndex);
+    // ostatnia komórka
+    if (currentTokens.length) {
+      cells.push(buildCell(currentTokens));
+    }
 
     result.push({
-      left,
-      right,
+      cells,
       raw: sorted,
     });
 
-    log.trace("layout_row_structure", traceId, {
+    log.trace("layout_row_cells", traceId, {
       rowIndex: i,
-      gap: maxGap,
-      left: left.map((t) => t.text),
-      right: right.map((t) => t.text),
+      cells: cells.map((c) => c.text),
     });
   }
 
@@ -180,4 +193,24 @@ function buildRowStructure(
   });
 
   return result;
+}
+
+// =====================================
+// 🔧 CELL BUILDER
+// =====================================
+
+function buildCell(tokens: NormalizedToken[]): LayoutCell {
+  const sorted = [...tokens].sort((a, b) => a.x - b.x);
+
+  const text = sorted.map((t) => t.text).join(" ").trim();
+
+  const xStart = Math.min(...sorted.map((t) => t.nx));
+  const xEnd = Math.max(...sorted.map((t) => t.nx));
+
+  return {
+    tokens: sorted,
+    text,
+    xStart,
+    xEnd,
+  };
 }
