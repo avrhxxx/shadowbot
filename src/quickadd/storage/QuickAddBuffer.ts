@@ -5,6 +5,9 @@
 type ParsedEntry = {
   nickname: string;
   value: number;
+
+  // 🔥 NEW (debug propagation)
+  source?: string;
 };
 
 type BufferedEntry = {
@@ -16,6 +19,9 @@ type BufferedEntry = {
   status?: string;
   confidence?: number;
   suggestion?: string;
+
+  // 🔥 NEW — SOURCE DEBUG
+  source?: string;
 };
 
 const buffer = new Map<string, BufferedEntry[]>();
@@ -33,6 +39,7 @@ export const QuickAddBuffer = {
       status?: string;
       confidence?: number;
       suggestion?: string;
+      source?: string;
     })[]
   ) {
     if (!buffer.has(guildId)) {
@@ -52,10 +59,13 @@ export const QuickAddBuffer = {
         nickname: entry.nickname,
         value: entry.value,
 
-        // 🔥 NEW (safe spread)
+        // 🔥 VALIDATION
         status: entry.status,
         confidence: entry.confidence,
         suggestion: entry.suggestion,
+
+        // 🔥 SOURCE DEBUG
+        source: entry.source,
       });
     }
 
