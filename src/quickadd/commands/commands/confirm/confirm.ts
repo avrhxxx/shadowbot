@@ -8,8 +8,8 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { formatPreview } from "../../../utils/formatPreview";
 import { createLogger } from "../../../debug/DebugLogger";
 
-// 🔥 NEW — QUEUE WRITE
-import { appendQuickAddQueueRows } from "../../../../googleSheetsStorage";
+// 🔥 FIX — USE SERVICE INSTEAD OF DIRECT SHEETS
+import { enqueue } from "../../../storage/QuickAddService";
 
 const log = createLogger("COMMAND");
 
@@ -117,22 +117,20 @@ ${preview}
     }
 
     // =====================================
-    // 🔥 QUEUE BUILD
+    // 🔥 QUEUE BUILD (DELEGATED)
     // =====================================
     try {
-      const rows = entries.map((e) => ({
-        guildId,
-        type: session.type,
-        nickname: e.nickname,
-        value: e.value,
-        status: "PENDING",
-        createdAt: Date.now(),
-      }));
-
-      await appendQuickAddQueueRows(rows);
+      await enqueue(
+        entries.map((e) => ({
+          guildId,
+          type: session.type,
+          nickname: e.nickname,
+          value: e.value,
+        }))
+      );
 
       log("queue_enqueued", {
-        count: rows.length,
+        count: entries.length,
         type: session.type,
       });
 
