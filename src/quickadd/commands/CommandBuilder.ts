@@ -70,6 +70,13 @@ function applySubcommands(builder: SlashCommandBuilder) {
         )
     )
 
+    // 🛠️ FIX (NEW)
+    .addSubcommand((sub) =>
+      sub
+        .setName("fix")
+        .setDescription("Auto-fix entries using suggestions")
+    )
+
     // ✅ CONFIRM
     .addSubcommand((sub) =>
       sub
@@ -77,7 +84,7 @@ function applySubcommands(builder: SlashCommandBuilder) {
         .setDescription("Confirm and send data to queue")
     )
 
-    // ❌ CANCEL (NEW)
+    // ❌ CANCEL
     .addSubcommand((sub) =>
       sub
         .setName("cancel")
