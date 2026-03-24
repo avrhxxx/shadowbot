@@ -6,7 +6,6 @@ import {
   appendQuickAddRows,
   appendQuickAddAdjusted,
   readSheet,
-  writeSheet, // ✅ FIX: normal import
   updateCell,
 } from "../../googleSheetsStorage";
 
@@ -97,16 +96,35 @@ export async function enqueue(entries: QueueEntry[]) {
 }
 
 // =====================================
+// 📖 READ LEARNING DATA (NEW)
+// =====================================
+export async function getLearningData(): Promise<any[][]> {
+  try {
+    const data = await readSheet("quickadd");
+
+    log("learning_loaded", {
+      rows: data.length,
+    });
+
+    return data;
+  } catch (err) {
+    log.error("learning_load_failed", err);
+    return [];
+  }
+}
+
+// =====================================
 // 🔧 INTERNAL QUEUE APPEND
 // =====================================
 async function appendToQueue(values: any[][]) {
-  const tab = "quickadd_points_queue"; // 🔥 MVP (points only)
+  const tab = "quickadd_points_queue";
 
   const existing = await readSheet(tab);
 
   const newData = [...existing, ...values];
 
-  // ✅ FIX: no dynamic import
+  const { writeSheet } = await import("../../googleSheetsStorage");
+
   await writeSheet(tab, newData);
 }
 
