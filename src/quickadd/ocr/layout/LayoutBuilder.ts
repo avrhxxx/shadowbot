@@ -16,7 +16,8 @@
  * - ONLY structure
  */
 
-import { OCRToken } from "../OCREngine";
+// ✅ FIX — correct layer import (no dependency on engine)
+import { OCRToken } from "../OCRTypes";
 import { createLogger } from "../../debug/DebugLogger";
 
 const log = createLogger("LAYOUT");
