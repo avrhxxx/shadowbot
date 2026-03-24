@@ -3,12 +3,13 @@
 // =====================================
 
 import { createLogger } from "../debug/DebugLogger"; // ✅ FIX
-import { readSheet, updateCell } from "../../../google/googleSheetsStorage"; // ✅ FIX
+import { readSheet, updateCell } from "../../google/googleSheetsStorage"; // ✅ FIX
 
-import { addParticipants } from "../../eventsPanel/eventService"; // ✅ FIX
-import { addPoints } from "../../pointsPanel/pointsService"; // ✅ FIX
+import { addParticipants } from "../../eventsPanel/eventService";
+import { addPoints } from "../../pointsPanel/pointsService";
 
-const log = createLogger("QA_WORKER");
+// ✅ FIX — scope zgodny z DebugLogger
+const log = createLogger("INTEGRATION");
 
 // --------------------------
 // CONFIG
