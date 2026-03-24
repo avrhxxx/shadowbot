@@ -29,11 +29,10 @@ type LearningRow = {
   parser_output: string;
 };
 
-// 🔥 FIX — type opcjonalny (kompatybilność z adjust.ts)
+// 🔥 FIX — CLEAN TYPE
 type AdjustedEntry = {
   ocr_raw: string;
   adjusted: string;
-  type?: string;
 };
 
 type PointsQueueEntry = {
@@ -101,7 +100,21 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
   if (!entries.length) return;
 
   try {
-    const sheet = await readSheet(NICKNAME_TAB);
+    let sheet = await readSheet(NICKNAME_TAB);
+
+    // 🔥 ENSURE HEADER
+    if (!sheet || sheet.length === 0) {
+      sheet = [[
+        "type",
+        "ocr_raw",
+        "layout_text",
+        "parser_output",
+        "adjusted",
+        "override",
+        "createdAt",
+      ]];
+    }
+
     const headers = sheet[0];
 
     const ocrIndex = headers.indexOf("ocr_raw");
@@ -111,6 +124,8 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
       log.warn("missing_columns_adjusted");
       return;
     }
+
+    let updated = false;
 
     for (const entry of entries) {
       const cleaned = clean(entry.ocr_raw);
@@ -129,10 +144,35 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
             adjusted: entry.adjusted,
           });
 
+          updated = true;
           break;
         }
       }
+
+      // =====================================
+      // 🔥 IF NOT FOUND → APPEND NEW ROW
+      // =====================================
+      if (!updated) {
+        const newRow = [
+          "", // type
+          entry.ocr_raw,
+          "", // layout_text
+          "", // parser_output
+          entry.adjusted,
+          "", // override
+          Date.now(),
+        ];
+
+        sheet.push(newRow);
+
+        log("adjusted_added_new", {
+          ocr: entry.ocr_raw,
+          adjusted: entry.adjusted,
+        });
+      }
     }
+
+    await writeSheet(NICKNAME_TAB, sheet);
 
   } catch (err) {
     log.warn("adjusted_failed", err);
