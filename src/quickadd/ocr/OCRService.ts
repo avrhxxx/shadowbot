@@ -52,7 +52,7 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
     ];
 
     // =====================================
-    // 🔥 SAFE DEBUG
+    // 🔥 SAFE DEBUG (FIXED)
     // =====================================
     log.trace(
       "ocr_multi_done",
@@ -73,8 +73,9 @@ export async function runOCR(imageUrl: string, traceId: string): Promise<OCRMult
           };
         }
 
+        // 🔥 TS FIX — wymuszenie typu
         return {
-          source: s.source,
+          source: (s as OCRSourceResult).source,
         };
       })
     );
