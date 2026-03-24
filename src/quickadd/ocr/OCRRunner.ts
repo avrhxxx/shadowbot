@@ -16,10 +16,8 @@ export async function runFullImage(buffer: Buffer, traceId: string) {
 
   const text = result.data.text || "";
 
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+  // 🔥 RAW LINES — NO CLEANING
+  const lines = text.split("\n");
 
   log.trace("run_full_result", traceId, {
     length: text.length,
