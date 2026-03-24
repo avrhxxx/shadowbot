@@ -20,24 +20,55 @@ export type OCRToken = {
 };
 
 // =====================================
-// 🔹 FULL IMAGE OCR
+// 🔹 INTERNAL HELPER (PSM RUN)
 // =====================================
-export async function runFullImage(buffer: Buffer, traceId: string) {
-  log.trace("run_full_start", traceId);
+async function runWithPSM(
+  buffer: Buffer,
+  traceId: string,
+  psm: number,
+  label: string
+) {
+  log.trace("run_psm_start", traceId, { psm, label });
 
   const result = await Tesseract.recognize(buffer, "eng", {
+    tessedit_pageseg_mode: psm,
     logger: () => {},
   });
 
   const text = result.data.text || "";
   const lines = text.split("\n");
 
-  log.trace("run_full_result", traceId, {
+  log.trace("run_psm_result", traceId, {
+    label,
+    psm,
     length: text.length,
     lines: lines.length,
   });
 
   return { text, lines };
+}
+
+// =====================================
+// 🔹 FULL IMAGE OCR (MULTI PSM)
+// =====================================
+export async function runFullImage(buffer: Buffer, traceId: string) {
+  const runs = await Promise.all([
+    runWithPSM(buffer, traceId, Tesseract.PSM.SPARSE_TEXT, "SPARSE"),
+    runWithPSM(buffer, traceId, Tesseract.PSM.AUTO, "AUTO"),
+    runWithPSM(buffer, traceId, Tesseract.PSM.SINGLE_BLOCK, "BLOCK"),
+  ]);
+
+  const mergedText = runs.map((r) => r.text).join("\n");
+  const mergedLines = mergedText.split("\n");
+
+  log.trace("run_full_merged", traceId, {
+    totalLines: mergedLines.length,
+  });
+
+  return {
+    text: mergedText,
+    lines: mergedLines,
+  };
 }
 
 // =====================================
@@ -47,6 +78,7 @@ export async function runLineBased(buffer: Buffer, traceId: string) {
   log.trace("run_line_start", traceId);
 
   const result = await Tesseract.recognize(buffer, "eng", {
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
     logger: () => {},
   });
 
@@ -62,12 +94,13 @@ export async function runLineBased(buffer: Buffer, traceId: string) {
 }
 
 // =====================================
-// 🔥 BOX BASED OCR (NEW - LAYOUT)
+// 🔥 BOX BASED OCR (TOKENS)
 // =====================================
 export async function runBoxBased(buffer: Buffer, traceId: string) {
   log.trace("run_box_start", traceId);
 
   const result = await Tesseract.recognize(buffer, "eng", {
+    tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
     logger: () => {},
   });
 
@@ -82,17 +115,36 @@ export async function runBoxBased(buffer: Buffer, traceId: string) {
     confidence: w.confidence,
   }));
 
-  // 🔥 DEBUG: podstawowe statystyki
   log.trace("run_box_result", traceId, {
     tokens: tokens.length,
   });
 
-  // 🔥 DEBUG: sample (żeby nie spamować)
   log.trace("run_box_sample", traceId, {
-    sample: tokens.slice(0, 5),
+    sample: tokens.slice(0, 10),
   });
 
   return {
     tokens,
   };
+}
+
+// =====================================
+// 🔥 HOCR (STRUCTURE)
+// =====================================
+export async function runHOCR(buffer: Buffer, traceId: string) {
+  log.trace("run_hocr_start", traceId);
+
+  const result = await Tesseract.recognize(buffer, "eng", {
+    tessjs_create_hocr: "1",
+    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+    logger: () => {},
+  });
+
+  const hocr = result.data.hocr || "";
+
+  log.trace("run_hocr_result", traceId, {
+    length: hocr.length,
+  });
+
+  return { hocr };
 }
