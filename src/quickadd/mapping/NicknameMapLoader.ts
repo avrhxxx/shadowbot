@@ -8,7 +8,7 @@ import { createLogger } from "../debug/DebugLogger";
 const log = createLogger("MAP_LOADER");
 
 // =====================================
-// 🔥 LOAD + BUILD MAP (UPGRADED)
+// 🔥 LOAD + BUILD MAP (IMPROVED)
 // =====================================
 export async function loadNicknameMap(): Promise<Record<string, string>> {
   try {
@@ -22,60 +22,41 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
-    const idxOCR = headers.indexOf("ocr_raw");
-    const idxLayout = headers.indexOf("layout_text");
-    const idxParser = headers.indexOf("parser_output");
-    const idxAdjusted = headers.indexOf("adjusted");
-    const idxOverride = headers.indexOf("override");
+    const ocrIndex = headers.indexOf("ocr_raw");
+    const parserIndex = headers.indexOf("parser_output");
+    const adjustedIndex = headers.indexOf("adjusted");
+    const overrideIndex = headers.indexOf("override");
 
-    if (
-      idxOCR === -1 ||
-      idxLayout === -1 ||
-      idxParser === -1 ||
-      idxAdjusted === -1 ||
-      idxOverride === -1
-    ) {
-      log.warn("missing_columns");
+    if (ocrIndex === -1) {
+      log.warn("missing_ocr_column");
       return {};
     }
 
     const map: Record<string, string> = {};
 
     for (const row of dataRows) {
-      const ocr = row[idxOCR];
-      const layout = row[idxLayout];
-      const parser = row[idxParser];
-      const adjusted = row[idxAdjusted];
-      const override = row[idxOverride];
+      const ocrRaw = row[ocrIndex];
+      const parser = parserIndex !== -1 ? row[parserIndex] : "";
+      const adjusted = adjustedIndex !== -1 ? row[adjustedIndex] : "";
+      const override = overrideIndex !== -1 ? row[overrideIndex] : "";
+
+      if (!ocrRaw || typeof ocrRaw !== "string") continue;
 
       // =====================================
       // 🔥 PRIORITY
       // =====================================
-      const final =
-        override ||
-        adjusted ||
-        parser;
+      const finalValue =
+        (override && override.trim()) ||
+        (adjusted && adjusted.trim()) ||
+        (parser && parser.trim());
 
-      if (!final || typeof final !== "string") continue;
+      if (!finalValue) continue;
 
-      const cleanedFinal = clean(final);
+      const cleaned = cleanNickname(ocrRaw);
 
-      if (!cleanedFinal) continue;
+      if (!cleaned) continue;
 
-      // =====================================
-      // 🔥 BUILD MULTI-KEY MAP
-      // =====================================
-      const sources = [ocr, layout, parser];
-
-      for (const src of sources) {
-        if (!src || typeof src !== "string") continue;
-
-        const key = clean(src);
-
-        if (!key) continue;
-
-        map[key] = final;
-      }
+      map[cleaned] = finalValue;
     }
 
     log("map_built", {
@@ -91,9 +72,9 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
 }
 
 // =====================================
-// 🧼 CLEAN
+// 🧼 CLEANER
 // =====================================
-function clean(input: string): string {
+function cleanNickname(input: string): string {
   return input
     .toLowerCase()
     .replace(/[^a-z0-9]/gi, "")
