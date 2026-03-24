@@ -2,7 +2,7 @@
 // 📁 src/quickadd/mapping/NicknameMapLoader.ts
 // =====================================
 
-import { readSheet } from "../../../googleSheetsStorage";
+import { getLearningData } from "../storage/QuickAddService"; // ✅ FIX
 import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("MAP_LOADER");
@@ -14,7 +14,7 @@ const QUICKADD_TAB = "quickadd";
 // =====================================
 export async function loadNicknameMap(): Promise<Record<string, string>> {
   try {
-    const rows = await readSheet(QUICKADD_TAB);
+    const rows = await getLearningData();
 
     if (!rows || rows.length < 2) {
       log.warn("empty_sheet");
@@ -42,7 +42,6 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
 
       if (!cleaned) continue;
 
-      // 🔥 najnowsze nadpisuje stare (learning)
       map[cleaned] = adjusted;
     }
 
@@ -59,7 +58,7 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
 }
 
 // =====================================
-// 🧼 CLEANER (MUSI być identyczny jak w resolverze)
+// 🧼 CLEANER
 // =====================================
 function cleanNickname(input: string): string {
   return input
