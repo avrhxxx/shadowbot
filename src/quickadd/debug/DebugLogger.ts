@@ -4,29 +4,19 @@
 
 /**
  * 🪵 ROLE:
- * Advanced structured logger (V4 FINAL).
+ * Advanced debug logger for QuickAdd system (V5 FINAL).
  *
  * Features:
- * - scoped logs (OCR, PARSER, etc.)
- * - auto trace grouping (by traceId)
- * - section grouping ([OCR], [PARSER], etc.)
- * - auto START / END block rendering
- * - backward compatible (NO code changes required)
+ * - auto grouping (OCR / PARSER / etc.)
+ * - traceId flow (pipeline)
+ * - worker tick grouping
+ * - clean structured output
+ * - file context (scope)
  *
- * Output example:
- *
- * ════════════════════════════════════════════
- * QUICKADD • trace: abc123
- * ════════════════════════════════════════════
- *
- * [OCR]
- *   [12:01:22] ocr_start
- *   [12:01:23] image_loaded { size: 482133 }
- *
- * [PARSER]
- *   [12:01:26] parsed { entries: 18 }
- *
- * ════════════════════════════════════════════
+ * ❗ RULES:
+ * - NO external deps
+ * - NO business logic
+ * - backward compatible (no changes needed in other files)
  */
 
 // =====================================
@@ -39,6 +29,7 @@ type Logger = {
   (event: string, data?: any): void;
   warn: (event: string, data?: any) => void;
   error: (event: string, data?: any, traceId?: string) => void;
+
   trace: {
     (event: string, data?: any): void;
     (event: string, traceId: string, data?: any): void;
@@ -46,95 +37,80 @@ type Logger = {
 };
 
 // =====================================
-// 🔹 INTERNAL TRACE STATE
+// 🔹 INTERNAL STATE
 // =====================================
 
-type TraceState = {
-  started: boolean;
-  lastActivity: number;
-  sections: Set<string>;
+type TraceLog = {
+  time: string;
+  group: string;
+  scope: string;
+  event: string;
+  data?: any;
 };
 
-const traces = new Map<string, TraceState>();
+const traceBuckets = new Map<string, TraceLog[]>();
 
-const TRACE_TIMEOUT = 5000; // auto close after inactivity
+let workerTick = 0;
 
 // =====================================
-// 🔹 HELPERS
+// 🔹 GROUP RESOLVER
 // =====================================
 
-function now() {
+function resolveGroup(scope: string): string {
+  if (scope.startsWith("OCR")) return "OCR";
+  if (scope.startsWith("PARSER")) return "PARSER";
+  if (scope.startsWith("VALIDATION")) return "VALIDATION";
+  if (scope.startsWith("REPOSITORY") || scope.startsWith("BUFFER"))
+    return "STORAGE";
+  if (scope.startsWith("CMD")) return "COMMAND";
+  if (scope.startsWith("QA")) return "DISCORD";
+  if (scope.startsWith("WORKER")) return "WORKER";
+  if (scope.startsWith("CHANNEL")) return "INFRA";
+
+  return "GENERAL";
+}
+
+// =====================================
+// 🔹 TIME FORMAT
+// =====================================
+
+function getTime(): string {
   return new Date().toISOString().split("T")[1].split(".")[0];
 }
 
-function separator() {
-  return "════════════════════════════════════════════";
-}
+// =====================================
+// 🔹 PRINT TRACE BLOCK
+// =====================================
 
-function printHeader(traceId: string) {
+function flushTrace(traceId: string) {
+  const logs = traceBuckets.get(traceId);
+  if (!logs || !logs.length) return;
+
   console.log("");
-  console.log(separator());
+  console.log("════════════════════════════════════════════");
   console.log(`QUICKADD • trace: ${traceId}`);
-  console.log(separator());
-  console.log("");
-}
+  console.log("════════════════════════════════════════════\n");
 
-function printFooter() {
-  console.log("");
-  console.log(separator());
-  console.log("");
-}
+  let currentGroup = "";
 
-function ensureTrace(traceId: string) {
-  let state = traces.get(traceId);
-
-  if (!state) {
-    state = {
-      started: false,
-      lastActivity: Date.now(),
-      sections: new Set(),
-    };
-    traces.set(traceId, state);
-  }
-
-  if (!state.started) {
-    printHeader(traceId);
-    state.started = true;
-  }
-
-  state.lastActivity = Date.now();
-
-  scheduleCleanup(traceId);
-
-  return state;
-}
-
-function scheduleCleanup(traceId: string) {
-  setTimeout(() => {
-    const state = traces.get(traceId);
-    if (!state) return;
-
-    const inactive = Date.now() - state.lastActivity > TRACE_TIMEOUT;
-
-    if (inactive) {
-      printFooter();
-      traces.delete(traceId);
+  for (const log of logs) {
+    if (log.group !== currentGroup) {
+      currentGroup = log.group;
+      console.log(`[${currentGroup}]`);
     }
-  }, TRACE_TIMEOUT + 100);
-}
 
-function printSection(state: TraceState, scope: string) {
-  if (!state.sections.has(scope)) {
-    console.log(`[${scope}]`);
-    state.sections.add(scope);
-  }
-}
+    const line = `  [${log.time}] ${log.scope} → ${log.event}`;
 
-function formatLine(event: string, data?: any) {
-  if (!data || Object.keys(data).length === 0) {
-    return `  [${now()}] ${event}`;
+    if (log.data && Object.keys(log.data).length > 0) {
+      console.log(line, log.data);
+    } else {
+      console.log(line);
+    }
   }
-  return `  [${now()}] ${event} ${JSON.stringify(data)}`;
+
+  console.log("\n════════════════════════════════════════════\n");
+
+  traceBuckets.delete(traceId);
 }
 
 // =====================================
@@ -142,27 +118,59 @@ function formatLine(event: string, data?: any) {
 // =====================================
 
 export function createLogger(scope: string): Logger {
+  const group = resolveGroup(scope);
+
+  // =====================================
+  // 🔹 BASE LOG
+  // =====================================
+
   const base = (event: string, data?: any) => {
-    console.log(`[${now()}] [${scope}] ${event}`, data ?? "");
-  };
-
-  base.warn = (event: string, data?: any) => {
-    console.warn(`[${now()}] [${scope}] ⚠️ ${event}`, data ?? "");
-  };
-
-  base.error = (event: string, data?: any, traceId?: string) => {
-    if (traceId) {
-      const state = ensureTrace(traceId);
-      printSection(state, scope);
-      console.error(formatLine(`❌ ${event}`, data));
-      return;
-    }
-
-    console.error(`[${now()}] [${scope}] ❌ ${event}`, data ?? "");
+    console.log(
+      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      data ?? ""
+    );
   };
 
   // =====================================
-  // 🔥 TRACE (AUTO GROUPING)
+  // 🔹 WARN
+  // =====================================
+
+  base.warn = (event: string, data?: any) => {
+    console.warn(
+      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      data ?? ""
+    );
+  };
+
+  // =====================================
+  // 🔹 ERROR
+  // =====================================
+
+  base.error = (event: string, data?: any, traceId?: string) => {
+    if (traceId) {
+      const logs = traceBuckets.get(traceId) || [];
+
+      logs.push({
+        time: getTime(),
+        group,
+        scope,
+        event,
+        data,
+      });
+
+      traceBuckets.set(traceId, logs);
+      flushTrace(traceId);
+      return;
+    }
+
+    console.error(
+      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      data ?? ""
+    );
+  };
+
+  // =====================================
+  // 🔥 TRACE (SMART)
   // =====================================
 
   const traceImpl = (
@@ -180,16 +188,64 @@ export function createLogger(scope: string): Logger {
       data = arg1;
     }
 
-    if (!traceId) {
-      console.log(`[${now()}] [${scope}] ${event}`, data ?? "");
+    // =====================================
+    // 🔥 WORKER MODE (NO TRACE ID)
+    // =====================================
+
+    if (!traceId && group === "WORKER") {
+      if (event === "worker_tick") {
+        workerTick++;
+        console.log("");
+        console.log("════════════════════════════════════════════");
+        console.log(`WORKER • tick: ${workerTick}`);
+        console.log("════════════════════════════════════════════\n");
+      }
+
+      const line = `[${getTime()}] ${scope} → ${event}`;
+
+      if (data && Object.keys(data).length > 0) {
+        console.log(line, data);
+      } else {
+        console.log(line);
+      }
+
       return;
     }
 
-    const state = ensureTrace(traceId);
+    // =====================================
+    // 🔥 NORMAL TRACE FLOW
+    // =====================================
 
-    printSection(state, scope);
+    if (!traceId) {
+      console.log(
+        `[${getTime()}] [${group}] ${scope} → ${event}`,
+        data ?? ""
+      );
+      return;
+    }
 
-    console.log(formatLine(event, data));
+    const logs = traceBuckets.get(traceId) || [];
+
+    logs.push({
+      time: getTime(),
+      group,
+      scope,
+      event,
+      data,
+    });
+
+    traceBuckets.set(traceId, logs);
+
+    // =====================================
+    // 🔥 AUTO FLUSH
+    // =====================================
+
+    if (
+      event === "pipeline_done" ||
+      event === "pipeline_error"
+    ) {
+      flushTrace(traceId);
+    }
   };
 
   base.trace = traceImpl as Logger["trace"];
