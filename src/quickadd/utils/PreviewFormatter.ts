@@ -17,6 +17,10 @@
  * - pure function
  */
 
+import { createLogger } from "../debug/DebugLogger";
+
+const log = createLogger("FORMATTER");
+
 type PreviewEntry = {
   id: number;
   nickname: string;
@@ -28,7 +32,12 @@ type PreviewEntry = {
 };
 
 export function formatPreview(entries: PreviewEntry[]): string {
+  log.trace("format_preview_start", {
+    entries: entries.length,
+  });
+
   if (!entries.length) {
+    log.trace("format_preview_empty");
     return "⚠️ No data";
   }
 
@@ -123,6 +132,13 @@ ${suggestions}
 
 ━━━━━━━━━━━━━━━━━━
 `;
+
+  log.trace("format_preview_done", {
+    entries: entries.length,
+    hasConfidence: !!confidenceList,
+    hasSuggestions: !!suggestions,
+    length: output.length,
+  });
 
   return output.trim();
 }
