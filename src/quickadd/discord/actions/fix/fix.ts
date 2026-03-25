@@ -6,15 +6,13 @@
  * 🤖 ROLE:
  * Automatically fixes entries using validator suggestions.
  *
- * Responsible for:
- * - validating session + context
- * - applying suggestion → nickname
- * - updating buffer entries
- *
  * ❗ RULES:
- * - NO external calls (no sheets write)
- * - operates only on buffer
- * - uses validator output (suggestion + confidence)
+ * - operates on buffer
+ * - MUST revalidate after applying fixes
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -22,6 +20,7 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
+import { validateEntries } from "../../../validation/QuickAddValidator";
 
 import { createLogger } from "../../../debug/DebugLogger";
 
@@ -32,8 +31,11 @@ const log = createLogger("CMD_FIX");
 // =====================================
 
 export async function handleFix(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -59,6 +61,15 @@ export async function handleFix(
     return;
   }
 
+  // =====================================
+  // 🔥 TRACE RESOLUTION
+  // =====================================
+  const resolvedTraceId = traceId || session?.traceId;
+
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
+
   try {
     // =====================================
     // 📥 LOAD BUFFER
@@ -70,7 +81,7 @@ export async function handleFix(
     // =====================================
     // 🔁 APPLY FIXES
     // =====================================
-    const updated = entries.map((entry) => {
+    const updatedRaw = entries.map((entry) => {
       if (
         entry.suggestion &&
         entry.suggestion !== entry.nickname
@@ -87,11 +98,29 @@ export async function handleFix(
     });
 
     // =====================================
+    // 🔥 REVALIDATION (CRITICAL)
+    // =====================================
+    const revalidated = await validateEntries(
+      updatedRaw.map((e) => ({
+        nickname: e.nickname,
+        value: e.value,
+      }))
+    );
+
+    // preserve IDs
+    const merged = revalidated.map((v, i) => ({
+      ...updatedRaw[i],
+      status: v.status,
+      confidence: v.confidence,
+      suggestion: v.suggestion,
+    }));
+
+    // =====================================
     // 💾 SAVE BUFFER
     // =====================================
-    QuickAddBuffer.setEntries(guildId, updated);
+    QuickAddBuffer.setEntries(guildId, merged);
 
-    log("fix_applied", {
+    log.trace("fix_applied", resolvedTraceId, {
       guildId,
       total: entries.length,
       fixed: applied,
@@ -108,8 +137,12 @@ export async function handleFix(
       ephemeral: true,
     });
 
+    log.trace("fix_done", resolvedTraceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
-    log.error("fix_failed", err);
+    log.error("fix_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to apply fixes",
