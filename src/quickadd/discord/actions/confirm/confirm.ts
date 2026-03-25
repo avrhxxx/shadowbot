@@ -10,6 +10,10 @@
  * - ALL entries must be OK
  * - owner only
  * - destructive (clears buffer)
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary, migration phase)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -28,7 +32,8 @@ const log = createLogger("CMD_CONFIRM");
 // =====================================
 
 export async function handleConfirm(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW (phase 1)
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -66,13 +71,13 @@ export async function handleConfirm(
   }
 
   // =====================================
-  // 🔥 TRACE ID ENFORCEMENT
+  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
   // =====================================
-  if (!session.traceId) {
-    throw new Error("Missing traceId in session");
-  }
+  const resolvedTraceId = traceId || session?.traceId;
 
-  const traceId = session.traceId;
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
 
   try {
     // =====================================
@@ -94,7 +99,7 @@ export async function handleConfirm(
     const invalid = entries.filter((e) => e.status !== "OK");
 
     if (invalid.length > 0) {
-      log.trace("confirm_blocked_non_ok", traceId, {
+      log.trace("confirm_blocked_non_ok", resolvedTraceId, {
         total: entries.length,
         invalid: invalid.length,
       });
@@ -122,7 +127,7 @@ export async function handleConfirm(
     // =====================================
     await enqueuePoints(payload);
 
-    log.trace("confirm_success", traceId, {
+    log.trace("confirm_success", resolvedTraceId, {
       total: entries.length,
     });
 
@@ -136,12 +141,12 @@ export async function handleConfirm(
       ephemeral: true,
     });
 
-    log.trace("confirm_done", traceId, {
+    log.trace("confirm_done", resolvedTraceId, {
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("confirm_failed", err, traceId);
+    log.error("confirm_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to confirm entries",
