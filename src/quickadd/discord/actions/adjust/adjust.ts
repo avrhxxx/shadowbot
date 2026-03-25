@@ -22,8 +22,8 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 
-// ✅ FIX — correct layer (service removed, repository used)
-import { QuickAddRepository } from "../../../storage/QuickAddRepository";
+// ✅ FIX — use correct function export (no class)
+import { saveAdjusted } from "../../../storage/QuickAddRepository";
 
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
@@ -99,8 +99,8 @@ export async function handleAdjust(
 
     QuickAddBuffer.setEntries(guildId, newEntries);
 
-    // ✅ FIX — logger consistency
-    log.trace("adjust_applied", {
+    // ✅ FIX — trace requires traceId
+    log.trace("adjust_applied", session?.traceId || "no-trace", {
       id,
       before: target,
       after: updated,
@@ -111,14 +111,14 @@ export async function handleAdjust(
     // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
-        await QuickAddRepository.saveAdjustments([
+        await saveAdjusted([
           {
             ocr_raw: target.nickname,
             adjusted: newNickname,
           },
         ]);
 
-        log.trace("learning_saved_adjust", {
+        log.trace("learning_saved_adjust", session?.traceId || "no-trace", {
           from: target.nickname,
           to: newNickname,
         });
@@ -144,3 +144,30 @@ export async function handleAdjust(
     });
   }
 }
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. ❌ Removed invalid import:
+ *    - QuickAddRepository (class does not exist)
+ *
+ * 2. ✅ Correct import:
+ *    - saveAdjusted (function export)
+ *
+ * 3. ❌ Fixed wrong function name:
+ *    - saveAdjustments → saveAdjusted
+ *
+ * 4. 🔥 FIXED LOGGER:
+ *    - log.trace now includes traceId:
+ *      log.trace(event, traceId, data)
+ *
+ * 5. 🧠 traceId source:
+ *    - session?.traceId fallback to "no-trace"
+ *
+ * ✔ File now aligned with:
+ *    - storage layer (repository functions)
+ *    - logger contract
+ *    - architecture rules
+ */
