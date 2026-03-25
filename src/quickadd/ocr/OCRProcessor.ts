@@ -4,13 +4,18 @@
 
 /**
  * 🔥 ROLE:
- * OCR orchestrator (entry point for pipeline).
+ * OCR orchestrator (data extraction layer ONLY).
  *
  * Responsible for:
  * - downloading image
  * - preprocessing (optional)
  * - running multiple OCR modes
  * - aggregating results
+ *
+ * ❗ DOES NOT:
+ * - build layout
+ * - parse data
+ * - validate
  */
 
 import fetch from "node-fetch";
@@ -28,9 +33,8 @@ export async function runOCR(
   imageUrl: string,
   traceId: string
 ): Promise<OCRResult> {
-  // =====================================
-  // 🚀 INPUT
-  // =====================================
+  const startedAt = Date.now();
+
   log.trace("ocr_input", traceId, {
     imageUrl,
     flags: {
@@ -48,8 +52,7 @@ export async function runOCR(
     const res = await fetch(imageUrl);
 
     if (!res.ok) {
-      log.warn("fetch_failed", {
-        traceId,
+      log.warn("fetch_failed", traceId, {
         status: res.status,
       });
 
@@ -115,8 +118,7 @@ export async function runOCR(
           length: hocrResult.hocr.length,
         });
       } catch (err) {
-        log.warn("hocr_failed", {
-          traceId,
+        log.warn("hocr_failed", traceId, {
           error: err,
         });
       }
@@ -127,7 +129,7 @@ export async function runOCR(
     // =====================================
     // 🧱 BUILD SOURCES
     // =====================================
-    const sources = [
+    const sources: OCRResult["sources"] = [
       {
         source: "TESSERACT_FULL",
         text: full.text,
@@ -142,14 +144,14 @@ export async function runOCR(
         source: "TESSERACT_BOX",
         tokens: box.tokens,
       },
-    ] as OCRResult["sources"];
+    ];
 
     if (ENABLE_HOCR && hocrResult) {
       sources.push({
         source: "TESSERACT_HOCR",
         text: hocrResult.hocr,
         lines: [],
-      } as any);
+      });
     }
 
     // =====================================
@@ -167,13 +169,18 @@ export async function runOCR(
       })
     );
 
+    log.trace("ocr_duration", traceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
     return { sources };
 
   } catch (err) {
-    // =====================================
-    // ❌ ERROR
-    // =====================================
     log.error("ocr_failed", err, traceId);
+
+    log.trace("ocr_duration_failed", traceId, {
+      durationMs: Date.now() - startedAt,
+    });
 
     return { sources: [] };
   }
