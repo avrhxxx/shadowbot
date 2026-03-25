@@ -28,12 +28,31 @@ export async function runOCR(
   imageUrl: string,
   traceId: string
 ): Promise<OCRResult> {
-  log.trace("ocr_start", traceId, imageUrl);
+  // =====================================
+  // 🚀 INPUT
+  // =====================================
+  log.trace("ocr_input", traceId, {
+    imageUrl,
+    flags: {
+      USE_PREPROCESS,
+      ENABLE_HOCR,
+    },
+  });
 
   try {
+    // =====================================
+    // 🌐 FETCH IMAGE
+    // =====================================
+    log.trace("fetch_start", traceId);
+
     const res = await fetch(imageUrl);
 
     if (!res.ok) {
+      log.warn("fetch_failed", {
+        traceId,
+        status: res.status,
+      });
+
       throw new Error(`fetch_failed: ${res.status}`);
     }
 
@@ -46,41 +65,67 @@ export async function runOCR(
     let inputBuffer = buffer;
 
     // =====================================
-    // 🔹 PREPROCESS (optional)
+    // 🧪 PREPROCESS (optional)
     // =====================================
     if (USE_PREPROCESS) {
+      log.trace("preprocess_start", traceId);
+
       const { OCRPreprocessor } = await import("./OCRPreprocessor");
 
       const base = await OCRPreprocessor.base(buffer);
       inputBuffer = await OCRPreprocessor.enhance(base);
 
-      log.trace("preprocess_applied", traceId);
+      log.trace("preprocess_done", traceId, {
+        originalSize: buffer.length,
+        finalSize: inputBuffer.length,
+      });
+    } else {
+      log.trace("preprocess_skipped", traceId);
     }
 
     // =====================================
-    // 🔹 RUN OCR (MAIN MODES)
+    // 🤖 RUN OCR ENGINES
     // =====================================
+    log.trace("ocr_engines_start", traceId);
+
     const [full, line, box] = await Promise.all([
       OCREngine.full(inputBuffer, traceId),
       OCREngine.line(inputBuffer, traceId),
       OCREngine.box(inputBuffer, traceId),
     ]);
 
+    log.trace("ocr_engines_done", traceId, {
+      full_lines: full.lines.length,
+      line_lines: line.lines.length,
+      box_tokens: box.tokens.length,
+    });
+
     // =====================================
-    // 🔹 HOCR (SEPARATE — FIX)
+    // 🧾 HOCR (OPTIONAL)
     // =====================================
     let hocrResult: { hocr: string } | null = null;
 
     if (ENABLE_HOCR) {
       try {
+        log.trace("hocr_start", traceId);
+
         hocrResult = await OCREngine.hocr(inputBuffer, traceId);
+
+        log.trace("hocr_done", traceId, {
+          length: hocrResult.hocr.length,
+        });
       } catch (err) {
-        log.warn("hocr_failed", traceId);
+        log.warn("hocr_failed", {
+          traceId,
+          error: err,
+        });
       }
+    } else {
+      log.trace("hocr_disabled", traceId);
     }
 
     // =====================================
-    // 🔹 BUILD SOURCES
+    // 🧱 BUILD SOURCES
     // =====================================
     const sources = [
       {
@@ -108,10 +153,10 @@ export async function runOCR(
     }
 
     // =====================================
-    // 🔹 SAFE LOGGING (FIX)
+    // 📤 OUTPUT SUMMARY
     // =====================================
     log.trace(
-      "ocr_done",
+      "ocr_output",
       traceId,
       sources.map((s) => {
         if ("tokens" in s) {
@@ -123,7 +168,11 @@ export async function runOCR(
     );
 
     return { sources };
+
   } catch (err) {
+    // =====================================
+    // ❌ ERROR
+    // =====================================
     log.error("ocr_failed", err, traceId);
 
     return { sources: [] };
