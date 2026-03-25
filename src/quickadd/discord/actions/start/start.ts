@@ -14,16 +14,17 @@
  * ❗ RULES:
  * - minimal logic (delegates to session layer)
  * - handles Discord-specific operations (thread)
+ * - MUST produce traceId
  */
 
 import {
   ChatInputCommandInteraction,
   ChannelType,
-  TextChannel, // ✅ FIX — needed for narrowing
+  TextChannel,
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
-import { QuickAddType } from "../../../core/QuickAddTypes"; // ✅ FIX — type safety
+import { QuickAddType } from "../../../core/QuickAddTypes";
 import { createLogger } from "../../../debug/DebugLogger";
 
 const log = createLogger("CMD_START");
@@ -48,6 +49,8 @@ function isQuickAddType(value: string): value is QuickAddType {
 export async function handleStart(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
@@ -65,14 +68,14 @@ export async function handleStart(
   // 🔒 SESSION ALREADY EXISTS
   // =====================================
   if (existing) {
+    log.trace("start_blocked_existing_session", existing.traceId, {
+      guildId,
+      owner: existing.ownerId,
+    });
+
     await interaction.reply({
       content: "⚠️ A session is already active",
       ephemeral: true,
-    });
-
-    log("start_blocked_existing_session", {
-      guildId,
-      owner: existing.ownerId,
     });
 
     return;
@@ -92,12 +95,6 @@ export async function handleStart(
   }
 
   const type: QuickAddType = rawType;
-
-  log("start_requested", {
-    guildId,
-    userId,
-    type,
-  });
 
   try {
     // =====================================
@@ -123,7 +120,7 @@ export async function handleStart(
     await thread.members.add(userId);
 
     // =====================================
-    // 🧠 START SESSION
+    // 🧠 START SESSION (TRACE ID CREATED HERE)
     // =====================================
     const session = QuickAddSession.start({
       guildId,
@@ -132,7 +129,17 @@ export async function handleStart(
       type,
     });
 
-    log("session_started_success", session);
+    const traceId = session.traceId;
+
+    // =====================================
+    // 🚀 LOG START
+    // =====================================
+    log.trace("session_started", traceId, {
+      guildId,
+      userId,
+      threadId: thread.id,
+      type,
+    });
 
     // =====================================
     // 📤 RESPONSE
@@ -146,6 +153,10 @@ export async function handleStart(
       content: `🚀 QuickAdd session started\n\nSend screenshots here.`,
     });
 
+    log.trace("start_done", traceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
     log.error("start_failed", err);
 
@@ -155,40 +166,3 @@ export async function handleStart(
     });
   }
 }
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. 🔥 FIX — threads.create ERROR
- *    BEFORE:
- *      interaction.channel?.threads.create(...)
- *
- *    AFTER:
- *      if (!(interaction.channel instanceof TextChannel)) throw
- *
- *    ✔ Proper type narrowing
- *    ✔ Fixes TS2339
- *
- * 2. 🔥 FIX — QuickAddType mismatch
- *    BEFORE:
- *      const type = string
- *
- *    AFTER:
- *      validated via type guard → QuickAddType
- *
- *    ✔ Fixes TS2322
- *
- * 3. 🧠 ADDED TYPE GUARD
- *    isQuickAddType()
- *
- *    ✔ prevents runtime invalid values
- *    ✔ keeps domain consistency
- *
- * 4. ❗ NO ARCHITECTURE VIOLATION
- *    - still no business logic
- *    - only validation + Discord handling
- *
- * ✔ FILE FULLY FIXED
- */
