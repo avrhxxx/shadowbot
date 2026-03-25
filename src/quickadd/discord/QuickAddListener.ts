@@ -33,6 +33,7 @@ export function registerQuickAddListener(client: Client) {
   client.on("interactionCreate", async (interaction: Interaction) => {
     const userId = interaction.isRepliable() ? interaction.user?.id : undefined;
     const guildId = "guildId" in interaction ? interaction.guildId : undefined;
+    const channelId = "channelId" in interaction ? interaction.channelId : undefined;
 
     try {
       // =====================================
@@ -47,6 +48,7 @@ export function registerQuickAddListener(client: Client) {
         log.trace("interaction_ignored", {
           userId,
           guildId,
+          channelId,
           command: interaction.commandName,
         });
         return;
@@ -58,7 +60,17 @@ export function registerQuickAddListener(client: Client) {
       log.trace("interaction_received", {
         userId,
         guildId,
+        channelId,
         command: interaction.commandName,
+      });
+
+      // =====================================
+      // 🔁 DELEGATION
+      // =====================================
+      log.trace("interaction_delegate_to_router", {
+        userId,
+        guildId,
+        channelId,
       });
 
       await handleQuickAddInteraction(interaction);
@@ -69,17 +81,19 @@ export function registerQuickAddListener(client: Client) {
       log.trace("interaction_handled", {
         userId,
         guildId,
+        channelId,
       });
 
     } catch (err) {
       // =====================================
       // 💥 ERROR
       // =====================================
-      log.error("listener_error", err, undefined);
+      log.error("listener_error", err);
 
       log.trace("interaction_failed", {
         userId,
         guildId,
+        channelId,
       });
 
       if (interaction.isRepliable()) {
