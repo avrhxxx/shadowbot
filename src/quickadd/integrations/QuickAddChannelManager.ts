@@ -38,6 +38,13 @@ const CHANNEL_NAME = "quickadd";
 export async function ensureQuickAddChannel(
   guild: Guild
 ): Promise<TextChannel> {
+  const guildId = guild.id;
+
+  log.trace("channel_ensure_start", {
+    guildId,
+    expectedName: CHANNEL_NAME,
+  });
+
   // =====================================
   // 🔍 FIND EXISTING
   // =====================================
@@ -49,8 +56,9 @@ export async function ensureQuickAddChannel(
 
   if (existing) {
     log.trace("channel_found", {
-      guildId: guild.id,
+      guildId,
       channelId: existing.id,
+      name: existing.name,
     });
 
     return existing;
@@ -59,14 +67,20 @@ export async function ensureQuickAddChannel(
   // =====================================
   // 🏗️ CREATE CHANNEL
   // =====================================
+  log.trace("channel_create_start", {
+    guildId,
+    name: CHANNEL_NAME,
+  });
+
   const created = await guild.channels.create({
     name: CHANNEL_NAME,
     type: ChannelType.GuildText,
   });
 
   log.trace("channel_created", {
-    guildId: guild.id,
+    guildId,
     channelId: created.id,
+    name: created.name,
   });
 
   return created;
