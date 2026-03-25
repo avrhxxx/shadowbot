@@ -19,12 +19,27 @@
 import {
   ChatInputCommandInteraction,
   ChannelType,
+  TextChannel, // ✅ FIX — needed for narrowing
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
+import { QuickAddType } from "../../../core/QuickAddTypes"; // ✅ FIX — type safety
 import { createLogger } from "../../../debug/DebugLogger";
 
 const log = createLogger("CMD_START");
+
+// =====================================
+// 🔹 TYPE GUARD (SAFE CAST)
+// =====================================
+
+function isQuickAddType(value: string): value is QuickAddType {
+  return [
+    "DONATIONS_POINTS",
+    "DUEL_POINTS",
+    "RR_SIGNUPS",
+    "RR_RESULTS",
+  ].includes(value);
+}
 
 // =====================================
 // 🚀 HANDLER
@@ -63,7 +78,20 @@ export async function handleStart(
     return;
   }
 
-  const type = interaction.options.getString("type", true);
+  const rawType = interaction.options.getString("type", true);
+
+  // =====================================
+  // 🔒 VALIDATE TYPE
+  // =====================================
+  if (!isQuickAddType(rawType)) {
+    await interaction.reply({
+      content: "❌ Invalid QuickAdd type",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const type: QuickAddType = rawType;
 
   log("start_requested", {
     guildId,
@@ -73,18 +101,21 @@ export async function handleStart(
 
   try {
     // =====================================
+    // 📢 CHANNEL TYPE GUARD
+    // =====================================
+    if (!interaction.channel || !(interaction.channel instanceof TextChannel)) {
+      throw new Error("Invalid channel type for thread creation");
+    }
+
+    // =====================================
     // 📢 CREATE THREAD
     // =====================================
-    const thread = await interaction.channel?.threads.create({
+    const thread = await interaction.channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
       type: ChannelType.PrivateThread,
       reason: "QuickAdd session",
     });
-
-    if (!thread) {
-      throw new Error("Thread creation failed");
-    }
 
     // =====================================
     // 👤 ADD USER TO THREAD
@@ -124,3 +155,40 @@ export async function handleStart(
     });
   }
 }
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. 🔥 FIX — threads.create ERROR
+ *    BEFORE:
+ *      interaction.channel?.threads.create(...)
+ *
+ *    AFTER:
+ *      if (!(interaction.channel instanceof TextChannel)) throw
+ *
+ *    ✔ Proper type narrowing
+ *    ✔ Fixes TS2339
+ *
+ * 2. 🔥 FIX — QuickAddType mismatch
+ *    BEFORE:
+ *      const type = string
+ *
+ *    AFTER:
+ *      validated via type guard → QuickAddType
+ *
+ *    ✔ Fixes TS2322
+ *
+ * 3. 🧠 ADDED TYPE GUARD
+ *    isQuickAddType()
+ *
+ *    ✔ prevents runtime invalid values
+ *    ✔ keeps domain consistency
+ *
+ * 4. ❗ NO ARCHITECTURE VIOLATION
+ *    - still no business logic
+ *    - only validation + Discord handling
+ *
+ * ✔ FILE FULLY FIXED
+ */
