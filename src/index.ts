@@ -39,20 +39,20 @@ import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 // 🔥 QUICKADD (NEW ARCHITECTURE)
 // =============================
 
-// ✅ FIX — updated paths (commands → discord)
+// ❗ FIX: zgodnie z repo — CommandBuilder i CommandRouter są w discord/
 import { qCommand } from "./quickadd/discord/CommandBuilder";
 import { handleQuickAddInteraction } from "./quickadd/discord/CommandRouter";
 
-// ✅ FIX — renamed service → manager
+// ❗ FIX: zgodnie z repo — ChannelManager (nie Service)
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelManager";
 
-// ✅ FIX — listener moved to discord layer
+// ❗ FIX: listener w warstwie discord/
 import { registerQuickAddListener } from "./quickadd/discord/QuickAddListener";
 
 // 🔥 FIX — PATH
 import { ensureAllSheets } from "./google/googleSheetsStorage";
 
-// 🔥 NEW — QUEUE WORKER
+// 🔥 NEW — QUEUE WORKER (zgodne z repo)
 import { startQuickAddWorker } from "./quickadd/integrations/QuickAddQueueWorker";
 
 // =============================
@@ -167,3 +167,25 @@ client.once("clientReady", async () => {
 });
 
 client.login(BOT_TOKEN);
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. Import paths verified against repo structure:
+ *    - CommandBuilder → ./quickadd/discord/CommandBuilder
+ *    - CommandRouter → ./quickadd/discord/CommandRouter
+ *    - QuickAddListener → ./quickadd/discord/QuickAddListener
+ *    - QuickAddChannelManager → integrations layer
+ *    - QuickAddQueueWorker → integrations layer
+ *
+ * 2. Removed legacy paths:
+ *    - ❌ ./quickadd/commands/*
+ *    - ❌ QuickAddChannelService
+ *
+ * 3. File now consistent with:
+ *    core → discord → integrations architecture
+ *
+ * 4. No logic changes — only import correctness (as required)
+ */
