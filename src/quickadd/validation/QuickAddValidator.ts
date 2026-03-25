@@ -61,6 +61,13 @@ export async function validateEntries(
   const seen = new Set<string>();
   let idCounter = 1;
 
+  // =====================================
+  // 🚀 INPUT
+  // =====================================
+  log.trace("validation_start", {
+    entries: entries.length,
+  });
+
   for (const entry of entries) {
     const originalNickname = entry.nickname;
 
@@ -69,11 +76,24 @@ export async function validateEntries(
     let suggestion: string | undefined;
 
     // =====================================
+    // 📥 ENTRY INPUT
+    // =====================================
+    log.trace("entry_input", {
+      nickname: entry.nickname,
+      value: entry.value,
+    });
+
+    // =====================================
     // 🔢 VALUE VALIDATION
     // =====================================
     if (!entry.value || entry.value <= 0) {
       status = "INVALID_VALUE";
       confidence = 0;
+
+      log.trace("decision_invalid_value", {
+        nickname: entry.nickname,
+        value: entry.value,
+      });
     }
 
     // =====================================
@@ -82,6 +102,12 @@ export async function validateEntries(
     let resolved = "";
     try {
       resolved = await resolveNickname(entry.nickname);
+
+      log.trace("resolve_result", {
+        input: entry.nickname,
+        resolved,
+      });
+
     } catch (err) {
       log.warn("resolve_failed", err);
     }
@@ -95,26 +121,57 @@ export async function validateEntries(
       status = "UNRESOLVED";
       confidence = 0.3;
 
+      log.trace("decision_unresolved", {
+        nickname: entry.nickname,
+      });
+
       // 🔥 OCR garbage detection
       if (
         entry.nickname.length < 4 ||
         /donations|total|points/i.test(entry.nickname)
       ) {
         confidence = 0.1;
+
+        log.trace("decision_low_quality_ocr", {
+          nickname: entry.nickname,
+        });
       }
+
     } else {
       const similarity = stringSimilarity(entry.nickname, resolved);
 
       confidence = similarity;
 
+      log.trace("similarity_computed", {
+        input: entry.nickname,
+        resolved,
+        similarity,
+      });
+
       if (similarity >= 0.9) {
         status = "OK";
+
+        log.trace("decision_high_confidence", {
+          similarity,
+        });
+
       } else if (similarity >= 0.7) {
         status = "LOW_CONFIDENCE";
         suggestion = resolved;
+
+        log.trace("decision_low_confidence", {
+          similarity,
+          suggestion,
+        });
+
       } else {
         status = "UNRESOLVED";
         suggestion = resolved;
+
+        log.trace("decision_unresolved_with_suggestion", {
+          similarity,
+          suggestion,
+        });
       }
     }
 
@@ -126,6 +183,11 @@ export async function validateEntries(
     if (seen.has(key)) {
       status = "DUPLICATE";
       confidence = Math.min(confidence, 0.5);
+
+      log.trace("decision_duplicate", {
+        key,
+      });
+
     } else {
       seen.add(key);
     }
@@ -142,8 +204,24 @@ export async function validateEntries(
 
     results.push(validated);
 
-    log("validated_entry", validated);
+    // =====================================
+    // 📤 ENTRY OUTPUT
+    // =====================================
+    log.trace("entry_output", {
+      id: validated.id,
+      nickname: validated.nickname,
+      status: validated.status,
+      confidence: validated.confidence,
+      suggestion: validated.suggestion,
+    });
   }
+
+  // =====================================
+  // ✅ FINAL OUTPUT
+  // =====================================
+  log.trace("validation_done", {
+    total: results.length,
+  });
 
   return results;
 }
