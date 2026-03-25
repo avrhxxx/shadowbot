@@ -70,11 +70,15 @@ export async function handlePreview(
     // =====================================
     const entries = QuickAddBuffer.getEntries(guildId);
 
-    // ✅ FIX — consistent logger usage
-    log.trace("preview_requested", {
-      guildId,
-      count: entries.length,
-    });
+    // ✅ FIX — trace requires traceId
+    log.trace(
+      "preview_requested",
+      session?.traceId || "no-trace",
+      {
+        guildId,
+        count: entries.length,
+      }
+    );
 
     // =====================================
     // 🖥️ FORMAT OUTPUT
@@ -98,3 +102,20 @@ export async function handlePreview(
     });
   }
 }
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. 🔥 FIXED LOGGER:
+ *    - log.trace now includes traceId
+ *    - required signature: (event, traceId, data)
+ *
+ * 2. 🧠 traceId source:
+ *    - session?.traceId fallback to "no-trace"
+ *
+ * ✔ File now aligned with:
+ *    - DebugLogger contract
+ *    - global logging standard
+ */
