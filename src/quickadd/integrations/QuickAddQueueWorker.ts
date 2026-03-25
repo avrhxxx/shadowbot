@@ -31,11 +31,15 @@ const INTERVAL_MS = 10_000; // 10s
 // =====================================
 
 export function startQuickAddWorker() {
-  log.trace("worker_started");
+  log.trace("worker_started", {
+    intervalMs: INTERVAL_MS,
+  });
 
   setInterval(async () => {
+    const startedAt = Date.now();
+
     try {
-      log.trace("worker_tick");
+      log.trace("worker_tick_start");
 
       // =====================================
       // 📥 LOAD QUEUE (POINTS)
@@ -48,12 +52,32 @@ export function startQuickAddWorker() {
       });
 
       // =====================================
+      // 🔍 EMPTY QUEUE SIGNAL (IMPORTANT)
+      // =====================================
+      if (!points.length) {
+        log.trace("queue_empty", {
+          type: "points",
+        });
+      }
+
+      // =====================================
       // 🔮 FUTURE PROCESSING
       // =====================================
       // TODO: process queue
 
+      // =====================================
+      // ✅ TICK DONE
+      // =====================================
+      log.trace("worker_tick_done", {
+        durationMs: Date.now() - startedAt,
+      });
+
     } catch (err) {
       log.error("worker_error", err);
+
+      log.trace("worker_tick_failed", {
+        durationMs: Date.now() - startedAt,
+      });
     }
   }, INTERVAL_MS);
 }
