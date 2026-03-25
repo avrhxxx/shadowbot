@@ -6,16 +6,13 @@
  * 🛑 ROLE:
  * Terminates QuickAdd session completely.
  *
- * Responsible for:
- * - validating session + ownership
- * - clearing buffer
- * - ending session
- * - optionally deleting thread
- *
  * ❗ RULES:
- * - destructive operation
- * - only session owner can execute
- * - no external side-effects (no queue, no learning)
+ * - destructive
+ * - owner only
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -36,8 +33,11 @@ const log = createLogger("CMD_END");
 // =====================================
 
 export async function handleEnd(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -71,6 +71,15 @@ export async function handleEnd(
     return;
   }
 
+  // =====================================
+  // 🔥 TRACE RESOLUTION
+  // =====================================
+  const resolvedTraceId = traceId || session?.traceId;
+
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
+
   try {
     const threadId = session!.threadId;
 
@@ -84,7 +93,7 @@ export async function handleEnd(
     // =====================================
     QuickAddSession.end(guildId);
 
-    log("session_ended", {
+    log.trace("session_ended", resolvedTraceId, {
       guildId,
       threadId,
     });
@@ -106,16 +115,22 @@ export async function handleEnd(
       if (channel && "deletable" in channel && channel.deletable) {
         await channel.delete();
 
-        log("thread_deleted", {
+        log.trace("thread_deleted", resolvedTraceId, {
           threadId,
         });
       }
     } catch (err) {
-      log.warn("thread_delete_failed", err);
+      log.warn("thread_delete_failed", resolvedTraceId, {
+        error: err,
+      });
     }
 
+    log.trace("end_done", resolvedTraceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
-    log.error("end_failed", err);
+    log.error("end_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to end session",
