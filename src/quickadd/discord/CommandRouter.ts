@@ -4,16 +4,12 @@
 
 /**
  * 🎯 ROLE:
- * Entry point for handling QuickAdd slash commands.
- *
- * Responsible for:
- * - extracting subcommand
- * - resolving handler from registry
- * - executing handler safely
+ * Command router + traceId injector
  *
  * ❗ RULES:
- * - NO business logic
- * - only routing + error safety
+ * - generates traceId
+ * - injects into handlers
+ * - no business logic
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -23,12 +19,22 @@ import { createLogger } from "../debug/DebugLogger";
 const log = createLogger("CMD_ROUTER");
 
 // =====================================
+// 🔥 TRACE ID GENERATOR
+// =====================================
+
+function generateTraceId(): string {
+  return `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// =====================================
 // 🚀 MAIN ROUTER
 // =====================================
 
 export async function handleQuickAddCommand(
   interaction: ChatInputCommandInteraction
 ) {
+  const traceId = generateTraceId();
+
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
   const channelId = interaction.channelId;
@@ -43,7 +49,7 @@ export async function handleQuickAddCommand(
     // =====================================
     // 📥 INPUT
     // =====================================
-    log.trace("command_received", {
+    log.trace("command_received", traceId, {
       userId,
       guildId,
       channelId,
@@ -52,11 +58,9 @@ export async function handleQuickAddCommand(
 
     const handler = getCommandHandler(subcommand);
 
-    // =====================================
-    // ❌ UNKNOWN COMMAND
-    // =====================================
     if (!handler) {
       log.warn("command_unknown", {
+        traceId,
         userId,
         guildId,
         channelId,
@@ -74,42 +78,40 @@ export async function handleQuickAddCommand(
     // =====================================
     // 🚀 EXECUTION START
     // =====================================
-    log.trace("command_execution_start", {
+    log.trace("command_execution_start", traceId, {
       userId,
       guildId,
       channelId,
       subcommand,
     });
 
-    await handler(interaction);
+    // 🔥 TRACE INJECTION
+    await handler(interaction, traceId);
 
     // =====================================
     // ✅ EXECUTION DONE
     // =====================================
-    log.trace("command_execution_done", {
+    log.trace("command_execution_done", traceId, {
       userId,
       guildId,
       channelId,
       subcommand,
-      duration: Date.now() - startTime,
+      durationMs: Date.now() - startTime,
     });
 
   } catch (err) {
     // =====================================
     // 💥 ERROR
     // =====================================
-    log.error("command_router_error", err);
+    log.error("command_router_error", err, traceId);
 
-    log.trace("command_execution_failed", {
+    log.trace("command_execution_failed", traceId, {
       userId,
       guildId,
       channelId,
-      duration: Date.now() - startTime,
+      durationMs: Date.now() - startTime,
     });
 
-    // =====================================
-    // 🔥 SAFE RESPONSE
-    // =====================================
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({
         content: "❌ Something went wrong",
