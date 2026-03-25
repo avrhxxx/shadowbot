@@ -4,17 +4,29 @@
 
 /**
  * 🪵 ROLE:
- * Advanced logging system (V3)
+ * Advanced structured logger (V4 FINAL).
  *
  * Features:
- * - grouped logs by traceId
- * - automatic sections (OCR, PARSER, STORAGE, etc.)
- * - pretty console output (boxed groups)
- * - backward compatible (no changes required in other files)
+ * - scoped logs (OCR, PARSER, etc.)
+ * - auto trace grouping (by traceId)
+ * - section grouping ([OCR], [PARSER], etc.)
+ * - auto START / END block rendering
+ * - backward compatible (NO code changes required)
  *
- * ❗ RULES:
- * - zero business logic
- * - lightweight
+ * Output example:
+ *
+ * ════════════════════════════════════════════
+ * QUICKADD • trace: abc123
+ * ════════════════════════════════════════════
+ *
+ * [OCR]
+ *   [12:01:22] ocr_start
+ *   [12:01:23] image_loaded { size: 482133 }
+ *
+ * [PARSER]
+ *   [12:01:26] parsed { entries: 18 }
+ *
+ * ════════════════════════════════════════════
  */
 
 // =====================================
@@ -27,7 +39,6 @@ type Logger = {
   (event: string, data?: any): void;
   warn: (event: string, data?: any) => void;
   error: (event: string, data?: any, traceId?: string) => void;
-
   trace: {
     (event: string, data?: any): void;
     (event: string, traceId: string, data?: any): void;
@@ -35,18 +46,18 @@ type Logger = {
 };
 
 // =====================================
-// 🔹 INTERNAL STATE
+// 🔹 INTERNAL TRACE STATE
 // =====================================
 
-type LogEntry = {
-  scope: string;
-  level: LogLevel;
-  event: string;
-  time: string;
-  data?: any;
+type TraceState = {
+  started: boolean;
+  lastActivity: number;
+  sections: Set<string>;
 };
 
-const TRACE_STORE = new Map<string, LogEntry[]>();
+const traces = new Map<string, TraceState>();
+
+const TRACE_TIMEOUT = 5000; // auto close after inactivity
 
 // =====================================
 // 🔹 HELPERS
@@ -56,54 +67,74 @@ function now() {
   return new Date().toISOString().split("T")[1].split(".")[0];
 }
 
-function formatLine(entry: LogEntry) {
-  const dataStr =
-    entry.data && Object.keys(entry.data).length
-      ? " " + JSON.stringify(entry.data)
-      : "";
-
-  return `  [${entry.time}] ${entry.event}${dataStr}`;
+function separator() {
+  return "════════════════════════════════════════════";
 }
 
-// 🔥 GROUP BY SCOPE (OCR / PARSER / STORAGE etc.)
-function groupByScope(entries: LogEntry[]) {
-  const map: Record<string, LogEntry[]> = {};
-
-  for (const e of entries) {
-    if (!map[e.scope]) map[e.scope] = [];
-    map[e.scope].push(e);
-  }
-
-  return map;
-}
-
-// =====================================
-// 🔹 FLUSH (PRINT GROUP)
-// =====================================
-
-function flushTrace(traceId: string) {
-  const entries = TRACE_STORE.get(traceId);
-  if (!entries || !entries.length) return;
-
-  const grouped = groupByScope(entries);
-
-  console.log("\n════════════════════════════════════════════");
+function printHeader(traceId: string) {
+  console.log("");
+  console.log(separator());
   console.log(`QUICKADD • trace: ${traceId}`);
-  console.log("════════════════════════════════════════════\n");
+  console.log(separator());
+  console.log("");
+}
 
-  for (const scope of Object.keys(grouped)) {
-    console.log(`[${scope}]`);
+function printFooter() {
+  console.log("");
+  console.log(separator());
+  console.log("");
+}
 
-    for (const entry of grouped[scope]) {
-      console.log(formatLine(entry));
-    }
+function ensureTrace(traceId: string) {
+  let state = traces.get(traceId);
 
-    console.log("");
+  if (!state) {
+    state = {
+      started: false,
+      lastActivity: Date.now(),
+      sections: new Set(),
+    };
+    traces.set(traceId, state);
   }
 
-  console.log("════════════════════════════════════════════\n");
+  if (!state.started) {
+    printHeader(traceId);
+    state.started = true;
+  }
 
-  TRACE_STORE.delete(traceId);
+  state.lastActivity = Date.now();
+
+  scheduleCleanup(traceId);
+
+  return state;
+}
+
+function scheduleCleanup(traceId: string) {
+  setTimeout(() => {
+    const state = traces.get(traceId);
+    if (!state) return;
+
+    const inactive = Date.now() - state.lastActivity > TRACE_TIMEOUT;
+
+    if (inactive) {
+      printFooter();
+      traces.delete(traceId);
+    }
+  }, TRACE_TIMEOUT + 100);
+}
+
+function printSection(state: TraceState, scope: string) {
+  if (!state.sections.has(scope)) {
+    console.log(`[${scope}]`);
+    state.sections.add(scope);
+  }
+}
+
+function formatLine(event: string, data?: any) {
+  if (!data || Object.keys(data).length === 0) {
+    return `  [${now()}] ${event}`;
+  }
+  return `  [${now()}] ${event} ${JSON.stringify(data)}`;
 }
 
 // =====================================
@@ -116,18 +147,22 @@ export function createLogger(scope: string): Logger {
   };
 
   base.warn = (event: string, data?: any) => {
-    console.warn(`[${now()}] [${scope}] WARN ${event}`, data ?? "");
+    console.warn(`[${now()}] [${scope}] ⚠️ ${event}`, data ?? "");
   };
 
   base.error = (event: string, data?: any, traceId?: string) => {
-    console.error(
-      `[${now()}] [${scope}] ERROR ${event}`,
-      traceId ? { traceId, ...(data || {}) } : data ?? ""
-    );
+    if (traceId) {
+      const state = ensureTrace(traceId);
+      printSection(state, scope);
+      console.error(formatLine(`❌ ${event}`, data));
+      return;
+    }
+
+    console.error(`[${now()}] [${scope}] ❌ ${event}`, data ?? "");
   };
 
   // =====================================
-  // 🔥 TRACE (GROUPED MODE)
+  // 🔥 TRACE (AUTO GROUPING)
   // =====================================
 
   const traceImpl = (
@@ -145,43 +180,16 @@ export function createLogger(scope: string): Logger {
       data = arg1;
     }
 
-    const entry: LogEntry = {
-      scope,
-      level: "trace",
-      event,
-      time: now(),
-      data,
-    };
-
-    // =====================================
-    // 🔥 WITH TRACE → GROUP
-    // =====================================
-    if (traceId) {
-      if (!TRACE_STORE.has(traceId)) {
-        TRACE_STORE.set(traceId, []);
-      }
-
-      TRACE_STORE.get(traceId)!.push(entry);
-
-      // 🔥 AUTO FLUSH ON FINAL EVENTS
-      if (
-        event.includes("done") ||
-        event.includes("success") ||
-        event.includes("failed")
-      ) {
-        flushTrace(traceId);
-      }
-
+    if (!traceId) {
+      console.log(`[${now()}] [${scope}] ${event}`, data ?? "");
       return;
     }
 
-    // =====================================
-    // 🔹 WITHOUT TRACE → NORMAL LOG
-    // =====================================
-    console.log(
-      `[${entry.time}] [${scope}] TRACE ${event}`,
-      data ?? ""
-    );
+    const state = ensureTrace(traceId);
+
+    printSection(state, scope);
+
+    console.log(formatLine(event, data));
   };
 
   base.trace = traceImpl as Logger["trace"];
