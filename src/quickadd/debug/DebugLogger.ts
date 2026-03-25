@@ -3,18 +3,18 @@
 // =====================================
 
 /**
- * 🪵 ROLE (V2):
- * Pretty structured logger with trace grouping.
+ * 🪵 ROLE:
+ * Advanced logging system (V3)
  *
  * Features:
- * - backward compatible (no code changes needed)
- * - groups logs per traceId
- * - pretty console output (sections + separators)
- * - scoped logging (OCR, PARSER, etc.)
+ * - grouped logs by traceId
+ * - automatic sections (OCR, PARSER, STORAGE, etc.)
+ * - pretty console output (boxed groups)
+ * - backward compatible (no changes required in other files)
  *
  * ❗ RULES:
- * - no business logic
- * - lightweight (no deps)
+ * - zero business logic
+ * - lightweight
  */
 
 // =====================================
@@ -34,22 +34,19 @@ type Logger = {
   };
 };
 
-type TraceBuffer = {
-  scopes: Map<string, string[]>;
-  lastFlush: number;
-};
-
-// =====================================
-// 🔹 CONFIG
-// =====================================
-
-const FLUSH_DELAY = 50; // ms (group burst logs)
-
 // =====================================
 // 🔹 INTERNAL STATE
 // =====================================
 
-const traces = new Map<string, TraceBuffer>();
+type LogEntry = {
+  scope: string;
+  level: LogLevel;
+  event: string;
+  time: string;
+  data?: any;
+};
+
+const TRACE_STORE = new Map<string, LogEntry[]>();
 
 // =====================================
 // 🔹 HELPERS
@@ -59,57 +56,54 @@ function now() {
   return new Date().toISOString().split("T")[1].split(".")[0];
 }
 
-function formatLine(event: string, data?: any) {
-  if (!data || Object.keys(data).length === 0) {
-    return `  [${now()}] ${event}`;
-  }
+function formatLine(entry: LogEntry) {
+  const dataStr =
+    entry.data && Object.keys(entry.data).length
+      ? " " + JSON.stringify(entry.data)
+      : "";
 
-  return `  [${now()}] ${event} ${JSON.stringify(data)}`;
+  return `  [${entry.time}] ${entry.event}${dataStr}`;
 }
 
-function ensureTrace(traceId: string): TraceBuffer {
-  if (!traces.has(traceId)) {
-    traces.set(traceId, {
-      scopes: new Map(),
-      lastFlush: Date.now(),
-    });
-  }
-  return traces.get(traceId)!;
-}
+// 🔥 GROUP BY SCOPE (OCR / PARSER / STORAGE etc.)
+function groupByScope(entries: LogEntry[]) {
+  const map: Record<string, LogEntry[]> = {};
 
-function scheduleFlush(traceId: string) {
-  const trace = traces.get(traceId);
-  if (!trace) return;
-
-  const nowTime = Date.now();
-
-  if (nowTime - trace.lastFlush > FLUSH_DELAY) {
-    flush(traceId);
-    return;
+  for (const e of entries) {
+    if (!map[e.scope]) map[e.scope] = [];
+    map[e.scope].push(e);
   }
 
-  setTimeout(() => flush(traceId), FLUSH_DELAY);
+  return map;
 }
 
-function flush(traceId: string) {
-  const trace = traces.get(traceId);
-  if (!trace) return;
+// =====================================
+// 🔹 FLUSH (PRINT GROUP)
+// =====================================
+
+function flushTrace(traceId: string) {
+  const entries = TRACE_STORE.get(traceId);
+  if (!entries || !entries.length) return;
+
+  const grouped = groupByScope(entries);
 
   console.log("\n════════════════════════════════════════════");
   console.log(`QUICKADD • trace: ${traceId}`);
   console.log("════════════════════════════════════════════\n");
 
-  for (const [scope, lines] of trace.scopes.entries()) {
+  for (const scope of Object.keys(grouped)) {
     console.log(`[${scope}]`);
-    for (const line of lines) {
-      console.log(line);
+
+    for (const entry of grouped[scope]) {
+      console.log(formatLine(entry));
     }
+
     console.log("");
   }
 
   console.log("════════════════════════════════════════════\n");
 
-  traces.delete(traceId);
+  TRACE_STORE.delete(traceId);
 }
 
 // =====================================
@@ -133,7 +127,7 @@ export function createLogger(scope: string): Logger {
   };
 
   // =====================================
-  // 🔥 TRACE (GROUPED)
+  // 🔥 TRACE (GROUPED MODE)
   // =====================================
 
   const traceImpl = (
@@ -151,23 +145,43 @@ export function createLogger(scope: string): Logger {
       data = arg1;
     }
 
-    // 🔹 NO TRACE ID → fallback to normal log
-    if (!traceId) {
-      console.log(`[${now()}] [${scope}] TRACE ${event}`, data ?? "");
+    const entry: LogEntry = {
+      scope,
+      level: "trace",
+      event,
+      time: now(),
+      data,
+    };
+
+    // =====================================
+    // 🔥 WITH TRACE → GROUP
+    // =====================================
+    if (traceId) {
+      if (!TRACE_STORE.has(traceId)) {
+        TRACE_STORE.set(traceId, []);
+      }
+
+      TRACE_STORE.get(traceId)!.push(entry);
+
+      // 🔥 AUTO FLUSH ON FINAL EVENTS
+      if (
+        event.includes("done") ||
+        event.includes("success") ||
+        event.includes("failed")
+      ) {
+        flushTrace(traceId);
+      }
+
       return;
     }
 
-    const trace = ensureTrace(traceId);
-
-    if (!trace.scopes.has(scope)) {
-      trace.scopes.set(scope, []);
-    }
-
-    trace.scopes.get(scope)!.push(formatLine(event, data));
-
-    trace.lastFlush = Date.now();
-
-    scheduleFlush(traceId);
+    // =====================================
+    // 🔹 WITHOUT TRACE → NORMAL LOG
+    // =====================================
+    console.log(
+      `[${entry.time}] [${scope}] TRACE ${event}`,
+      data ?? ""
+    );
   };
 
   base.trace = traceImpl as Logger["trace"];
