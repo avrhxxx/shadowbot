@@ -9,6 +9,10 @@
  * ❗ RULES:
  * - owner only
  * - revalidation required
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary, migration phase)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -30,7 +34,8 @@ const log = createLogger("CMD_ADJUST");
 // =====================================
 
 export async function handleAdjust(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW (phase 1)
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -68,13 +73,13 @@ export async function handleAdjust(
   }
 
   // =====================================
-  // 🔥 TRACE ID ENFORCEMENT
+  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
   // =====================================
-  if (!session?.traceId) {
-    throw new Error("Missing traceId in session");
-  }
+  const resolvedTraceId = traceId || session?.traceId;
 
-  const traceId = session.traceId;
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
 
   const id = interaction.options.getInteger("id", true);
   const newNickname = interaction.options.getString("nickname");
@@ -117,8 +122,7 @@ export async function handleAdjust(
       newEntries.map((e) => ({
         nickname: e.nickname,
         value: e.value,
-      })),
-      traceId
+      }))
     );
 
     // preserve IDs
@@ -131,7 +135,7 @@ export async function handleAdjust(
 
     QuickAddBuffer.setEntries(guildId, merged);
 
-    log.trace("adjust_applied", traceId, {
+    log.trace("adjust_applied", resolvedTraceId, {
       id,
       before: target,
       after: updated,
@@ -149,13 +153,13 @@ export async function handleAdjust(
           },
         ]);
 
-        log.trace("learning_saved_adjust", traceId, {
+        log.trace("learning_saved_adjust", resolvedTraceId, {
           from: target.nickname,
           to: newNickname,
         });
       }
     } catch (err) {
-      log.warn("learning_failed_adjust", traceId, {
+      log.warn("learning_failed_adjust", resolvedTraceId, {
         error: err,
       });
     }
@@ -165,12 +169,12 @@ export async function handleAdjust(
       ephemeral: true,
     });
 
-    log.trace("adjust_done", traceId, {
+    log.trace("adjust_done", resolvedTraceId, {
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("adjust_failed", err, traceId);
+    log.error("adjust_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to adjust entry",
