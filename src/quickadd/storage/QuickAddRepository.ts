@@ -105,7 +105,8 @@ export async function saveLearning(rows: LearningRow[]) {
 
     await writeSheet(NICKNAME_TAB, newData);
 
-    log.trace("learning_saved", {
+    // ✅ FIX — trace requires traceId
+    log.trace("learning_saved", "repository", {
       count: rows.length,
     });
 
@@ -147,7 +148,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
     }
 
     for (const entry of entries) {
-      let updated = false; // ✅ FIX — reset per entry
+      let updated = false;
 
       const cleaned = clean(entry.ocr_raw);
 
@@ -160,7 +161,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
         if (clean(ocrRaw) === cleaned) {
           await updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted);
 
-          log.trace("adjusted_updated", {
+          log.trace("adjusted_updated", "repository", {
             ocr: ocrRaw,
             adjusted: entry.adjusted,
           });
@@ -170,9 +171,6 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
         }
       }
 
-      // =====================================
-      // 🔥 IF NOT FOUND → APPEND NEW
-      // =====================================
       if (!updated) {
         const newRow = [
           "",
@@ -186,7 +184,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
 
         sheet.push(newRow);
 
-        log.trace("adjusted_added", {
+        log.trace("adjusted_added", "repository", {
           ocr: entry.ocr_raw,
           adjusted: entry.adjusted,
         });
@@ -224,7 +222,7 @@ export async function enqueuePoints(entries: PointsQueueEntry[]) {
 
     await writeSheet(POINTS_QUEUE_TAB, newData);
 
-    log.trace("points_enqueued", {
+    log.trace("points_enqueued", "repository", {
       count: rows.length,
     });
 
@@ -257,7 +255,7 @@ export async function enqueueEvents(entries: EventsQueueEntry[]) {
 
     await writeSheet(EVENTS_QUEUE_TAB, newData);
 
-    log.trace("events_enqueued", {
+    log.trace("events_enqueued", "repository", {
       count: rows.length,
     });
 
@@ -275,7 +273,7 @@ export async function getLearningData(): Promise<any[][]> {
   try {
     const data = await readSheet(NICKNAME_TAB);
 
-    log.trace("learning_loaded", {
+    log.trace("learning_loaded", "repository", {
       rows: data.length,
     });
 
@@ -314,3 +312,28 @@ function clean(input: string): string {
     .replace(/[^a-z0-9]/gi, "")
     .trim();
 }
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. 🔥 FIXED ALL log.trace CALLS
+ *    BEFORE:
+ *      log.trace("event", { data })
+ *
+ *    AFTER:
+ *      log.trace("event", "repository", { data })
+ *
+ *    ✔ Added required traceId argument
+ *
+ * 2. 🧠 TRACE STRATEGY
+ *    - repository layer uses static traceId: "repository"
+ *    - no session context here → correct architectural choice
+ *
+ * 3. ❗ NO OTHER LOGIC CHANGES
+ *    - purely logging contract fix
+ *
+ * ✔ File now fully compatible with DebugLogger
+ * ✔ Removes 6+ TS errors
+ */
