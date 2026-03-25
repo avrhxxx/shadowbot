@@ -31,6 +31,9 @@ export async function handleQuickAddCommand(
 ) {
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
+  const channelId = interaction.channelId;
+
+  const startTime = Date.now();
 
   try {
     if (!interaction.isChatInputCommand()) return;
@@ -43,6 +46,7 @@ export async function handleQuickAddCommand(
     log.trace("command_received", {
       userId,
       guildId,
+      channelId,
       subcommand,
     });
 
@@ -55,6 +59,7 @@ export async function handleQuickAddCommand(
       log.warn("command_unknown", {
         userId,
         guildId,
+        channelId,
         subcommand,
       });
 
@@ -72,6 +77,7 @@ export async function handleQuickAddCommand(
     log.trace("command_execution_start", {
       userId,
       guildId,
+      channelId,
       subcommand,
     });
 
@@ -83,18 +89,22 @@ export async function handleQuickAddCommand(
     log.trace("command_execution_done", {
       userId,
       guildId,
+      channelId,
       subcommand,
+      duration: Date.now() - startTime,
     });
 
   } catch (err) {
     // =====================================
     // 💥 ERROR
     // =====================================
-    log.error("command_router_error", err, undefined);
+    log.error("command_router_error", err);
 
     log.trace("command_execution_failed", {
       userId,
       guildId,
+      channelId,
+      duration: Date.now() - startTime,
     });
 
     // =====================================
