@@ -6,15 +6,9 @@
  * 🧠 ROLE:
  * In-memory state for QuickAdd session entries.
  *
- * Responsible for:
- * - storing validated entries per guild
- * - assigning stable IDs
- * - enabling preview / adjust / confirm flow
- *
  * ❗ RULES:
- * - NO persistence (this is NOT database)
- * - NO business logic
- * - pure state container
+ * - IMMUTABLE OUTSIDE
+ * - state can ONLY be modified via API
  */
 
 import { createLogger } from "../debug/DebugLogger";
@@ -24,8 +18,6 @@ const log = createLogger("BUFFER");
 type ParsedEntry = {
   nickname: string;
   value: number;
-
-  // 🔥 debug / tracing
   source?: string;
 };
 
@@ -35,12 +27,10 @@ type BufferedEntry = {
   nickname: string;
   value: number;
 
-  // 🔥 validation
   status?: string;
   confidence?: number;
   suggestion?: string;
 
-  // 🔥 debug
   source?: string;
 };
 
@@ -49,8 +39,6 @@ type BufferedEntry = {
 // =====================================
 
 const buffer = new Map<string, BufferedEntry[]>();
-
-// 🔥 ID counter per guild (stable IDs for UI)
 const idCounters = new Map<string, number>();
 
 // =====================================
@@ -58,9 +46,6 @@ const idCounters = new Map<string, number>();
 // =====================================
 
 export const QuickAddBuffer = {
-  // =============================
-  // ➕ ADD ENTRIES
-  // =============================
   addEntries(
     guildId: string,
     entries: (ParsedEntry & {
@@ -70,9 +55,6 @@ export const QuickAddBuffer = {
       source?: string;
     })[]
   ) {
-    // =====================================
-    // 📥 INPUT
-    // =====================================
     log.trace("buffer_add_start", {
       guildId,
       incoming: entries.length,
@@ -93,37 +75,32 @@ export const QuickAddBuffer = {
 
     let currentId = idCounters.get(guildId)!;
 
-    // =====================================
-    // ➕ ADD LOOP
-    // =====================================
     for (const entry of entries) {
+      // 🔥 defensive copy (input safety)
+      const safeEntry = { ...entry };
+
       log.trace("buffer_entry_in", {
-        nickname: entry.nickname,
-        value: entry.value,
-        status: entry.status,
-        confidence: entry.confidence,
+        nickname: safeEntry.nickname,
+        value: safeEntry.value,
+        status: safeEntry.status,
+        confidence: safeEntry.confidence,
       });
 
       current.push({
         id: currentId++,
-        nickname: entry.nickname,
-        value: entry.value,
+        nickname: safeEntry.nickname,
+        value: safeEntry.value,
 
-        // validation
-        status: entry.status,
-        confidence: entry.confidence,
-        suggestion: entry.suggestion,
+        status: safeEntry.status,
+        confidence: safeEntry.confidence,
+        suggestion: safeEntry.suggestion,
 
-        // debug
-        source: entry.source,
+        source: safeEntry.source,
       });
     }
 
     idCounters.set(guildId, currentId);
 
-    // =====================================
-    // 📊 STATE DIFF
-    // =====================================
     log.trace("buffer_updated", {
       guildId,
       before: beforeCount,
@@ -132,16 +109,10 @@ export const QuickAddBuffer = {
     });
   },
 
-  // =============================
-  // 🔁 SET ENTRIES (REPLACE)
-  // =============================
   setEntries(
     guildId: string,
     entries: BufferedEntry[]
   ) {
-    // =====================================
-    // 📥 INPUT
-    // =====================================
     const before = buffer.get(guildId)?.length || 0;
 
     log.trace("buffer_replace_start", {
@@ -150,12 +121,10 @@ export const QuickAddBuffer = {
       incoming: entries.length,
     });
 
-    // 🔥 immutability guard
     const cloned = entries.map((e) => ({ ...e }));
 
     buffer.set(guildId, cloned);
 
-    // 🔥 keep ID counter consistent
     const maxId = cloned.reduce(
       (max, e) => (e.id > max ? e.id : max),
       0
@@ -163,9 +132,6 @@ export const QuickAddBuffer = {
 
     idCounters.set(guildId, maxId + 1);
 
-    // =====================================
-    // 📊 STATE DIFF
-    // =====================================
     log.trace("buffer_replaced", {
       guildId,
       before,
@@ -174,9 +140,6 @@ export const QuickAddBuffer = {
     });
   },
 
-  // =============================
-  // 📥 GET ENTRIES
-  // =============================
   getEntries(guildId: string): BufferedEntry[] {
     const entries = buffer.get(guildId) || [];
 
@@ -185,12 +148,10 @@ export const QuickAddBuffer = {
       count: entries.length,
     });
 
-    return entries;
+    // 🔥 CRITICAL FIX — return copy
+    return entries.map((e) => ({ ...e }));
   },
 
-  // =============================
-  // 🧹 CLEAR
-  // =============================
   clear(guildId: string) {
     const before = buffer.get(guildId)?.length || 0;
 
