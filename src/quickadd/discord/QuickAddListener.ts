@@ -28,24 +28,59 @@ const log = createLogger("QA_LISTENER");
 // =====================================
 
 export function registerQuickAddListener(client: Client) {
+  log.trace("listener_registered");
+
   client.on("interactionCreate", async (interaction: Interaction) => {
+    const userId = interaction.isRepliable() ? interaction.user?.id : undefined;
+    const guildId = "guildId" in interaction ? interaction.guildId : undefined;
+
     try {
+      // =====================================
+      // 🔍 IGNORE NON-COMMANDS (NO SPAM)
+      // =====================================
       if (!interaction.isChatInputCommand()) return;
 
       // =====================================
       // 🎯 FILTER — ONLY /q COMMAND
       // =====================================
-      if (interaction.commandName !== "q") return;
+      if (interaction.commandName !== "q") {
+        log.trace("interaction_ignored", {
+          userId,
+          guildId,
+          command: interaction.commandName,
+        });
+        return;
+      }
 
-      log("interaction_received", {
-        userId: interaction.user.id,
-        guildId: interaction.guildId,
+      // =====================================
+      // 📥 ENTRY POINT
+      // =====================================
+      log.trace("interaction_received", {
+        userId,
+        guildId,
+        command: interaction.commandName,
       });
 
       await handleQuickAddInteraction(interaction);
 
+      // =====================================
+      // ✅ DELEGATION DONE
+      // =====================================
+      log.trace("interaction_handled", {
+        userId,
+        guildId,
+      });
+
     } catch (err) {
-      log.error("listener_error", err);
+      // =====================================
+      // 💥 ERROR
+      // =====================================
+      log.error("listener_error", err, undefined);
+
+      log.trace("interaction_failed", {
+        userId,
+        guildId,
+      });
 
       if (interaction.isRepliable()) {
         await interaction
@@ -58,28 +93,3 @@ export function registerQuickAddListener(client: Client) {
     }
   });
 }
-
-/**
- * =====================================
- * ✅ CHANGES / PURPOSE (INDEX)
- * =====================================
- *
- * 1. 🔥 CREATED MISSING FILE
- *    → fixes:
- *      Cannot find module './quickadd/discord/QuickAddListener'
- *
- * 2. 🧠 CLEAN ARCHITECTURE
- *    - Listener ONLY listens
- *    - Router handles logic
- *
- * 3. 🎯 FILTER ADDED
- *    → only reacts to `/q`
- *
- * 4. 🛡️ SAFE ERROR HANDLING
- *    → never crashes global interaction system
- *
- * ✔ FULLY COMPATIBLE WITH:
- *   - CommandRouter
- *   - CommandRegistry
- *   - index.ts
- */
