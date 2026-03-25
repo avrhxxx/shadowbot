@@ -9,6 +9,10 @@
  * ❗ RULES:
  * - read-only
  * - requires valid traceId
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary, migration phase)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -31,7 +35,8 @@ const log = createLogger("CMD_PREVIEW");
 // =====================================
 
 export async function handlePreview(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW (phase 1 = optional)
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -58,13 +63,13 @@ export async function handlePreview(
   }
 
   // =====================================
-  // 🔥 TRACE ID ENFORCEMENT
+  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
   // =====================================
-  if (!session?.traceId) {
-    throw new Error("Missing traceId in session");
-  }
+  const resolvedTraceId = traceId || session?.traceId;
 
-  const traceId = session.traceId;
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
 
   try {
     // =====================================
@@ -72,7 +77,7 @@ export async function handlePreview(
     // =====================================
     const entries = QuickAddBuffer.getEntries(guildId);
 
-    log.trace("preview_requested", traceId, {
+    log.trace("preview_requested", resolvedTraceId, {
       guildId,
       count: entries.length,
     });
@@ -90,13 +95,13 @@ export async function handlePreview(
       ephemeral: true,
     });
 
-    log.trace("preview_done", traceId, {
+    log.trace("preview_done", resolvedTraceId, {
       count: entries.length,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("preview_failed", err, traceId);
+    log.error("preview_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to generate preview",
