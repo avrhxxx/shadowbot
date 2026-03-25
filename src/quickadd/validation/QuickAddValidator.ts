@@ -4,19 +4,18 @@
 
 /**
  * 🧠 ROLE:
- * Validates parsed entries and enriches them with:
- * - nickname resolution (mapping)
+ * Validates parsed entries (BATCH, evaluate-only).
+ *
+ * Responsible for:
+ * - nickname resolution
  * - confidence scoring
  * - duplicate detection
  * - suggestions
  *
- * Pipeline stage:
- * parser → validation → buffer
- *
  * ❗ RULES:
- * - may use async (mapping)
- * - contains "intelligence layer"
- * - no OCR / parsing logic here
+ * - NO blocking (evaluate_only)
+ * - BATCH processing
+ * - FULL trace logging
  */
 
 import { createLogger } from "../debug/DebugLogger";
@@ -50,21 +49,42 @@ export type ValidatedEntry = {
 };
 
 // =====================================
+// 🧠 PRIORITY
+// =====================================
+
+const statusPriority: Record<EntryStatus, number> = {
+  INVALID_VALUE: 5,
+  DUPLICATE: 4,
+  UNRESOLVED: 3,
+  LOW_CONFIDENCE: 2,
+  OK: 1,
+};
+
+function pickHigherStatus(
+  current: EntryStatus,
+  next: EntryStatus
+): EntryStatus {
+  return statusPriority[next] > statusPriority[current]
+    ? next
+    : current;
+}
+
+// =====================================
 // 🧠 MAIN VALIDATOR
 // =====================================
 
 export async function validateEntries(
-  entries: { nickname: string; value: number }[]
+  entries: { nickname: string; value: number }[],
+  traceId: string
 ): Promise<ValidatedEntry[]> {
-  const results: ValidatedEntry[] = [];
+  const startedAt = Date.now();
 
+  const results: ValidatedEntry[] = [];
   const seen = new Set<string>();
+
   let idCounter = 1;
 
-  // =====================================
-  // 🚀 INPUT
-  // =====================================
-  log.trace("validation_start", {
+  log.trace("validation_start", traceId, {
     entries: entries.length,
   });
 
@@ -75,10 +95,7 @@ export async function validateEntries(
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
-    // =====================================
-    // 📥 ENTRY INPUT
-    // =====================================
-    log.trace("entry_input", {
+    log.trace("entry_input", traceId, {
       nickname: entry.nickname,
       value: entry.value,
     });
@@ -87,10 +104,10 @@ export async function validateEntries(
     // 🔢 VALUE VALIDATION
     // =====================================
     if (!entry.value || entry.value <= 0) {
-      status = "INVALID_VALUE";
+      status = pickHigherStatus(status, "INVALID_VALUE");
       confidence = 0;
 
-      log.trace("decision_invalid_value", {
+      log.trace("decision_invalid_value", traceId, {
         nickname: entry.nickname,
         value: entry.value,
       });
@@ -103,13 +120,15 @@ export async function validateEntries(
     try {
       resolved = await resolveNickname(entry.nickname);
 
-      log.trace("resolve_result", {
+      log.trace("resolve_result", traceId, {
         input: entry.nickname,
         resolved,
       });
 
     } catch (err) {
-      log.warn("resolve_failed", err);
+      log.warn("resolve_failed", traceId, {
+        error: err,
+      });
     }
 
     const wasMapped = resolved && resolved !== entry.nickname;
@@ -118,21 +137,20 @@ export async function validateEntries(
     // 🧠 CONFIDENCE + STATUS
     // =====================================
     if (!wasMapped) {
-      status = "UNRESOLVED";
-      confidence = 0.3;
+      status = pickHigherStatus(status, "UNRESOLVED");
+      confidence = Math.min(confidence || 1, 0.3);
 
-      log.trace("decision_unresolved", {
+      log.trace("decision_unresolved", traceId, {
         nickname: entry.nickname,
       });
 
-      // 🔥 OCR garbage detection
       if (
         entry.nickname.length < 4 ||
         /donations|total|points/i.test(entry.nickname)
       ) {
-        confidence = 0.1;
+        confidence = Math.min(confidence, 0.1);
 
-        log.trace("decision_low_quality_ocr", {
+        log.trace("decision_low_quality_ocr", traceId, {
           nickname: entry.nickname,
         });
       }
@@ -142,36 +160,22 @@ export async function validateEntries(
 
       confidence = similarity;
 
-      log.trace("similarity_computed", {
+      log.trace("similarity_computed", traceId, {
         input: entry.nickname,
         resolved,
         similarity,
       });
 
       if (similarity >= 0.9) {
-        status = "OK";
-
-        log.trace("decision_high_confidence", {
-          similarity,
-        });
+        status = pickHigherStatus(status, "OK");
 
       } else if (similarity >= 0.7) {
-        status = "LOW_CONFIDENCE";
+        status = pickHigherStatus(status, "LOW_CONFIDENCE");
         suggestion = resolved;
-
-        log.trace("decision_low_confidence", {
-          similarity,
-          suggestion,
-        });
 
       } else {
-        status = "UNRESOLVED";
+        status = pickHigherStatus(status, "UNRESOLVED");
         suggestion = resolved;
-
-        log.trace("decision_unresolved_with_suggestion", {
-          similarity,
-          suggestion,
-        });
       }
     }
 
@@ -181,10 +185,10 @@ export async function validateEntries(
     const key = `${entry.nickname}:${entry.value}`;
 
     if (seen.has(key)) {
-      status = "DUPLICATE";
+      status = pickHigherStatus(status, "DUPLICATE");
       confidence = Math.min(confidence, 0.5);
 
-      log.trace("decision_duplicate", {
+      log.trace("decision_duplicate", traceId, {
         key,
       });
 
@@ -204,10 +208,7 @@ export async function validateEntries(
 
     results.push(validated);
 
-    // =====================================
-    // 📤 ENTRY OUTPUT
-    // =====================================
-    log.trace("entry_output", {
+    log.trace("entry_output", traceId, {
       id: validated.id,
       nickname: validated.nickname,
       status: validated.status,
@@ -216,11 +217,9 @@ export async function validateEntries(
     });
   }
 
-  // =====================================
-  // ✅ FINAL OUTPUT
-  // =====================================
-  log.trace("validation_done", {
+  log.trace("validation_done", traceId, {
     total: results.length,
+    durationMs: Date.now() - startedAt,
   });
 
   return results;
