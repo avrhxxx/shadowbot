@@ -14,6 +14,10 @@
  * - DOES NOT end session
  * - DOES NOT send anything to queue
  * - user can continue flow after this
+ *
+ * 🔥 NOTE:
+ * - traceId injected from CommandRouter
+ * - fallback to session.traceId (temporary)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -31,7 +35,8 @@ const log = createLogger("CMD_CANCEL");
 // =====================================
 
 export async function handleCancel(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId?: string // 🔥 NEW
 ): Promise<void> {
   const guildId = interaction.guildId;
 
@@ -58,13 +63,22 @@ export async function handleCancel(
     return;
   }
 
+  // =====================================
+  // 🔥 TRACE RESOLUTION
+  // =====================================
+  const resolvedTraceId = traceId || session?.traceId;
+
+  if (!resolvedTraceId) {
+    throw new Error("Missing traceId");
+  }
+
   try {
     // =====================================
     // 🧹 CLEAR BUFFER ONLY
     // =====================================
     QuickAddBuffer.clear(guildId);
 
-    log.trace("cancel_buffer_cleared", guildId, {
+    log.trace("cancel_buffer_cleared", resolvedTraceId, {
       guildId,
     });
 
@@ -77,7 +91,7 @@ export async function handleCancel(
     });
 
   } catch (err) {
-    log.error("cancel_failed", err);
+    log.error("cancel_failed", err, resolvedTraceId);
 
     await interaction.reply({
       content: "❌ Failed to clear buffer",
