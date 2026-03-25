@@ -17,6 +17,10 @@
  * - pure state container
  */
 
+import { createLogger } from "../debug/DebugLogger";
+
+const log = createLogger("BUFFER");
+
 type ParsedEntry = {
   nickname: string;
   value: number;
@@ -66,18 +70,40 @@ export const QuickAddBuffer = {
       source?: string;
     })[]
   ) {
+    // =====================================
+    // 📥 INPUT
+    // =====================================
+    log.trace("buffer_add_start", {
+      guildId,
+      incoming: entries.length,
+    });
+
     if (!buffer.has(guildId)) {
       buffer.set(guildId, []);
+      log.trace("buffer_created", { guildId });
     }
 
     if (!idCounters.has(guildId)) {
       idCounters.set(guildId, 1);
+      log.trace("id_counter_initialized", { guildId });
     }
 
     const current = buffer.get(guildId)!;
+    const beforeCount = current.length;
+
     let currentId = idCounters.get(guildId)!;
 
+    // =====================================
+    // ➕ ADD LOOP
+    // =====================================
     for (const entry of entries) {
+      log.trace("buffer_entry_in", {
+        nickname: entry.nickname,
+        value: entry.value,
+        status: entry.status,
+        confidence: entry.confidence,
+      });
+
       current.push({
         id: currentId++,
         nickname: entry.nickname,
@@ -94,6 +120,16 @@ export const QuickAddBuffer = {
     }
 
     idCounters.set(guildId, currentId);
+
+    // =====================================
+    // 📊 STATE DIFF
+    // =====================================
+    log.trace("buffer_updated", {
+      guildId,
+      before: beforeCount,
+      added: entries.length,
+      after: current.length,
+    });
   },
 
   // =============================
@@ -103,6 +139,17 @@ export const QuickAddBuffer = {
     guildId: string,
     entries: BufferedEntry[]
   ) {
+    // =====================================
+    // 📥 INPUT
+    // =====================================
+    const before = buffer.get(guildId)?.length || 0;
+
+    log.trace("buffer_replace_start", {
+      guildId,
+      before,
+      incoming: entries.length,
+    });
+
     // 🔥 immutability guard
     const cloned = entries.map((e) => ({ ...e }));
 
@@ -115,19 +162,43 @@ export const QuickAddBuffer = {
     );
 
     idCounters.set(guildId, maxId + 1);
+
+    // =====================================
+    // 📊 STATE DIFF
+    // =====================================
+    log.trace("buffer_replaced", {
+      guildId,
+      before,
+      after: cloned.length,
+      nextId: maxId + 1,
+    });
   },
 
   // =============================
   // 📥 GET ENTRIES
   // =============================
   getEntries(guildId: string): BufferedEntry[] {
-    return buffer.get(guildId) || [];
+    const entries = buffer.get(guildId) || [];
+
+    log.trace("buffer_get", {
+      guildId,
+      count: entries.length,
+    });
+
+    return entries;
   },
 
   // =============================
   // 🧹 CLEAR
   // =============================
   clear(guildId: string) {
+    const before = buffer.get(guildId)?.length || 0;
+
+    log.trace("buffer_clear", {
+      guildId,
+      before,
+    });
+
     buffer.delete(guildId);
     idCounters.delete(guildId);
   },
