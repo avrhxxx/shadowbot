@@ -4,19 +4,14 @@
 
 /**
  * 🪵 ROLE:
- * Advanced debug logger for QuickAdd system (V5 FINAL).
+ * Advanced debug logger for QuickAdd system (V6 PRO).
  *
  * Features:
- * - auto grouping (OCR / PARSER / etc.)
- * - traceId flow (pipeline)
+ * - grouped trace logs
+ * - professional column layout
+ * - ANSI colors (optional)
  * - worker tick grouping
- * - clean structured output
- * - file context (scope)
- *
- * ❗ RULES:
- * - NO external deps
- * - NO business logic
- * - backward compatible (no changes needed in other files)
+ * - backward compatible
  */
 
 // =====================================
@@ -37,7 +32,23 @@ type Logger = {
 };
 
 // =====================================
-// 🔹 INTERNAL STATE
+// 🔹 CONFIG
+// =====================================
+
+const USE_COLORS = true;
+
+// ANSI COLORS
+const C = {
+  reset: "\x1b[0m",
+  gray: "\x1b[90m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  cyan: "\x1b[36m",
+  magenta: "\x1b[35m",
+};
+
+// =====================================
+// 🔹 STATE
 // =====================================
 
 type TraceLog = {
@@ -53,8 +64,16 @@ const traceBuckets = new Map<string, TraceLog[]>();
 let workerTick = 0;
 
 // =====================================
-// 🔹 GROUP RESOLVER
+// 🔹 HELPERS
 // =====================================
+
+function getTime(): string {
+  return new Date().toISOString().split("T")[1].split(".")[0];
+}
+
+function color(text: string, c: string) {
+  return USE_COLORS ? c + text + C.reset : text;
+}
 
 function resolveGroup(scope: string): string {
   if (scope.startsWith("OCR")) return "OCR";
@@ -70,16 +89,31 @@ function resolveGroup(scope: string): string {
   return "GENERAL";
 }
 
-// =====================================
-// 🔹 TIME FORMAT
-// =====================================
-
-function getTime(): string {
-  return new Date().toISOString().split("T")[1].split(".")[0];
+function groupColor(group: string): string {
+  switch (group) {
+    case "OCR":
+      return C.magenta;
+    case "PARSER":
+      return C.cyan;
+    case "VALIDATION":
+      return C.yellow;
+    case "STORAGE":
+      return C.gray;
+    case "COMMAND":
+      return C.cyan;
+    case "DISCORD":
+      return C.gray;
+    case "WORKER":
+      return C.yellow;
+    case "INFRA":
+      return C.gray;
+    default:
+      return C.gray;
+  }
 }
 
 // =====================================
-// 🔹 PRINT TRACE BLOCK
+// 🔹 TRACE FLUSH
 // =====================================
 
 function flushTrace(traceId: string) {
@@ -87,19 +121,30 @@ function flushTrace(traceId: string) {
   if (!logs || !logs.length) return;
 
   console.log("");
-  console.log("════════════════════════════════════════════");
-  console.log(`QUICKADD • trace: ${traceId}`);
-  console.log("════════════════════════════════════════════\n");
+
+  console.log(
+    color("========== QUICKADD TRACE (" + traceId + ") ==========", C.cyan)
+  );
+  console.log("");
 
   let currentGroup = "";
 
   for (const log of logs) {
     if (log.group !== currentGroup) {
       currentGroup = log.group;
-      console.log(`[${currentGroup}]`);
+
+      console.log(
+        color("[" + currentGroup + "]", groupColor(currentGroup))
+      );
     }
 
-    const line = `  [${log.time}] ${log.scope} → ${log.event}`;
+    const line =
+      "  " +
+      color(log.time, C.gray) +
+      " | " +
+      log.scope +
+      " | " +
+      log.event;
 
     if (log.data && Object.keys(log.data).length > 0) {
       console.log(line, log.data);
@@ -108,7 +153,9 @@ function flushTrace(traceId: string) {
     }
   }
 
-  console.log("\n════════════════════════════════════════════\n");
+  console.log("");
+  console.log(color("============================================", C.cyan));
+  console.log("");
 
   traceBuckets.delete(traceId);
 }
@@ -120,31 +167,31 @@ function flushTrace(traceId: string) {
 export function createLogger(scope: string): Logger {
   const group = resolveGroup(scope);
 
-  // =====================================
-  // 🔹 BASE LOG
-  // =====================================
-
   const base = (event: string, data?: any) => {
     console.log(
-      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      color("[" + getTime() + "]", C.gray) +
+        " [" +
+        color(group, groupColor(group)) +
+        "] " +
+        scope +
+        " -> " +
+        event,
       data ?? ""
     );
   };
-
-  // =====================================
-  // 🔹 WARN
-  // =====================================
 
   base.warn = (event: string, data?: any) => {
     console.warn(
-      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      color("[" + getTime() + "]", C.gray) +
+        " [" +
+        color(group, C.yellow) +
+        "] " +
+        scope +
+        " -> " +
+        event,
       data ?? ""
     );
   };
-
-  // =====================================
-  // 🔹 ERROR
-  // =====================================
 
   base.error = (event: string, data?: any, traceId?: string) => {
     if (traceId) {
@@ -164,14 +211,16 @@ export function createLogger(scope: string): Logger {
     }
 
     console.error(
-      `[${getTime()}] [${group}] ${scope} → ${event}`,
+      color("[" + getTime() + "]", C.gray) +
+        " [" +
+        color(group, C.red) +
+        "] " +
+        scope +
+        " -> " +
+        event,
       data ?? ""
     );
   };
-
-  // =====================================
-  // 🔥 TRACE (SMART)
-  // =====================================
 
   const traceImpl = (
     event: string,
@@ -189,19 +238,30 @@ export function createLogger(scope: string): Logger {
     }
 
     // =====================================
-    // 🔥 WORKER MODE (NO TRACE ID)
+    // 🔥 WORKER MODE
     // =====================================
 
     if (!traceId && group === "WORKER") {
       if (event === "worker_tick") {
         workerTick++;
+
         console.log("");
-        console.log("════════════════════════════════════════════");
-        console.log(`WORKER • tick: ${workerTick}`);
-        console.log("════════════════════════════════════════════\n");
+        console.log(
+          color(
+            "========== WORKER TICK (" + workerTick + ") ==========",
+            C.yellow
+          )
+        );
+        console.log("");
       }
 
-      const line = `[${getTime()}] ${scope} → ${event}`;
+      const line =
+        "  " +
+        color(getTime(), C.gray) +
+        " | " +
+        scope +
+        " | " +
+        event;
 
       if (data && Object.keys(data).length > 0) {
         console.log(line, data);
@@ -213,12 +273,18 @@ export function createLogger(scope: string): Logger {
     }
 
     // =====================================
-    // 🔥 NORMAL TRACE FLOW
+    // 🔥 NORMAL TRACE
     // =====================================
 
     if (!traceId) {
       console.log(
-        `[${getTime()}] [${group}] ${scope} → ${event}`,
+        color("[" + getTime() + "]", C.gray) +
+          " [" +
+          color(group, groupColor(group)) +
+          "] " +
+          scope +
+          " -> " +
+          event,
         data ?? ""
       );
       return;
@@ -235,10 +301,6 @@ export function createLogger(scope: string): Logger {
     });
 
     traceBuckets.set(traceId, logs);
-
-    // =====================================
-    // 🔥 AUTO FLUSH
-    // =====================================
 
     if (
       event === "pipeline_done" ||
