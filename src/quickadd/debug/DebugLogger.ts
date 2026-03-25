@@ -4,31 +4,28 @@
 
 /**
  * 🪵 ROLE:
- * Advanced debug logger for QuickAdd system (V6 PRO).
+ * STRICT TRACE LOGGER (ENFORCED MODE)
  *
- * Features:
- * - grouped trace logs
- * - professional column layout
- * - ANSI colors (optional)
- * - worker tick grouping
- * - backward compatible
+ * ✔ Enforces traceId for ALL trace logs
+ * ✔ Groups logs per traceId
+ * ✔ Flushes automatically on pipeline end/error
+ *
+ * ❗ RULES:
+ * - traceId REQUIRED
+ * - NO backward compatibility
+ * - throws error on missing traceId
  */
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
-type LogLevel = "log" | "warn" | "error" | "trace";
-
 type Logger = {
   (event: string, data?: any): void;
   warn: (event: string, data?: any) => void;
   error: (event: string, data?: any, traceId?: string) => void;
 
-  trace: {
-    (event: string, data?: any): void;
-    (event: string, traceId: string, data?: any): void;
-  };
+  trace: (event: string, traceId: string, data?: any) => void;
 };
 
 // =====================================
@@ -60,8 +57,6 @@ type TraceLog = {
 };
 
 const traceBuckets = new Map<string, TraceLog[]>();
-
-let workerTick = 0;
 
 // =====================================
 // 🔹 HELPERS
@@ -222,72 +217,20 @@ export function createLogger(scope: string): Logger {
     );
   };
 
+  // =====================================
+  // 🔥 STRICT TRACE (ENFORCED)
+  // =====================================
+
   const traceImpl = (
     event: string,
-    arg1?: any,
-    arg2?: any
+    traceId: string,
+    data?: any
   ) => {
-    let traceId: string | undefined;
-    let data: any;
-
-    if (typeof arg1 === "string") {
-      traceId = arg1;
-      data = arg2;
-    } else {
-      data = arg1;
-    }
-
-    // =====================================
-    // 🔥 WORKER MODE
-    // =====================================
-
-    if (!traceId && group === "WORKER") {
-      if (event === "worker_tick") {
-        workerTick++;
-
-        console.log("");
-        console.log(
-          color(
-            "========== WORKER TICK (" + workerTick + ") ==========",
-            C.yellow
-          )
-        );
-        console.log("");
-      }
-
-      const line =
-        "  " +
-        color(getTime(), C.gray) +
-        " | " +
-        scope +
-        " | " +
-        event;
-
-      if (data && Object.keys(data).length > 0) {
-        console.log(line, data);
-      } else {
-        console.log(line);
-      }
-
-      return;
-    }
-
-    // =====================================
-    // 🔥 NORMAL TRACE
-    // =====================================
-
+    // ❗ HARD ENFORCEMENT
     if (!traceId) {
-      console.log(
-        color("[" + getTime() + "]", C.gray) +
-          " [" +
-          color(group, groupColor(group)) +
-          "] " +
-          scope +
-          " -> " +
-          event,
-        data ?? ""
+      throw new Error(
+        `[TRACE ERROR] Missing traceId in ${scope} for event: ${event}`
       );
-      return;
     }
 
     const logs = traceBuckets.get(traceId) || [];
@@ -302,6 +245,9 @@ export function createLogger(scope: string): Logger {
 
     traceBuckets.set(traceId, logs);
 
+    // =====================================
+    // 🔥 AUTO FLUSH
+    // =====================================
     if (
       event === "pipeline_done" ||
       event === "pipeline_error"
@@ -310,7 +256,7 @@ export function createLogger(scope: string): Logger {
     }
   };
 
-  base.trace = traceImpl as Logger["trace"];
+  base.trace = traceImpl;
 
   return base as Logger;
 }
