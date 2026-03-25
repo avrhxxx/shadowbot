@@ -3,32 +3,25 @@
 // =====================================
 
 /**
- * 🧠 PARSER ROUTER
+ * 🧠 PARSER ROUTER (REGISTRY BASED)
  *
  * Rola:
- * • wybiera odpowiedni parser na podstawie typu QuickAdd
- * • zarządza fallback flow:
- *    layout → tokens → lines
+ * • wybiera parser na podstawie typu
+ * • deleguje parsing (NO fallback logic)
  *
- * Ważne:
- * • brak logiki domenowej (tylko routing)
- * • parsery są w subfolderach (np. donations/)
+ * ❗ RULES:
+ * - ONLY routing
+ * - NO layout building
+ * - NO fallback logic
  */
 
 import { QuickAddType } from "../core/QuickAddTypes";
+import { LayoutRow } from "../ocr/layout/LayoutBuilder";
+import { createLogger } from "../debug/DebugLogger";
 
-// ✅ FIX — merged import
 import {
-  parseDonations,
   parseDonationsFromLayout,
 } from "./donations/DonationsParser";
-
-import { buildLayout, LayoutRow } from "../ocr/layout/LayoutBuilder";
-
-// ✅ FIX — import from OCRTypes (not engine)
-import { OCRToken } from "../ocr/OCRTypes";
-
-import { createLogger } from "../debug/DebugLogger";
 
 const log = createLogger("PARSER");
 
@@ -36,11 +29,26 @@ const log = createLogger("PARSER");
 // 🧱 TYPES
 // =====================================
 
-type ParseInput = {
-  lines?: string[];
-  tokens?: OCRToken[];
-  layout?: LayoutRow[];
-};
+type ParserFn = (
+  layout: LayoutRow[],
+  traceId: string
+) => any[];
+
+const registry = new Map<QuickAddType, ParserFn>();
+
+// =====================================
+// 🧩 REGISTRATION (MANUAL)
+// =====================================
+
+function registerParser(
+  type: QuickAddType,
+  parser: ParserFn
+) {
+  registry.set(type, parser);
+}
+
+// 🔥 REGISTER PARSERS
+registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
 
 // =====================================
 // 🎯 MAIN ROUTER
@@ -48,118 +56,48 @@ type ParseInput = {
 
 export function parseByType(
   type: QuickAddType,
-  input: ParseInput,
+  input: { layout?: LayoutRow[] },
   traceId: string
 ) {
-  // =====================================
-  // 🚀 INPUT
-  // =====================================
+  const layout = input.layout ?? [];
+
   log.trace("parser_input", traceId, {
     type,
-    hasLayout: !!input.layout?.length,
-    layoutRows: input.layout?.length ?? 0,
-    hasTokens: !!input.tokens?.length,
-    tokens: input.tokens?.length ?? 0,
-    hasLines: !!input.lines?.length,
-    lines: input.lines?.length ?? 0,
+    layoutRows: layout.length,
   });
 
-  switch (type) {
-    case "DONATIONS_POINTS": {
-      log.trace("parser_type_selected", traceId, {
-        type: "DONATIONS_POINTS",
-      });
+  const parser = registry.get(type);
 
-      // =====================================
-      // 🔥 1. DIRECT LAYOUT (BEST QUALITY)
-      // =====================================
-      if (input.layout && input.layout.length > 0) {
-        log.trace("decision_layout_direct", traceId, {
-          rows: input.layout.length,
-        });
+  if (!parser) {
+    log.warn("parser_not_found", traceId, {
+      type,
+    });
+    return [];
+  }
 
-        const result = parseDonationsFromLayout(input.layout, traceId);
+  if (!layout.length) {
+    log.warn("parser_empty_layout", traceId, {
+      type,
+    });
+    return [];
+  }
 
-        log.trace("parser_output", traceId, {
-          method: "layout_direct",
-          entries: result.length,
-        });
+  try {
+    const result = parser(layout, traceId);
 
-        return result;
-      }
+    log.trace("parser_output", traceId, {
+      type,
+      entries: result.length,
+    });
 
-      // =====================================
-      // 🔥 2. TOKENS → LAYOUT
-      // =====================================
-      if (input.tokens && input.tokens.length > 0) {
-        log.trace("decision_tokens_to_layout", traceId, {
-          tokens: input.tokens.length,
-        });
+    return result;
 
-        const layout = buildLayout(input.tokens, traceId);
+  } catch (err) {
+    log.warn("parser_failed", traceId, {
+      type,
+      error: err,
+    });
 
-        log.trace("layout_built", traceId, {
-          rows: layout.length,
-        });
-
-        const result = parseDonationsFromLayout(layout, traceId);
-
-        log.trace("parser_output", traceId, {
-          method: "tokens_to_layout",
-          entries: result.length,
-        });
-
-        return result;
-      }
-
-      // =====================================
-      // 🔹 3. FALLBACK → LINES
-      // =====================================
-      if (input.lines && input.lines.length > 0) {
-        log.trace("decision_lines_fallback", traceId, {
-          lines: input.lines.length,
-        });
-
-        const result = parseDonations(input.lines, traceId);
-
-        log.trace("parser_output", traceId, {
-          method: "lines_fallback",
-          entries: result.length,
-        });
-
-        return result;
-      }
-
-      // =====================================
-      // ❌ NO INPUT
-      // =====================================
-      log.warn("parse_no_input", {
-        traceId,
-        type,
-      });
-
-      return [];
-    }
-
-    // =====================================
-    // 🚧 FUTURE TYPES
-    // =====================================
-    case "DUEL_POINTS":
-    case "RR_SIGNUPS":
-    case "RR_RESULTS":
-      log.warn("parser_not_implemented", {
-        traceId,
-        type,
-      });
-
-      return [];
-
-    default:
-      log.warn("unknown_parser_type", {
-        traceId,
-        type,
-      });
-
-      return [];
+    return [];
   }
 }
