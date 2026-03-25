@@ -4,17 +4,11 @@
 
 /**
  * ✏️ ROLE:
- * Manually adjusts a single entry in buffer.
- *
- * Responsible for:
- * - validating session + context
- * - updating entry (nickname/value)
- * - persisting learning (Google Sheets)
+ * Adjust entry + REVALIDATE buffer
  *
  * ❗ RULES:
- * - minimal business logic
- * - mutation only on buffer layer
- * - learning write is side-effect
+ * - owner only
+ * - revalidation required
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -22,10 +16,10 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 
-// ✅ FIX — use correct function export (no class)
 import { saveAdjusted } from "../../../storage/QuickAddRepository";
 
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
+import { validateEntries } from "../../../validation/QuickAddValidator";
 
 import { createLogger } from "../../../debug/DebugLogger";
 
@@ -38,6 +32,8 @@ const log = createLogger("CMD_ADJUST");
 export async function handleAdjust(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -50,9 +46,6 @@ export async function handleAdjust(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // 🔒 VALIDATION
-  // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
   if (contextError) {
@@ -62,6 +55,26 @@ export async function handleAdjust(
     });
     return;
   }
+
+  // =====================================
+  // 🔒 OWNER CHECK
+  // =====================================
+  if (session?.ownerId !== interaction.user.id) {
+    await interaction.reply({
+      content: "❌ Only session owner can use this command",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // =====================================
+  // 🔥 TRACE ID ENFORCEMENT
+  // =====================================
+  if (!session?.traceId) {
+    throw new Error("Missing traceId in session");
+  }
+
+  const traceId = session.traceId;
 
   const id = interaction.options.getInteger("id", true);
   const newNickname = interaction.options.getString("nickname");
@@ -92,22 +105,40 @@ export async function handleAdjust(
     };
 
     // =====================================
-    // 🔁 UPDATE BUFFER (IMMUTABLE)
+    // 🔁 APPLY CHANGE
     // =====================================
     const newEntries = [...entries];
     newEntries[index] = updated;
 
-    QuickAddBuffer.setEntries(guildId, newEntries);
+    // =====================================
+    // 🔥 REVALIDATION (CRITICAL)
+    // =====================================
+    const revalidated = await validateEntries(
+      newEntries.map((e) => ({
+        nickname: e.nickname,
+        value: e.value,
+      })),
+      traceId
+    );
 
-    // ✅ FIX — trace requires traceId
-    log.trace("adjust_applied", session?.traceId || "no-trace", {
+    // preserve IDs
+    const merged = revalidated.map((v, i) => ({
+      ...newEntries[i],
+      status: v.status,
+      confidence: v.confidence,
+      suggestion: v.suggestion,
+    }));
+
+    QuickAddBuffer.setEntries(guildId, merged);
+
+    log.trace("adjust_applied", traceId, {
       id,
       before: target,
       after: updated,
     });
 
     // =====================================
-    // 💾 SAVE LEARNING (ASYNC SIDE EFFECT)
+    // 💾 SAVE LEARNING
     // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
@@ -118,25 +149,28 @@ export async function handleAdjust(
           },
         ]);
 
-        log.trace("learning_saved_adjust", session?.traceId || "no-trace", {
+        log.trace("learning_saved_adjust", traceId, {
           from: target.nickname,
           to: newNickname,
         });
       }
     } catch (err) {
-      log.warn("learning_failed_adjust", err);
+      log.warn("learning_failed_adjust", traceId, {
+        error: err,
+      });
     }
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
     await interaction.reply({
       content: `✅ Updated entry [${id}]`,
       ephemeral: true,
     });
 
+    log.trace("adjust_done", traceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
-    log.error("adjust_failed", err);
+    log.error("adjust_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to adjust entry",
@@ -144,30 +178,3 @@ export async function handleAdjust(
     });
   }
 }
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. ❌ Removed invalid import:
- *    - QuickAddRepository (class does not exist)
- *
- * 2. ✅ Correct import:
- *    - saveAdjusted (function export)
- *
- * 3. ❌ Fixed wrong function name:
- *    - saveAdjustments → saveAdjusted
- *
- * 4. 🔥 FIXED LOGGER:
- *    - log.trace now includes traceId:
- *      log.trace(event, traceId, data)
- *
- * 5. 🧠 traceId source:
- *    - session?.traceId fallback to "no-trace"
- *
- * ✔ File now aligned with:
- *    - storage layer (repository functions)
- *    - logger contract
- *    - architecture rules
- */
