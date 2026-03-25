@@ -7,15 +7,11 @@
  * Central orchestrator of the QuickAdd pipeline.
  *
  * Flow:
- * 1. OCR (OCRProcessor)
- * 2. parsing (ParserRouter)
- * 3. validation (QuickAddValidator)
- * 4. buffering (QuickAddBuffer)
+ * OCR → layout → parser → validator → selection → buffer
  *
  * ❗ RULES:
- * - NO business logic (only orchestration)
- * - NO data mutation (delegate to modules)
- * - FULL trace logging (end-to-end)
+ * - NO business logic
+ * - orchestration only
  */
 
 import { Message } from "discord.js";
@@ -25,14 +21,11 @@ import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
 import { validateEntries } from "../validation/QuickAddValidator";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
+import { LayoutBuilder } from "../ocr/layout/LayoutBuilder";
 
 import { QuickAddSession } from "./QuickAddSession";
 
 const log = createLogger("PIPELINE");
-
-// =====================================
-// 🔥 MAIN ENTRY
-// =====================================
 
 export async function processImageInput(
   message: Message,
@@ -40,12 +33,11 @@ export async function processImageInput(
   imageUrl: string,
   traceId: string
 ) {
+  const startedAt = Date.now();
+
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
-  // =====================================
-  // 🔍 CONTEXT CHECK
-  // =====================================
   log.trace("pipeline_context_check", traceId, {
     guildId,
     userId,
@@ -53,7 +45,7 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.warn("pipeline_invalid_context", {
+    log.warn("pipeline_invalid_context", traceId, {
       guildId,
       userId,
     });
@@ -61,90 +53,117 @@ export async function processImageInput(
   }
 
   try {
-    // =====================================
-    // 🚀 PIPELINE START
-    // =====================================
     log.trace("pipeline_start", traceId, {
       type: session.type,
       imageUrl,
     });
 
     // =====================================
-    // 🔹 1. OCR
+    // 🔹 OCR
     // =====================================
-    log.trace("ocr_stage_start", traceId);
-
     const ocrResult = await runOCR(imageUrl, traceId);
 
-    log.trace("ocr_stage_result", traceId, {
-      sources: ocrResult.sources.length,
-    });
-
     if (!ocrResult.sources.length) {
-      log.warn("ocr_empty", { traceId });
+      log.warn("ocr_empty", traceId);
       return;
     }
 
     // =====================================
-    // 🔹 PICK BEST SOURCES
+    // 🔥 MULTI PIPELINE
     // =====================================
-    const lineSource = ocrResult.sources.find(
-      (s) => "lines" in s && s.lines.length > 0
-    );
+    const pipelineResults: {
+      entries: any[];
+      validCount: number;
+    }[] = [];
 
-    const tokenSource = ocrResult.sources.find(
-      (s) => "tokens" in s && s.tokens.length > 0
-    );
+    for (const source of ocrResult.sources) {
+      try {
+        log.trace("pipeline_source_start", traceId, {
+          source: source.source,
+        });
 
-    log.trace("ocr_sources_selected", traceId, {
-      hasLines: !!lineSource,
-      hasTokens: !!tokenSource,
-    });
+        // =====================================
+        // 🧱 LAYOUT
+        // =====================================
+        let layout = [];
+
+        if ("tokens" in source && source.tokens) {
+          layout = LayoutBuilder.fromTokens(source.tokens);
+        } else if ("lines" in source && source.lines) {
+          layout = LayoutBuilder.fromLines(source.lines);
+        }
+
+        if (!layout.length) {
+          log.trace("layout_empty", traceId, {
+            source: source.source,
+          });
+          continue;
+        }
+
+        // =====================================
+        // 🔹 PARSER
+        // =====================================
+        const parsed = parseByType(
+          session.type,
+          { layout },
+          traceId
+        );
+
+        if (!parsed.length) continue;
+
+        // =====================================
+        // 🔹 VALIDATOR
+        // =====================================
+        const validated = await validateEntries(parsed, traceId);
+
+        const validCount = validated.filter(
+          (v) => v.status === "OK"
+        ).length;
+
+        pipelineResults.push({
+          entries: validated,
+          validCount,
+        });
+
+        log.trace("pipeline_source_done", traceId, {
+          source: source.source,
+          entries: validated.length,
+          validCount,
+        });
+
+      } catch (err) {
+        log.warn("pipeline_source_failed", traceId, {
+          error: err,
+        });
+      }
+    }
 
     // =====================================
-    // 🔹 2. PARSING
+    // 🔍 SELECTION (HYBRID)
     // =====================================
-    log.trace("parser_stage_start", traceId, {
-      type: session.type,
-    });
-
-    const parsed = parseByType(
-      session.type,
-      {
-        lines: lineSource && "lines" in lineSource ? lineSource.lines : undefined,
-        tokens: tokenSource && "tokens" in tokenSource ? tokenSource.tokens : undefined,
-      },
-      traceId
-    );
-
-    if (!parsed.length) {
-      log.warn("parser_empty", { traceId });
+    if (!pipelineResults.length) {
+      log.warn("pipeline_no_results", traceId);
       return;
     }
 
-    log.trace("parser_stage_result", traceId, {
-      parsed: parsed.length,
+    const best = pipelineResults.sort((a, b) => {
+      if (b.entries.length !== a.entries.length) {
+        return b.entries.length - a.entries.length;
+      }
+      return b.validCount - a.validCount;
+    })[0];
+
+    log.trace("pipeline_selected", traceId, {
+      entries: best.entries.length,
+      valid: best.validCount,
     });
 
     // =====================================
-    // 🔹 3. VALIDATION
+    // 🔹 BUFFER
     // =====================================
-    log.trace("validation_stage_start", traceId);
-
-    const validated = await validateEntries(parsed);
-
-    log.trace("validation_stage_result", traceId, {
-      validated: validated.length,
-    });
-
-    // =====================================
-    // 🔹 4. BUFFER
-    // =====================================
-    log.trace("buffer_stage_start", traceId);
-
     QuickAddBuffer.addEntries(
       guildId,
-      validated.map((v) => ({
+      best.entries.map((v) => ({
         nickname: v.nickname,
         value: v.value,
         status: v.status,
@@ -155,16 +174,9 @@ export async function processImageInput(
 
     const total = QuickAddBuffer.getEntries(guildId).length;
 
-    log.trace("buffer_stage_result", traceId, {
-      added: validated.length,
-      total,
-    });
-
-    // =====================================
-    // ✅ PIPELINE DONE
-    // =====================================
     log.trace("pipeline_done", traceId, {
       total,
+      durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
