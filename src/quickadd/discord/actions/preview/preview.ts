@@ -6,14 +6,9 @@
  * 👀 ROLE:
  * Displays current QuickAdd buffer preview.
  *
- * Responsible for:
- * - validating session + context
- * - fetching buffered entries
- * - formatting output
- *
  * ❗ RULES:
- * - NO mutations
- * - read-only operation
+ * - read-only
+ * - requires valid traceId
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -21,7 +16,6 @@ import { ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 
-// ✅ FIX — correct file name
 import { formatPreview } from "../../../utils/PreviewFormatter";
 
 import {
@@ -39,6 +33,8 @@ const log = createLogger("CMD_PREVIEW");
 export async function handlePreview(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -51,9 +47,6 @@ export async function handlePreview(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // 🔒 VALIDATION (SESSION + THREAD)
-  // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
   if (contextError) {
@@ -64,21 +57,25 @@ export async function handlePreview(
     return;
   }
 
+  // =====================================
+  // 🔥 TRACE ID ENFORCEMENT
+  // =====================================
+  if (!session?.traceId) {
+    throw new Error("Missing traceId in session");
+  }
+
+  const traceId = session.traceId;
+
   try {
     // =====================================
     // 📥 LOAD BUFFER
     // =====================================
     const entries = QuickAddBuffer.getEntries(guildId);
 
-    // ✅ FIX — trace requires traceId
-    log.trace(
-      "preview_requested",
-      session?.traceId || "no-trace",
-      {
-        guildId,
-        count: entries.length,
-      }
-    );
+    log.trace("preview_requested", traceId, {
+      guildId,
+      count: entries.length,
+    });
 
     // =====================================
     // 🖥️ FORMAT OUTPUT
@@ -93,8 +90,13 @@ export async function handlePreview(
       ephemeral: true,
     });
 
+    log.trace("preview_done", traceId, {
+      count: entries.length,
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
-    log.error("preview_failed", err);
+    log.error("preview_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to generate preview",
@@ -102,20 +104,3 @@ export async function handlePreview(
     });
   }
 }
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. 🔥 FIXED LOGGER:
- *    - log.trace now includes traceId
- *    - required signature: (event, traceId, data)
- *
- * 2. 🧠 traceId source:
- *    - session?.traceId fallback to "no-trace"
- *
- * ✔ File now aligned with:
- *    - DebugLogger contract
- *    - global logging standard
- */
