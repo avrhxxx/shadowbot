@@ -108,10 +108,15 @@ export async function handleConfirm(
     // =====================================
     await enqueuePoints(payload);
 
-    log.trace("confirm_success", {
-      total: entries.length,
-      valid: validEntries.length,
-    });
+    // ✅ FIX — trace requires traceId
+    log.trace(
+      "confirm_success",
+      session.traceId,
+      {
+        total: entries.length,
+        valid: validEntries.length,
+      }
+    );
 
     // =====================================
     // 🧹 CLEAR BUFFER
@@ -135,3 +140,20 @@ export async function handleConfirm(
     });
   }
 }
+
+/**
+ * =====================================
+ * ✅ CHANGES (INDEX)
+ * =====================================
+ *
+ * 1. 🔥 FIXED LOGGER:
+ *    - log.trace now includes traceId
+ *    - required signature: (event, traceId, data)
+ *
+ * 2. 🧠 traceId source:
+ *    - session.traceId (safe because session validated above)
+ *
+ * ✔ File now aligned with:
+ *    - DebugLogger contract
+ *    - global logging standard
+ */
