@@ -4,25 +4,19 @@
 
 /**
  * ✅ ROLE:
- * Finalizes QuickAdd session and sends data to queue.
- *
- * Responsible for:
- * - validating session + context
- * - validating entries (final filter)
- * - pushing to queue (Google Sheets)
- * - clearing buffer
+ * Finalizes QuickAdd session (STRICT MODE).
  *
  * ❗ RULES:
- * - ONLY valid entries go to queue
- * - destructive operation (clears buffer)
- * - final stage of pipeline
+ * - ALL entries must be OK
+ * - owner only
+ * - destructive (clears buffer)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { enqueuePoints } from "../../../storage/QuickAddRepository"; // ✅ FIX
+import { enqueuePoints } from "../../../storage/QuickAddRepository";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
 import { createLogger } from "../../../debug/DebugLogger";
@@ -36,6 +30,8 @@ const log = createLogger("CMD_CONFIRM");
 export async function handleConfirm(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -48,18 +44,35 @@ export async function handleConfirm(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // 🔒 VALIDATION
-  // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError || !session) { // ✅ FIX (safety)
+  if (contextError || !session) {
     await interaction.reply({
       content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
   }
+
+  // =====================================
+  // 🔒 OWNER CHECK
+  // =====================================
+  if (session.ownerId !== interaction.user.id) {
+    await interaction.reply({
+      content: "❌ Only session owner can confirm",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // =====================================
+  // 🔥 TRACE ID ENFORCEMENT
+  // =====================================
+  if (!session.traceId) {
+    throw new Error("Missing traceId in session");
+  }
+
+  const traceId = session.traceId;
 
   try {
     // =====================================
@@ -76,63 +89,59 @@ export async function handleConfirm(
     }
 
     // =====================================
-    // 🔍 FILTER VALID ENTRIES
+    // 🔴 STRICT VALIDATION
     // =====================================
-    const validEntries = entries.filter(
-      (e) =>
-        e.status === "OK" ||
-        e.status === "LOW_CONFIDENCE"
-    );
+    const invalid = entries.filter((e) => e.status !== "OK");
 
-    if (!validEntries.length) {
+    if (invalid.length > 0) {
+      log.trace("confirm_blocked_non_ok", traceId, {
+        total: entries.length,
+        invalid: invalid.length,
+      });
+
       await interaction.reply({
-        content: "❌ No valid entries to submit",
+        content: `❌ Cannot confirm. ${invalid.length} entries are not OK.`,
         ephemeral: true,
       });
       return;
     }
 
     // =====================================
-    // 📤 BUILD QUEUE PAYLOAD
+    // 📤 BUILD PAYLOAD
     // =====================================
-    const payload = validEntries.map((e) => ({
+    const payload = entries.map((e) => ({
       guildId,
-      category: session.type, // ✅ FIX (no !)
-      week: "CURRENT", // 🔥 TODO: replace later
+      category: session.type,
+      week: "CURRENT",
       nickname: e.nickname,
       points: e.value,
     }));
 
     // =====================================
-    // 💾 SEND TO QUEUE
+    // 💾 QUEUE
     // =====================================
     await enqueuePoints(payload);
 
-    // ✅ FIX — trace requires traceId
-    log.trace(
-      "confirm_success",
-      session.traceId,
-      {
-        total: entries.length,
-        valid: validEntries.length,
-      }
-    );
+    log.trace("confirm_success", traceId, {
+      total: entries.length,
+    });
 
     // =====================================
     // 🧹 CLEAR BUFFER
     // =====================================
     QuickAddBuffer.clear(guildId);
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
     await interaction.reply({
-      content: `✅ Submitted ${validEntries.length} entries`,
+      content: `✅ Submitted ${entries.length} entries`,
       ephemeral: true,
     });
 
+    log.trace("confirm_done", traceId, {
+      durationMs: Date.now() - startedAt,
+    });
+
   } catch (err) {
-    log.error("confirm_failed", err);
+    log.error("confirm_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to confirm entries",
@@ -140,20 +149,3 @@ export async function handleConfirm(
     });
   }
 }
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. 🔥 FIXED LOGGER:
- *    - log.trace now includes traceId
- *    - required signature: (event, traceId, data)
- *
- * 2. 🧠 traceId source:
- *    - session.traceId (safe because session validated above)
- *
- * ✔ File now aligned with:
- *    - DebugLogger contract
- *    - global logging standard
- */
