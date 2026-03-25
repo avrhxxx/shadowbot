@@ -51,44 +51,93 @@ export function parseByType(
   input: ParseInput,
   traceId: string
 ) {
+  // =====================================
+  // 🚀 INPUT
+  // =====================================
+  log.trace("parser_input", traceId, {
+    type,
+    hasLayout: !!input.layout?.length,
+    layoutRows: input.layout?.length ?? 0,
+    hasTokens: !!input.tokens?.length,
+    tokens: input.tokens?.length ?? 0,
+    hasLines: !!input.lines?.length,
+    lines: input.lines?.length ?? 0,
+  });
+
   switch (type) {
     case "DONATIONS_POINTS": {
+      log.trace("parser_type_selected", traceId, {
+        type: "DONATIONS_POINTS",
+      });
+
       // =====================================
       // 🔥 1. DIRECT LAYOUT (BEST QUALITY)
       // =====================================
       if (input.layout && input.layout.length > 0) {
-        log.trace("parse_layout_direct", traceId, {
+        log.trace("decision_layout_direct", traceId, {
           rows: input.layout.length,
         });
 
-        return parseDonationsFromLayout(input.layout, traceId);
+        const result = parseDonationsFromLayout(input.layout, traceId);
+
+        log.trace("parser_output", traceId, {
+          method: "layout_direct",
+          entries: result.length,
+        });
+
+        return result;
       }
 
       // =====================================
       // 🔥 2. TOKENS → LAYOUT
       // =====================================
       if (input.tokens && input.tokens.length > 0) {
-        log.trace("parse_layout_from_tokens", traceId, {
+        log.trace("decision_tokens_to_layout", traceId, {
           tokens: input.tokens.length,
         });
 
         const layout = buildLayout(input.tokens, traceId);
 
-        return parseDonationsFromLayout(layout, traceId);
+        log.trace("layout_built", traceId, {
+          rows: layout.length,
+        });
+
+        const result = parseDonationsFromLayout(layout, traceId);
+
+        log.trace("parser_output", traceId, {
+          method: "tokens_to_layout",
+          entries: result.length,
+        });
+
+        return result;
       }
 
       // =====================================
       // 🔹 3. FALLBACK → LINES
       // =====================================
       if (input.lines && input.lines.length > 0) {
-        log.trace("parse_lines_fallback", traceId, {
+        log.trace("decision_lines_fallback", traceId, {
           lines: input.lines.length,
         });
 
-        return parseDonations(input.lines, traceId);
+        const result = parseDonations(input.lines, traceId);
+
+        log.trace("parser_output", traceId, {
+          method: "lines_fallback",
+          entries: result.length,
+        });
+
+        return result;
       }
 
-      log.warn("parse_no_input", { type });
+      // =====================================
+      // ❌ NO INPUT
+      // =====================================
+      log.warn("parse_no_input", {
+        traceId,
+        type,
+      });
+
       return [];
     }
 
@@ -98,11 +147,19 @@ export function parseByType(
     case "DUEL_POINTS":
     case "RR_SIGNUPS":
     case "RR_RESULTS":
-      log.warn("parser_not_implemented", { type });
+      log.warn("parser_not_implemented", {
+        traceId,
+        type,
+      });
+
       return [];
 
     default:
-      log.warn("unknown_parser_type", { type });
+      log.warn("unknown_parser_type", {
+        traceId,
+        type,
+      });
+
       return [];
   }
 }
