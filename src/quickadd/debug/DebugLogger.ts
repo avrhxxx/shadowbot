@@ -27,7 +27,12 @@ type Logger = {
   (event: string, data?: any): void;
   warn: (event: string, data?: any) => void;
   error: (event: string, data?: any, traceId?: string) => void;
-  trace: (event: string, traceId: string, data?: any) => void;
+
+  // ✅ OVERLOAD
+  trace: {
+    (event: string, data?: any): void;
+    (event: string, traceId: string, data?: any): void;
+  };
 };
 
 // =====================================
@@ -55,16 +60,38 @@ export function createLogger(scope: string): Logger {
   base.error = (event: string, data?: any, traceId?: string) => {
     console.error(
       format(scope, "error", event),
-      traceId ? { traceId, ...data } : data ?? ""
+      traceId ? { traceId, ...(data || {}) } : data ?? ""
     );
   };
 
-  base.trace = (event: string, traceId: string, data?: any) => {
+  // =====================================
+  // 🔥 TRACE (SMART OVERLOAD)
+  // =====================================
+
+  const traceImpl = (
+    event: string,
+    arg1?: any,
+    arg2?: any
+  ) => {
+    let traceId: string | undefined;
+    let data: any;
+
+    if (typeof arg1 === "string") {
+      traceId = arg1;
+      data = arg2;
+    } else {
+      data = arg1;
+    }
+
     console.log(
       format(scope, "trace", event),
-      { traceId, ...(data || {}) }
+      traceId
+        ? { traceId, ...(data || {}) }
+        : data ?? ""
     );
   };
 
-  return base;
+  base.trace = traceImpl as Logger["trace"];
+
+  return base as Logger;
 }
