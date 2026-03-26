@@ -76,7 +76,7 @@ export async function handleCancel(
     // =====================================
     // 🧹 CLEAR BUFFER ONLY
     // =====================================
-    QuickAddBuffer.clear(guildId);
+    QuickAddBuffer.clear(guildId, resolvedTraceId); // ✅ FIX
 
     log.trace("cancel_buffer_cleared", resolvedTraceId, {
       guildId,
