@@ -7,58 +7,64 @@
  * Centralized ID generator for QuickAdd system.
  *
  * Responsibilities:
- * - generate traceId (per command execution)
- * - generate sessionId (per session lifecycle)
- * - provide deterministic displayId mapping
+ * - generate sessionId (real + display)
+ * - generate traceId (real + display)
+ * - maintain realId → displayId mapping
  *
  * ❗ RULES:
- * - pure utility (no external dependencies)
+ * - single source of truth
  * - NO logging
+ * - NO external dependencies
  * - deterministic structure
- * - UUID ensures uniqueness
- * - counter scoped per DAY
- *
- * FORMAT:
- * realId   → s-17031200-01-uuid
- * display  → S-17031200-01-550e
  */
 
 // =====================================
-// 🔹 INTERNAL STATE (IN-MEMORY)
+// 🔹 INTERNAL STATE
 // =====================================
 
-const counters = new Map<string, number>(); // key = DDMM
+const traceCounters = new Map<string, number>();
+const sessionCounters = new Map<string, number>();
+
+const idDisplayMap = new Map<string, string>();
 
 // =====================================
 // 🔹 HELPERS
 // =====================================
 
-function pad(value: number, length: number): string {
-  return value.toString().padStart(length, "0");
-}
-
-function getTimestampParts() {
+function getDateKey(): string {
   const now = new Date();
 
-  const dd = pad(now.getDate(), 2);
-  const mm = pad(now.getMonth() + 1, 2);
-  const hh = pad(now.getHours(), 2);
-  const min = pad(now.getMinutes(), 2);
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
 
-  return {
-    dayMonth: `${dd}${mm}`,        // do countera
-    hourMinute: `${hh}${min}`,     // do ID
-    counterKey: `${dd}${mm}`,      // ✅ RESET PER DAY
-  };
+  return `${dd}${mm}${hh}${min}`; // DDMMHHmm
 }
 
-function nextCounter(key: string): string {
-  const current = counters.get(key) ?? 0;
+function getDayKey(): string {
+  const now = new Date();
+
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+
+  return `${dd}${mm}`; // reset per day
+}
+
+function getNextCounter(
+  map: Map<string, number>,
+  dayKey: string
+): number {
+  const current = map.get(dayKey) || 0;
   const next = current + 1;
 
-  counters.set(key, next);
+  map.set(dayKey, next);
 
-  return pad(next, 2);
+  return next;
+}
+
+function padCounter(num: number): string {
+  return String(num).padStart(2, "0");
 }
 
 function generateUUID(): string {
@@ -66,47 +72,59 @@ function generateUUID(): string {
 }
 
 // =====================================
-// 🔥 CORE BUILDER
+// 🔹 CORE BUILDER
 // =====================================
 
-function buildId(prefix: "s" | "t"): string {
-  const { dayMonth, hourMinute, counterKey } = getTimestampParts();
+function buildId(
+  prefix: "s" | "t",
+  counterMap: Map<string, number>
+) {
+  const dateKey = getDateKey(); // DDMMHHmm
+  const dayKey = getDayKey(); // DDMM
 
-  const counter = nextCounter(counterKey);
+  const counter = getNextCounter(counterMap, dayKey);
+  const counterStr = padCounter(counter);
+
   const uuid = generateUUID();
+  const shortUuid = uuid.slice(0, 6);
 
-  // format: s-17031200-01-uuid
-  return `${prefix}-${dayMonth}${hourMinute}-${counter}-${uuid}`;
+  // =====================================
+  // 🔥 REAL ID
+  // =====================================
+  const realId = `${prefix}-${dateKey}-${counterStr}-${uuid}`;
+
+  // =====================================
+  // 🔥 DISPLAY ID
+  // =====================================
+  const displayId = `${prefix.toUpperCase()}-${dateKey}-${counterStr}-${shortUuid}`;
+
+  // =====================================
+  // 🔗 MAPPING
+  // =====================================
+  idDisplayMap.set(realId, displayId);
+
+  return {
+    realId,
+    displayId,
+  };
 }
 
 // =====================================
 // 🔥 PUBLIC API
 // =====================================
 
-export function createSessionId(): string {
-  return buildId("s");
-}
-
 export function createTraceId(): string {
-  return buildId("t");
+  return buildId("t", traceCounters).realId;
+}
+
+export function createSessionId(): string {
+  return buildId("s", sessionCounters).realId;
 }
 
 // =====================================
-// 🔹 DISPLAY (PURE TRANSFORM)
+// 🔍 RESOLVER (FOR LOGGER)
 // =====================================
 
-export function toDisplayId(realId: string): string {
-  const parts = realId.split("-");
-
-  if (parts.length < 4) {
-    throw new Error(`Invalid ID format: ${realId}`);
-  }
-
-  const prefix = parts[0].toUpperCase();
-  const timestamp = parts[1];
-  const counter = parts[2];
-  const uuidPart = parts[3].slice(0, 4);
-
-  // format: S-17031200-01-550e
-  return `${prefix}-${timestamp}-${counter}-${uuidPart}`;
+export function resolveDisplayId(realId: string): string {
+  return idDisplayMap.get(realId) || realId;
 }
