@@ -3,17 +3,14 @@
 // =====================================
 
 /**
- * ✅ ROLE:
+ * 🧠 ROLE:
  * Finalizes QuickAdd session (STRICT MODE).
  *
  * ❗ RULES:
  * - ALL entries must be OK
  * - owner only
  * - destructive (clears buffer)
- *
- * 🔥 NOTE:
- * - traceId injected from CommandRouter
- * - fallback to session.traceId (temporary, migration phase)
+ * - FULL trace logging
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -33,7 +30,7 @@ const log = createLogger("CMD_CONFIRM");
 
 export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
-  traceId?: string // 🔥 NEW (phase 1)
+  traceId?: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -59,9 +56,6 @@ export async function handleConfirm(
     return;
   }
 
-  // =====================================
-  // 🔒 OWNER CHECK
-  // =====================================
   if (session.ownerId !== interaction.user.id) {
     await interaction.reply({
       content: "❌ Only session owner can confirm",
@@ -70,9 +64,6 @@ export async function handleConfirm(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
-  // =====================================
   const resolvedTraceId = traceId || session?.traceId;
 
   if (!resolvedTraceId) {
@@ -80,10 +71,22 @@ export async function handleConfirm(
   }
 
   try {
+    log.trace("confirm_start", resolvedTraceId, {
+      guildId,
+      type: session.type,
+    });
+
     // =====================================
     // 📥 LOAD BUFFER
     // =====================================
-    const entries = QuickAddBuffer.getEntries(guildId);
+    const entries = QuickAddBuffer.getEntries(
+      guildId,
+      resolvedTraceId
+    );
+
+    log.trace("buffer_loaded", resolvedTraceId, {
+      count: entries.length,
+    });
 
     if (!entries.length) {
       await interaction.reply({
@@ -98,9 +101,13 @@ export async function handleConfirm(
     // =====================================
     const invalid = entries.filter((e) => e.status !== "OK");
 
+    log.trace("validation_check", resolvedTraceId, {
+      total: entries.length,
+      invalid: invalid.length,
+    });
+
     if (invalid.length > 0) {
       log.trace("confirm_blocked_non_ok", resolvedTraceId, {
-        total: entries.length,
         invalid: invalid.length,
       });
 
@@ -122,10 +129,14 @@ export async function handleConfirm(
       points: e.value,
     }));
 
+    log.trace("queue_start", resolvedTraceId, {
+      count: payload.length,
+    });
+
     // =====================================
     // 💾 QUEUE
     // =====================================
-    await enqueuePoints(payload);
+    await enqueuePoints(payload, resolvedTraceId);
 
     log.trace("confirm_success", resolvedTraceId, {
       total: entries.length,
@@ -134,7 +145,11 @@ export async function handleConfirm(
     // =====================================
     // 🧹 CLEAR BUFFER
     // =====================================
-    QuickAddBuffer.clear(guildId);
+    QuickAddBuffer.clear(guildId, resolvedTraceId);
+
+    log.trace("buffer_cleared", resolvedTraceId, {
+      guildId,
+    });
 
     await interaction.reply({
       content: `✅ Submitted ${entries.length} entries`,
