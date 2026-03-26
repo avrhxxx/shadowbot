@@ -26,8 +26,8 @@ import { resolveDisplayId } from "../core/IdGenerator";
 
 type Logger = {
   (event: string, data?: any): void;
-  warn: (event: string, data?: any): void;
-  error: (event: string, data?: any, traceId?: string): void;
+  warn: (event: string, data?: any) => void;
+  error: (event: string, data: any, traceId: string) => void;
 
   trace: (event: string, traceId: string, data?: any) => void;
 };
@@ -201,7 +201,7 @@ export function createLogger(scope: string): Logger {
   // 🔥 STRICT ERROR (TRACE ENFORCED)
   // =====================================
 
-  base.error = (event: string, data?: any, traceId?: string) => {
+  base.error = (event: string, data: any, traceId: string) => {
     if (!traceId) {
       throw new Error(
         `[TRACE ERROR] Missing traceId in ${scope} for error: ${event}`
