@@ -36,7 +36,7 @@ const log = createLogger("CMD_PREVIEW");
 
 export async function handlePreview(
   interaction: ChatInputCommandInteraction,
-  traceId?: string // 🔥 NEW (phase 1 = optional)
+  traceId?: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -54,18 +54,18 @@ export async function handlePreview(
 
   const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError) {
+  if (contextError || !session) {
     await interaction.reply({
-      content: contextError,
+      content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
   }
 
   // =====================================
-  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
+  // 🔥 TRACE RESOLUTION
   // =====================================
-  const resolvedTraceId = traceId || session?.traceId;
+  const resolvedTraceId = traceId || session.traceId;
 
   if (!resolvedTraceId) {
     throw new Error("Missing traceId");
@@ -73,14 +73,28 @@ export async function handlePreview(
 
   try {
     // =====================================
-    // 📥 LOAD BUFFER
+    // 📥 LOAD BUFFER (FIXED)
     // =====================================
-    const entries = QuickAddBuffer.getEntries(guildId);
+    const entries = QuickAddBuffer.getEntries(
+      guildId,
+      resolvedTraceId
+    );
 
     log.trace("preview_requested", resolvedTraceId, {
       guildId,
       count: entries.length,
     });
+
+    // =====================================
+    // ⚠️ EMPTY STATE (UX FIX)
+    // =====================================
+    if (!entries.length) {
+      await interaction.reply({
+        content: "⚠️ Buffer is empty",
+        ephemeral: true,
+      });
+      return;
+    }
 
     // =====================================
     // 🖥️ FORMAT OUTPUT
