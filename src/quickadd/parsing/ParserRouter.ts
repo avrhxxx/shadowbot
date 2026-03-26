@@ -16,27 +16,26 @@
  * - STRICT typing (no any)
  */
 
-import { QuickAddType } from "../core/QuickAddTypes";
+import { QuickAddType, ParsedEntry } from "../core/QuickAddTypes";
 import { LayoutRow } from "../ocr/layout/LayoutBuilder";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
 import {
   parseDonationsFromLayout,
 } from "./donations/DonationsParser";
 
-const log = createLogger("PARSER");
+import { parseDuel } from "./duel/DuelParser";
+import { parseReservoirSignups } from "./reservoir/ReservoirSignupsParser";
+import { parseReservoirResults } from "./reservoir/ReservoirResultsParser";
+
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧱 TYPES
 // =====================================
 
-export type ParsedEntry = {
-  nickname: string;
-  value: number;
-};
-
 type ParserFn = (
-  layout: LayoutRow[],
+  input: { layout: LayoutRow[] },
   traceId: string
 ) => ParsedEntry[];
 
@@ -54,32 +53,13 @@ function registerParser(
 }
 
 // =====================================
-// 🧪 PLACEHOLDER PARSERS (SAFE)
-// =====================================
-
-function emptyParser(
-  type: QuickAddType
-): ParserFn {
-  return (layout: LayoutRow[], traceId: string) => {
-    log.trace("placeholder_parser_used", traceId, {
-      type,
-      layoutRows: layout.length,
-    });
-
-    return [];
-  };
-}
-
-// =====================================
 // 🔥 REGISTER PARSERS
 // =====================================
 
 registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
-
-// 🔥 PLACEHOLDERS (snapshot completeness)
-registerParser("DUEL_POINTS", emptyParser("DUEL_POINTS"));
-registerParser("RR_SIGNUPS", emptyParser("RR_SIGNUPS"));
-registerParser("RR_RESULTS", emptyParser("RR_RESULTS"));
+registerParser("DUEL_POINTS", parseDuel);
+registerParser("RR_SIGNUPS", parseReservoirSignups);
+registerParser("RR_RESULTS", parseReservoirResults);
 
 // =====================================
 // 🎯 MAIN ROUTER
@@ -104,21 +84,21 @@ export function parseByType(
   const parser = registry.get(type);
 
   if (!parser) {
-    log.warn("parser_not_found", traceId, {
+    log.warn("parser_not_found", {
       type,
     });
     return [];
   }
 
   if (!layout.length) {
-    log.warn("parser_empty_layout", traceId, {
+    log.warn("parser_empty_layout", {
       type,
     });
     return [];
   }
 
   try {
-    const result = parser(layout, traceId);
+    const result = parser(input, traceId);
 
     log.trace("parser_output", traceId, {
       type,
@@ -128,7 +108,7 @@ export function parseByType(
     return result;
 
   } catch (err) {
-    log.warn("parser_failed", traceId, {
+    log.warn("parser_failed", {
       type,
       error: err,
     });
