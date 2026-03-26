@@ -14,13 +14,13 @@
  */
 
 import Tesseract from "tesseract.js";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { OCRToken } from "./OCRTypes";
 
 // 🔥 NEW
 import { extractTextGoogle } from "../../google/GoogleVisionService";
 
-const log = createLogger("OCR_ENGINE");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🔧 TESSERACT CORE
@@ -74,7 +74,6 @@ async function runVision(buffer: Buffer, traceId: string) {
 
     const lines = text.split("\n").filter(Boolean);
 
-    // ⚠️ Vision nie daje bbox → robimy FAKE tokens
     const tokens: OCRToken[] = lines.map((line, i) => ({
       text: line,
       x: 0,
@@ -92,7 +91,8 @@ async function runVision(buffer: Buffer, traceId: string) {
     return { text, lines, tokens };
 
   } catch (err) {
-    log.warn("vision_failed", traceId, {
+    log.warn("vision_failed", {
+      traceId,
       error: err,
     });
 
@@ -119,6 +119,8 @@ export const OCREngine = {
     runWithPSM(buffer, traceId, 4, "BOX"),
 
   async hocr(buffer: Buffer, traceId: string) {
+    log.trace("hocr_start", traceId);
+
     const result = await Tesseract.recognize(buffer, "eng", {
       logger: () => {},
       config: {
@@ -126,10 +128,15 @@ export const OCREngine = {
       },
     } as any);
 
-    return { hocr: result.data.hocr || "" };
+    const hocr = result.data.hocr || "";
+
+    log.trace("hocr_done", traceId, {
+      length: hocr.length,
+    });
+
+    return { hocr };
   },
 
-  // 🔥 NEW ENGINE
   vision: (buffer: Buffer, traceId: string) =>
     runVision(buffer, traceId),
 };
