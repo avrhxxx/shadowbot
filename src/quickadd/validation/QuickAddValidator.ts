@@ -18,10 +18,10 @@
  * - FULL trace logging
  */
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { resolveNickname } from "../mapping/NicknameResolver";
 
-const log = createLogger("VALIDATION");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧱 TYPES
@@ -95,7 +95,7 @@ export async function validateEntries(
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
-    let isInvalidValue = false; // 🔥 FIX FLAG
+    let isInvalidValue = false;
 
     log.trace("entry_input", traceId, {
       nickname: entry.nickname,
@@ -128,7 +128,8 @@ export async function validateEntries(
         resolved,
       });
     } catch (err) {
-      log.warn("resolve_failed", traceId, {
+      log.warn("resolve_failed", {
+        traceId,
         error: err,
       });
     }
@@ -139,7 +140,7 @@ export async function validateEntries(
     // =====================================
     // 🧠 CONFIDENCE + STATUS
     // =====================================
-    if (!isInvalidValue) { // 🔥 FIX
+    if (!isInvalidValue) {
       if (!wasMapped) {
         status = pickHigherStatus(status, "UNRESOLVED");
         confidence = 0.3;
