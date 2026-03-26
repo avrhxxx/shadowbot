@@ -49,9 +49,6 @@ export async function handleEnd(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // 🔒 VALIDATION
-  // =====================================
   const contextError = validateQuickAddContext(interaction, session);
   if (contextError || !session) {
     await interaction.reply({
@@ -79,14 +76,7 @@ export async function handleEnd(
       threadId,
     });
 
-    // =====================================
-    // 🧹 CLEAR BUFFER
-    // =====================================
     QuickAddBuffer.clear(guildId, traceId);
-
-    // =====================================
-    // 🧠 END SESSION
-    // =====================================
     QuickAddSession.end(guildId, traceId);
 
     log.trace("session_ended", traceId, {
@@ -95,17 +85,11 @@ export async function handleEnd(
       threadId,
     });
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
     await interaction.reply({
       content: "🛑 QuickAdd session ended",
       ephemeral: true,
     });
 
-    // =====================================
-    // 🧵 OPTIONAL: DELETE THREAD
-    // =====================================
     try {
       const channel = interaction.channel;
 
@@ -119,7 +103,6 @@ export async function handleEnd(
       }
     } catch (err) {
       log.warn("thread_delete_failed", {
-        traceId,
         sessionId: session.sessionId,
         error: err,
       });
