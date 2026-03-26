@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/ocr/VisionOCRAdapter.ts
+// 📁 src/quickadd/ocr/VisionOCRExtractor.ts
 // =====================================
 
 /**
