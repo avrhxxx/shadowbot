@@ -1,43 +1,53 @@
 // =====================================
-// 📁 src/google/GoogleVisionService.ts
+// 📁 src/google/googleSheetsClient.ts
 // =====================================
 
 /**
  * 🧠 ROLE:
- * Minimal Google Vision API client.
+ * Shared Google Cloud authentication + Sheets client.
  *
  * Responsibilities:
- * - use shared GoogleAuth
- * - send request
- * - return raw response
+ * - provide single GoogleAuth instance
+ * - configure scopes for all Google services (Sheets + Vision)
  *
  * ❗ RULES:
- * - NO logging
- * - NO traceId
- * - NO OCR logic
- * - NO transformation
+ * - single source of truth for auth
+ * - reusable across Google integrations
  */
 
-import vision from "@google-cloud/vision";
-import { googleAuth } from "./googleSheetsClient";
+import { google } from "googleapis";
 
-// 🔥 używamy WSPÓLNEGO AUTH
-const client = new vision.ImageAnnotatorClient({
-  auth: googleAuth,
+// =====================================
+// 🔐 ENV CHECK
+// =====================================
+
+if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+  throw new Error("❌ Brakuje zmiennej GOOGLE_SERVICE_ACCOUNT!");
+}
+
+// =====================================
+// 🔑 PARSE CREDENTIALS
+// =====================================
+
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+
+// =====================================
+// 🔥 SHARED AUTH (Sheets + Vision)
+// =====================================
+
+export const googleAuth = new google.auth.GoogleAuth({
+  credentials,
+  scopes: [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/cloud-platform", // 🔥 wymagane dla Vision
+  ],
 });
 
-export async function runVisionOCR(buffer: Buffer) {
-  try {
-    const [result] = await client.documentTextDetection({
-      image: { content: buffer },
-      imageContext: {
-        languageHints: ["en"],
-      },
-    });
+// =====================================
+// 📊 SHEETS CLIENT
+// =====================================
 
-    return result ?? null;
-
-  } catch {
-    return null;
-  }
-}
+export const sheetsClient = google.sheets({
+  version: "v4",
+  auth: googleAuth,
+});
