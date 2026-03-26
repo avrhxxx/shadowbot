@@ -19,10 +19,10 @@
  * - STRICT typing (no any)
  */
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { OCRToken } from "./OCRTypes";
 
-const log = createLogger("OCR_VISION");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧱 TYPES (MINIMAL VISION CONTRACT)
@@ -110,7 +110,7 @@ export function mapVisionToTokens(
             y,
             width,
             height,
-            confidence: undefined, // Vision nie daje confidence na tym poziomie
+            confidence: undefined,
           });
         }
       }
