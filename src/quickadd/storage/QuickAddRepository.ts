@@ -6,18 +6,11 @@
  * 💾 ROLE:
  * Persistence layer for QuickAdd (Google Sheets).
  *
- * Responsible for:
- * - reading/writing learning data
- * - saving user corrections (adjusted)
- * - enqueueing points/events
- *
  * ❗ RULES:
  * - NO business logic
  * - NO validation
- * - just data IO
- *
- * Acts as:
- * QuickAdd → Repository → GoogleSheetsAdapter
+ * - traceId REQUIRED (STRICT)
+ * - FULL logging
  */
 
 import {
@@ -26,12 +19,12 @@ import {
   updateCell,
 } from "../../google/googleSheetsStorage";
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("REPOSITORY");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
-// 📌 CONFIG (TABS)
+// 📌 CONFIG
 // =====================================
 
 const NICKNAME_TAB = "quickadd_nicknames";
@@ -39,93 +32,39 @@ const POINTS_QUEUE_TAB = "quickadd_points_queue";
 const EVENTS_QUEUE_TAB = "quickadd_events_queue";
 
 // =====================================
-// 🧱 TYPES
+// 🧠 HELPERS
 // =====================================
 
-type LearningRow = {
-  type: string;
-  ocr_raw: string;
-  layout_text: string;
-  parser_output: string;
-};
-
-type AdjustedEntry = {
-  ocr_raw: string;
-  adjusted: string;
-};
-
-type PointsQueueEntry = {
-  guildId: string;
-  category: string;
-  week: string;
-  nickname: string;
-  points: number;
-};
-
-type EventsQueueEntry = {
-  guildId: string;
-  eventId: string;
-  type: string;
-  nickname: string;
-};
-
-// =====================================
-// 📊 SAVE LEARNING (OCR → PARSER FLOW)
-// =====================================
-
-export async function saveLearning(rows: LearningRow[]) {
-  if (!rows.length) return;
-
-  try {
-    let sheet = await readSheet(NICKNAME_TAB);
-
-    if (!sheet || sheet.length === 0) {
-      sheet = [[
-        "type",
-        "ocr_raw",
-        "layout_text",
-        "parser_output",
-        "adjusted",
-        "override",
-        "createdAt",
-      ]];
-    }
-
-    const values = rows.map((r) => [
-      r.type,
-      r.ocr_raw,
-      r.layout_text,
-      r.parser_output,
-      "",
-      "",
-      Date.now(),
-    ]);
-
-    const newData = [...sheet, ...values];
-
-    await writeSheet(NICKNAME_TAB, newData);
-
-    // ✅ FIX — trace requires traceId
-    log.trace("learning_saved", "repository", {
-      count: rows.length,
-    });
-
-  } catch (err) {
-    log.warn("learning_failed", err);
+function assertTrace(traceId: string, scope: string) {
+  if (!traceId) {
+    throw new Error(`[REPOSITORY ERROR] Missing traceId in ${scope}`);
   }
 }
 
+function safeSheet(data: any[][] | null | undefined): any[][] {
+  return data && data.length ? data : [];
+}
+
 // =====================================
-// ✏️ SAVE ADJUSTED (USER CORRECTIONS)
+// ✏️ SAVE ADJUSTED
 // =====================================
 
-export async function saveAdjusted(entries: AdjustedEntry[]) {
+export async function saveAdjusted(
+  entries: { ocr_raw: string; adjusted: string }[],
+  traceId: string
+) {
+  assertTrace(traceId, "saveAdjusted");
+
   if (!entries.length) return;
 
   try {
-    let sheet = await readSheet(NICKNAME_TAB);
+    log.trace("adjusted_save_start", traceId, {
+      count: entries.length,
+    });
 
-    if (!sheet || sheet.length === 0) {
+    let sheet = safeSheet(await readSheet(NICKNAME_TAB));
+
+    if (sheet.length === 0) {
       sheet = [[
         "type",
         "ocr_raw",
@@ -143,13 +82,14 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
     const adjustedIndex = headers.indexOf("adjusted");
 
     if (ocrIndex === -1 || adjustedIndex === -1) {
-      log.warn("missing_columns_adjusted");
+      log.warn("adjusted_missing_columns", {
+        traceId,
+      });
       return;
     }
 
     for (const entry of entries) {
       let updated = false;
-
       const cleaned = clean(entry.ocr_raw);
 
       for (let i = 1; i < sheet.length; i++) {
@@ -161,9 +101,9 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
         if (clean(ocrRaw) === cleaned) {
           await updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted);
 
-          log.trace("adjusted_updated", "repository", {
-            ocr: ocrRaw,
-            adjusted: entry.adjusted,
+          log.trace("adjusted_updated", traceId, {
+            from: ocrRaw,
+            to: entry.adjusted,
           });
 
           updated = true;
@@ -172,7 +112,7 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
       }
 
       if (!updated) {
-        const newRow = [
+        sheet.push([
           "",
           entry.ocr_raw,
           "",
@@ -180,11 +120,9 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
           entry.adjusted,
           "",
           Date.now(),
-        ];
+        ]);
 
-        sheet.push(newRow);
-
-        log.trace("adjusted_added", "repository", {
+        log.trace("adjusted_added", traceId, {
           ocr: entry.ocr_raw,
           adjusted: entry.adjusted,
         });
@@ -193,8 +131,12 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
 
     await writeSheet(NICKNAME_TAB, sheet);
 
+    log.trace("adjusted_save_done", traceId, {
+      count: entries.length,
+    });
+
   } catch (err) {
-    log.warn("adjusted_failed", err);
+    log.error("adjusted_failed", err, traceId);
   }
 }
 
@@ -202,11 +144,26 @@ export async function saveAdjusted(entries: AdjustedEntry[]) {
 // 📥 QUEUE — POINTS
 // =====================================
 
-export async function enqueuePoints(entries: PointsQueueEntry[]) {
+export async function enqueuePoints(
+  entries: {
+    guildId: string;
+    category: string;
+    week: string;
+    nickname: string;
+    points: number;
+  }[],
+  traceId: string
+) {
+  assertTrace(traceId, "enqueuePoints");
+
   if (!entries.length) return;
 
   try {
-    const existing = await readSheet(POINTS_QUEUE_TAB);
+    log.trace("points_queue_start", traceId, {
+      count: entries.length,
+    });
+
+    const existing = safeSheet(await readSheet(POINTS_QUEUE_TAB));
 
     const rows = entries.map((e) => [
       e.guildId,
@@ -222,12 +179,12 @@ export async function enqueuePoints(entries: PointsQueueEntry[]) {
 
     await writeSheet(POINTS_QUEUE_TAB, newData);
 
-    log.trace("points_enqueued", "repository", {
+    log.trace("points_queue_done", traceId, {
       count: rows.length,
     });
 
   } catch (err) {
-    log.error("points_queue_failed", err);
+    log.error("points_queue_failed", err, traceId);
     throw err;
   }
 }
@@ -236,11 +193,25 @@ export async function enqueuePoints(entries: PointsQueueEntry[]) {
 // 📥 QUEUE — EVENTS
 // =====================================
 
-export async function enqueueEvents(entries: EventsQueueEntry[]) {
+export async function enqueueEvents(
+  entries: {
+    guildId: string;
+    eventId: string;
+    type: string;
+    nickname: string;
+  }[],
+  traceId: string
+) {
+  assertTrace(traceId, "enqueueEvents");
+
   if (!entries.length) return;
 
   try {
-    const existing = await readSheet(EVENTS_QUEUE_TAB);
+    log.trace("events_queue_start", traceId, {
+      count: entries.length,
+    });
+
+    const existing = safeSheet(await readSheet(EVENTS_QUEUE_TAB));
 
     const rows = entries.map((e) => [
       e.guildId,
@@ -251,59 +222,41 @@ export async function enqueueEvents(entries: EventsQueueEntry[]) {
       Date.now(),
     ]);
 
-    const newData = [...existing, ...rows];
+    await writeSheet(EVENTS_QUEUE_TAB, [...existing, ...rows]);
 
-    await writeSheet(EVENTS_QUEUE_TAB, newData);
-
-    log.trace("events_enqueued", "repository", {
+    log.trace("events_queue_done", traceId, {
       count: rows.length,
     });
 
   } catch (err) {
-    log.error("events_queue_failed", err);
+    log.error("events_queue_failed", err, traceId);
     throw err;
   }
 }
 
 // =====================================
-// 📖 READ LEARNING DATA
+// 📖 READ
 // =====================================
 
-export async function getLearningData(): Promise<any[][]> {
-  try {
-    const data = await readSheet(NICKNAME_TAB);
+export async function getLearningData(traceId: string): Promise<any[][]> {
+  assertTrace(traceId, "getLearningData");
 
-    log.trace("learning_loaded", "repository", {
+  try {
+    const data = safeSheet(await readSheet(NICKNAME_TAB));
+
+    log.trace("learning_loaded", traceId, {
       rows: data.length,
     });
 
     return data;
   } catch (err) {
-    log.error("learning_load_failed", err);
+    log.error("learning_load_failed", err, traceId);
     return [];
   }
 }
 
 // =====================================
-// 🔧 WORKER HELPERS
-// =====================================
-
-export async function getQueue(tab: string) {
-  return readSheet(tab);
-}
-
-export async function markProcessed(
-  tab: string,
-  rowIndex: number,
-  statusCol: number,
-  processedAtCol: number
-) {
-  await updateCell(tab, rowIndex, statusCol, "PROCESSED");
-  await updateCell(tab, rowIndex, processedAtCol, Date.now());
-}
-
-// =====================================
-// 🧼 CLEAN (ONLY FOR MATCHING)
+// 🧼 CLEAN
 // =====================================
 
 function clean(input: string): string {
@@ -312,28 +265,3 @@ function clean(input: string): string {
     .replace(/[^a-z0-9]/gi, "")
     .trim();
 }
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. 🔥 FIXED ALL log.trace CALLS
- *    BEFORE:
- *      log.trace("event", { data })
- *
- *    AFTER:
- *      log.trace("event", "repository", { data })
- *
- *    ✔ Added required traceId argument
- *
- * 2. 🧠 TRACE STRATEGY
- *    - repository layer uses static traceId: "repository"
- *    - no session context here → correct architectural choice
- *
- * 3. ❗ NO OTHER LOGIC CHANGES
- *    - purely logging contract fix
- *
- * ✔ File now fully compatible with DebugLogger
- * ✔ Removes 6+ TS errors
- */
