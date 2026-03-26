@@ -45,9 +45,6 @@ export async function handleFix(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // 🔒 VALIDATION
-  // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
   if (contextError || !session) {
@@ -58,9 +55,6 @@ export async function handleFix(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION
-  // =====================================
   const resolvedTraceId = traceId || session.traceId;
 
   if (!resolvedTraceId) {
@@ -83,6 +77,15 @@ export async function handleFix(
     log.trace("buffer_loaded", resolvedTraceId, {
       count: entries.length,
     });
+
+    // 🔥 EMPTY GUARD (FIX)
+    if (!entries.length) {
+      await interaction.reply({
+        content: "⚠️ Nothing to fix",
+        ephemeral: true,
+      });
+      return;
+    }
 
     let applied = 0;
 
@@ -111,7 +114,7 @@ export async function handleFix(
     });
 
     // =====================================
-    // 🔥 REVALIDATION (CRITICAL)
+    // 🔥 REVALIDATION
     // =====================================
     log.trace("revalidation_start", resolvedTraceId, {
       count: updatedRaw.length,
@@ -125,11 +128,19 @@ export async function handleFix(
       resolvedTraceId
     );
 
+    // 🔥 SAFETY CHECK (NEW)
+    if (revalidated.length !== updatedRaw.length) {
+      log.warn("revalidation_length_mismatch", resolvedTraceId, {
+        before: updatedRaw.length,
+        after: revalidated.length,
+      });
+    }
+
     // =====================================
     // 🔗 MERGE (preserve IDs)
     // =====================================
     const merged = revalidated.map((v, i) => ({
-      ...updatedRaw[i], // preserves id + metadata
+      ...updatedRaw[i],
       status: v.status,
       confidence: v.confidence,
       suggestion: v.suggestion,
