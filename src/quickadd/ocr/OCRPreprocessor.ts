@@ -10,24 +10,24 @@
  */
 
 import sharp from "sharp";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("OCR_PRE");
+const log = createScopedLogger(import.meta.url);
 
 export const OCRPreprocessor = {
-  async base(buffer: Buffer): Promise<Buffer> {
+  async base(buffer: Buffer, traceId: string): Promise<Buffer> {
     try {
       return await sharp(buffer)
         .rotate()
         .resize({ width: 1500, withoutEnlargement: true })
         .toBuffer();
     } catch (err) {
-      log.error("pre_base_failed", err);
+      log.error("pre_base_failed", err, traceId);
       return buffer;
     }
   },
 
-  async enhance(buffer: Buffer): Promise<Buffer> {
+  async enhance(buffer: Buffer, traceId: string): Promise<Buffer> {
     try {
       return await sharp(buffer)
         .grayscale()
@@ -35,7 +35,7 @@ export const OCRPreprocessor = {
         .sharpen()
         .toBuffer();
     } catch (err) {
-      log.error("pre_enhance_failed", err);
+      log.error("pre_enhance_failed", err, traceId);
       return buffer;
     }
   },
