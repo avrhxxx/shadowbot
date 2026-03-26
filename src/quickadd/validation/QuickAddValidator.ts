@@ -95,6 +95,8 @@ export async function validateEntries(
     let status: EntryStatus = "OK";
     let suggestion: string | undefined;
 
+    let isInvalidValue = false; // 🔥 FIX FLAG
+
     log.trace("entry_input", traceId, {
       nickname: entry.nickname,
       value: entry.value,
@@ -106,6 +108,7 @@ export async function validateEntries(
     if (!entry.value || entry.value <= 0) {
       status = pickHigherStatus(status, "INVALID_VALUE");
       confidence = 0;
+      isInvalidValue = true;
 
       log.trace("decision_invalid_value", traceId, {
         nickname: entry.nickname,
@@ -136,47 +139,49 @@ export async function validateEntries(
     // =====================================
     // 🧠 CONFIDENCE + STATUS
     // =====================================
-    if (!wasMapped) {
-      status = pickHigherStatus(status, "UNRESOLVED");
-      confidence = 0.3;
+    if (!isInvalidValue) { // 🔥 FIX
+      if (!wasMapped) {
+        status = pickHigherStatus(status, "UNRESOLVED");
+        confidence = 0.3;
 
-      log.trace("decision_unresolved", traceId, {
-        nickname: entry.nickname,
-      });
-
-      if (
-        entry.nickname.length < 4 ||
-        /donations|total|points/i.test(entry.nickname)
-      ) {
-        confidence = 0.1;
-
-        log.trace("decision_low_quality_ocr", traceId, {
+        log.trace("decision_unresolved", traceId, {
           nickname: entry.nickname,
         });
-      }
-    } else {
-      const similarity = stringSimilarity(entry.nickname, resolved);
-      confidence = similarity;
 
-      log.trace("similarity_computed", traceId, {
-        input: entry.nickname,
-        resolved,
-        similarity,
-      });
+        if (
+          entry.nickname.length < 4 ||
+          /donations|total|points/i.test(entry.nickname)
+        ) {
+          confidence = 0.1;
 
-      if (similarity >= 0.9) {
-        status = pickHigherStatus(status, "OK");
-      } else if (similarity >= 0.7) {
-        status = pickHigherStatus(status, "LOW_CONFIDENCE");
-        suggestion = resolved;
+          log.trace("decision_low_quality_ocr", traceId, {
+            nickname: entry.nickname,
+          });
+        }
       } else {
-        status = pickHigherStatus(status, "UNRESOLVED");
-        suggestion = resolved;
+        const similarity = stringSimilarity(entry.nickname, resolved);
+        confidence = similarity;
+
+        log.trace("similarity_computed", traceId, {
+          input: entry.nickname,
+          resolved,
+          similarity,
+        });
+
+        if (similarity >= 0.9) {
+          status = pickHigherStatus(status, "OK");
+        } else if (similarity >= 0.7) {
+          status = pickHigherStatus(status, "LOW_CONFIDENCE");
+          suggestion = resolved;
+        } else {
+          status = pickHigherStatus(status, "UNRESOLVED");
+          suggestion = resolved;
+        }
       }
     }
 
     // =====================================
-    // 🔁 DUPLICATE DETECTION (FIXED)
+    // 🔁 DUPLICATE DETECTION
     // =====================================
     const key = `${finalNickname}:${entry.value}`;
 
