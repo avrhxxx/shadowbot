@@ -7,11 +7,12 @@
  * Central orchestrator of the QuickAdd pipeline.
  *
  * Flow:
- * OCR → layout → parser → validator → selection → buffer
+ * OCR → parser → validator → selection → buffer
  *
  * ❗ RULES:
  * - NO business logic
  * - orchestration only
+ * - FULL traceId propagation (STRICT)
  */
 
 import { Message } from "discord.js";
@@ -21,11 +22,14 @@ import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
 import { validateEntries } from "../validation/QuickAddValidator";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
-import { LayoutBuilder } from "../ocr/layout/LayoutBuilder";
 
 import { QuickAddSession } from "./QuickAddSession";
 
 const log = createLogger("PIPELINE");
+
+// =====================================
+// 🚀 MAIN ENTRY
+// =====================================
 
 export async function processImageInput(
   message: Message,
@@ -38,6 +42,9 @@ export async function processImageInput(
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
+  // =====================================
+  // 🔍 CONTEXT CHECK
+  // =====================================
   log.trace("pipeline_context_check", traceId, {
     guildId,
     userId,
@@ -45,7 +52,7 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.warn("pipeline_invalid_context", traceId, {
+    log.warn("pipeline_invalid_context", {
       guildId,
       userId,
     });
@@ -53,6 +60,9 @@ export async function processImageInput(
   }
 
   try {
+    // =====================================
+    // 🚀 START
+    // =====================================
     log.trace("pipeline_start", traceId, {
       type: session.type,
       imageUrl,
@@ -64,12 +74,12 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.warn("ocr_empty", traceId);
+      log.warn("ocr_empty");
       return;
     }
 
     // =====================================
-    // 🔥 MULTI PIPELINE
+    // 🔥 MULTI PIPELINE (SNAPSHOT REQUIRED)
     // =====================================
     const pipelineResults: {
       entries: any[];
@@ -83,36 +93,26 @@ export async function processImageInput(
         });
 
         // =====================================
-        // 🧱 LAYOUT
+        // 🔹 PARSER (delegates layout internally)
         // =====================================
-        let layout = [];
+        const parsed = parseByType(
+          session.type,
+          {
+            lines: "lines" in source ? source.lines : undefined,
+            tokens: "tokens" in source ? source.tokens : undefined,
+          },
+          traceId
+        );
 
-        if ("tokens" in source && source.tokens) {
-          layout = LayoutBuilder.fromTokens(source.tokens);
-        } else if ("lines" in source && source.lines) {
-          layout = LayoutBuilder.fromLines(source.lines);
-        }
-
-        if (!layout.length) {
-          log.trace("layout_empty", traceId, {
+        if (!parsed.length) {
+          log.trace("parser_empty_for_source", traceId, {
             source: source.source,
           });
           continue;
         }
 
         // =====================================
-        // 🔹 PARSER
-        // =====================================
-        const parsed = parseByType(
-          session.type,
-          { layout },
-          traceId
-        );
-
-        if (!parsed.length) continue;
-
-        // =====================================
-        // 🔹 VALIDATOR
+        // 🔹 VALIDATOR (STRICT TRACE)
         // =====================================
         const validated = await validateEntries(parsed, traceId);
 
@@ -132,7 +132,8 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        log.warn("pipeline_source_failed", traceId, {
+        log.warn("pipeline_source_failed", {
+          source: source.source,
           error: err,
         });
       }
@@ -142,7 +143,7 @@ export async function processImageInput(
     // 🔍 SELECTION (HYBRID)
     // =====================================
     if (!pipelineResults.length) {
-      log.warn("pipeline_no_results", traceId);
+      log.warn("pipeline_no_results");
       return;
     }
 
@@ -174,6 +175,9 @@ export async function processImageInput(
 
     const total = QuickAddBuffer.getEntries(guildId).length;
 
+    // =====================================
+    // ✅ DONE
+    // =====================================
     log.trace("pipeline_done", traceId, {
       total,
       durationMs: Date.now() - startedAt,
