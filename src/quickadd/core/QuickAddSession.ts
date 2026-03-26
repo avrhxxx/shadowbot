@@ -12,9 +12,10 @@
  * - storing session context (type, stage)
  *
  * ❗ RULES:
- * - NO business logic (no OCR, parsing, etc.)
+ * - NO business logic
  * - pure state manager
  * - one session per guild
+ * - MUST include session-level traceId
  */
 
 import { createLogger } from "../debug/DebugLogger";
@@ -35,6 +36,8 @@ type SessionData = {
   stage: QuickAddStage;
 
   createdAt: number;
+
+  traceId: string; // 🔥 NEW
 };
 
 // =====================================
@@ -42,6 +45,14 @@ type SessionData = {
 // =====================================
 
 const sessions = new Map<string, SessionData>();
+
+// =====================================
+// 🔹 HELPERS
+// =====================================
+
+function generateTraceId(): string {
+  return `qa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 // =====================================
 // 🔹 SESSION MANAGER
@@ -57,7 +68,9 @@ export const QuickAddSession = {
     ownerId: string;
     type: QuickAddType;
   }) {
-    log.trace("session_start_requested", {
+    const traceId = generateTraceId();
+
+    log.trace("session_start_requested", traceId, {
       guildId: data.guildId,
       ownerId: data.ownerId,
       threadId: data.threadId,
@@ -68,11 +81,12 @@ export const QuickAddSession = {
       ...data,
       stage: "COLLECTING",
       createdAt: Date.now(),
+      traceId,
     };
 
     sessions.set(data.guildId, session);
 
-    log.trace("session_started", {
+    log.trace("session_started", traceId, {
       guildId: data.guildId,
       stage: session.stage,
       createdAt: session.createdAt,
@@ -87,7 +101,7 @@ export const QuickAddSession = {
   get(guildId: string): SessionData | null {
     const session = sessions.get(guildId) || null;
 
-    log.trace("session_get", {
+    log.trace("session_get", session?.traceId, {
       guildId,
       exists: !!session,
       stage: session?.stage,
@@ -100,16 +114,16 @@ export const QuickAddSession = {
   // 🛑 END SESSION
   // =============================
   end(guildId: string) {
-    const existed = sessions.has(guildId);
+    const session = sessions.get(guildId);
 
-    log.trace("session_end_requested", {
+    log.trace("session_end_requested", session?.traceId, {
       guildId,
-      existed,
+      existed: !!session,
     });
 
     sessions.delete(guildId);
 
-    log.trace("session_ended", {
+    log.trace("session_ended", session?.traceId, {
       guildId,
     });
   },
@@ -132,7 +146,7 @@ export const QuickAddSession = {
 
     session.stage = stage;
 
-    log.trace("session_stage_updated", {
+    log.trace("session_stage_updated", session.traceId, {
       guildId,
       from: prevStage,
       to: stage,
@@ -146,7 +160,7 @@ export const QuickAddSession = {
     const session = sessions.get(guildId);
 
     if (!session) {
-      log.trace("session_owner_check_no_session", {
+      log.trace("session_owner_check_no_session", undefined, {
         guildId,
         userId,
       });
@@ -155,7 +169,7 @@ export const QuickAddSession = {
 
     const result = session.ownerId === userId;
 
-    log.trace("session_owner_check", {
+    log.trace("session_owner_check", session.traceId, {
       guildId,
       userId,
       ownerId: session.ownerId,
@@ -172,7 +186,7 @@ export const QuickAddSession = {
     const session = sessions.get(guildId);
 
     if (!session) {
-      log.trace("session_thread_check_no_session", {
+      log.trace("session_thread_check_no_session", undefined, {
         guildId,
         channelId,
       });
@@ -181,7 +195,7 @@ export const QuickAddSession = {
 
     const result = session.threadId === channelId;
 
-    log.trace("session_thread_check", {
+    log.trace("session_thread_check", session.traceId, {
       guildId,
       channelId,
       threadId: session.threadId,
