@@ -16,6 +16,7 @@
  * - NO blocking (evaluate_only)
  * - BATCH processing
  * - FULL trace logging
+ * - traceId REQUIRED (STRICT)
  */
 
 import { createScopedLogger } from "@/quickadd/debug/logger";
@@ -35,7 +36,7 @@ export type EntryStatus =
   | "INVALID_VALUE";
 
 export type ValidatedEntry = {
-  id: number;
+  id: number; // ⚠️ temporary validation id
 
   nickname: string;
   value: number;
@@ -47,6 +48,20 @@ export type ValidatedEntry = {
 
   suggestion?: string;
 };
+
+// =====================================
+// 🧠 HELPERS
+// =====================================
+
+function assertTrace(traceId: string) {
+  if (!traceId) {
+    throw new Error("[VALIDATOR ERROR] Missing traceId");
+  }
+}
+
+function normalize(str: string): string {
+  return str.trim().toLowerCase();
+}
 
 // =====================================
 // 🧠 PRIORITY
@@ -77,6 +92,8 @@ export async function validateEntries(
   entries: { nickname: string; value: number }[],
   traceId: string
 ): Promise<ValidatedEntry[]> {
+  assertTrace(traceId);
+
   const startedAt = Date.now();
 
   const results: ValidatedEntry[] = [];
@@ -89,6 +106,11 @@ export async function validateEntries(
   });
 
   for (const entry of entries) {
+    log.trace("validation_entry_start", traceId, {
+      nickname: entry.nickname,
+      value: entry.value,
+    });
+
     const originalNickname = entry.nickname;
 
     let confidence = 0;
@@ -96,11 +118,6 @@ export async function validateEntries(
     let suggestion: string | undefined;
 
     let isInvalidValue = false;
-
-    log.trace("entry_input", traceId, {
-      nickname: entry.nickname,
-      value: entry.value,
-    });
 
     // =====================================
     // 🔢 VALUE VALIDATION
@@ -111,7 +128,6 @@ export async function validateEntries(
       isInvalidValue = true;
 
       log.trace("decision_invalid_value", traceId, {
-        nickname: entry.nickname,
         value: entry.value,
       });
     }
@@ -120,6 +136,7 @@ export async function validateEntries(
     // 🧠 RESOLVE NICKNAME
     // =====================================
     let resolved = "";
+
     try {
       resolved = await resolveNickname(entry.nickname);
 
@@ -182,9 +199,9 @@ export async function validateEntries(
     }
 
     // =====================================
-    // 🔁 DUPLICATE DETECTION
+    // 🔁 DUPLICATE DETECTION (FIXED)
     // =====================================
-    const key = `${finalNickname}:${entry.value}`;
+    const key = `${normalize(finalNickname)}:${entry.value}`;
 
     if (seen.has(key)) {
       status = pickHigherStatus(status, "DUPLICATE");
@@ -209,7 +226,7 @@ export async function validateEntries(
 
     results.push(validated);
 
-    log.trace("entry_output", traceId, {
+    log.trace("validation_entry_done", traceId, {
       id: validated.id,
       nickname: validated.nickname,
       status: validated.status,
