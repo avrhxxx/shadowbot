@@ -17,9 +17,9 @@
  */
 
 import { OCRToken } from "../OCRTypes";
-import { createLogger } from "../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("LAYOUT");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧱 TYPES
