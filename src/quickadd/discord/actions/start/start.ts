@@ -15,6 +15,7 @@
  * - minimal logic (delegates to session layer)
  * - handles Discord-specific operations (thread)
  * - MUST produce traceId
+ * - FULL trace logging AFTER session start
  */
 
 import {
@@ -30,7 +31,7 @@ import { createLogger } from "../../../debug/DebugLogger";
 const log = createLogger("CMD_START");
 
 // =====================================
-// 🔹 TYPE GUARD (SAFE CAST)
+// 🔹 TYPE GUARD
 // =====================================
 
 function isQuickAddType(value: string): value is QuickAddType {
@@ -54,8 +55,6 @@ export async function handleStart(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  let traceId: string | undefined; // 🔥 NEW
-
   if (!guildId) {
     await interaction.reply({
       content: "❌ Guild only command",
@@ -67,7 +66,7 @@ export async function handleStart(
   const existing = QuickAddSession.get(guildId);
 
   // =====================================
-  // 🔒 SESSION ALREADY EXISTS
+  // 🔒 SESSION EXISTS
   // =====================================
   if (existing) {
     log.trace("start_blocked_existing_session", existing.traceId, {
@@ -85,9 +84,6 @@ export async function handleStart(
 
   const rawType = interaction.options.getString("type", true);
 
-  // =====================================
-  // 🔒 VALIDATE TYPE
-  // =====================================
   if (!isQuickAddType(rawType)) {
     await interaction.reply({
       content: "❌ Invalid QuickAdd type",
@@ -100,7 +96,7 @@ export async function handleStart(
 
   try {
     // =====================================
-    // 📢 CHANNEL TYPE GUARD
+    // 📢 CHANNEL GUARD
     // =====================================
     if (!interaction.channel || !(interaction.channel instanceof TextChannel)) {
       throw new Error("Invalid channel type for thread creation");
@@ -117,12 +113,12 @@ export async function handleStart(
     });
 
     // =====================================
-    // 👤 ADD USER TO THREAD
+    // 👤 ADD USER
     // =====================================
     await thread.members.add(userId);
 
     // =====================================
-    // 🧠 START SESSION (TRACE ID CREATED HERE)
+    // 🧠 START SESSION (TRACE STARTS HERE)
     // =====================================
     const session = QuickAddSession.start({
       guildId,
@@ -131,15 +127,29 @@ export async function handleStart(
       type,
     });
 
-    traceId = session.traceId; // 🔥 ASSIGN
+    const traceId = session.traceId;
 
     // =====================================
-    // 🚀 LOG START
+    // 🔍 LOG START
     // =====================================
-    log.trace("session_started", traceId, {
+    log.trace("start_start", traceId, {
       guildId,
       userId,
       threadId: thread.id,
+      type,
+    });
+
+    log.trace("thread_created", traceId, {
+      threadId: thread.id,
+    });
+
+    log.trace("thread_member_added", traceId, {
+      userId,
+    });
+
+    log.trace("session_started", traceId, {
+      guildId,
+      ownerId: userId,
       type,
     });
 
@@ -160,7 +170,7 @@ export async function handleStart(
     });
 
   } catch (err) {
-    log.error("start_failed", err, traceId ?? "NO_TRACE"); // 🔥 FIX
+    log.error("start_failed", err);
 
     await interaction.reply({
       content: "❌ Failed to start session",
