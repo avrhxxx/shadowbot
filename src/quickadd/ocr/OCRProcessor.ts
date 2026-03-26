@@ -23,6 +23,10 @@ import { createLogger } from "../debug/DebugLogger";
 import { OCREngine } from "./OCREngine";
 import { OCRResult } from "./OCRTypes";
 
+// 🔥 NEW
+import { runVisionOCR } from "../../google/GoogleVisionService";
+import { mapVisionToTokens } from "./VisionOCRAdapter";
+
 const log = createLogger("OCR_PROCESSOR");
 
 // 🔥 FEATURE FLAGS
@@ -87,7 +91,31 @@ export async function runOCR(
     }
 
     // =====================================
-    // 🤖 RUN OCR ENGINES
+    // 🔥 GOOGLE VISION (PRIMARY)
+    // =====================================
+    log.trace("vision_ocr_start", traceId);
+
+    let visionTokens: any[] = [];
+
+    try {
+      const visionResult = await runVisionOCR(inputBuffer);
+
+      if (visionResult) {
+        visionTokens = mapVisionToTokens(visionResult, traceId);
+      }
+
+      log.trace("vision_ocr_done", traceId, {
+        tokens: visionTokens.length,
+      });
+
+    } catch (err) {
+      log.warn("vision_ocr_failed", traceId, {
+        error: err,
+      });
+    }
+
+    // =====================================
+    // 🤖 RUN OCR ENGINES (TESSERACT)
     // =====================================
     log.trace("ocr_engines_start", traceId);
 
@@ -130,6 +158,10 @@ export async function runOCR(
     // 🧱 BUILD SOURCES
     // =====================================
     const sources: OCRResult["sources"] = [
+      {
+        source: "VISION",
+        tokens: visionTokens,
+      },
       {
         source: "TESSERACT_FULL",
         text: full.text,
