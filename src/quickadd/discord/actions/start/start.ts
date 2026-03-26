@@ -54,6 +54,8 @@ export async function handleStart(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  let traceId: string | undefined; // 🔥 NEW
+
   if (!guildId) {
     await interaction.reply({
       content: "❌ Guild only command",
@@ -129,7 +131,7 @@ export async function handleStart(
       type,
     });
 
-    const traceId = session.traceId;
+    traceId = session.traceId; // 🔥 ASSIGN
 
     // =====================================
     // 🚀 LOG START
@@ -158,7 +160,7 @@ export async function handleStart(
     });
 
   } catch (err) {
-    log.error("start_failed", err);
+    log.error("start_failed", err, traceId ?? "NO_TRACE"); // 🔥 FIX
 
     await interaction.reply({
       content: "❌ Failed to start session",
