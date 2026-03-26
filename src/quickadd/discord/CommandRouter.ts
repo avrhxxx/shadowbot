@@ -15,7 +15,7 @@
 import { ChatInputCommandInteraction } from "discord.js";
 import { getCommandHandler } from "./CommandRegistry";
 import { createLogger } from "../debug/DebugLogger";
-import { createTraceId } from "../core/IdGenerator"; // ✅ NEW
+import { createTraceId } from "../core/IdGenerator";
 
 const log = createLogger("CMD_ROUTER");
 
@@ -26,7 +26,7 @@ const log = createLogger("CMD_ROUTER");
 export async function handleQuickAddCommand(
   interaction: ChatInputCommandInteraction
 ) {
-  const traceId = createTraceId(); // ✅ FIX (centralized generator)
+  const traceId = createTraceId();
 
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
@@ -52,8 +52,7 @@ export async function handleQuickAddCommand(
     const handler = getCommandHandler(subcommand);
 
     if (!handler) {
-      log.warn("command_unknown", {
-        traceId,
+      log.trace("command_unknown", traceId, {
         userId,
         guildId,
         channelId,
@@ -104,17 +103,5 @@ export async function handleQuickAddCommand(
       channelId,
       durationMs: Date.now() - startTime,
     });
-
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({
-        content: "❌ Something went wrong",
-        ephemeral: true,
-      });
-    } else {
-      await interaction.reply({
-        content: "❌ Something went wrong",
-        ephemeral: true,
-      });
-    }
   }
 }
