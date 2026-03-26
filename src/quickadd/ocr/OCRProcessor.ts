@@ -41,7 +41,6 @@ export async function runOCR(
 
     if (!res.ok) {
       log.warn("fetch_failed", {
-        traceId,
         status: res.status,
       });
 
@@ -64,8 +63,8 @@ export async function runOCR(
 
       const { OCRPreprocessor } = await import("./OCRPreprocessor");
 
-      const base = await OCRPreprocessor.base(buffer, traceId);
-      inputBuffer = await OCRPreprocessor.enhance(base, traceId);
+      const base = await OCRPreprocessor.base(buffer);
+      inputBuffer = await OCRPreprocessor.enhance(base);
 
       log.trace("preprocess_done", traceId, {
         originalSize: buffer.length,
@@ -95,7 +94,6 @@ export async function runOCR(
 
     } catch (err) {
       log.warn("vision_ocr_failed", {
-        traceId,
         error: err,
       });
     }
@@ -133,7 +131,6 @@ export async function runOCR(
         });
       } catch (err) {
         log.warn("hocr_failed", {
-          traceId,
           error: err,
         });
       }
