@@ -17,31 +17,25 @@
  * - deterministic behavior
  */
 
-import { createLogger } from "../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
+import { ParsedEntry } from "../../core/QuickAddTypes";
 
-const log = createLogger("PARSER");
-
-// =====================================
-// 🧱 TYPES
-// =====================================
-
-type ParsedEntry = {
-  nickname: string;
-  value: number;
-};
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🔥 MAIN — LAYOUT MODE (PRIMARY)
 // =====================================
 
 export function parseDonationsFromLayout(
-  layout: LayoutRow[],
+  input: { layout: LayoutRow[] },
   traceId: string
 ): ParsedEntry[] {
   if (!traceId) {
     throw new Error("traceId is required in parseDonationsFromLayout");
   }
+
+  const { layout } = input;
 
   log.trace("parse_layout_start", traceId, {
     rows: layout.length,
