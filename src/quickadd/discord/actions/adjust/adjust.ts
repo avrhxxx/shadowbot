@@ -9,10 +9,9 @@
  * ❗ RULES:
  * - owner only
  * - revalidation required
- *
- * 🔥 NOTE:
- * - traceId injected from CommandRouter
- * - fallback to session.traceId (temporary, migration phase)
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -25,9 +24,9 @@ import { saveAdjusted } from "../../../storage/QuickAddRepository";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_ADJUST");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -35,7 +34,7 @@ const log = createLogger("CMD_ADJUST");
 
 export async function handleAdjust(
   interaction: ChatInputCommandInteraction,
-  traceId?: string // 🔥 NEW (phase 1)
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -53,9 +52,9 @@ export async function handleAdjust(
 
   const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError) {
+  if (contextError || !session) {
     await interaction.reply({
-      content: contextError,
+      content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -64,7 +63,7 @@ export async function handleAdjust(
   // =====================================
   // 🔒 OWNER CHECK
   // =====================================
-  if (session?.ownerId !== interaction.user.id) {
+  if (session.ownerId !== interaction.user.id) {
     await interaction.reply({
       content: "❌ Only session owner can use this command",
       ephemeral: true,
@@ -72,24 +71,23 @@ export async function handleAdjust(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION (MIGRATION SAFE)
-  // =====================================
-  const resolvedTraceId = traceId || session?.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   const id = interaction.options.getInteger("id", true);
   const newNickname = interaction.options.getString("nickname");
   const newValue = interaction.options.getInteger("value");
 
   try {
+    log.trace("adjust_start", traceId, {
+      sessionId: session.sessionId,
+      guildId,
+      id,
+      newNickname,
+      newValue,
+    });
+
     // =====================================
     // 📥 LOAD BUFFER
     // =====================================
-    const entries = QuickAddBuffer.getEntries(guildId);
+    const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     const index = entries.findIndex((e) => e.id === id);
 
@@ -122,7 +120,8 @@ export async function handleAdjust(
       newEntries.map((e) => ({
         nickname: e.nickname,
         value: e.value,
-      }))
+      })),
+      traceId
     );
 
     // preserve IDs
@@ -133,9 +132,10 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.setEntries(guildId, merged);
+    QuickAddBuffer.setEntries(guildId, merged, traceId);
 
-    log.trace("adjust_applied", resolvedTraceId, {
+    log.trace("adjust_applied", traceId, {
+      sessionId: session.sessionId,
       id,
       before: target,
       after: updated,
@@ -146,20 +146,26 @@ export async function handleAdjust(
     // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
-        await saveAdjusted([
-          {
-            ocr_raw: target.nickname,
-            adjusted: newNickname,
-          },
-        ]);
+        await saveAdjusted(
+          [
+            {
+              ocr_raw: target.nickname,
+              adjusted: newNickname,
+            },
+          ],
+          traceId
+        );
 
-        log.trace("learning_saved_adjust", resolvedTraceId, {
+        log.trace("learning_saved_adjust", traceId, {
+          sessionId: session.sessionId,
           from: target.nickname,
           to: newNickname,
         });
       }
     } catch (err) {
-      log.warn("learning_failed_adjust", resolvedTraceId, {
+      log.warn("learning_failed_adjust", {
+        traceId,
+        sessionId: session.sessionId,
         error: err,
       });
     }
@@ -169,12 +175,13 @@ export async function handleAdjust(
       ephemeral: true,
     });
 
-    log.trace("adjust_done", resolvedTraceId, {
+    log.trace("adjust_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("adjust_failed", err, resolvedTraceId);
+    log.error("adjust_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to adjust entry",
