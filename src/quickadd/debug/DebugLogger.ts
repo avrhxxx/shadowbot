@@ -122,7 +122,6 @@ function flushTrace(traceId: string) {
   const displayId = resolveDisplayId(traceId);
 
   console.log("");
-
   console.log(
     color(
       `========== QUICKADD TRACE (${displayId}) ==========`,
@@ -197,10 +196,6 @@ export function createLogger(scope: string): Logger {
     );
   };
 
-  // =====================================
-  // 🔥 STRICT ERROR (TRACE ENFORCED)
-  // =====================================
-
   base.error = (event: string, data: any, traceId: string) => {
     if (!traceId) {
       throw new Error(
@@ -222,15 +217,7 @@ export function createLogger(scope: string): Logger {
     flushTrace(traceId);
   };
 
-  // =====================================
-  // 🔥 STRICT TRACE (ENFORCED)
-  // =====================================
-
-  const traceImpl = (
-    event: string,
-    traceId: string,
-    data?: any
-  ) => {
+  base.trace = (event: string, traceId: string, data?: any) => {
     if (!traceId) {
       throw new Error(
         `[TRACE ERROR] Missing traceId in ${scope} for event: ${event}`
@@ -256,8 +243,6 @@ export function createLogger(scope: string): Logger {
       flushTrace(traceId);
     }
   };
-
-  base.trace = traceImpl;
 
   return base as Logger;
 }
