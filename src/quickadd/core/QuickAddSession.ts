@@ -19,10 +19,10 @@
  * - traceId ONLY for logging (injected)
  */
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createSessionId } from "./IdGenerator";
 
-const log = createLogger("SESSION");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🔹 TYPES
