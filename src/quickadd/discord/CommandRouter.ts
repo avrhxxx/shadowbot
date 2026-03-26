@@ -14,10 +14,10 @@
 
 import { ChatInputCommandInteraction } from "discord.js";
 import { getCommandHandler } from "./CommandRegistry";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
-const log = createLogger("CMD_ROUTER");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 MAIN ROUTER
@@ -77,8 +77,8 @@ export async function handleQuickAddCommand(
       subcommand,
     });
 
-    // 🔥 TRACE INJECTION
-    await handler(interaction, traceId);
+    // 🔥 TRACE INJECTION (TEMP — FIX IN NEXT PHASE)
+    await (handler as any)(interaction, traceId);
 
     // =====================================
     // ✅ EXECUTION DONE
