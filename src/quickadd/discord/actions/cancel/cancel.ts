@@ -14,7 +14,9 @@
  * - DOES NOT end session
  * - DOES NOT send anything to queue
  * - user can continue flow after this
- * - FULL trace logging
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -23,9 +25,9 @@ import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_CANCEL");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -33,7 +35,7 @@ const log = createLogger("CMD_CANCEL");
 
 export async function handleCancel(
   interaction: ChatInputCommandInteraction,
-  traceId?: string
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -62,26 +64,19 @@ export async function handleCancel(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION
-  // =====================================
-  const resolvedTraceId = traceId || session.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   try {
-    log.trace("cancel_start", resolvedTraceId, {
+    log.trace("cancel_start", traceId, {
+      sessionId: session.sessionId,
       guildId,
     });
 
     // =====================================
     // 🧹 CLEAR BUFFER
     // =====================================
-    QuickAddBuffer.clear(guildId, resolvedTraceId);
+    QuickAddBuffer.clear(guildId, traceId);
 
-    log.trace("cancel_buffer_cleared", resolvedTraceId, {
+    log.trace("cancel_buffer_cleared", traceId, {
+      sessionId: session.sessionId,
       guildId,
     });
 
@@ -93,12 +88,13 @@ export async function handleCancel(
       ephemeral: true,
     });
 
-    log.trace("cancel_done", resolvedTraceId, {
+    log.trace("cancel_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("cancel_failed", err, resolvedTraceId);
+    log.error("cancel_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to clear buffer",
