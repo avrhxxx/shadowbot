@@ -9,10 +9,9 @@
  * ❗ RULES:
  * - destructive
  * - owner only
- *
- * 🔥 NOTE:
- * - traceId injected from CommandRouter
- * - fallback to session.traceId (temporary)
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -24,9 +23,9 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_END");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -34,7 +33,7 @@ const log = createLogger("CMD_END");
 
 export async function handleEnd(
   interaction: ChatInputCommandInteraction,
-  traceId?: string // 🔥 NEW
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -54,9 +53,9 @@ export async function handleEnd(
   // 🔒 VALIDATION
   // =====================================
   const contextError = validateQuickAddContext(interaction, session);
-  if (contextError) {
+  if (contextError || !session) {
     await interaction.reply({
-      content: contextError,
+      content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -71,29 +70,27 @@ export async function handleEnd(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION
-  // =====================================
-  const resolvedTraceId = traceId || session?.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   try {
-    const threadId = session!.threadId;
+    const threadId = session.threadId;
+
+    log.trace("end_start", traceId, {
+      sessionId: session.sessionId,
+      guildId,
+      threadId,
+    });
 
     // =====================================
     // 🧹 CLEAR BUFFER
     // =====================================
-    QuickAddBuffer.clear(guildId);
+    QuickAddBuffer.clear(guildId, traceId);
 
     // =====================================
     // 🧠 END SESSION
     // =====================================
-    QuickAddSession.end(guildId);
+    QuickAddSession.end(guildId, traceId);
 
-    log.trace("session_ended", resolvedTraceId, {
+    log.trace("session_ended", traceId, {
+      sessionId: session.sessionId,
       guildId,
       threadId,
     });
@@ -115,22 +112,26 @@ export async function handleEnd(
       if (channel && "deletable" in channel && channel.deletable) {
         await channel.delete();
 
-        log.trace("thread_deleted", resolvedTraceId, {
+        log.trace("thread_deleted", traceId, {
+          sessionId: session.sessionId,
           threadId,
         });
       }
     } catch (err) {
-      log.warn("thread_delete_failed", resolvedTraceId, {
+      log.warn("thread_delete_failed", {
+        traceId,
+        sessionId: session.sessionId,
         error: err,
       });
     }
 
-    log.trace("end_done", resolvedTraceId, {
+    log.trace("end_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("end_failed", err, resolvedTraceId);
+    log.error("end_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to end session",
