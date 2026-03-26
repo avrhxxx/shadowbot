@@ -19,19 +19,41 @@
  */
 
 import { createLogger } from "../debug/DebugLogger";
+import { OCRToken } from "./OCRTypes";
 
-const log = createLogger("OCR");
+const log = createLogger("OCR_VISION");
 
 // =====================================
-// 🧱 TYPES
+// 🧱 TYPES (MINIMAL SAFE SHAPE)
 // =====================================
 
-export type OCRToken = {
+type VisionSymbol = {
   text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+};
+
+type VisionWord = {
+  symbols?: VisionSymbol[];
+  boundingBox?: {
+    vertices?: { x?: number; y?: number }[];
+  };
+};
+
+type VisionParagraph = {
+  words?: VisionWord[];
+};
+
+type VisionBlock = {
+  paragraphs?: VisionParagraph[];
+};
+
+type VisionPage = {
+  blocks?: VisionBlock[];
+};
+
+type VisionResult = {
+  fullTextAnnotation?: {
+    pages?: VisionPage[];
+  };
 };
 
 // =====================================
@@ -39,7 +61,7 @@ export type OCRToken = {
 // =====================================
 
 export function mapVisionToTokens(
-  result: any,
+  result: VisionResult,
   traceId: string
 ): OCRToken[] {
   if (!traceId) {
@@ -51,7 +73,7 @@ export function mapVisionToTokens(
   const fullText = result?.fullTextAnnotation;
 
   if (!fullText) {
-    log.trace("ocr_no_fulltext", traceId, {});
+    log.trace("vision_no_fulltext", traceId, {});
     return [];
   }
 
@@ -65,7 +87,7 @@ export function mapVisionToTokens(
       for (const paragraph of block.paragraphs || []) {
         for (const word of paragraph.words || []) {
           const text =
-            word.symbols?.map((s: any) => s.text).join("") || "";
+            word.symbols?.map((s) => s.text).join("") || "";
 
           if (!text) continue;
 
@@ -85,13 +107,14 @@ export function mapVisionToTokens(
             y,
             width,
             height,
+            confidence: undefined, // Vision does not provide confidence
           });
         }
       }
     }
   }
 
-  log.trace("ocr_tokens_extracted", traceId, {
+  log.trace("vision_tokens_extracted", traceId, {
     tokens: tokens.length,
     durationMs: Date.now() - startedAt,
   });
