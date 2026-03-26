@@ -5,17 +5,18 @@
 /**
  * 🧠 ROLE:
  * Adapter that transforms Google Vision OCR response
- * into QuickAdd OCRToken format.
+ * into unified OCRToken format used in QuickAdd.
  *
  * Responsibilities:
  * - extract words from Vision response
- * - map bounding boxes → tokens
+ * - map bounding boxes → OCRToken
  *
  * ❗ RULES:
  * - NO business logic
  * - NO validation
  * - NO filtering
  * - deterministic
+ * - STRICT typing (no any)
  */
 
 import { createLogger } from "../debug/DebugLogger";
@@ -24,7 +25,7 @@ import { OCRToken } from "./OCRTypes";
 const log = createLogger("OCR_VISION");
 
 // =====================================
-// 🧱 TYPES (MINIMAL SAFE SHAPE)
+// 🧱 TYPES (MINIMAL VISION CONTRACT)
 // =====================================
 
 type VisionSymbol = {
@@ -50,10 +51,12 @@ type VisionPage = {
   blocks?: VisionBlock[];
 };
 
-type VisionResult = {
-  fullTextAnnotation?: {
-    pages?: VisionPage[];
-  };
+type VisionFullText = {
+  pages?: VisionPage[];
+};
+
+type VisionResponse = {
+  fullTextAnnotation?: VisionFullText;
 };
 
 // =====================================
@@ -61,7 +64,7 @@ type VisionResult = {
 // =====================================
 
 export function mapVisionToTokens(
-  result: VisionResult,
+  result: VisionResponse | null,
   traceId: string
 ): OCRToken[] {
   if (!traceId) {
@@ -82,12 +85,12 @@ export function mapVisionToTokens(
   // =====================================
   // 🧠 PARSE WORDS
   // =====================================
-  for (const page of fullText.pages || []) {
-    for (const block of page.blocks || []) {
-      for (const paragraph of block.paragraphs || []) {
-        for (const word of paragraph.words || []) {
+  for (const page of fullText.pages ?? []) {
+    for (const block of page.blocks ?? []) {
+      for (const paragraph of block.paragraphs ?? []) {
+        for (const word of paragraph.words ?? []) {
           const text =
-            word.symbols?.map((s) => s.text).join("") || "";
+            word.symbols?.map((s) => s.text).join("") ?? "";
 
           if (!text) continue;
 
@@ -95,11 +98,11 @@ export function mapVisionToTokens(
 
           if (!vertices || vertices.length < 4) continue;
 
-          const x = vertices[0].x || 0;
-          const y = vertices[0].y || 0;
+          const x = vertices[0]?.x ?? 0;
+          const y = vertices[0]?.y ?? 0;
 
-          const width = (vertices[1].x || 0) - x;
-          const height = (vertices[2].y || 0) - y;
+          const width = (vertices[1]?.x ?? x) - x;
+          const height = (vertices[2]?.y ?? y) - y;
 
           tokens.push({
             text,
@@ -107,7 +110,7 @@ export function mapVisionToTokens(
             y,
             width,
             height,
-            confidence: undefined, // Vision does not provide confidence
+            confidence: undefined, // Vision nie daje confidence na tym poziomie
           });
         }
       }
