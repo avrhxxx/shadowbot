@@ -12,12 +12,13 @@
  * ✔ Uses displayId for readable logs
  *
  * ❗ RULES:
- * - traceId REQUIRED
+ * - traceId REQUIRED (HARD ENFORCEMENT)
  * - NO backward compatibility
- * - throws error on missing traceId
+ * - NO fallback logging
+ * - everything goes through trace system
  */
 
-import { toDisplayId } from "../core/IdGenerator";
+import { resolveDisplayId } from "../core/IdGenerator";
 
 // =====================================
 // 🔹 TYPES
@@ -25,8 +26,8 @@ import { toDisplayId } from "../core/IdGenerator";
 
 type Logger = {
   (event: string, data?: any): void;
-  warn: (event: string, data?: any) => void;
-  error: (event: string, data?: any, traceId?: string) => void;
+  warn: (event: string, data?: any): void;
+  error: (event: string, data?: any, traceId?: string): void;
 
   trace: (event: string, traceId: string, data?: any) => void;
 };
@@ -118,7 +119,7 @@ function flushTrace(traceId: string) {
   const logs = traceBuckets.get(traceId);
   if (!logs || !logs.length) return;
 
-  const displayId = toDisplayId(traceId);
+  const displayId = resolveDisplayId(traceId);
 
   console.log("");
 
@@ -196,33 +197,29 @@ export function createLogger(scope: string): Logger {
     );
   };
 
+  // =====================================
+  // 🔥 STRICT ERROR (TRACE ENFORCED)
+  // =====================================
+
   base.error = (event: string, data?: any, traceId?: string) => {
-    if (traceId) {
-      const logs = traceBuckets.get(traceId) || [];
-
-      logs.push({
-        time: getTime(),
-        group,
-        scope,
-        event,
-        data,
-      });
-
-      traceBuckets.set(traceId, logs);
-      flushTrace(traceId);
-      return;
+    if (!traceId) {
+      throw new Error(
+        `[TRACE ERROR] Missing traceId in ${scope} for error: ${event}`
+      );
     }
 
-    console.error(
-      color("[" + getTime() + "]", C.gray) +
-        " [" +
-        color(group, C.red) +
-        "] " +
-        scope +
-        " -> " +
-        event,
-      data ?? ""
-    );
+    const logs = traceBuckets.get(traceId) || [];
+
+    logs.push({
+      time: getTime(),
+      group,
+      scope,
+      event,
+      data,
+    });
+
+    traceBuckets.set(traceId, logs);
+    flushTrace(traceId);
   };
 
   // =====================================
