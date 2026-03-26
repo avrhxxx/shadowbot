@@ -56,7 +56,13 @@ function checkTimeout(guildId: string, traceId: string) {
   const now = Date.now();
 
   if (last && now - last > TIMEOUT_MS) {
-    log.trace("buffer_timeout", traceId, { guildId });
+    const before = buffer.get(guildId)?.length || 0;
+
+    log.trace("buffer_timeout", traceId, {
+      guildId,
+      before,
+    });
+
     buffer.delete(guildId);
     idCounters.delete(guildId);
     lastAccess.delete(guildId);
@@ -78,7 +84,7 @@ export const QuickAddBuffer = {
       suggestion?: string;
       source?: string;
     })[],
-    traceId: string // 🔥 REQUIRED
+    traceId: string
   ) {
     checkTimeout(guildId, traceId);
 
@@ -91,7 +97,6 @@ export const QuickAddBuffer = {
     const beforeCount = current.length;
 
     const currentId = idCounters.get(guildId) || 1;
-
     let nextId = currentId;
 
     const newEntries: BufferedEntry[] = entries.map((entry) => ({
@@ -104,7 +109,6 @@ export const QuickAddBuffer = {
       source: entry.source,
     }));
 
-    // 🔥 IMMUTABLE UPDATE
     const updated = [...current, ...newEntries];
 
     buffer.set(guildId, updated);
