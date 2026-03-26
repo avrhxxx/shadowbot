@@ -4,10 +4,10 @@
 
 /**
  * 🔧 ROLE:
- * Low-level OCR execution (Tesseract).
+ * Low-level OCR execution (multi-engine).
  *
  * Responsible for:
- * - running OCR with different PSM modes
+ * - running OCR with different engines (Tesseract + Vision)
  * - extracting tokens / lines / text
  *
  * ❗ NO orchestration here
@@ -17,7 +17,14 @@ import Tesseract from "tesseract.js";
 import { createLogger } from "../debug/DebugLogger";
 import { OCRToken } from "./OCRTypes";
 
+// 🔥 NEW
+import { extractTextGoogle } from "../../google/GoogleVisionService";
+
 const log = createLogger("OCR_ENGINE");
+
+// =====================================
+// 🔧 TESSERACT CORE
+// =====================================
 
 async function runWithPSM(
   buffer: Buffer,
@@ -56,6 +63,48 @@ async function runWithPSM(
 }
 
 // =====================================
+// 🔥 VISION ENGINE
+// =====================================
+
+async function runVision(buffer: Buffer, traceId: string) {
+  log.trace("vision_start", traceId);
+
+  try {
+    const text = await extractTextGoogle(buffer);
+
+    const lines = text.split("\n").filter(Boolean);
+
+    // ⚠️ Vision nie daje bbox → robimy FAKE tokens
+    const tokens: OCRToken[] = lines.map((line, i) => ({
+      text: line,
+      x: 0,
+      y: i * 10,
+      width: line.length * 6,
+      height: 10,
+      confidence: 90,
+    }));
+
+    log.trace("vision_done", traceId, {
+      lines: lines.length,
+      tokens: tokens.length,
+    });
+
+    return { text, lines, tokens };
+
+  } catch (err) {
+    log.warn("vision_failed", traceId, {
+      error: err,
+    });
+
+    return {
+      text: "",
+      lines: [],
+      tokens: [],
+    };
+  }
+}
+
+// =====================================
 // 🔹 MODES
 // =====================================
 
@@ -79,4 +128,8 @@ export const OCREngine = {
 
     return { hocr: result.data.hocr || "" };
   },
+
+  // 🔥 NEW ENGINE
+  vision: (buffer: Buffer, traceId: string) =>
+    runVision(buffer, traceId),
 };
