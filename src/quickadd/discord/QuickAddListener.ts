@@ -20,7 +20,6 @@
 import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
 import { createScopedLogger } from "@/quickadd/debug/logger";
-import { createTraceId } from "../core/IdGenerator";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -29,14 +28,18 @@ const log = createScopedLogger(import.meta.url);
 // =====================================
 
 export function registerQuickAddListener(client: Client) {
-  log("listener_registered");
+  log.trace("listener_registered", "system", {});
 
   client.on("interactionCreate", async (interaction: Interaction) => {
-    const traceId = createTraceId();
+    const userId = interaction.isRepliable()
+      ? interaction.user?.id
+      : undefined;
 
-    const userId = interaction.isRepliable() ? interaction.user?.id : undefined;
-    const guildId = "guildId" in interaction ? interaction.guildId : undefined;
-    const channelId = "channelId" in interaction ? interaction.channelId : undefined;
+    const guildId =
+      "guildId" in interaction ? interaction.guildId : undefined;
+
+    const channelId =
+      "channelId" in interaction ? interaction.channelId : undefined;
 
     try {
       // =====================================
@@ -48,7 +51,7 @@ export function registerQuickAddListener(client: Client) {
       // 🎯 FILTER — ONLY /q COMMAND
       // =====================================
       if (interaction.commandName !== "q") {
-        log.trace("interaction_ignored", traceId, {
+        log.trace("interaction_ignored", "system", {
           userId,
           guildId,
           channelId,
@@ -60,7 +63,7 @@ export function registerQuickAddListener(client: Client) {
       // =====================================
       // 📥 ENTRY POINT
       // =====================================
-      log.trace("interaction_received", traceId, {
+      log.trace("interaction_received", "system", {
         userId,
         guildId,
         channelId,
@@ -70,7 +73,7 @@ export function registerQuickAddListener(client: Client) {
       // =====================================
       // 🔁 DELEGATION
       // =====================================
-      log.trace("interaction_delegate_to_router", traceId, {
+      log.trace("interaction_delegate_to_router", "system", {
         userId,
         guildId,
         channelId,
@@ -81,7 +84,7 @@ export function registerQuickAddListener(client: Client) {
       // =====================================
       // ✅ DELEGATION DONE
       // =====================================
-      log.trace("interaction_handled", traceId, {
+      log.trace("interaction_handled", "system", {
         userId,
         guildId,
         channelId,
@@ -91,9 +94,9 @@ export function registerQuickAddListener(client: Client) {
       // =====================================
       // 💥 ERROR
       // =====================================
-      log.error("listener_error", err, traceId);
+      log.error("listener_error", err, "system");
 
-      log.trace("interaction_failed", traceId, {
+      log.trace("interaction_failed", "system", {
         userId,
         guildId,
         channelId,
