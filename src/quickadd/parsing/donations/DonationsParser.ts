@@ -39,6 +39,10 @@ export function parseDonationsFromLayout(
   layout: LayoutRow[],
   traceId: string
 ): ParsedEntry[] {
+  if (!traceId) {
+    throw new Error("traceId is required in parseDonationsFromLayout");
+  }
+
   log.trace("parse_layout_start", traceId, {
     rows: layout.length,
   });
@@ -50,9 +54,6 @@ export function parseDonationsFromLayout(
 
     if (!cellTexts.length) continue;
 
-    // =====================================
-    // 🔍 FIND VALUE CELL (last numeric-like)
-    // =====================================
     let valueRaw = "";
     let valueIndex = -1;
 
@@ -66,9 +67,6 @@ export function parseDonationsFromLayout(
 
     if (!valueRaw) continue;
 
-    // =====================================
-    // 🔍 BUILD NICKNAME
-    // =====================================
     const nicknameParts = cellTexts.filter((_, idx) => idx !== valueIndex);
     const nickname = nicknameParts.join(" ").trim();
 
@@ -104,6 +102,10 @@ export function parseDonations(
   lines: string[],
   traceId: string
 ): ParsedEntry[] {
+  if (!traceId) {
+    throw new Error("traceId is required in parseDonations");
+  }
+
   log.trace("parse_lines_start", traceId, {
     lines: lines.length,
   });
