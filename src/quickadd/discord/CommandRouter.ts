@@ -7,7 +7,7 @@
  * Command router + traceId injector
  *
  * ❗ RULES:
- * - generates traceId
+ * - generates traceId (via IdGenerator)
  * - injects into handlers
  * - no business logic
  */
@@ -15,16 +15,9 @@
 import { ChatInputCommandInteraction } from "discord.js";
 import { getCommandHandler } from "./CommandRegistry";
 import { createLogger } from "../debug/DebugLogger";
+import { createTraceId } from "../core/IdGenerator"; // ✅ NEW
 
 const log = createLogger("CMD_ROUTER");
-
-// =====================================
-// 🔥 TRACE ID GENERATOR
-// =====================================
-
-function generateTraceId(): string {
-  return `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 // =====================================
 // 🚀 MAIN ROUTER
@@ -33,7 +26,7 @@ function generateTraceId(): string {
 export async function handleQuickAddCommand(
   interaction: ChatInputCommandInteraction
 ) {
-  const traceId = generateTraceId();
+  const traceId = createTraceId(); // ✅ FIX (centralized generator)
 
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
