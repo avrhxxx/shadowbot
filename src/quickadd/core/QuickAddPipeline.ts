@@ -47,6 +47,7 @@ export async function processImageInput(
   const userId = message.author?.id;
 
   log.trace("pipeline_context_check", traceId, {
+    sessionId: session?.sessionId, // ✅ NEW
     guildId,
     userId,
     hasSession: !!session,
@@ -62,6 +63,7 @@ export async function processImageInput(
 
   try {
     log.trace("pipeline_start", traceId, {
+      sessionId: session.sessionId, // ✅ NEW
       type: session.type,
       imageUrl,
     });
@@ -88,6 +90,7 @@ export async function processImageInput(
     for (const source of ocrResult.sources) {
       try {
         log.trace("pipeline_source_start", traceId, {
+          sessionId: session.sessionId, // ✅ NEW
           source: source.source,
         });
 
@@ -97,6 +100,7 @@ export async function processImageInput(
           layout = buildLayout(source.tokens, traceId);
         } else {
           log.trace("layout_skipped_no_tokens", traceId, {
+            sessionId: session.sessionId, // ✅ NEW
             source: source.source,
           });
           continue;
@@ -104,6 +108,7 @@ export async function processImageInput(
 
         if (!layout.length) {
           log.trace("layout_empty_for_source", traceId, {
+            sessionId: session.sessionId, // ✅ NEW
             source: source.source,
           });
           continue;
@@ -117,6 +122,7 @@ export async function processImageInput(
 
         if (!parsed.length) {
           log.trace("parser_empty_for_source", traceId, {
+            sessionId: session.sessionId, // ✅ NEW
             source: source.source,
           });
           continue;
@@ -135,6 +141,7 @@ export async function processImageInput(
         });
 
         log.trace("pipeline_source_done", traceId, {
+          sessionId: session.sessionId, // ✅ NEW
           source: source.source,
           entries: validated.length,
           validCount,
@@ -142,6 +149,7 @@ export async function processImageInput(
 
       } catch (err) {
         log.warn("pipeline_source_failed", traceId, {
+          sessionId: session.sessionId, // ✅ NEW
           source: source.source,
           error: err,
         });
@@ -153,6 +161,7 @@ export async function processImageInput(
     // =====================================
     if (!pipelineResults.length) {
       log.warn("pipeline_no_results", traceId, {
+        sessionId: session.sessionId, // ✅ NEW
         reason: "all_sources_failed_or_empty",
       });
       return;
@@ -174,13 +183,14 @@ export async function processImageInput(
     })[0];
 
     log.trace("pipeline_selected", traceId, {
+      sessionId: session.sessionId, // ✅ NEW
       source: best.source,
       entries: best.entries.length,
       valid: best.validCount,
     });
 
     // =====================================
-    // 🔹 BUFFER (FIXED)
+    // 🔹 BUFFER
     // =====================================
     QuickAddBuffer.addEntries(
       guildId,
@@ -190,20 +200,21 @@ export async function processImageInput(
         status: v.status,
         confidence: v.confidence,
         suggestion: v.suggestion,
-        source: best.source, // 🔥 FIX
+        source: best.source,
       })),
-      traceId // 🔥 FIX
+      traceId
     );
 
     const total = QuickAddBuffer.getEntries(
       guildId,
-      traceId // 🔥 FIX
+      traceId
     ).length;
 
     // =====================================
     // ✅ DONE
     // =====================================
     log.trace("pipeline_done", traceId, {
+      sessionId: session.sessionId, // ✅ NEW
       source: best.source,
       total,
       durationMs: Date.now() - startedAt,
