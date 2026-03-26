@@ -10,6 +10,10 @@
  * - OCRProcessor
  * - OCREngine
  * - LayoutBuilder
+ *
+ * 🧠 NOTE:
+ * - Supports multiple OCR providers (Vision + Tesseract)
+ * - Tokens must be unified across engines
  */
 
 export type OCRToken = {
@@ -18,14 +22,23 @@ export type OCRToken = {
   y: number;
   width: number;
   height: number;
-  confidence: number;
+  confidence?: number; // 🔥 OPTIONAL (Vision doesn't provide this)
 };
 
+// =====================================
+// 🧱 SOURCE TYPES
+// =====================================
+
 export type OCRSourceType =
+  | "VISION" // 🔥 NEW (primary OCR)
   | "TESSERACT_FULL"
   | "TESSERACT_LINE"
   | "TESSERACT_BOX"
   | "TESSERACT_HOCR";
+
+// =====================================
+// 🧱 SOURCE STRUCTURES
+// =====================================
 
 export interface OCRTextSource {
   source: OCRSourceType;
@@ -34,11 +47,15 @@ export interface OCRTextSource {
 }
 
 export interface OCRTokenSource {
-  source: "TESSERACT_BOX";
+  source: OCRSourceType; // 🔥 NOT limited anymore
   tokens: OCRToken[];
 }
 
 export type OCRSource = OCRTextSource | OCRTokenSource;
+
+// =====================================
+// 📤 FINAL RESULT
+// =====================================
 
 export interface OCRResult {
   sources: OCRSource[];
