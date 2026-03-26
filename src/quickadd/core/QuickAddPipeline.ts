@@ -19,8 +19,11 @@ import { Message } from "discord.js";
 import { createLogger } from "../debug/DebugLogger";
 
 import { runOCR } from "../ocr/OCRProcessor";
-import { parseByType } from "../parsing/ParserRouter";
-import { validateEntries } from "../validation/QuickAddValidator";
+import { parseByType, ParsedEntry } from "../parsing/ParserRouter";
+import {
+  validateEntries,
+  ValidatedEntry,
+} from "../validation/QuickAddValidator";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { buildLayout } from "../ocr/layout/LayoutBuilder";
 
@@ -50,7 +53,7 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.warn("pipeline_invalid_context", {
+    log.warn("pipeline_invalid_context", traceId, {
       guildId,
       userId,
     });
@@ -78,7 +81,7 @@ export async function processImageInput(
     // =====================================
     const pipelineResults: {
       source: string;
-      entries: any[];
+      entries: ValidatedEntry[];
       validCount: number;
     }[] = [];
 
@@ -106,7 +109,7 @@ export async function processImageInput(
           continue;
         }
 
-        const parsed = parseByType(
+        const parsed: ParsedEntry[] = parseByType(
           session.type,
           { layout },
           traceId
@@ -126,7 +129,7 @@ export async function processImageInput(
         ).length;
 
         pipelineResults.push({
-          source: source.source, // 🔥 FIX
+          source: source.source,
           entries: validated,
           validCount,
         });
@@ -156,17 +159,14 @@ export async function processImageInput(
     }
 
     const best = pipelineResults.sort((a, b) => {
-      // 🔥 PRIMARY: entries count
       if (b.entries.length !== a.entries.length) {
         return b.entries.length - a.entries.length;
       }
 
-      // 🔥 SECONDARY: valid entries
       if (b.validCount !== a.validCount) {
         return b.validCount - a.validCount;
       }
 
-      // 🔥 BONUS: prefer VISION
       if (a.source === "VISION") return -1;
       if (b.source === "VISION") return 1;
 
@@ -180,7 +180,7 @@ export async function processImageInput(
     });
 
     // =====================================
-    // 🔹 BUFFER
+    // 🔹 BUFFER (FIXED)
     // =====================================
     QuickAddBuffer.addEntries(
       guildId,
@@ -190,11 +190,19 @@ export async function processImageInput(
         status: v.status,
         confidence: v.confidence,
         suggestion: v.suggestion,
-      }))
+        source: best.source, // 🔥 FIX
+      })),
+      traceId // 🔥 FIX
     );
 
-    const total = QuickAddBuffer.getEntries(guildId).length;
+    const total = QuickAddBuffer.getEntries(
+      guildId,
+      traceId // 🔥 FIX
+    ).length;
 
+    // =====================================
+    // ✅ DONE
+    // =====================================
     log.trace("pipeline_done", traceId, {
       source: best.source,
       total,
