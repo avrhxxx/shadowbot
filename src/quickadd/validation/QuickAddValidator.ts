@@ -124,13 +124,13 @@ export async function validateEntries(
         input: entry.nickname,
         resolved,
       });
-
     } catch (err) {
       log.warn("resolve_failed", traceId, {
         error: err,
       });
     }
 
+    const finalNickname = resolved || entry.nickname;
     const wasMapped = resolved && resolved !== entry.nickname;
 
     // =====================================
@@ -138,7 +138,7 @@ export async function validateEntries(
     // =====================================
     if (!wasMapped) {
       status = pickHigherStatus(status, "UNRESOLVED");
-      confidence = Math.min(confidence || 1, 0.3);
+      confidence = 0.3;
 
       log.trace("decision_unresolved", traceId, {
         nickname: entry.nickname,
@@ -148,16 +148,14 @@ export async function validateEntries(
         entry.nickname.length < 4 ||
         /donations|total|points/i.test(entry.nickname)
       ) {
-        confidence = Math.min(confidence, 0.1);
+        confidence = 0.1;
 
         log.trace("decision_low_quality_ocr", traceId, {
           nickname: entry.nickname,
         });
       }
-
     } else {
       const similarity = stringSimilarity(entry.nickname, resolved);
-
       confidence = similarity;
 
       log.trace("similarity_computed", traceId, {
@@ -168,11 +166,9 @@ export async function validateEntries(
 
       if (similarity >= 0.9) {
         status = pickHigherStatus(status, "OK");
-
       } else if (similarity >= 0.7) {
         status = pickHigherStatus(status, "LOW_CONFIDENCE");
         suggestion = resolved;
-
       } else {
         status = pickHigherStatus(status, "UNRESOLVED");
         suggestion = resolved;
@@ -180,9 +176,9 @@ export async function validateEntries(
     }
 
     // =====================================
-    // 🔁 DUPLICATE DETECTION
+    // 🔁 DUPLICATE DETECTION (FIXED)
     // =====================================
-    const key = `${entry.nickname}:${entry.value}`;
+    const key = `${finalNickname}:${entry.value}`;
 
     if (seen.has(key)) {
       status = pickHigherStatus(status, "DUPLICATE");
@@ -191,14 +187,13 @@ export async function validateEntries(
       log.trace("decision_duplicate", traceId, {
         key,
       });
-
     } else {
       seen.add(key);
     }
 
     const validated: ValidatedEntry = {
       id: idCounter++,
-      nickname: entry.nickname,
+      nickname: finalNickname,
       value: entry.value,
       originalNickname,
       status,
