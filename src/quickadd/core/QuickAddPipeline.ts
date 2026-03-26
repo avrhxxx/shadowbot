@@ -16,7 +16,7 @@
  */
 
 import { Message } from "discord.js";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
 import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType, ParsedEntry } from "../parsing/ParserRouter";
@@ -29,7 +29,7 @@ import { buildLayout } from "../ocr/layout/LayoutBuilder";
 
 import { QuickAddSession } from "./QuickAddSession";
 
-const log = createLogger("PIPELINE");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 MAIN ENTRY
@@ -54,7 +54,7 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.warn("pipeline_invalid_context", traceId, {
+    log.warn("pipeline_invalid_context", {
       guildId,
       userId,
     });
@@ -74,7 +74,7 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.warn("ocr_empty", traceId);
+      log.warn("ocr_empty");
       return;
     }
 
@@ -148,7 +148,7 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        log.warn("pipeline_source_failed", traceId, {
+        log.warn("pipeline_source_failed", {
           sessionId: session.sessionId, // ✅ NEW
           source: source.source,
           error: err,
@@ -160,7 +160,7 @@ export async function processImageInput(
     // 🔍 SELECTION (HYBRID)
     // =====================================
     if (!pipelineResults.length) {
-      log.warn("pipeline_no_results", traceId, {
+      log.warn("pipeline_no_results", {
         sessionId: session.sessionId, // ✅ NEW
         reason: "all_sources_failed_or_empty",
       });
