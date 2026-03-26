@@ -7,7 +7,7 @@
  * Central orchestrator of the QuickAdd pipeline.
  *
  * Flow:
- * OCR → parser → validator → selection → buffer
+ * OCR → layout → parser → validator → selection → buffer
  *
  * ❗ RULES:
  * - NO business logic
@@ -22,6 +22,7 @@ import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
 import { validateEntries } from "../validation/QuickAddValidator";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
+import { buildLayout } from "../ocr/layout/LayoutBuilder"; // ✅ NEW
 
 import { QuickAddSession } from "./QuickAddSession";
 
@@ -74,7 +75,7 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.warn("ocr_empty");
+      log.warn("ocr_empty", traceId);
       return;
     }
 
@@ -93,14 +94,32 @@ export async function processImageInput(
         });
 
         // =====================================
-        // 🔹 PARSER (delegates layout internally)
+        // 🔹 LAYOUT (SNAPSHOT: pipeline responsibility)
+        // =====================================
+        let layout = [];
+
+        if ("tokens" in source && source.tokens?.length) {
+          layout = buildLayout(source.tokens, traceId);
+        } else {
+          log.trace("layout_skipped_no_tokens", traceId, {
+            source: source.source,
+          });
+          continue;
+        }
+
+        if (!layout.length) {
+          log.trace("layout_empty_for_source", traceId, {
+            source: source.source,
+          });
+          continue;
+        }
+
+        // =====================================
+        // 🔹 PARSER (layout only)
         // =====================================
         const parsed = parseByType(
           session.type,
-          {
-            lines: "lines" in source ? source.lines : undefined,
-            tokens: "tokens" in source ? source.tokens : undefined,
-          },
+          { layout },
           traceId
         );
 
@@ -132,7 +151,7 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        log.warn("pipeline_source_failed", {
+        log.warn("pipeline_source_failed", traceId, {
           source: source.source,
           error: err,
         });
@@ -143,7 +162,7 @@ export async function processImageInput(
     // 🔍 SELECTION (HYBRID)
     // =====================================
     if (!pipelineResults.length) {
-      log.warn("pipeline_no_results");
+      log.warn("pipeline_no_results", traceId);
       return;
     }
 
