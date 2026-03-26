@@ -147,7 +147,7 @@ export async function handleAdjust(
         });
       }
     } catch (err) {
-      log.trace("learning_failed_adjust", traceId, {
+      log.warn("learning_failed_adjust", {
         sessionId: session.sessionId,
         error: err,
       });
