@@ -2,6 +2,23 @@
 // 📁 src/quickadd/discord/actions/start/start.ts
 // =====================================
 
+/**
+ * ⚙️ ROLE:
+ * Starts a new QuickAdd session.
+ *
+ * Responsible for:
+ * - validating no active session exists
+ * - creating a private thread
+ * - initializing session state
+ *
+ * ❗ RULES:
+ * - minimal logic (delegates to session layer)
+ * - handles Discord-specific operations (thread)
+ * - traceId MUST be injected (from router)
+ * - NO traceId generation here
+ * - FULL trace logging AFTER session start
+ */
+
 import {
   ChatInputCommandInteraction,
   ChannelType,
