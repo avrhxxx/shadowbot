@@ -85,6 +85,7 @@ export function parseByType(
 
   if (!parser) {
     log.warn("parser_not_found", {
+      traceId,
       type,
     });
     return [];
@@ -92,6 +93,7 @@ export function parseByType(
 
   if (!layout.length) {
     log.warn("parser_empty_layout", {
+      traceId,
       type,
     });
     return [];
@@ -109,6 +111,7 @@ export function parseByType(
 
   } catch (err) {
     log.warn("parser_failed", {
+      traceId,
       type,
       error: err,
     });
