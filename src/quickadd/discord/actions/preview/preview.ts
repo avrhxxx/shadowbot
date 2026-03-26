@@ -8,11 +8,9 @@
  *
  * ❗ RULES:
  * - read-only
- * - requires valid traceId
- *
- * 🔥 NOTE:
- * - traceId injected from CommandRouter
- * - fallback to session.traceId (temporary, migration phase)
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -26,9 +24,9 @@ import {
   validateQuickAddContext,
 } from "../../../rules/QuickAddGuards";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_PREVIEW");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -36,7 +34,7 @@ const log = createLogger("CMD_PREVIEW");
 
 export async function handlePreview(
   interaction: ChatInputCommandInteraction,
-  traceId?: string
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -62,31 +60,23 @@ export async function handlePreview(
     return;
   }
 
-  // =====================================
-  // 🔥 TRACE RESOLUTION
-  // =====================================
-  const resolvedTraceId = traceId || session.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   try {
     // =====================================
-    // 📥 LOAD BUFFER (FIXED)
+    // 📥 LOAD BUFFER
     // =====================================
     const entries = QuickAddBuffer.getEntries(
       guildId,
-      resolvedTraceId
+      traceId
     );
 
-    log.trace("preview_requested", resolvedTraceId, {
+    log.trace("preview_requested", traceId, {
+      sessionId: session.sessionId,
       guildId,
       count: entries.length,
     });
 
     // =====================================
-    // ⚠️ EMPTY STATE (UX FIX)
+    // ⚠️ EMPTY STATE
     // =====================================
     if (!entries.length) {
       await interaction.reply({
@@ -109,13 +99,14 @@ export async function handlePreview(
       ephemeral: true,
     });
 
-    log.trace("preview_done", resolvedTraceId, {
+    log.trace("preview_done", traceId, {
+      sessionId: session.sessionId,
       count: entries.length,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("preview_failed", err, resolvedTraceId);
+    log.error("preview_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to generate preview",
