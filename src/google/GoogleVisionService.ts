@@ -7,7 +7,7 @@
  * Minimal Google Vision API client.
  *
  * Responsibilities:
- * - authenticate
+ * - use shared GoogleAuth
  * - send request
  * - return raw response
  *
@@ -19,15 +19,11 @@
  */
 
 import vision from "@google-cloud/vision";
+import { googleAuth } from "./googleSheetsClient";
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-  throw new Error("❌ Brakuje GOOGLE_SERVICE_ACCOUNT!");
-}
-
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-
+// 🔥 używamy WSPÓLNEGO AUTH
 const client = new vision.ImageAnnotatorClient({
-  credentials,
+  auth: googleAuth,
 });
 
 export async function runVisionOCR(buffer: Buffer) {
