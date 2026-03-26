@@ -13,10 +13,10 @@
  * - sliding timeout
  */
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { EntryStatus } from "../validation/QuickAddValidator";
 
-const log = createLogger("BUFFER");
+const log = createScopedLogger(import.meta.url);
 
 type ParsedEntry = {
   nickname: string;
