@@ -2,22 +2,6 @@
 // 📁 src/quickadd/discord/actions/start/start.ts
 // =====================================
 
-/**
- * ⚙️ ROLE:
- * Starts a new QuickAdd session.
- *
- * Responsible for:
- * - validating no active session exists
- * - creating a private thread
- * - initializing session state
- *
- * ❗ RULES:
- * - minimal logic (delegates to session layer)
- * - handles Discord-specific operations (thread)
- * - MUST produce traceId
- * - FULL trace logging AFTER session start
- */
-
 import {
   ChatInputCommandInteraction,
   ChannelType,
@@ -26,9 +10,9 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_START");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🔹 TYPE GUARD
@@ -48,7 +32,8 @@ function isQuickAddType(value: string): value is QuickAddType {
 // =====================================
 
 export async function handleStart(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -69,7 +54,7 @@ export async function handleStart(
   // 🔒 SESSION EXISTS
   // =====================================
   if (existing) {
-    log.trace("start_blocked_existing_session", existing.traceId, {
+    log.trace("start_blocked_existing_session", traceId, {
       guildId,
       owner: existing.ownerId,
     });
@@ -118,21 +103,23 @@ export async function handleStart(
     await thread.members.add(userId);
 
     // =====================================
-    // 🧠 START SESSION (TRACE STARTS HERE)
+    // 🧠 START SESSION
     // =====================================
-    const session = QuickAddSession.start({
-      guildId,
-      threadId: thread.id,
-      ownerId: userId,
-      type,
-    });
-
-    const traceId = session.traceId;
+    const session = QuickAddSession.start(
+      {
+        guildId,
+        threadId: thread.id,
+        ownerId: userId,
+        type,
+      },
+      traceId
+    );
 
     // =====================================
     // 🔍 LOG START
     // =====================================
     log.trace("start_start", traceId, {
+      sessionId: session.sessionId,
       guildId,
       userId,
       threadId: thread.id,
@@ -140,14 +127,17 @@ export async function handleStart(
     });
 
     log.trace("thread_created", traceId, {
+      sessionId: session.sessionId,
       threadId: thread.id,
     });
 
     log.trace("thread_member_added", traceId, {
+      sessionId: session.sessionId,
       userId,
     });
 
     log.trace("session_started", traceId, {
+      sessionId: session.sessionId,
       guildId,
       ownerId: userId,
       type,
@@ -166,11 +156,12 @@ export async function handleStart(
     });
 
     log.trace("start_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("start_failed", err);
+    log.error("start_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to start session",
