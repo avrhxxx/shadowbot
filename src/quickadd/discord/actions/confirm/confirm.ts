@@ -10,7 +10,9 @@
  * - ALL entries must be OK
  * - owner only
  * - destructive (clears buffer)
- * - FULL trace logging
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -20,9 +22,9 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { enqueuePoints } from "../../../storage/QuickAddRepository";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_CONFIRM");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -30,7 +32,7 @@ const log = createLogger("CMD_CONFIRM");
 
 export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
-  traceId?: string
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -64,14 +66,9 @@ export async function handleConfirm(
     return;
   }
 
-  const resolvedTraceId = traceId || session?.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   try {
-    log.trace("confirm_start", resolvedTraceId, {
+    log.trace("confirm_start", traceId, {
+      sessionId: session.sessionId,
       guildId,
       type: session.type,
     });
@@ -81,10 +78,11 @@ export async function handleConfirm(
     // =====================================
     const entries = QuickAddBuffer.getEntries(
       guildId,
-      resolvedTraceId
+      traceId
     );
 
-    log.trace("buffer_loaded", resolvedTraceId, {
+    log.trace("buffer_loaded", traceId, {
+      sessionId: session.sessionId,
       count: entries.length,
     });
 
@@ -101,13 +99,15 @@ export async function handleConfirm(
     // =====================================
     const invalid = entries.filter((e) => e.status !== "OK");
 
-    log.trace("validation_check", resolvedTraceId, {
+    log.trace("validation_check", traceId, {
+      sessionId: session.sessionId,
       total: entries.length,
       invalid: invalid.length,
     });
 
     if (invalid.length > 0) {
-      log.trace("confirm_blocked_non_ok", resolvedTraceId, {
+      log.trace("confirm_blocked_non_ok", traceId, {
+        sessionId: session.sessionId,
         invalid: invalid.length,
       });
 
@@ -129,25 +129,28 @@ export async function handleConfirm(
       points: e.value,
     }));
 
-    log.trace("queue_start", resolvedTraceId, {
+    log.trace("queue_start", traceId, {
+      sessionId: session.sessionId,
       count: payload.length,
     });
 
     // =====================================
     // 💾 QUEUE
     // =====================================
-    await enqueuePoints(payload, resolvedTraceId);
+    await enqueuePoints(payload, traceId);
 
-    log.trace("confirm_success", resolvedTraceId, {
+    log.trace("confirm_success", traceId, {
+      sessionId: session.sessionId,
       total: entries.length,
     });
 
     // =====================================
     // 🧹 CLEAR BUFFER
     // =====================================
-    QuickAddBuffer.clear(guildId, resolvedTraceId);
+    QuickAddBuffer.clear(guildId, traceId);
 
-    log.trace("buffer_cleared", resolvedTraceId, {
+    log.trace("buffer_cleared", traceId, {
+      sessionId: session.sessionId,
       guildId,
     });
 
@@ -156,12 +159,13 @@ export async function handleConfirm(
       ephemeral: true,
     });
 
-    log.trace("confirm_done", resolvedTraceId, {
+    log.trace("confirm_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("confirm_failed", err, resolvedTraceId);
+    log.error("confirm_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to confirm entries",
