@@ -1,23 +1,43 @@
-// src/google/googleSheetsClient.ts
-import { google } from "googleapis";
+// =====================================
+// 📁 src/google/GoogleVisionService.ts
+// =====================================
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-  throw new Error("❌ Brakuje zmiennej GOOGLE_SERVICE_ACCOUNT!");
-}
+/**
+ * 🧠 ROLE:
+ * Minimal Google Vision API client.
+ *
+ * Responsibilities:
+ * - use shared GoogleAuth
+ * - send request
+ * - return raw response
+ *
+ * ❗ RULES:
+ * - NO logging
+ * - NO traceId
+ * - NO OCR logic
+ * - NO transformation
+ */
 
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+import vision from "@google-cloud/vision";
+import { googleAuth } from "./googleSheetsClient";
 
-// 🔥 WSPÓLNY AUTH (Sheets + Vision + wszystko z Google Cloud)
-export const googleAuth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/cloud-platform", // 🔥 DODAJ TO
-  ],
-});
-
-// 🔥 Sheets client
-export const sheetsClient = google.sheets({
-  version: "v4",
+// 🔥 używamy WSPÓLNEGO AUTH
+const client = new vision.ImageAnnotatorClient({
   auth: googleAuth,
 });
+
+export async function runVisionOCR(buffer: Buffer) {
+  try {
+    const [result] = await client.documentTextDetection({
+      image: { content: buffer },
+      imageContext: {
+        languageHints: ["en"],
+      },
+    });
+
+    return result ?? null;
+
+  } catch {
+    return null;
+  }
+}
