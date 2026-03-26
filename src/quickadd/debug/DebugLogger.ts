@@ -4,18 +4,18 @@
 
 /**
  * 🪵 ROLE:
- * STRICT TRACE LOGGER (ENFORCED MODE)
+ * STRICT TRACE LOGGER (ENFORCED MODE — FIXED)
  *
- * ✔ Enforces traceId for ALL trace logs
+ * ✔ ONE unified API (trace/warn/error)
+ * ✔ traceId REQUIRED for ALL logs (HARD ENFORCEMENT)
  * ✔ Groups logs per traceId
- * ✔ Flushes automatically on pipeline end/error
+ * ✔ Flushes ONLY on explicit terminal events
  * ✔ Uses displayId for readable logs
  *
  * ❗ RULES:
- * - traceId REQUIRED (HARD ENFORCEMENT)
- * - NO backward compatibility
- * - NO fallback logging
- * - everything goes through trace system
+ * - NO base logger (no log(...))
+ * - NO mixed signatures
+ * - NO missing traceId
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
@@ -25,11 +25,9 @@ import { resolveDisplayId } from "../core/IdGenerator";
 // =====================================
 
 type Logger = {
-  (event: string, data?: any): void;
-  warn: (event: string, data?: any) => void;
-  error: (event: string, data: any, traceId: string) => void;
-
   trace: (event: string, traceId: string, data?: any) => void;
+  warn: (event: string, traceId: string, data?: any) => void;
+  error: (event: string, traceId: string, data?: any) => void;
 };
 
 // =====================================
@@ -37,6 +35,7 @@ type Logger = {
 // =====================================
 
 const USE_COLORS = true;
+const MAX_BUCKET_SIZE = 500; // safety cap
 
 // ANSI COLORS
 const C = {
@@ -164,77 +163,49 @@ function flushTrace(traceId: string) {
 }
 
 // =====================================
+// 🔹 INTERNAL PUSH
+// =====================================
+
+function pushLog(
+  traceId: string,
+  entry: TraceLog
+) {
+  const logs = traceBuckets.get(traceId) || [];
+
+  // safety cap
+  if (logs.length >= MAX_BUCKET_SIZE) {
+    logs.shift();
+  }
+
+  logs.push(entry);
+  traceBuckets.set(traceId, logs);
+}
+
+// =====================================
 // 🔹 LOGGER FACTORY
 // =====================================
 
 export function createLogger(scope: string): Logger {
   const group = resolveGroup(scope);
 
-  const base = (event: string, data?: any) => {
-    console.log(
-      color("[" + getTime() + "]", C.gray) +
-        " [" +
-        color(group, groupColor(group)) +
-        "] " +
-        scope +
-        " -> " +
-        event,
-      data ?? ""
-    );
-  };
-
-  base.warn = (event: string, data?: any) => {
-    console.warn(
-      color("[" + getTime() + "]", C.gray) +
-        " [" +
-        color(group, C.yellow) +
-        "] " +
-        scope +
-        " -> " +
-        event,
-      data ?? ""
-    );
-  };
-
-  base.error = (event: string, data: any, traceId: string) => {
-    if (!traceId) {
-      throw new Error(
-        `[TRACE ERROR] Missing traceId in ${scope} for error: ${event}`
-      );
-    }
-
-    const logs = traceBuckets.get(traceId) || [];
-
-    logs.push({
-      time: getTime(),
-      group,
-      scope,
-      event,
-      data,
-    });
-
-    traceBuckets.set(traceId, logs);
-    flushTrace(traceId);
-  };
-
-  base.trace = (event: string, traceId: string, data?: any) => {
+  function ensureTrace(traceId: string, event: string) {
     if (!traceId) {
       throw new Error(
         `[TRACE ERROR] Missing traceId in ${scope} for event: ${event}`
       );
     }
+  }
 
-    const logs = traceBuckets.get(traceId) || [];
+  function trace(event: string, traceId: string, data?: any) {
+    ensureTrace(traceId, event);
 
-    logs.push({
+    pushLog(traceId, {
       time: getTime(),
       group,
       scope,
       event,
       data,
     });
-
-    traceBuckets.set(traceId, logs);
 
     if (
       event === "pipeline_done" ||
@@ -242,7 +213,38 @@ export function createLogger(scope: string): Logger {
     ) {
       flushTrace(traceId);
     }
-  };
+  }
 
-  return base as Logger;
+  function warn(event: string, traceId: string, data?: any) {
+    ensureTrace(traceId, event);
+
+    pushLog(traceId, {
+      time: getTime(),
+      group,
+      scope,
+      event,
+      data,
+    });
+  }
+
+  function error(event: string, traceId: string, data?: any) {
+    ensureTrace(traceId, event);
+
+    pushLog(traceId, {
+      time: getTime(),
+      group,
+      scope,
+      event,
+      data,
+    });
+
+    // treat error as terminal if not already handled
+    flushTrace(traceId);
+  }
+
+  return {
+    trace,
+    warn,
+    error,
+  };
 }
