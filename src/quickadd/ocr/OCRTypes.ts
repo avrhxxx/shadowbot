@@ -22,7 +22,7 @@ export type OCRToken = {
   y: number;
   width: number;
   height: number;
-  confidence?: number; // 🔥 OPTIONAL (Vision doesn't provide this)
+  confidence?: number; // Vision may not provide confidence
 };
 
 // =====================================
@@ -30,27 +30,33 @@ export type OCRToken = {
 // =====================================
 
 export type OCRSourceType =
-  | "VISION" // 🔥 NEW (primary OCR)
+  | "VISION"
   | "TESSERACT_FULL"
   | "TESSERACT_LINE"
   | "TESSERACT_BOX"
   | "TESSERACT_HOCR";
 
 // =====================================
-// 🧱 SOURCE STRUCTURES
+// 🧱 SOURCE STRUCTURES (STRICT)
 // =====================================
 
 export interface OCRTextSource {
-  source: OCRSourceType;
+  source:
+    | "TESSERACT_FULL"
+    | "TESSERACT_LINE"
+    | "TESSERACT_HOCR";
   text: string;
   lines: string[];
 }
 
 export interface OCRTokenSource {
-  source: OCRSourceType; // 🔥 NOT limited anymore
+  source:
+    | "VISION"
+    | "TESSERACT_BOX";
   tokens: OCRToken[];
 }
 
+// 🔥 DISCRIMINATED UNION
 export type OCRSource = OCRTextSource | OCRTokenSource;
 
 // =====================================
