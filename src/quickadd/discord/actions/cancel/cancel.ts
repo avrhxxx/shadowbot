@@ -14,10 +14,7 @@
  * - DOES NOT end session
  * - DOES NOT send anything to queue
  * - user can continue flow after this
- *
- * 🔥 NOTE:
- * - traceId injected from CommandRouter
- * - fallback to session.traceId (temporary)
+ * - FULL trace logging
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -36,8 +33,10 @@ const log = createLogger("CMD_CANCEL");
 
 export async function handleCancel(
   interaction: ChatInputCommandInteraction,
-  traceId?: string // 🔥 NEW
+  traceId?: string
 ): Promise<void> {
+  const startedAt = Date.now();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -51,13 +50,13 @@ export async function handleCancel(
   const session = QuickAddSession.get(guildId);
 
   // =====================================
-  // 🔒 VALIDATION (SESSION + THREAD)
+  // 🔒 VALIDATION
   // =====================================
   const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError) {
+  if (contextError || !session) {
     await interaction.reply({
-      content: contextError,
+      content: contextError ?? "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -66,17 +65,21 @@ export async function handleCancel(
   // =====================================
   // 🔥 TRACE RESOLUTION
   // =====================================
-  const resolvedTraceId = traceId || session?.traceId;
+  const resolvedTraceId = traceId || session.traceId;
 
   if (!resolvedTraceId) {
     throw new Error("Missing traceId");
   }
 
   try {
+    log.trace("cancel_start", resolvedTraceId, {
+      guildId,
+    });
+
     // =====================================
-    // 🧹 CLEAR BUFFER ONLY
+    // 🧹 CLEAR BUFFER
     // =====================================
-    QuickAddBuffer.clear(guildId, resolvedTraceId); // ✅ FIX
+    QuickAddBuffer.clear(guildId, resolvedTraceId);
 
     log.trace("cancel_buffer_cleared", resolvedTraceId, {
       guildId,
@@ -88,6 +91,10 @@ export async function handleCancel(
     await interaction.reply({
       content: "🧹 Buffer cleared (session still active)",
       ephemeral: true,
+    });
+
+    log.trace("cancel_done", resolvedTraceId, {
+      durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
