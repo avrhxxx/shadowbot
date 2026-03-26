@@ -13,6 +13,7 @@
  * - ONLY routing
  * - NO layout building
  * - NO fallback logic
+ * - STRICT typing (no any)
  */
 
 import { QuickAddType } from "../core/QuickAddTypes";
@@ -29,10 +30,15 @@ const log = createLogger("PARSER");
 // 🧱 TYPES
 // =====================================
 
+export type ParsedEntry = {
+  nickname: string;
+  value: number;
+};
+
 type ParserFn = (
   layout: LayoutRow[],
   traceId: string
-) => any[];
+) => ParsedEntry[];
 
 const registry = new Map<QuickAddType, ParserFn>();
 
@@ -56,10 +62,10 @@ registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
 
 export function parseByType(
   type: QuickAddType,
-  input: { layout?: LayoutRow[] },
+  input: { layout: LayoutRow[] }, // ✅ REQUIRED (snapshot guarantee)
   traceId: string
-) {
-  const layout = input.layout ?? [];
+): ParsedEntry[] {
+  const layout = input.layout;
 
   log.trace("parser_input", traceId, {
     type,
