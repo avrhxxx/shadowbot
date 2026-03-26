@@ -9,8 +9,9 @@
  * ❗ RULES:
  * - IMMUTABLE OUTSIDE
  * - state can ONLY be modified via API
- * - traceId REQUIRED
+ * - traceId REQUIRED (STRICT)
  * - sliding timeout
+ * - returns SAFE COPIES ONLY
  */
 
 import { createScopedLogger } from "@/quickadd/debug/logger";
@@ -51,6 +52,20 @@ const TIMEOUT_MS = 5 * 60 * 1000;
 // 🧠 INTERNAL HELPERS
 // =====================================
 
+function assertTrace(traceId: string, scope: string) {
+  if (!traceId) {
+    throw new Error(`[BUFFER ERROR] Missing traceId in ${scope}`);
+  }
+}
+
+function cloneEntry(entry: BufferedEntry): BufferedEntry {
+  return { ...entry };
+}
+
+function cloneEntries(entries: BufferedEntry[]): BufferedEntry[] {
+  return entries.map(cloneEntry);
+}
+
 function checkTimeout(guildId: string, traceId: string) {
   const last = lastAccess.get(guildId);
   const now = Date.now();
@@ -86,6 +101,7 @@ export const QuickAddBuffer = {
     })[],
     traceId: string
   ) {
+    assertTrace(traceId, "addEntries");
     checkTimeout(guildId, traceId);
 
     log.trace("buffer_add_start", traceId, {
@@ -114,7 +130,7 @@ export const QuickAddBuffer = {
     buffer.set(guildId, updated);
     idCounters.set(guildId, nextId);
 
-    log.trace("buffer_updated", traceId, {
+    log.trace("buffer_add_done", traceId, {
       guildId,
       before: beforeCount,
       added: entries.length,
@@ -127,6 +143,7 @@ export const QuickAddBuffer = {
     entries: BufferedEntry[],
     traceId: string
   ) {
+    assertTrace(traceId, "setEntries");
     checkTimeout(guildId, traceId);
 
     const before = buffer.get(guildId)?.length || 0;
@@ -137,7 +154,7 @@ export const QuickAddBuffer = {
       incoming: entries.length,
     });
 
-    const cloned = entries.map((e) => ({ ...e }));
+    const cloned = cloneEntries(entries);
 
     buffer.set(guildId, cloned);
 
@@ -148,7 +165,7 @@ export const QuickAddBuffer = {
 
     idCounters.set(guildId, maxId + 1);
 
-    log.trace("buffer_replaced", traceId, {
+    log.trace("buffer_replace_done", traceId, {
       guildId,
       before,
       after: cloned.length,
@@ -157,6 +174,7 @@ export const QuickAddBuffer = {
   },
 
   getEntries(guildId: string, traceId: string): BufferedEntry[] {
+    assertTrace(traceId, "getEntries");
     checkTimeout(guildId, traceId);
 
     const entries = buffer.get(guildId) || [];
@@ -166,13 +184,15 @@ export const QuickAddBuffer = {
       count: entries.length,
     });
 
-    return entries.map((e) => ({ ...e }));
+    return cloneEntries(entries);
   },
 
   clear(guildId: string, traceId: string) {
+    assertTrace(traceId, "clear");
+
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_clear", traceId, {
+    log.trace("buffer_clear_start", traceId, {
       guildId,
       before,
     });
@@ -180,5 +200,9 @@ export const QuickAddBuffer = {
     buffer.delete(guildId);
     idCounters.delete(guildId);
     lastAccess.delete(guildId);
+
+    log.trace("buffer_clear_done", traceId, {
+      guildId,
+    });
   },
 };
