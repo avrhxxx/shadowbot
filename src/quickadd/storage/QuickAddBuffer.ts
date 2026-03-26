@@ -9,9 +9,12 @@
  * ❗ RULES:
  * - IMMUTABLE OUTSIDE
  * - state can ONLY be modified via API
+ * - traceId REQUIRED
+ * - sliding timeout
  */
 
 import { createLogger } from "../debug/DebugLogger";
+import { EntryStatus } from "../validation/QuickAddValidator";
 
 const log = createLogger("BUFFER");
 
@@ -27,7 +30,7 @@ type BufferedEntry = {
   nickname: string;
   value: number;
 
-  status?: string;
+  status?: EntryStatus;
   confidence?: number;
   suggestion?: string;
 
@@ -40,6 +43,27 @@ type BufferedEntry = {
 
 const buffer = new Map<string, BufferedEntry[]>();
 const idCounters = new Map<string, number>();
+const lastAccess = new Map<string, number>();
+
+const TIMEOUT_MS = 5 * 60 * 1000;
+
+// =====================================
+// 🧠 INTERNAL HELPERS
+// =====================================
+
+function checkTimeout(guildId: string, traceId: string) {
+  const last = lastAccess.get(guildId);
+  const now = Date.now();
+
+  if (last && now - last > TIMEOUT_MS) {
+    log.trace("buffer_timeout", traceId, { guildId });
+    buffer.delete(guildId);
+    idCounters.delete(guildId);
+    lastAccess.delete(guildId);
+  }
+
+  lastAccess.set(guildId, now);
+}
 
 // =====================================
 // 🚀 PUBLIC API
@@ -49,73 +73,61 @@ export const QuickAddBuffer = {
   addEntries(
     guildId: string,
     entries: (ParsedEntry & {
-      status?: string;
+      status?: EntryStatus;
       confidence?: number;
       suggestion?: string;
       source?: string;
-    })[]
+    })[],
+    traceId: string // 🔥 REQUIRED
   ) {
-    log.trace("buffer_add_start", {
+    checkTimeout(guildId, traceId);
+
+    log.trace("buffer_add_start", traceId, {
       guildId,
       incoming: entries.length,
     });
 
-    if (!buffer.has(guildId)) {
-      buffer.set(guildId, []);
-      log.trace("buffer_created", { guildId });
-    }
-
-    if (!idCounters.has(guildId)) {
-      idCounters.set(guildId, 1);
-      log.trace("id_counter_initialized", { guildId });
-    }
-
-    const current = buffer.get(guildId)!;
+    const current = buffer.get(guildId) || [];
     const beforeCount = current.length;
 
-    let currentId = idCounters.get(guildId)!;
+    const currentId = idCounters.get(guildId) || 1;
 
-    for (const entry of entries) {
-      // 🔥 defensive copy (input safety)
-      const safeEntry = { ...entry };
+    let nextId = currentId;
 
-      log.trace("buffer_entry_in", {
-        nickname: safeEntry.nickname,
-        value: safeEntry.value,
-        status: safeEntry.status,
-        confidence: safeEntry.confidence,
-      });
+    const newEntries: BufferedEntry[] = entries.map((entry) => ({
+      id: nextId++,
+      nickname: entry.nickname,
+      value: entry.value,
+      status: entry.status,
+      confidence: entry.confidence,
+      suggestion: entry.suggestion,
+      source: entry.source,
+    }));
 
-      current.push({
-        id: currentId++,
-        nickname: safeEntry.nickname,
-        value: safeEntry.value,
+    // 🔥 IMMUTABLE UPDATE
+    const updated = [...current, ...newEntries];
 
-        status: safeEntry.status,
-        confidence: safeEntry.confidence,
-        suggestion: safeEntry.suggestion,
+    buffer.set(guildId, updated);
+    idCounters.set(guildId, nextId);
 
-        source: safeEntry.source,
-      });
-    }
-
-    idCounters.set(guildId, currentId);
-
-    log.trace("buffer_updated", {
+    log.trace("buffer_updated", traceId, {
       guildId,
       before: beforeCount,
       added: entries.length,
-      after: current.length,
+      after: updated.length,
     });
   },
 
   setEntries(
     guildId: string,
-    entries: BufferedEntry[]
+    entries: BufferedEntry[],
+    traceId: string
   ) {
+    checkTimeout(guildId, traceId);
+
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_replace_start", {
+    log.trace("buffer_replace_start", traceId, {
       guildId,
       before,
       incoming: entries.length,
@@ -132,7 +144,7 @@ export const QuickAddBuffer = {
 
     idCounters.set(guildId, maxId + 1);
 
-    log.trace("buffer_replaced", {
+    log.trace("buffer_replaced", traceId, {
       guildId,
       before,
       after: cloned.length,
@@ -140,27 +152,29 @@ export const QuickAddBuffer = {
     });
   },
 
-  getEntries(guildId: string): BufferedEntry[] {
+  getEntries(guildId: string, traceId: string): BufferedEntry[] {
+    checkTimeout(guildId, traceId);
+
     const entries = buffer.get(guildId) || [];
 
-    log.trace("buffer_get", {
+    log.trace("buffer_get", traceId, {
       guildId,
       count: entries.length,
     });
 
-    // 🔥 CRITICAL FIX — return copy
     return entries.map((e) => ({ ...e }));
   },
 
-  clear(guildId: string) {
+  clear(guildId: string, traceId: string) {
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_clear", {
+    log.trace("buffer_clear", traceId, {
       guildId,
       before,
     });
 
     buffer.delete(guildId);
     idCounters.delete(guildId);
+    lastAccess.delete(guildId);
   },
 };
