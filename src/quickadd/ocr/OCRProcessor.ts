@@ -2,24 +2,8 @@
 // 📁 src/quickadd/ocr/OCRProcessor.ts
 // =====================================
 
-/**
- * 🔥 ROLE:
- * OCR orchestrator (data extraction layer ONLY).
- *
- * Responsible for:
- * - downloading image
- * - preprocessing (optional)
- * - running multiple OCR modes
- * - aggregating results
- *
- * ❗ DOES NOT:
- * - build layout
- * - parse data
- * - validate
- */
-
 import fetch from "node-fetch";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 import { OCREngine } from "./OCREngine";
 import { OCRResult } from "./OCRTypes";
 
@@ -27,7 +11,7 @@ import { OCRResult } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
 import { mapVisionToTokens } from "./VisionOCRAdapter";
 
-const log = createLogger("OCR_PROCESSOR");
+const log = createScopedLogger(import.meta.url);
 
 // 🔥 FEATURE FLAGS
 const USE_PREPROCESS = false;
@@ -56,7 +40,8 @@ export async function runOCR(
     const res = await fetch(imageUrl);
 
     if (!res.ok) {
-      log.warn("fetch_failed", traceId, {
+      log.warn("fetch_failed", {
+        traceId,
         status: res.status,
       });
 
@@ -79,8 +64,8 @@ export async function runOCR(
 
       const { OCRPreprocessor } = await import("./OCRPreprocessor");
 
-      const base = await OCRPreprocessor.base(buffer);
-      inputBuffer = await OCRPreprocessor.enhance(base);
+      const base = await OCRPreprocessor.base(buffer, traceId);
+      inputBuffer = await OCRPreprocessor.enhance(base, traceId);
 
       log.trace("preprocess_done", traceId, {
         originalSize: buffer.length,
@@ -109,7 +94,8 @@ export async function runOCR(
       });
 
     } catch (err) {
-      log.warn("vision_ocr_failed", traceId, {
+      log.warn("vision_ocr_failed", {
+        traceId,
         error: err,
       });
     }
@@ -146,7 +132,8 @@ export async function runOCR(
           length: hocrResult.hocr.length,
         });
       } catch (err) {
-        log.warn("hocr_failed", traceId, {
+        log.warn("hocr_failed", {
+          traceId,
           error: err,
         });
       }
