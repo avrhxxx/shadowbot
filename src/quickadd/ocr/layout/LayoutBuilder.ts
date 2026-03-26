@@ -16,7 +16,6 @@
  * - ONLY structure
  */
 
-// ✅ FIX — correct layer import (no dependency on engine)
 import { OCRToken } from "../OCRTypes";
 import { createLogger } from "../../debug/DebugLogger";
 
@@ -106,12 +105,18 @@ function filterTokens(
   tokens: NormalizedToken[],
   traceId: string
 ): NormalizedToken[] {
-  const filtered = tokens.filter(
-    (t) =>
-      t.text &&
-      t.text.trim().length >= 1 &&
-      t.confidence > 20
-  );
+  const filtered = tokens.filter((t) => {
+    if (!t.text || t.text.trim().length < 1) {
+      return false;
+    }
+
+    // 🔥 FIX: Vision compatibility
+    if (t.confidence === undefined) {
+      return true; // accept Vision tokens
+    }
+
+    return t.confidence > 20;
+  });
 
   log.trace("layout_filter_done", traceId, {
     before: tokens.length,
