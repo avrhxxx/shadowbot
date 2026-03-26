@@ -28,7 +28,8 @@ const log = createScopedLogger(import.meta.url);
 // =====================================
 
 export function registerQuickAddListener(client: Client) {
-  log.trace("listener_registered", "system", {});
+  // 🔧 FIX: no traceId allowed here → use base logger (non-trace)
+  log("listener_registered", {});
 
   client.on("interactionCreate", async (interaction: Interaction) => {
     const userId = interaction.isRepliable()
@@ -43,7 +44,7 @@ export function registerQuickAddListener(client: Client) {
 
     try {
       // =====================================
-      // 🔍 IGNORE NON-COMMANDS (NO SPAM)
+      // 🔍 IGNORE NON-COMMANDS
       // =====================================
       if (!interaction.isChatInputCommand()) return;
 
@@ -51,19 +52,13 @@ export function registerQuickAddListener(client: Client) {
       // 🎯 FILTER — ONLY /q COMMAND
       // =====================================
       if (interaction.commandName !== "q") {
-        log.trace("interaction_ignored", "system", {
-          userId,
-          guildId,
-          channelId,
-          command: interaction.commandName,
-        });
         return;
       }
 
       // =====================================
       // 📥 ENTRY POINT
       // =====================================
-      log.trace("interaction_received", "system", {
+      log("interaction_received", {
         userId,
         guildId,
         channelId,
@@ -73,33 +68,17 @@ export function registerQuickAddListener(client: Client) {
       // =====================================
       // 🔁 DELEGATION
       // =====================================
-      log.trace("interaction_delegate_to_router", "system", {
-        userId,
-        guildId,
-        channelId,
-      });
-
       await handleQuickAddCommand(interaction);
-
-      // =====================================
-      // ✅ DELEGATION DONE
-      // =====================================
-      log.trace("interaction_handled", "system", {
-        userId,
-        guildId,
-        channelId,
-      });
 
     } catch (err) {
       // =====================================
       // 💥 ERROR
       // =====================================
-      log.error("listener_error", err, "system");
-
-      log.trace("interaction_failed", "system", {
+      log.warn("listener_error", {
         userId,
         guildId,
         channelId,
+        error: err,
       });
 
       if (interaction.isRepliable()) {
