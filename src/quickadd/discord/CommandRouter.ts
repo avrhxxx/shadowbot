@@ -26,6 +26,8 @@ const log = createScopedLogger(import.meta.url);
 export async function handleQuickAddCommand(
   interaction: ChatInputCommandInteraction
 ) {
+  if (!interaction.isChatInputCommand()) return;
+
   const traceId = createTraceId();
 
   const userId = interaction.user.id;
@@ -35,8 +37,6 @@ export async function handleQuickAddCommand(
   const startTime = Date.now();
 
   try {
-    if (!interaction.isChatInputCommand()) return;
-
     const subcommand = interaction.options.getSubcommand();
 
     // =====================================
