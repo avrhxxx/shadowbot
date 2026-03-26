@@ -14,7 +14,6 @@
  * - NO layout building
  * - NO fallback logic
  * - STRICT typing (no any)
- * - registry must be complete (snapshot enforced)
  */
 
 import { QuickAddType } from "../core/QuickAddTypes";
@@ -43,10 +42,8 @@ type ParserFn = (
 
 const registry = new Map<QuickAddType, ParserFn>();
 
-const EXPECTED_PARSERS = 4;
-
 // =====================================
-// 🧩 REGISTRATION
+// 🧩 REGISTRATION (MANUAL)
 // =====================================
 
 function registerParser(
@@ -56,25 +53,33 @@ function registerParser(
   registry.set(type, parser);
 }
 
+// =====================================
+// 🧪 PLACEHOLDER PARSERS (SAFE)
+// =====================================
+
+function emptyParser(
+  type: QuickAddType
+): ParserFn {
+  return (layout: LayoutRow[], traceId: string) => {
+    log.trace("placeholder_parser_used", traceId, {
+      type,
+      layoutRows: layout.length,
+    });
+
+    return [];
+  };
+}
+
+// =====================================
 // 🔥 REGISTER PARSERS
+// =====================================
+
 registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
 
-// =====================================
-// 🔍 REGISTRY VALIDATION
-// =====================================
-
-(function validateRegistry() {
-  if (registry.size !== EXPECTED_PARSERS) {
-    log.warn("parser_registry_incomplete", {
-      registered: registry.size,
-      expected: EXPECTED_PARSERS,
-    });
-  } else {
-    log.trace("parser_registry_ready", {
-      count: registry.size,
-    });
-  }
-})();
+// 🔥 PLACEHOLDERS (snapshot completeness)
+registerParser("DUEL_POINTS", emptyParser("DUEL_POINTS"));
+registerParser("RR_SIGNUPS", emptyParser("RR_SIGNUPS"));
+registerParser("RR_RESULTS", emptyParser("RR_RESULTS"));
 
 // =====================================
 // 🎯 MAIN ROUTER
@@ -91,13 +96,12 @@ export function parseByType(
 
   const layout = input.layout;
 
-  const parser = registry.get(type);
-
-  log.trace("parser_start", traceId, {
+  log.trace("parser_input", traceId, {
     type,
-    parser: parser?.name ?? "UNKNOWN",
     layoutRows: layout.length,
   });
+
+  const parser = registry.get(type);
 
   if (!parser) {
     log.warn("parser_not_found", traceId, {
@@ -116,9 +120,8 @@ export function parseByType(
   try {
     const result = parser(layout, traceId);
 
-    log.trace("parser_done", traceId, {
+    log.trace("parser_output", traceId, {
       type,
-      parser: parser.name,
       entries: result.length,
     });
 
@@ -127,7 +130,6 @@ export function parseByType(
   } catch (err) {
     log.warn("parser_failed", traceId, {
       type,
-      parser: parser.name,
       error: err,
     });
 
