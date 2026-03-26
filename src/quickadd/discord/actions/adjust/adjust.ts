@@ -60,9 +60,6 @@ export async function handleAdjust(
     return;
   }
 
-  // =====================================
-  // 🔒 OWNER CHECK
-  // =====================================
   if (session.ownerId !== interaction.user.id) {
     await interaction.reply({
       content: "❌ Only session owner can use this command",
@@ -84,9 +81,6 @@ export async function handleAdjust(
       newValue,
     });
 
-    // =====================================
-    // 📥 LOAD BUFFER
-    // =====================================
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     const index = entries.findIndex((e) => e.id === id);
@@ -107,15 +101,9 @@ export async function handleAdjust(
       value: newValue ?? target.value,
     };
 
-    // =====================================
-    // 🔁 APPLY CHANGE
-    // =====================================
     const newEntries = [...entries];
     newEntries[index] = updated;
 
-    // =====================================
-    // 🔥 REVALIDATION (CRITICAL)
-    // =====================================
     const revalidated = await validateEntries(
       newEntries.map((e) => ({
         nickname: e.nickname,
@@ -124,7 +112,6 @@ export async function handleAdjust(
       traceId
     );
 
-    // preserve IDs
     const merged = revalidated.map((v, i) => ({
       ...newEntries[i],
       status: v.status,
@@ -141,9 +128,6 @@ export async function handleAdjust(
       after: updated,
     });
 
-    // =====================================
-    // 💾 SAVE LEARNING
-    // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
         await saveAdjusted(
@@ -163,8 +147,7 @@ export async function handleAdjust(
         });
       }
     } catch (err) {
-      log.warn("learning_failed_adjust", {
-        traceId,
+      log.trace("learning_failed_adjust", traceId, {
         sessionId: session.sessionId,
         error: err,
       });
