@@ -77,8 +77,8 @@ export async function handleQuickAddCommand(
       subcommand,
     });
 
-    // 🔥 TRACE INJECTION (TEMP — FIX IN NEXT PHASE)
-    await (handler as any)(interaction, traceId);
+    // ✅ FIX: removed unsafe `as any`
+    await handler(interaction, traceId);
 
     // =====================================
     // ✅ EXECUTION DONE
