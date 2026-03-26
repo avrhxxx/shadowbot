@@ -9,12 +9,15 @@
  * ✔ Enforces traceId for ALL trace logs
  * ✔ Groups logs per traceId
  * ✔ Flushes automatically on pipeline end/error
+ * ✔ Uses displayId for readable logs
  *
  * ❗ RULES:
  * - traceId REQUIRED
  * - NO backward compatibility
  * - throws error on missing traceId
  */
+
+import { toDisplayId } from "../core/IdGenerator";
 
 // =====================================
 // 🔹 TYPES
@@ -115,10 +118,15 @@ function flushTrace(traceId: string) {
   const logs = traceBuckets.get(traceId);
   if (!logs || !logs.length) return;
 
+  const displayId = toDisplayId(traceId);
+
   console.log("");
 
   console.log(
-    color("========== QUICKADD TRACE (" + traceId + ") ==========", C.cyan)
+    color(
+      `========== QUICKADD TRACE (${displayId}) ==========`,
+      C.cyan
+    )
   );
   console.log("");
 
@@ -226,7 +234,6 @@ export function createLogger(scope: string): Logger {
     traceId: string,
     data?: any
   ) => {
-    // ❗ HARD ENFORCEMENT
     if (!traceId) {
       throw new Error(
         `[TRACE ERROR] Missing traceId in ${scope} for event: ${event}`
@@ -245,9 +252,6 @@ export function createLogger(scope: string): Logger {
 
     traceBuckets.set(traceId, logs);
 
-    // =====================================
-    // 🔥 AUTO FLUSH
-    // =====================================
     if (
       event === "pipeline_done" ||
       event === "pipeline_error"
