@@ -65,6 +65,10 @@ export function parseByType(
   input: { layout: LayoutRow[] }, // ✅ REQUIRED (snapshot guarantee)
   traceId: string
 ): ParsedEntry[] {
+  if (!traceId) {
+    throw new Error("traceId is required in parseByType");
+  }
+
   const layout = input.layout;
 
   log.trace("parser_input", traceId, {
