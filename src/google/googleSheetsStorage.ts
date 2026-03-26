@@ -2,20 +2,6 @@
 // 📁 src/google/googleSheetsStorage.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Low-level Google Sheets adapter + schema initializer (SELF-HEALING)
- *
- * Responsibilities:
- * - read/write raw sheet data
- * - ensure sheets exist
- * - enforce headers structure
- *
- * ❗ RULES:
- * - NO business logic
- * - schema defined HERE (single source of truth)
- */
-
 import { google } from "googleapis";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -39,15 +25,12 @@ const ABSENCE_CONFIG_TAB = "absence_config";
 const TRANSLATE_TAB = "translate";
 const TRANSLATE_CONFIG_TAB = "translate_config";
 
-// 🔥 QUICKADD
+// 🔥 QUICKADD (UPDATED)
 const QUICKADD_NICKNAMES_TAB = "quickadd_nicknames";
 
 // 🔥 QUEUES
 const QUICKADD_EVENTS_QUEUE_TAB = "quickadd_events_queue";
 const QUICKADD_POINTS_QUEUE_TAB = "quickadd_points_queue";
-
-// 🆕 SESSIONS
-const QUICKADD_SESSIONS_TAB = "quickadd_sessions";
 
 // --------------------------
 // ENV VALIDATION
@@ -126,75 +109,14 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
   }
 }
 
-// --------------------------
-// 🔥 INIT (SCHEMA)
-// --------------------------
+// 🔥 INIT
 export async function ensureAllSheets() {
-  // =============================
-  // 📌 EVENTS QUEUE
-  // =============================
-  await ensureSheetExists(QUICKADD_EVENTS_QUEUE_TAB, [
-    [
-      "id",
-      "displayId",
-      "sessionId",
-      "guildId",
-      "eventId",
-      "type",
-      "nickname",
-      "status",
-      "createdAt",
-    ],
-  ]);
+  // 🔥 QUICKADD — BEZ SCHEMY (tylko tworzenie zakładek)
+  await ensureSheetExists(QUICKADD_EVENTS_QUEUE_TAB, [[]]);
 
-  // =============================
-  // 📌 POINTS QUEUE
-  // =============================
-  await ensureSheetExists(QUICKADD_POINTS_QUEUE_TAB, [
-    [
-      "id",
-      "displayId",
-      "sessionId",
-      "guildId",
-      "category",
-      "week",
-      "nickname",
-      "points",
-      "status",
-      "createdAt",
-    ],
-  ]);
+  await ensureSheetExists(QUICKADD_POINTS_QUEUE_TAB, [[]]);
 
-  // =============================
-  // 📌 NICKNAMES (LEARNING)
-  // =============================
-  await ensureSheetExists(QUICKADD_NICKNAMES_TAB, [
-    [
-      "id",
-      "displayId",
-      "sessionId",
-      "type",
-      "ocr_raw",
-      "layout_text",
-      "parser_output",
-      "adjusted",
-      "override",
-      "created_at",
-    ],
-  ]);
-
-  // =============================
-  // 🆕 SESSIONS (DEBUG / OBSERVABILITY)
-  // =============================
-  await ensureSheetExists(QUICKADD_SESSIONS_TAB, [
-    [
-      "sessionId",
-      "displayId",
-      "status",
-      "createdAt",
-      "endedAt",
-    ],
-  ]);
+  await ensureSheetExists(QUICKADD_NICKNAMES_TAB, [[]]);
 }
 
 // --------------------------
