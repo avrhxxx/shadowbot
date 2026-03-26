@@ -9,7 +9,9 @@
  * ❗ RULES:
  * - operates on buffer
  * - MUST revalidate after applying fixes
- * - FULL trace logging
+ * - traceId MUST be injected (from router)
+ * - NO traceId fallback (STRICT)
+ * - sessionId included in logs
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -19,9 +21,9 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { createLogger } from "../../../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("CMD_FIX");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🚀 HANDLER
@@ -29,7 +31,7 @@ const log = createLogger("CMD_FIX");
 
 export async function handleFix(
   interaction: ChatInputCommandInteraction,
-  traceId?: string
+  traceId: string
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -55,14 +57,9 @@ export async function handleFix(
     return;
   }
 
-  const resolvedTraceId = traceId || session.traceId;
-
-  if (!resolvedTraceId) {
-    throw new Error("Missing traceId");
-  }
-
   try {
-    log.trace("fix_start", resolvedTraceId, {
+    log.trace("fix_start", traceId, {
+      sessionId: session.sessionId,
       guildId,
     });
 
@@ -71,14 +68,14 @@ export async function handleFix(
     // =====================================
     const entries = QuickAddBuffer.getEntries(
       guildId,
-      resolvedTraceId
+      traceId
     );
 
-    log.trace("buffer_loaded", resolvedTraceId, {
+    log.trace("buffer_loaded", traceId, {
+      sessionId: session.sessionId,
       count: entries.length,
     });
 
-    // 🔥 EMPTY GUARD (FIX)
     if (!entries.length) {
       await interaction.reply({
         content: "⚠️ Nothing to fix",
@@ -108,7 +105,8 @@ export async function handleFix(
       return entry;
     });
 
-    log.trace("fix_applied_phase", resolvedTraceId, {
+    log.trace("fix_applied_phase", traceId, {
+      sessionId: session.sessionId,
       total: entries.length,
       fixed: applied,
     });
@@ -116,7 +114,8 @@ export async function handleFix(
     // =====================================
     // 🔥 REVALIDATION
     // =====================================
-    log.trace("revalidation_start", resolvedTraceId, {
+    log.trace("revalidation_start", traceId, {
+      sessionId: session.sessionId,
       count: updatedRaw.length,
     });
 
@@ -125,12 +124,13 @@ export async function handleFix(
         nickname: e.nickname,
         value: e.value,
       })),
-      resolvedTraceId
+      traceId
     );
 
-    // 🔥 SAFETY CHECK (NEW)
     if (revalidated.length !== updatedRaw.length) {
-      log.warn("revalidation_length_mismatch", resolvedTraceId, {
+      log.warn("revalidation_length_mismatch", {
+        traceId,
+        sessionId: session.sessionId,
         before: updatedRaw.length,
         after: revalidated.length,
       });
@@ -152,10 +152,11 @@ export async function handleFix(
     QuickAddBuffer.setEntries(
       guildId,
       merged,
-      resolvedTraceId
+      traceId
     );
 
-    log.trace("buffer_saved", resolvedTraceId, {
+    log.trace("buffer_saved", traceId, {
+      sessionId: session.sessionId,
       guildId,
       count: merged.length,
     });
@@ -171,12 +172,13 @@ export async function handleFix(
       ephemeral: true,
     });
 
-    log.trace("fix_done", resolvedTraceId, {
+    log.trace("fix_done", traceId, {
+      sessionId: session.sessionId,
       durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
-    log.error("fix_failed", err, resolvedTraceId);
+    log.error("fix_failed", err, traceId);
 
     await interaction.reply({
       content: "❌ Failed to apply fixes",
