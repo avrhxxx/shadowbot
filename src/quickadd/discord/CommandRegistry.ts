@@ -23,7 +23,8 @@ import { ChatInputCommandInteraction } from "discord.js";
 // =====================================
 
 export type CommandHandler = (
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId: string
 ) => Promise<void>;
 
 // =====================================
