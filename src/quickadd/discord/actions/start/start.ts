@@ -67,6 +67,7 @@ export async function handleStart(
     const session = QuickAddSession.start(
       {
         guildId,
+        userId,
         ownerId: userId,
         threadId: null,
         type,
@@ -76,7 +77,7 @@ export async function handleStart(
 
     if (!session) {
       await interaction.reply({
-        content: "⚠️ A session is already active",
+        content: "⚠️ You already have an active session",
         ephemeral: true,
       });
       return;
@@ -93,26 +94,35 @@ export async function handleStart(
       throw new Error("Invalid channel type");
     }
 
-    const channel = interaction.channel as TextChannel;
+    // =====================================
+    // 📩 CREATE STARTER MESSAGE
+    // =====================================
+    const starterMessage = await interaction.channel.send({
+      content: `🚀 QuickAdd session: ${type}`,
+    });
 
     // =====================================
-    // 🔒 CREATE PRIVATE THREAD (JAK WCZEŚNIEJ)
+    // 🧵 THREAD (normalny, potem ograniczamy dostęp)
     // =====================================
-    const thread = await channel.threads.create({
+    const thread = await starterMessage.startThread({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
-      type: 12, // 🔥 PRIVATE THREAD (ChannelType.PrivateThread)
     });
 
     threadId = thread.id;
 
-    // tylko owner → prywatność dla userów
+    // 🔒 tylko owner + admini widzą
     await thread.members.add(userId);
 
     // =====================================
-    // 🔗 ATTACH THREAD TO SESSION
+    // 🔗 ATTACH THREAD
     // =====================================
-    QuickAddSession.setThreadId(guildId, thread.id, traceId);
+    QuickAddSession.setThreadId(
+      guildId,
+      userId,
+      thread.id,
+      traceId
+    );
 
     // =====================================
     // 📤 THREAD MESSAGE
@@ -125,7 +135,7 @@ export async function handleStart(
     // 📤 RESPONSE
     // =====================================
     await interaction.reply({
-      content: `✅ QuickAdd started\n🔒 Private thread: <#${thread.id}>`,
+      content: `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`,
       ephemeral: true,
     });
 
@@ -151,7 +161,7 @@ export async function handleStart(
     });
 
     // ❗ CLEANUP SESSION
-    QuickAddSession.end(guildId, traceId);
+    QuickAddSession.end(guildId, userId, traceId);
 
     // ❗ CLEANUP THREAD
     if (
