@@ -10,7 +10,6 @@
  * - generate sessionId (real + display)
  * - generate traceId (real + display)
  * - generate queueId (real + display)
- * - generate systemId (real + display)
  * - maintain realId → displayId mapping
  *
  * ❗ RULES:
@@ -18,6 +17,7 @@
  * - NO logging
  * - NO external dependencies
  * - deterministic structure
+ * - NO systemId → use traceType instead
  */
 
 import crypto from "crypto";
@@ -29,7 +29,6 @@ import crypto from "crypto";
 const traceCounters = new Map<string, number>();
 const sessionCounters = new Map<string, number>();
 const queueCounters = new Map<string, number>();
-const systemCounters = new Map<string, number>(); // 🔥 NEW
 
 const idDisplayMap = new Map<string, string>();
 
@@ -82,7 +81,7 @@ function generateUUID(): string {
 // =====================================
 
 function buildId(
-  prefix: "s" | "t" | "q" | "sys",
+  prefix: "s" | "t" | "q",
   counterMap: Map<string, number>
 ) {
   const dateKey = getDateKey();
@@ -94,9 +93,19 @@ function buildId(
   const uuid = generateUUID();
   const shortUuid = uuid.slice(0, 6);
 
+  // =====================================
+  // 🔥 REAL ID
+  // =====================================
   const realId = `${prefix}-${dateKey}-${counterStr}-${uuid}`;
+
+  // =====================================
+  // 🔥 DISPLAY ID
+  // =====================================
   const displayId = `${prefix.toUpperCase()}-${dateKey}-${counterStr}-${shortUuid}`;
 
+  // =====================================
+  // 🔗 MAPPING
+  // =====================================
   idDisplayMap.set(realId, displayId);
 
   return {
@@ -119,11 +128,6 @@ export function createSessionId(): string {
 
 export function createQueueId(): string {
   return buildId("q", queueCounters).realId;
-}
-
-// 🔥 NEW
-export function createSystemId(): string {
-  return buildId("sys", systemCounters).realId;
 }
 
 // =====================================
