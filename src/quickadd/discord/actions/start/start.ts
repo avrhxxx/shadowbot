@@ -12,6 +12,11 @@
  * - CJS SAFE (__filename)
  * - no duplicate logs vs core
  * - cleanup on failure
+ *
+ * ✅ LOGGER:
+ * - uses global log.emit ONLY
+ * - no direct logger usage
+ * - future-proof (zero refactor needed)
  */
 
 import {
@@ -22,10 +27,7 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { createScopedLogger } from "../../../debug/logger";
-
-// ✅ GLOBAL RULE — CJS SAFE
-const log = createScopedLogger(__filename);
+import { log } from "../../../logger";
 
 // =====================================
 // 🔹 TYPE GUARD
@@ -67,9 +69,14 @@ export async function handleStart(
   // 🔒 SESSION EXISTS
   // =====================================
   if (existing) {
-    log.trace("start_blocked_existing_session", traceId, {
-      guildId,
-      owner: existing.ownerId,
+    log.emit({
+      event: "start_blocked_existing_session",
+      traceId,
+      data: {
+        guildId,
+        owner: existing.ownerId,
+      },
+      level: "warn",
     });
 
     await interaction.reply({
@@ -96,7 +103,7 @@ export async function handleStart(
 
   try {
     // =====================================
-    // 📢 CHANNEL GUARD (Discord.js safe)
+    // 📢 CHANNEL GUARD
     // =====================================
     if (!interaction.channel || !(interaction.channel instanceof TextChannel)) {
       throw new Error("Invalid channel type");
@@ -129,13 +136,17 @@ export async function handleStart(
       traceId
     );
 
-    // ❗ HARD GUARD (MANDATORY)
+    // ❗ HARD GUARD
     if (!session) {
-      log.error(
-        "start_session_null",
-        new Error("Session creation failed"),
-        traceId
-      );
+      log.emit({
+        event: "start_session_null",
+        traceId,
+        data: {
+          guildId,
+          threadId: thread.id,
+        },
+        level: "error",
+      });
 
       try {
         await thread.delete();
@@ -150,14 +161,18 @@ export async function handleStart(
     }
 
     // =====================================
-    // 🔍 LOG (NO DUPLICATES)
+    // 🔍 LOG
     // =====================================
-    log.trace("start_initialized", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      threadId: thread.id,
-      userId,
-      type,
+    log.emit({
+      event: "start_initialized",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+        threadId: thread.id,
+        userId,
+        type,
+      },
     });
 
     // =====================================
@@ -172,13 +187,25 @@ export async function handleStart(
       content: "🚀 QuickAdd session started\n\nSend screenshots here.",
     });
 
-    log.trace("start_done", traceId, {
-      sessionId: session.sessionId,
-      durationMs: Date.now() - startedAt,
+    log.emit({
+      event: "start_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+      },
     });
 
   } catch (err) {
-    log.error("start_failed", err, traceId);
+    log.emit({
+      event: "start_failed",
+      traceId,
+      data: {
+        error: err,
+        guildId,
+      },
+      level: "error",
+    });
 
     // ❗ CLEANUP ORPHAN THREAD
     if (createdThreadId && interaction.channel instanceof TextChannel) {
