@@ -2,18 +2,6 @@
 // 📁 src/quickadd/debug/Timing.ts
 // =====================================
 
-/**
- * ⏱️ ROLE:
- * Execution timing helper.
- *
- * Responsible for:
- * - measuring durations
- *
- * ❗ RULES:
- * - NO logging
- * - NO side effects
- */
-
 import { LOGGER_CONFIG } from "./LoggerConfig";
 
 const timers = new Map<string, number>();
