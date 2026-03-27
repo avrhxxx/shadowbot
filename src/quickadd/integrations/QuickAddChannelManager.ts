@@ -1,8 +1,30 @@
 // =====================================
-// 📁 src/quickadd/integrations/QuickAddQueueWorker.ts
+// 📁 src/quickadd/integrations/QuickAddChannelManager.ts
 // =====================================
 
-import { getQueue } from "../storage/QuickAddRepository";
+/**
+ * 📢 ROLE:
+ * Ensures QuickAdd channel exists in guild.
+ *
+ * Responsible for:
+ * - finding existing channel
+ * - creating if missing
+ *
+ * ❗ RULES:
+ * - no business logic
+ * - no session logic
+ *
+ * 🔥 LOGGER UPDATE:
+ * - uses createScopedLogger
+ * - SYSTEM traceId generated locally
+ */
+
+import {
+  Guild,
+  ChannelType,
+  TextChannel,
+} from "discord.js";
+
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
@@ -12,51 +34,60 @@ const log = createScopedLogger(import.meta.url);
 // 📌 CONFIG
 // =====================================
 
-const INTERVAL_MS = 10_000; // 10s
+const CHANNEL_NAME = "quickadd";
 
 // =====================================
-// 🚀 START WORKER
+// 🚀 MAIN
 // =====================================
 
-export function startQuickAddWorker() {
-  const systemTraceId = createTraceId();
+export async function ensureQuickAddChannel(
+  guild: Guild
+): Promise<TextChannel> {
+  const traceId = createTraceId(); // 🔥 SYSTEM TRACE
+  const guildId = guild.id;
 
-  log.trace("worker_started", systemTraceId, {
-    intervalMs: INTERVAL_MS,
+  log.trace("channel_ensure_start", traceId, {
+    guildId,
+    expectedName: CHANNEL_NAME,
   });
 
-  setInterval(async () => {
-    const traceId = createTraceId(); // 🔥 NEW TRACE PER TICK
-    const startedAt = Date.now();
+  // =====================================
+  // 🔍 FIND EXISTING
+  // =====================================
+  const existing = guild.channels.cache.find(
+    (c) =>
+      c.type === ChannelType.GuildText &&
+      c.name === CHANNEL_NAME
+  ) as TextChannel | undefined;
 
-    try {
-      log.trace("worker_tick_start", traceId);
+  if (existing) {
+    log.trace("channel_found", traceId, {
+      guildId,
+      channelId: existing.id,
+      name: existing.name,
+    });
 
-      const points = await getQueue("quickadd_points_queue");
+    return existing;
+  }
 
-      log.trace("queue_loaded", traceId, {
-        type: "points",
-        rows: points.length,
-      });
+  // =====================================
+  // 🏗️ CREATE CHANNEL
+  // =====================================
+  log.trace("channel_create_start", traceId, {
+    guildId,
+    name: CHANNEL_NAME,
+  });
 
-      if (!points.length) {
-        log.trace("queue_empty", traceId, {
-          type: "points",
-        });
-      }
+  const created = await guild.channels.create({
+    name: CHANNEL_NAME,
+    type: ChannelType.GuildText,
+  });
 
-      // TODO: processing
+  log.trace("channel_created", traceId, {
+    guildId,
+    channelId: created.id,
+    name: created.name,
+  });
 
-      log.trace("worker_tick_done", traceId, {
-        durationMs: Date.now() - startedAt,
-      });
-
-    } catch (err) {
-      log.error("worker_error", err, traceId);
-
-      log.trace("worker_tick_failed", traceId, {
-        durationMs: Date.now() - startedAt,
-      });
-    }
-  }, INTERVAL_MS);
+  return created;
 }
