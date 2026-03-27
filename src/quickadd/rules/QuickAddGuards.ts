@@ -106,7 +106,7 @@ export function isInQuickAddThread(
 }
 
 // =====================================
-// 🧠 VALIDATORS
+// 🧠 VALIDATORS (USER-FACING)
 // =====================================
 
 export function validateQuickAddContext(
@@ -173,7 +173,7 @@ export function validateSessionOwner(
     return "❌ No active session";
   }
 
-  if (!isSessionOwner(userId, session, traceId)) {
+  if (session.ownerId !== userId) {
     log.emit({
       event: "guard_owner_mismatch",
       traceId,
