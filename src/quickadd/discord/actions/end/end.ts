@@ -32,6 +32,19 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -43,16 +56,14 @@ export async function handleEnd(
   timing.start(timerId);
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -67,13 +78,10 @@ export async function handleEnd(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.reply({
-      content:
-        contextError ??
-        ownerError ??
-        "❌ Session not found",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      contextError ?? ownerError ?? "❌ Session not found"
+    );
     return;
   }
 
@@ -113,10 +121,10 @@ export async function handleEnd(
     // 📤 RESPONSE
     // =====================================
 
-    await interaction.reply({
-      content: "🛑 QuickAdd session ended",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "🛑 QuickAdd session ended"
+    );
 
     // =====================================
     // 🧵 THREAD DELETE (SAFE)
@@ -184,9 +192,9 @@ export async function handleEnd(
       },
     });
 
-    await interaction.reply({
-      content: "❌ Failed to end session",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "❌ Failed to end session"
+    );
   }
 }
