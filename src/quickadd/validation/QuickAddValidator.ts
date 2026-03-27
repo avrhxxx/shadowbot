@@ -19,7 +19,7 @@
  * - traceId REQUIRED (STRICT)
  */
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { log } from "../logger";
 import { resolveNickname } from "../mapping/NicknameResolver";
 
 import {
@@ -27,8 +27,6 @@ import {
   ValidatedEntry,
   EntryStatus,
 } from "../core/QuickAddTypes";
-
-const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧠 HELPERS
@@ -82,14 +80,20 @@ export async function validateEntries(
 
   let idCounter = 1;
 
-  log.trace("validation_start", traceId, {
-    entries: entries.length,
+  log.emit({
+    event: "validation_start",
+    traceId,
+    data: { entries: entries.length },
   });
 
   for (const entry of entries) {
-    log.trace("validation_entry_start", traceId, {
-      nickname: entry.nickname,
-      value: entry.value,
+    log.emit({
+      event: "validation_entry_start",
+      traceId,
+      data: {
+        nickname: entry.nickname,
+        value: entry.value,
+      },
     });
 
     const originalNickname = entry.nickname;
@@ -108,8 +112,10 @@ export async function validateEntries(
       confidence = 0;
       isInvalidValue = true;
 
-      log.trace("decision_invalid_value", traceId, {
-        value: entry.value,
+      log.emit({
+        event: "decision_invalid_value",
+        traceId,
+        data: { value: entry.value },
       });
     }
 
@@ -121,14 +127,20 @@ export async function validateEntries(
     try {
       resolved = await resolveNickname(entry.nickname);
 
-      log.trace("resolve_result", traceId, {
-        input: entry.nickname,
-        resolved,
+      log.emit({
+        event: "resolve_result",
+        traceId,
+        data: {
+          input: entry.nickname,
+          resolved,
+        },
       });
     } catch (err) {
-      log.warn("resolve_failed", {
+      log.emit({
+        event: "resolve_failed",
         traceId,
-        error: err,
+        data: { error: err, input: entry.nickname },
+        level: "warn",
       });
     }
 
@@ -143,8 +155,10 @@ export async function validateEntries(
         status = pickHigherStatus(status, "UNRESOLVED");
         confidence = 0.3;
 
-        log.trace("decision_unresolved", traceId, {
-          nickname: entry.nickname,
+        log.emit({
+          event: "decision_unresolved",
+          traceId,
+          data: { nickname: entry.nickname },
         });
 
         if (
@@ -153,18 +167,24 @@ export async function validateEntries(
         ) {
           confidence = 0.1;
 
-          log.trace("decision_low_quality_ocr", traceId, {
-            nickname: entry.nickname,
+          log.emit({
+            event: "decision_low_quality_ocr",
+            traceId,
+            data: { nickname: entry.nickname },
           });
         }
       } else {
         const similarity = stringSimilarity(entry.nickname, resolved);
         confidence = similarity;
 
-        log.trace("similarity_computed", traceId, {
-          input: entry.nickname,
-          resolved,
-          similarity,
+        log.emit({
+          event: "similarity_computed",
+          traceId,
+          data: {
+            input: entry.nickname,
+            resolved,
+            similarity,
+          },
         });
 
         if (similarity >= 0.9) {
@@ -188,8 +208,10 @@ export async function validateEntries(
       status = pickHigherStatus(status, "DUPLICATE");
       confidence = Math.min(confidence, 0.5);
 
-      log.trace("decision_duplicate", traceId, {
-        key,
+      log.emit({
+        event: "decision_duplicate",
+        traceId,
+        data: { key },
       });
     } else {
       seen.add(key);
@@ -207,18 +229,26 @@ export async function validateEntries(
 
     results.push(validated);
 
-    log.trace("validation_entry_done", traceId, {
-      id: validated.id,
-      nickname: validated.nickname,
-      status: validated.status,
-      confidence: validated.confidence,
-      suggestion: validated.suggestion,
+    log.emit({
+      event: "validation_entry_done",
+      traceId,
+      data: {
+        id: validated.id,
+        nickname: validated.nickname,
+        status: validated.status,
+        confidence: validated.confidence,
+        suggestion: validated.suggestion,
+      },
     });
   }
 
-  log.trace("validation_done", traceId, {
-    total: results.length,
-    durationMs: Date.now() - startedAt,
+  log.emit({
+    event: "validation_done",
+    traceId,
+    data: {
+      total: results.length,
+      durationMs: Date.now() - startedAt,
+    },
   });
 
   return results;
