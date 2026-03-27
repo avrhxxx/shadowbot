@@ -12,19 +12,27 @@
  * - traceId MUST be injected (from router)
  * - NO traceId fallback (STRICT)
  * - sessionId included in logs
+ *
+ * ✅ FINAL:
+ * - relative imports (Node-safe)
+ * - validator API unified (traceId)
+ * - full TS + Discord + Fly.io compliance
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-
 import { saveAdjusted } from "../../../storage/QuickAddRepository";
 
-import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
+import {
+  validateQuickAddContext,
+  validateSessionOwner,
+} from "../../../rules/QuickAddGuards";
+
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -50,19 +58,24 @@ export async function handleAdjust(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
 
-  if (contextError || !session) {
-    await interaction.reply({
-      content: contextError ?? "❌ Session not found",
-      ephemeral: true,
-    });
-    return;
-  }
+  const ownerError = validateSessionOwner(
+    interaction,
+    session,
+    traceId
+  );
 
-  if (session.ownerId !== interaction.user.id) {
+  if (contextError || ownerError || !session) {
     await interaction.reply({
-      content: "❌ Only session owner can use this command",
+      content:
+        contextError ??
+        ownerError ??
+        "❌ Session not found",
       ephemeral: true,
     });
     return;
