@@ -1,147 +1,90 @@
 // =====================================
-// 📁 src/quickadd/ocr/OCREngine.ts
+// 📁 src/quickadd/ocr/VisionOCRExtractor.ts
 // =====================================
 
-import Tesseract from "tesseract.js";
 import { log } from "../logger";
 import { OCRToken } from "./OCRTypes";
-import { extractTextGoogle } from "../../google/GoogleVisionService";
 
-type OCRRunResult = {
-  text: string;
-  lines: string[];
-  tokens: OCRToken[];
+type VisionSymbol = { text: string };
+
+type VisionWord = {
+  symbols?: VisionSymbol[];
+  boundingBox?: {
+    vertices?: { x?: number; y?: number }[];
+  };
 };
 
-async function runWithPSM(
-  buffer: Buffer,
-  traceId: string,
-  psm: number,
-  label: string
-): Promise<OCRRunResult> {
+type VisionParagraph = { words?: VisionWord[] };
+type VisionBlock = { paragraphs?: VisionParagraph[] };
+type VisionPage = { blocks?: VisionBlock[] };
+type VisionFullText = { pages?: VisionPage[] };
+
+type VisionResponse = {
+  fullTextAnnotation?: VisionFullText;
+};
+
+export function mapVisionToTokens(
+  result: VisionResponse | null,
+  traceId: string
+): OCRToken[] {
+  if (!traceId) {
+    throw new Error("traceId is required in VisionOCRExtractor");
+  }
+
+  const startedAt = Date.now();
+
+  const fullText = result?.fullTextAnnotation;
+
+  if (!fullText) {
+    log.emit({
+      event: "vision_no_fulltext",
+      traceId,
+      type: "system",
+    });
+    return [];
+  }
+
+  const tokens: OCRToken[] = [];
+
+  for (const page of fullText.pages ?? []) {
+    for (const block of page.blocks ?? []) {
+      for (const paragraph of block.paragraphs ?? []) {
+        for (const word of paragraph.words ?? []) {
+          const text =
+            word.symbols?.map((s) => s.text).join("") ?? "";
+
+          if (!text) continue;
+
+          const vertices = word.boundingBox?.vertices;
+          if (!vertices || vertices.length < 4) continue;
+
+          const x = vertices[0]?.x ?? 0;
+          const y = vertices[0]?.y ?? 0;
+
+          const width = (vertices[1]?.x ?? x) - x;
+          const height = (vertices[2]?.y ?? y) - y;
+
+          tokens.push({
+            text,
+            x,
+            y,
+            width,
+            height,
+          });
+        }
+      }
+    }
+  }
+
   log.emit({
-    event: "ocr_psm_start",
-    traceId,
-    type: "system",
-    data: { psm, label },
-  });
-
-  const result = await Tesseract.recognize(buffer, "eng", {
-    logger: () => {},
-    config: {
-      tessedit_pageseg_mode: String(psm),
-    },
-  } as unknown as Tesseract.WorkerParams);
-
-  const text = result.data.text || "";
-  const lines = text.split("\n");
-
-  const tokens: OCRToken[] = (result.data.words || []).map((w) => ({
-    text: w.text,
-    x: w.bbox.x0,
-    y: w.bbox.y0,
-    width: w.bbox.x1 - w.bbox.x0,
-    height: w.bbox.y1 - w.bbox.y0,
-    confidence: w.confidence,
-  }));
-
-  log.emit({
-    event: "ocr_psm_done",
+    event: "vision_tokens_extracted",
     traceId,
     type: "system",
     data: {
-      label,
-      lines: lines.length,
       tokens: tokens.length,
+      durationMs: Date.now() - startedAt,
     },
   });
 
-  return { text, lines, tokens };
+  return tokens;
 }
-
-async function runVision(
-  buffer: Buffer,
-  traceId: string
-): Promise<OCRRunResult> {
-  log.emit({
-    event: "vision_start",
-    traceId,
-    type: "system",
-  });
-
-  try {
-    const text = await extractTextGoogle(buffer);
-    const lines = text.split("\n").filter(Boolean);
-
-    const tokens: OCRToken[] = lines.map((line, i) => ({
-      text: line,
-      x: 0,
-      y: i * 10,
-      width: line.length * 6,
-      height: 10,
-      confidence: 90,
-    }));
-
-    log.emit({
-      event: "vision_done",
-      traceId,
-      type: "system",
-      data: {
-        lines: lines.length,
-        tokens: tokens.length,
-      },
-    });
-
-    return { text, lines, tokens };
-  } catch (error) {
-    log.emit({
-      event: "vision_failed",
-      traceId,
-      type: "system",
-      level: "warn",
-      data: { error },
-    });
-
-    return { text: "", lines: [], tokens: [] };
-  }
-}
-
-export const OCREngine = {
-  full: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 6, "FULL"),
-
-  line: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 11, "LINE"),
-
-  box: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 4, "BOX"),
-
-  async hocr(buffer: Buffer, traceId: string) {
-    log.emit({
-      event: "hocr_start",
-      traceId,
-      type: "system",
-    });
-
-    const result = await Tesseract.recognize(buffer, "eng", {
-      logger: () => {},
-      config: {
-        tessedit_create_hocr: "1",
-      },
-    } as unknown as Tesseract.WorkerParams);
-
-    const hocr = result.data.hocr || "";
-
-    log.emit({
-      event: "hocr_done",
-      traceId,
-      type: "system",
-      data: { length: hocr.length },
-    });
-
-    return { hocr };
-  },
-
-  vision: (buffer: Buffer, traceId: string) =>
-    runVision(buffer, traceId),
-};
