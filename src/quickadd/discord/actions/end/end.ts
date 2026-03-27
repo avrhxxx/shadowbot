@@ -11,13 +11,12 @@
  * - owner only
  * - traceId MUST be injected
  * - NO traceId fallback
- * - sessionId included in logs
- * - CJS SAFE
  *
  * ✅ FINAL:
+ * - log.emit only
  * - full cleanup (buffer + session)
  * - safe Discord thread deletion
- * - guarded execution
+ * - full observability (metrics + timing)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -30,10 +29,7 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🚀 HANDLER
@@ -43,7 +39,8 @@ export async function handleEnd(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `end-${traceId}`;
+  timing.start(timerId);
 
   const guildId = interaction.guildId;
 
@@ -57,8 +54,17 @@ export async function handleEnd(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session);
-  const ownerError = validateSessionOwner(interaction, session);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
+
+  const ownerError = validateSessionOwner(
+    interaction,
+    session,
+    traceId
+  );
 
   if (contextError || ownerError || !session) {
     await interaction.reply({
@@ -72,12 +78,18 @@ export async function handleEnd(
   }
 
   try {
+    metrics.increment("end_started");
+
     const threadId = session.threadId;
 
-    log.trace("end_start", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      threadId,
+    log.emit({
+      event: "end_start",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+        threadId,
+      },
     });
 
     // =====================================
@@ -87,10 +99,14 @@ export async function handleEnd(
     QuickAddBuffer.clear(guildId, traceId);
     QuickAddSession.end(guildId, traceId);
 
-    log.trace("session_ended", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      threadId,
+    log.emit({
+      event: "session_ended",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+        threadId,
+      },
     });
 
     // =====================================
@@ -117,25 +133,56 @@ export async function handleEnd(
       ) {
         await channel.delete();
 
-        log.trace("thread_deleted", traceId, {
-          sessionId: session.sessionId,
-          threadId,
+        log.emit({
+          event: "thread_deleted",
+          traceId,
+          data: {
+            sessionId: session.sessionId,
+            threadId,
+          },
         });
       }
     } catch (err) {
-      log.warn("thread_delete_failed", traceId, {
-        sessionId: session.sessionId,
-        error: err,
+      metrics.increment("end_thread_delete_failed");
+
+      log.emit({
+        event: "thread_delete_failed",
+        traceId,
+        level: "warn",
+        data: {
+          sessionId: session.sessionId,
+          error: err,
+        },
       });
     }
 
-    log.trace("end_done", traceId, {
-      sessionId: session.sessionId,
-      durationMs: Date.now() - startedAt,
+    const duration = timing.end(timerId);
+
+    metrics.increment("end_success");
+
+    log.emit({
+      event: "end_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
-    log.error("end_failed", err, traceId);
+    const duration = timing.end(timerId);
+
+    metrics.increment("end_error");
+
+    log.emit({
+      event: "end_failed",
+      traceId,
+      level: "error",
+      data: {
+        error: err,
+        durationMs: duration,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to end session",
