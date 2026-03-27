@@ -5,30 +5,34 @@
 /**
  * 🧠 PARSER ROUTER (REGISTRY BASED)
  *
- * Rola:
- * • wybiera parser na podstawie typu
- * • deleguje parsing (NO fallback logic)
+ * ROLE:
+ * - selects parser based on QuickAddType
+ * - delegates parsing
+ *
+ * 🔥 SYSTEM POSITION:
+ * OCR → Layout → Parser → Validator
  *
  * ❗ RULES:
  * - ONLY routing
  * - NO layout building
- * - NO fallback logic
+ * - NO fallback logic (beyond safe empty return)
  * - STRICT typing (no any)
+ * - traceId REQUIRED
+ * - LOGGING via log.emit (GLOBAL API)
+ *
+ * ✅ FINAL:
+ * - deterministic
+ * - compile-time safe registry
  */
 
 import { QuickAddType, ParsedEntry } from "../core/QuickAddTypes";
 import { LayoutRow } from "../ocr/layout/LayoutBuilder";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { log } from "@/quickadd/debug/logger";
 
-import {
-  parseDonationsFromLayout,
-} from "./donations/DonationsParser";
-
+import { parseDonationsFromLayout } from "./donations/DonationsParser";
 import { parseDuel } from "./duel/DuelParser";
 import { parseReservoirSignups } from "./reservoir/ReservoirSignupsParser";
 import { parseReservoirResults } from "./reservoir/ReservoirResultsParser";
-
-const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🧱 TYPES
@@ -39,27 +43,16 @@ type ParserFn = (
   traceId: string
 ) => ParsedEntry[];
 
-const registry = new Map<QuickAddType, ParserFn>();
-
 // =====================================
-// 🧩 REGISTRATION (MANUAL)
+// 🧠 REGISTRY (COMPILE-TIME SAFE)
 // =====================================
 
-function registerParser(
-  type: QuickAddType,
-  parser: ParserFn
-) {
-  registry.set(type, parser);
-}
-
-// =====================================
-// 🔥 REGISTER PARSERS
-// =====================================
-
-registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
-registerParser("DUEL_POINTS", parseDuel);
-registerParser("RR_SIGNUPS", parseReservoirSignups);
-registerParser("RR_RESULTS", parseReservoirResults);
+const registry: Record<QuickAddType, ParserFn> = {
+  DONATIONS_POINTS: parseDonationsFromLayout,
+  DUEL_POINTS: parseDuel,
+  RR_SIGNUPS: parseReservoirSignups,
+  RR_RESULTS: parseReservoirResults,
+};
 
 // =====================================
 // 🎯 MAIN ROUTER
@@ -74,43 +67,67 @@ export function parseByType(
     throw new Error("traceId is required in parseByType");
   }
 
-  const layout = input.layout;
-
-  log.trace("parser_input", traceId, {
-    type,
-    layoutRows: layout.length,
+  log.emit({
+    scope: "ParserRouter",
+    event: "parser_input",
+    traceId,
+    data: {
+      type,
+      layoutRows: input.layout.length,
+    },
   });
 
-  const parser = registry.get(type);
+  const parser = registry[type];
 
   if (!parser) {
-    log.warn("parser_not_found", traceId, {
-      type,
+    log.emit({
+      scope: "ParserRouter",
+      event: "parser_not_found",
+      traceId,
+      data: { type },
+      level: "warn",
     });
+
     return [];
   }
 
-  if (!layout.length) {
-    log.warn("parser_empty_layout", traceId, {
-      type,
+  if (!input.layout.length) {
+    log.emit({
+      scope: "ParserRouter",
+      event: "parser_empty_layout",
+      traceId,
+      data: { type },
+      level: "warn",
     });
+
     return [];
   }
 
   try {
     const result = parser(input, traceId);
 
-    log.trace("parser_output", traceId, {
-      type,
-      entries: result.length,
+    log.emit({
+      scope: "ParserRouter",
+      event: "parser_output",
+      traceId,
+      data: {
+        type,
+        entries: result.length,
+      },
     });
 
     return result;
 
-  } catch (err) {
-    log.warn("parser_failed", traceId, {
-      type,
-      error: err,
+  } catch (error) {
+    log.emit({
+      scope: "ParserRouter",
+      event: "parser_failed",
+      traceId,
+      data: {
+        type,
+        error,
+      },
+      level: "error",
     });
 
     return [];
