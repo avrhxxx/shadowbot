@@ -7,17 +7,21 @@
  * Finalizes QuickAdd session (STRICT MODE).
  *
  * ❗ RULES:
- * - OK ONLY (block otherwise)
+ * - OK ONLY
  * - 2-stage confirm flow
- * - branch by session.type
- * - uses autocomplete target (week / event)
- * - full cleanup after success
+ * - owner only
+ * - traceId required
+ *
+ * ✅ FINAL:
+ * - unified validators
+ * - Node-safe imports
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+
 import {
   enqueuePoints,
   enqueueEvents,
@@ -30,7 +34,7 @@ import {
 
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -42,12 +46,7 @@ function resolveMode(type: QuickAddType): "points" | "events" {
   if (type === "DONATIONS_POINTS" || type === "DUEL_POINTS") {
     return "points";
   }
-
-  if (type === "RR_SIGNUPS" || type === "RR_RESULTS") {
-    return "events";
-  }
-
-  throw new Error("Unknown QuickAddType");
+  return "events";
 }
 
 // =====================================
@@ -72,12 +71,24 @@ export async function handleConfirm(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session, traceId);
-  const ownerError = validateSessionOwner(interaction, session, traceId);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
+
+  const ownerError = validateSessionOwner(
+    interaction,
+    session,
+    traceId
+  );
 
   if (contextError || ownerError || !session) {
     await interaction.reply({
-      content: contextError ?? ownerError ?? "❌ Session not found",
+      content:
+        contextError ??
+        ownerError ??
+        "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -90,10 +101,6 @@ export async function handleConfirm(
       type: session.type,
     });
 
-    // =====================================
-    // 📥 BUFFER
-    // =====================================
-
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     if (!entries.length) {
@@ -103,10 +110,6 @@ export async function handleConfirm(
       });
       return;
     }
-
-    // =====================================
-    // ❗ OK ONLY RULE
-    // =====================================
 
     const invalid = entries.filter((e) => e.status !== "OK");
 
@@ -118,29 +121,21 @@ export async function handleConfirm(
       return;
     }
 
-    // =====================================
-    // 🧠 STAGE 1 → ENTER CONFIRM MODE
-    // =====================================
-
     if (session.stage === "COLLECTING") {
-      QuickAddSession.setStage(guildId, "CONFIRM_PENDING", traceId);
+      QuickAddSession.setStage(
+        guildId,
+        "CONFIRM_PENDING",
+        traceId
+      );
 
       await interaction.reply({
         content:
-          "⚠️ Confirm stage started.\n\nUse /q confirm with target (week/event) to finalize.",
+          "⚠️ Confirm stage started.\nUse /q confirm with target.",
         ephemeral: true,
-      });
-
-      log.trace("confirm_stage_entered", traceId, {
-        sessionId: session.sessionId,
       });
 
       return;
     }
-
-    // =====================================
-    // 🧠 STAGE GUARD
-    // =====================================
 
     if (session.stage !== "CONFIRM_PENDING") {
       await interaction.reply({
@@ -150,26 +145,17 @@ export async function handleConfirm(
       return;
     }
 
-    // =====================================
-    // 🎯 STAGE 2 → FINAL CONFIRM
-    // =====================================
-
     const target = interaction.options.getString("target");
 
     if (!target) {
       await interaction.reply({
-        content:
-          "❌ You must select target (week/event).\n💡 Start typing to see suggestions.",
+        content: "❌ Target required",
         ephemeral: true,
       });
       return;
     }
 
     const mode = resolveMode(session.type);
-
-    // =====================================
-    // 🟦 POINTS
-    // =====================================
 
     if (mode === "points") {
       await enqueuePoints(
@@ -182,18 +168,7 @@ export async function handleConfirm(
         })),
         traceId
       );
-
-      log.trace("confirm_points_enqueued", traceId, {
-        count: entries.length,
-        week: target,
-      });
-    }
-
-    // =====================================
-    // 🟥 EVENTS
-    // =====================================
-
-    if (mode === "events") {
+    } else {
       await enqueueEvents(
         entries.map((e) => ({
           guildId,
@@ -203,23 +178,10 @@ export async function handleConfirm(
         })),
         traceId
       );
-
-      log.trace("confirm_events_enqueued", traceId, {
-        count: entries.length,
-        eventId: target,
-      });
     }
-
-    // =====================================
-    // 🧹 CLEANUP
-    // =====================================
 
     QuickAddBuffer.clear(guildId, traceId);
     QuickAddSession.end(guildId, traceId);
-
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
 
     await interaction.reply({
       content: `✅ Submitted ${entries.length} entries`,
@@ -228,7 +190,6 @@ export async function handleConfirm(
 
     log.trace("confirm_done", traceId, {
       sessionId: session.sessionId,
-      mode,
       durationMs: Date.now() - startedAt,
     });
 
