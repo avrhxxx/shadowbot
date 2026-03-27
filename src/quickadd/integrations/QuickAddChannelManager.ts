@@ -2,28 +2,16 @@
 // 📁 src/quickadd/integrations/QuickAddChannelManager.ts
 // =====================================
 
-/**
- * 📢 ROLE:
- * Ensures QuickAdd channel exists in guild.
- *
- * Responsible for:
- * - finding existing channel
- * - creating if missing
- *
- * ❗ RULES:
- * - no business logic
- * - no session logic
- */
-
 import {
   Guild,
   ChannelType,
   TextChannel,
 } from "discord.js";
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createTraceId } from "../core/IdGenerator";
 
-const log = createLogger("CHANNEL");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 📌 CONFIG
@@ -38,16 +26,14 @@ const CHANNEL_NAME = "quickadd";
 export async function ensureQuickAddChannel(
   guild: Guild
 ): Promise<TextChannel> {
+  const traceId = createTraceId(); // 🔥 SYSTEM TRACE
   const guildId = guild.id;
 
-  log.trace("channel_ensure_start", {
+  log.trace("channel_ensure_start", traceId, {
     guildId,
     expectedName: CHANNEL_NAME,
   });
 
-  // =====================================
-  // 🔍 FIND EXISTING
-  // =====================================
   const existing = guild.channels.cache.find(
     (c) =>
       c.type === ChannelType.GuildText &&
@@ -55,7 +41,7 @@ export async function ensureQuickAddChannel(
   ) as TextChannel | undefined;
 
   if (existing) {
-    log.trace("channel_found", {
+    log.trace("channel_found", traceId, {
       guildId,
       channelId: existing.id,
       name: existing.name,
@@ -64,10 +50,7 @@ export async function ensureQuickAddChannel(
     return existing;
   }
 
-  // =====================================
-  // 🏗️ CREATE CHANNEL
-  // =====================================
-  log.trace("channel_create_start", {
+  log.trace("channel_create_start", traceId, {
     guildId,
     name: CHANNEL_NAME,
   });
@@ -77,7 +60,7 @@ export async function ensureQuickAddChannel(
     type: ChannelType.GuildText,
   });
 
-  log.trace("channel_created", {
+  log.trace("channel_created", traceId, {
     guildId,
     channelId: created.id,
     name: created.name,
