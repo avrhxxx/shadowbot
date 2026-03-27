@@ -11,13 +11,13 @@
  * - NO scope passed from outside (auto-resolved)
  * - supports:
  *    - trace logs (buffered)
- *    - system logs (direct)
+ *    - system + user flows
  *    - levels (info/warn/error)
- *    - types (user/system)
  *
  * ✅ DESIGN:
  * - fully replaceable
  * - zero refactor impact on business files
+ * - unified trace model (no special systemId)
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
@@ -45,6 +45,7 @@ type InternalLog = {
   scope: string;
   event: string;
   level: LogLevel;
+  type: TraceType;
   data?: any;
 };
 
@@ -79,7 +80,7 @@ function flush(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${log.time} | ${log.scope} | ${log.level} | ${log.event}`,
+      `${log.time} | ${log.scope}:${log.type} | ${log.level} | ${log.event}`,
       log.data || ""
     );
   }
@@ -106,14 +107,14 @@ export const DebugLogger = {
     const scope = resolveScope();
 
     // =====================================
-    // 🔹 SYSTEM LOG (NO TRACE BUFFER)
+    // 🔹 DIRECT LOG (NO TRACE)
     // =====================================
 
-    if (type === "system" || !traceId) {
+    if (!traceId) {
       if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
 
       console.log(
-        `${getTime()} | ${scope}:SYSTEM | ${level} | ${event}`,
+        `${getTime()} | ${scope}:${type} | ${level} | ${event}`,
         data || ""
       );
 
@@ -131,6 +132,7 @@ export const DebugLogger = {
       scope,
       event,
       level,
+      type,
       data,
     });
 
