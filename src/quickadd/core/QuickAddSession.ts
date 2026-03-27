@@ -10,15 +10,15 @@ import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
  * 🧠 ROLE:
  * Manages QuickAdd session lifecycle.
  *
- * ❗ RULES:
- * - one session per (guildId + userId)
- * - no business logic
- * - no ID generation except sessionId
+ * ❗ FINAL RULES:
+ * - multi-session per guild
+ * - ONE session per user (per guild)
+ * - sessionId = source of truth
+ * - NO business logic
  */
 
 type SessionData = {
   guildId: string;
-  userId: string;
   threadId: string | null;
   ownerId: string;
 
@@ -29,6 +29,7 @@ type SessionData = {
   sessionId: string;
 };
 
+// 🔥 KEY = guildId:userId
 const sessions = new Map<string, SessionData>();
 
 const ALLOWED_TRANSITIONS: Record<QuickAddStage, QuickAddStage[]> = {
@@ -36,17 +37,24 @@ const ALLOWED_TRANSITIONS: Record<QuickAddStage, QuickAddStage[]> = {
   CONFIRM_PENDING: [],
 };
 
-// 🔑 KEY BUILDER
-function buildKey(guildId: string, userId: string) {
+// =====================================
+// 🔹 HELPERS
+// =====================================
+
+function buildKey(guildId: string, userId: string): string {
   return `${guildId}:${userId}`;
 }
+
+// =====================================
+// 🚀 API
+// =====================================
 
 export const QuickAddSession = {
   start(
     data: Omit<SessionData, "sessionId" | "stage" | "createdAt">,
     traceId: string
   ) {
-    const key = buildKey(data.guildId, data.userId);
+    const key = buildKey(data.guildId, data.ownerId);
 
     const existing = sessions.get(key);
 
@@ -55,7 +63,10 @@ export const QuickAddSession = {
         event: "session_start_blocked",
         traceId,
         level: "warn",
-        data: { existingSessionId: existing.sessionId },
+        data: {
+          sessionId: existing.sessionId,
+          ownerId: existing.ownerId,
+        },
       });
       return null;
     }
@@ -75,8 +86,7 @@ export const QuickAddSession = {
       traceId,
       data: {
         sessionId: session.sessionId,
-        guildId: data.guildId,
-        userId: data.userId,
+        ownerId: session.ownerId,
       },
     });
 
@@ -187,8 +197,7 @@ export const QuickAddSession = {
       traceId,
       data: {
         sessionId: session?.sessionId,
-        guildId,
-        userId,
+        ownerId: userId,
       },
     });
   },
