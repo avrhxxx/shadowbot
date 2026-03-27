@@ -8,6 +8,7 @@
  *
  * ❗ RULES:
  * - OK ONLY (block otherwise)
+ * - 2-stage confirm flow
  * - branch by session.type
  * - uses autocomplete target (week / event)
  * - full cleanup after success
@@ -60,7 +61,6 @@ export async function handleConfirm(
   const startedAt = Date.now();
 
   const guildId = interaction.guildId;
-  const userId = interaction.user.id;
 
   if (!guildId) {
     await interaction.reply({
@@ -86,6 +86,7 @@ export async function handleConfirm(
   try {
     log.trace("confirm_start", traceId, {
       sessionId: session.sessionId,
+      stage: session.stage,
       type: session.type,
     });
 
@@ -118,12 +119,30 @@ export async function handleConfirm(
     }
 
     // =====================================
-    // 🎯 TARGET (AUTOCOMPLETE VALUE)
+    // 🧠 STAGE 1 → ENTER CONFIRM MODE
     // =====================================
 
-    const target =
-      interaction.options.getString("week") ||
-      interaction.options.getString("event");
+    if (session.stage === "COLLECTING") {
+      QuickAddSession.setStage(guildId, "CONFIRM_PENDING", traceId);
+
+      await interaction.reply({
+        content:
+          "⚠️ Confirm stage started.\n\nUse /q confirm with target (week/event) to finalize.",
+        ephemeral: true,
+      });
+
+      log.trace("confirm_stage_entered", traceId, {
+        sessionId: session.sessionId,
+      });
+
+      return;
+    }
+
+    // =====================================
+    // 🎯 STAGE 2 → FINAL CONFIRM
+    // =====================================
+
+    const target = interaction.options.getString("target");
 
     if (!target) {
       await interaction.reply({
