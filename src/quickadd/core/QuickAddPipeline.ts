@@ -3,20 +3,18 @@
 // =====================================
 
 import { Message } from "discord.js";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../debug/logger";
 
 import { runOCR } from "../ocr/OCRProcessor";
-import { parseByType, ParsedEntry } from "../parsing/ParserRouter";
-import {
-  validateEntries,
-  ValidatedEntry,
-} from "../validation/QuickAddValidator";
+import { parseByType } from "../parsing/ParserRouter";
+import { validateEntries } from "../validation/QuickAddValidator";
 import { QuickAddBuffer } from "../storage/QuickAddBuffer";
 import { buildLayout } from "../ocr/layout/LayoutBuilder";
 
 import { QuickAddSession } from "./QuickAddSession";
+import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
 
-const log = createScopedLogger(import.meta.url);
+const log = createScopedLogger(__filename);
 
 export async function processImageInput(
   message: Message,
