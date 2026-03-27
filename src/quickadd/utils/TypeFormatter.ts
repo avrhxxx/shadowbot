@@ -15,8 +15,14 @@
  */
 
 export function formatType(type: string): string {
-  return type
+  if (!type) return "Unknown";
+
+  const cleaned = type
     .toLowerCase()
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .trim();
+
+  if (!cleaned) return "Unknown";
+
+  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
 }
