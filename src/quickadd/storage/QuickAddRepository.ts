@@ -72,7 +72,7 @@ async function withRetry<T>(
 }
 
 // =====================================
-// 📥 QUEUE READ (🔥 NEW)
+// 📥 QUEUE READ
 // =====================================
 
 export async function getQueue(
@@ -84,7 +84,9 @@ export async function getQueue(
   const startedAt = Date.now();
 
   const tab =
-    type === "points" ? POINTS_QUEUE_TAB : EVENTS_QUEUE_TAB;
+    type === "points"
+      ? POINTS_QUEUE_TAB
+      : EVENTS_QUEUE_TAB;
 
   try {
     const data = safeSheet(
@@ -160,8 +162,8 @@ export async function saveAdjusted(
       log.emit({
         event: "adjusted_missing_columns",
         traceId,
-        data: {},
         level: "warn",
+        data: {},
       });
       return;
     }
