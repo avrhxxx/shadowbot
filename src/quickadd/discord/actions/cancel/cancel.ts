@@ -15,19 +15,6 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -42,7 +29,7 @@ export async function handleCancel(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
@@ -61,8 +48,7 @@ export async function handleCancel(
   );
 
   if (contextError || ownerError || !session) {
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -93,8 +79,7 @@ export async function handleCancel(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "🧹 Buffer cleared (session still active)"
     );
 
@@ -126,8 +111,7 @@ export async function handleCancel(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to clear buffer"
     );
   }
