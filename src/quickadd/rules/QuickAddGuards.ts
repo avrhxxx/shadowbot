@@ -2,21 +2,6 @@
 // 📁 src/quickadd/rules/QuickAddGuards.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Guards and validators for QuickAdd commands.
- *
- * Responsible for:
- * - validating session existence
- * - validating correct thread context
- * - validating session ownership
- *
- * ❗ RULES:
- * - NO side effects
- * - NO business logic
- * - pure validation helpers
- */
-
 import { Channel, ChatInputCommandInteraction } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
 import { createScopedLogger } from "@/quickadd/debug/logger";
@@ -79,7 +64,6 @@ export function isInQuickAddThread(
     return false;
   }
 
-  // 🔥 main thread
   if (channel.id === session.threadId) {
     log.trace("guard_thread_match_main", traceId, {
       channelId: channel.id,
@@ -88,7 +72,6 @@ export function isInQuickAddThread(
     return true;
   }
 
-  // 🔥 child thread
   if ("parentId" in channel && channel.parentId === session.threadId) {
     log.trace("guard_thread_match_child", traceId, {
       channelId: channel.id,
@@ -120,8 +103,7 @@ export function validateQuickAddContext(
   const channelId = interaction.channel?.id;
 
   if (!isSessionActive(session, traceId)) {
-    log.warn("guard_fail_no_session", {
-      traceId,
+    log.warn("guard_fail_no_session", traceId, {
       guildId,
       userId,
       channelId,
@@ -131,8 +113,7 @@ export function validateQuickAddContext(
   }
 
   if (!isInQuickAddThread(interaction.channel, session, traceId)) {
-    log.warn("guard_fail_wrong_thread", {
-      traceId,
+    log.warn("guard_fail_wrong_thread", traceId, {
       guildId,
       userId,
       channelId,
@@ -160,8 +141,7 @@ export function validateSessionOwner(
   const userId = interaction.user.id;
 
   if (!isSessionActive(session, traceId)) {
-    log.warn("guard_owner_no_session", {
-      traceId,
+    log.warn("guard_owner_no_session", traceId, {
       guildId,
       userId,
     });
@@ -170,8 +150,7 @@ export function validateSessionOwner(
   }
 
   if (!isSessionOwner(interaction.user.id, session, traceId)) {
-    log.warn("guard_owner_mismatch", {
-      traceId,
+    log.warn("guard_owner_mismatch", traceId, {
       guildId,
       userId,
       ownerId: session.ownerId,
