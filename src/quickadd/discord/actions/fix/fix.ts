@@ -31,19 +31,6 @@ import { validateEntries } from "../../../validation/QuickAddValidator";
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -58,11 +45,10 @@ export async function handleFix(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
-  // 🔥 MULTI-SESSION FIX
   const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
@@ -72,12 +58,13 @@ export async function handleFix(
   );
 
   if (contextError || !session) {
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       contextError ?? "❌ Session not found"
     );
     return;
   }
+
+  const sessionId = session.sessionId;
 
   try {
     metrics.increment("fix_started");
@@ -86,16 +73,16 @@ export async function handleFix(
       event: "fix_start",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         guildId,
       },
     });
 
-    // 🔥 (NA RAZIE) BUFFER PO GUILD — później przejdziemy na sessionId
-    const entries = QuickAddBuffer.getEntries(guildId, traceId);
+    // 🔥 SESSION-BASED BUFFER (FIX)
+    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
-      await safeReply(interaction, "⚠️ Nothing to fix");
+      await interaction.editReply("⚠️ Nothing to fix");
       return;
     }
 
@@ -143,14 +130,13 @@ export async function handleFix(
         traceId,
         level: "warn",
         data: {
-          sessionId: session.sessionId,
+          sessionId,
           before: updatedRaw.length,
           after: revalidated.length,
         },
       });
 
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         "❌ Internal error (revalidation mismatch)"
       );
       return;
@@ -167,15 +153,14 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
-    // 🔥 (NA RAZIE) BUFFER PO GUILD
-    QuickAddBuffer.replaceEntries(guildId, merged, traceId);
+    // 🔥 SESSION-BASED WRITE (FIX)
+    QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
     // =====================================
     // 📤 RESPONSE
     // =====================================
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       applied > 0
         ? `🤖 Fixed ${applied} entries automatically`
         : "⚠️ No entries to fix"
@@ -189,7 +174,7 @@ export async function handleFix(
       event: "fix_done",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         applied,
         durationMs: duration,
       },
@@ -210,8 +195,7 @@ export async function handleFix(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to apply fixes"
     );
   }
