@@ -125,7 +125,7 @@ export async function validateEntries(
     let resolved = "";
 
     try {
-      resolved = await resolveNickname(entry.nickname);
+      resolved = await resolveNickname(entry.nickname, traceId);
 
       log.emit({
         event: "resolve_result",
@@ -139,7 +139,10 @@ export async function validateEntries(
       log.emit({
         event: "resolve_failed",
         traceId,
-        data: { error: err, input: entry.nickname },
+        data: {
+          input: entry.nickname,
+          error: String(err),
+        },
         level: "warn",
       });
     }
