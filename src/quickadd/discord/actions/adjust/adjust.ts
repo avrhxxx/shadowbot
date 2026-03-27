@@ -14,9 +14,9 @@
  * - sessionId included in logs
  *
  * ✅ FINAL:
- * - relative imports (Node-safe)
- * - validator API unified (traceId)
- * - full TS + Discord + Fly.io compliance
+ * - global logger (log.emit)
+ * - no scoped logger
+ * - full compliance with logging system
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -32,9 +32,7 @@ import {
 
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-const log = createScopedLogger(import.meta.url);
+import { log } from "../../../logger";
 
 // =====================================
 // 🚀 HANDLER
@@ -86,12 +84,17 @@ export async function handleAdjust(
   const newValue = interaction.options.getInteger("value");
 
   try {
-    log.trace("adjust_start", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      id,
-      newNickname,
-      newValue,
+    log.emit({
+      event: "adjust_start",
+      traceId,
+      type: "user",
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+        id,
+        newNickname,
+        newValue,
+      },
     });
 
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
@@ -134,11 +137,16 @@ export async function handleAdjust(
 
     QuickAddBuffer.setEntries(guildId, merged, traceId);
 
-    log.trace("adjust_applied", traceId, {
-      sessionId: session.sessionId,
-      id,
-      before: target,
-      after: updated,
+    log.emit({
+      event: "adjust_applied",
+      traceId,
+      type: "user",
+      data: {
+        sessionId: session.sessionId,
+        id,
+        before: target,
+        after: updated,
+      },
     });
 
     try {
@@ -153,16 +161,27 @@ export async function handleAdjust(
           traceId
         );
 
-        log.trace("learning_saved_adjust", traceId, {
-          sessionId: session.sessionId,
-          from: target.nickname,
-          to: newNickname,
+        log.emit({
+          event: "learning_saved_adjust",
+          traceId,
+          type: "user",
+          data: {
+            sessionId: session.sessionId,
+            from: target.nickname,
+            to: newNickname,
+          },
         });
       }
     } catch (err) {
-      log.warn("learning_failed_adjust", traceId, {
-        sessionId: session.sessionId,
-        error: err,
+      log.emit({
+        event: "learning_failed_adjust",
+        traceId,
+        level: "warn",
+        type: "user",
+        data: {
+          sessionId: session.sessionId,
+          error: err,
+        },
       });
     }
 
@@ -171,13 +190,26 @@ export async function handleAdjust(
       ephemeral: true,
     });
 
-    log.trace("adjust_done", traceId, {
-      sessionId: session.sessionId,
-      durationMs: Date.now() - startedAt,
+    log.emit({
+      event: "adjust_done",
+      traceId,
+      type: "user",
+      data: {
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+      },
     });
 
   } catch (err) {
-    log.error("adjust_failed", err, traceId);
+    log.emit({
+      event: "adjust_failed",
+      traceId,
+      level: "error",
+      type: "user",
+      data: {
+        error: err,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to adjust entry",
