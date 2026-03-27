@@ -6,17 +6,12 @@
  * ⚙️ ROLE:
  * Starts a new QuickAdd session.
  *
- * Responsible for:
- * - validating no active session exists
- * - creating a private thread
- * - initializing session state
- *
  * ❗ RULES:
- * - minimal logic (delegates to session layer)
- * - handles Discord-specific operations (thread)
- * - traceId MUST be injected (from router)
- * - NO traceId generation here
- * - FULL trace logging AFTER session start
+ * - NO import aliases
+ * - traceId injected ONLY
+ * - CJS SAFE (__filename)
+ * - no duplicate logs vs core
+ * - cleanup on failure
  */
 
 import {
@@ -27,9 +22,10 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
-const log = createScopedLogger(import.meta.url);
+// ✅ GLOBAL RULE — CJS SAFE
+const log = createScopedLogger(__filename);
 
 // =====================================
 // 🔹 TYPE GUARD
@@ -96,16 +92,18 @@ export async function handleStart(
 
   const type: QuickAddType = rawType;
 
+  let createdThreadId: string | null = null;
+
   try {
     // =====================================
-    // 📢 CHANNEL GUARD
+    // 📢 CHANNEL GUARD (Discord.js safe)
     // =====================================
     if (!interaction.channel || !(interaction.channel instanceof TextChannel)) {
-      throw new Error("Invalid channel type for thread creation");
+      throw new Error("Invalid channel type");
     }
 
     // =====================================
-    // 📢 CREATE THREAD
+    // 🧵 CREATE THREAD
     // =====================================
     const thread = await interaction.channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
@@ -114,9 +112,8 @@ export async function handleStart(
       reason: "QuickAdd session",
     });
 
-    // =====================================
-    // 👤 ADD USER
-    // =====================================
+    createdThreadId = thread.id;
+
     await thread.members.add(userId);
 
     // =====================================
@@ -132,31 +129,34 @@ export async function handleStart(
       traceId
     );
 
+    // ❗ HARD GUARD (MANDATORY)
+    if (!session) {
+      log.error(
+        "start_session_null",
+        new Error("Session creation failed"),
+        traceId
+      );
+
+      try {
+        await thread.delete();
+      } catch {}
+
+      await interaction.reply({
+        content: "❌ Failed to start session",
+        ephemeral: true,
+      });
+
+      return;
+    }
+
     // =====================================
-    // 🔍 LOG START
+    // 🔍 LOG (NO DUPLICATES)
     // =====================================
-    log.trace("start_start", traceId, {
+    log.trace("start_initialized", traceId, {
       sessionId: session.sessionId,
       guildId,
-      userId,
       threadId: thread.id,
-      type,
-    });
-
-    log.trace("thread_created", traceId, {
-      sessionId: session.sessionId,
-      threadId: thread.id,
-    });
-
-    log.trace("thread_member_added", traceId, {
-      sessionId: session.sessionId,
       userId,
-    });
-
-    log.trace("session_started", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      ownerId: userId,
       type,
     });
 
@@ -169,7 +169,7 @@ export async function handleStart(
     });
 
     await thread.send({
-      content: `🚀 QuickAdd session started\n\nSend screenshots here.`,
+      content: "🚀 QuickAdd session started\n\nSend screenshots here.",
     });
 
     log.trace("start_done", traceId, {
@@ -179,6 +179,14 @@ export async function handleStart(
 
   } catch (err) {
     log.error("start_failed", err, traceId);
+
+    // ❗ CLEANUP ORPHAN THREAD
+    if (createdThreadId && interaction.channel instanceof TextChannel) {
+      try {
+        const thread = await interaction.channel.threads.fetch(createdThreadId);
+        await thread?.delete();
+      } catch {}
+    }
 
     await interaction.reply({
       content: "❌ Failed to start session",
