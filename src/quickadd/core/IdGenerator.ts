@@ -18,6 +18,8 @@
  * - deterministic structure
  */
 
+import crypto from "crypto";
+
 // =====================================
 // 🔹 INTERNAL STATE
 // =====================================
