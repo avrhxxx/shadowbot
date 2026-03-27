@@ -17,11 +17,11 @@
  * - deterministic behavior
  */
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../debug/logger";
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
 import { ParsedEntry } from "../../core/QuickAddTypes";
 
-const log = createScopedLogger(import.meta.url);
+const log = createScopedLogger(__filename);
 
 // =====================================
 // 🔥 MAIN — LAYOUT MODE (PRIMARY)
@@ -35,7 +35,7 @@ export function parseDonationsFromLayout(
     throw new Error("traceId is required in parseDonationsFromLayout");
   }
 
-  const { layout } = input;
+  const layout = input?.layout ?? [];
 
   log.trace("parse_layout_start", traceId, {
     rows: layout.length,
@@ -100,11 +100,13 @@ export function parseDonations(
     throw new Error("traceId is required in parseDonations");
   }
 
+  const safeLines = lines ?? [];
+
   log.trace("parse_lines_start", traceId, {
-    lines: lines.length,
+    lines: safeLines.length,
   });
 
-  const candidates = extractCandidates(lines);
+  const candidates = extractCandidates(safeLines);
   const paired = pairCandidates(candidates);
   const cleaned = cleanEntries(paired, traceId);
   const final = finalizeEntries(cleaned, traceId);
