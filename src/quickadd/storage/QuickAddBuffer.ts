@@ -14,10 +14,8 @@
  * - returns SAFE COPIES ONLY
  */
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { log } from "../logger";
 import { EntryStatus } from "../validation/QuickAddValidator";
-
-const log = createScopedLogger(import.meta.url);
 
 type ParsedEntry = {
   nickname: string;
@@ -73,9 +71,13 @@ function checkTimeout(guildId: string, traceId: string) {
   if (last && now - last > TIMEOUT_MS) {
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_timeout", traceId, {
-      guildId,
-      before,
+    log.emit({
+      event: "buffer_timeout",
+      traceId,
+      data: {
+        guildId,
+        before,
+      },
     });
 
     buffer.delete(guildId);
@@ -104,9 +106,13 @@ export const QuickAddBuffer = {
     assertTrace(traceId, "addEntries");
     checkTimeout(guildId, traceId);
 
-    log.trace("buffer_add_start", traceId, {
-      guildId,
-      incoming: entries.length,
+    log.emit({
+      event: "buffer_add_start",
+      traceId,
+      data: {
+        guildId,
+        incoming: entries.length,
+      },
     });
 
     const current = buffer.get(guildId) || [];
@@ -130,11 +136,15 @@ export const QuickAddBuffer = {
     buffer.set(guildId, updated);
     idCounters.set(guildId, nextId);
 
-    log.trace("buffer_add_done", traceId, {
-      guildId,
-      before: beforeCount,
-      added: entries.length,
-      after: updated.length,
+    log.emit({
+      event: "buffer_add_done",
+      traceId,
+      data: {
+        guildId,
+        before: beforeCount,
+        added: entries.length,
+        after: updated.length,
+      },
     });
   },
 
@@ -148,10 +158,14 @@ export const QuickAddBuffer = {
 
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_replace_start", traceId, {
-      guildId,
-      before,
-      incoming: entries.length,
+    log.emit({
+      event: "buffer_replace_start",
+      traceId,
+      data: {
+        guildId,
+        before,
+        incoming: entries.length,
+      },
     });
 
     const cloned = cloneEntries(entries);
@@ -165,11 +179,15 @@ export const QuickAddBuffer = {
 
     idCounters.set(guildId, maxId + 1);
 
-    log.trace("buffer_replace_done", traceId, {
-      guildId,
-      before,
-      after: cloned.length,
-      nextId: maxId + 1,
+    log.emit({
+      event: "buffer_replace_done",
+      traceId,
+      data: {
+        guildId,
+        before,
+        after: cloned.length,
+        nextId: maxId + 1,
+      },
     });
   },
 
@@ -179,9 +197,13 @@ export const QuickAddBuffer = {
 
     const entries = buffer.get(guildId) || [];
 
-    log.trace("buffer_get", traceId, {
-      guildId,
-      count: entries.length,
+    log.emit({
+      event: "buffer_get",
+      traceId,
+      data: {
+        guildId,
+        count: entries.length,
+      },
     });
 
     return cloneEntries(entries);
@@ -192,17 +214,25 @@ export const QuickAddBuffer = {
 
     const before = buffer.get(guildId)?.length || 0;
 
-    log.trace("buffer_clear_start", traceId, {
-      guildId,
-      before,
+    log.emit({
+      event: "buffer_clear_start",
+      traceId,
+      data: {
+        guildId,
+        before,
+      },
     });
 
     buffer.delete(guildId);
     idCounters.delete(guildId);
     lastAccess.delete(guildId);
 
-    log.trace("buffer_clear_done", traceId, {
-      guildId,
+    log.emit({
+      event: "buffer_clear_done",
+      traceId,
+      data: {
+        guildId,
+      },
     });
   },
 };
