@@ -76,8 +76,12 @@ export async function runOCR(
     try {
       const visionResult = await runVisionOCR(inputBuffer);
 
-      if (visionResult && visionResult.fullTextAnnotation) {
-        visionTokens = mapVisionToTokens(visionResult, traceId);
+      // ✅ FIX: strict null guard + safe cast
+      if (visionResult?.fullTextAnnotation?.text) {
+        visionTokens = mapVisionToTokens(
+          visionResult as any,
+          traceId
+        );
       }
     } catch (error) {
       log.emit({
