@@ -1,19 +1,31 @@
+
 // =====================================
 // 📁 src/quickadd/discord/actions/confirm/confirmAutocomplete.ts
 // =====================================
+
+/**
+ * 🧠 ROLE:
+ * Provides autocomplete suggestions for confirm target.
+ *
+ * ❗ RULES:
+ * - requires active session
+ * - stage must be CONFIRM_PENDING
+ * - traceId injected
+ *
+ * ✅ FINAL:
+ * - log.emit only
+ * - lightweight observability
+ */
 
 import { AutocompleteInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
+import { log, metrics } from "../../../logger";
 
 // =====================================
-// MOCK
+// MOCK DATA
 // =====================================
 
 const WEEK_OPTIONS = [
@@ -63,10 +75,16 @@ export async function handleConfirmAutocomplete(
     opt.name.toLowerCase().includes(focused.toLowerCase())
   );
 
-  log.trace("confirm_autocomplete", traceId, {
-    sessionId: session.sessionId,
-    input: focused,
-    results: filtered.length,
+  metrics.increment("confirm_autocomplete_used");
+
+  log.emit({
+    event: "confirm_autocomplete",
+    traceId,
+    data: {
+      sessionId: session.sessionId,
+      input: focused,
+      results: filtered.length,
+    },
   });
 
   await interaction.respond(
