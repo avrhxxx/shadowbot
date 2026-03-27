@@ -2,9 +2,24 @@
 // 📁 src/quickadd/discord/CommandBuilder.ts
 // =====================================
 
+/**
+ * 🧠 ROLE:
+ * Builds /q slash command structure
+ *
+ * ❗ RULES:
+ * - NO business logic
+ * - Discord.js compliant
+ * - clear UX descriptions
+ *
+ * ✅ FINAL:
+ * - consistent descriptions
+ * - autocomplete ready
+ * - TS safe
+ */
+
 import { SlashCommandBuilder } from "discord.js";
 
-export function buildQuickAddCommand() {
+export function buildQuickAddCommand(): SlashCommandBuilder {
   return new SlashCommandBuilder()
     .setName("q")
     .setDescription("QuickAdd system")
@@ -12,15 +27,15 @@ export function buildQuickAddCommand() {
     .addSubcommand((sub) =>
       sub
         .setName("start")
-        .setDescription("Start QuickAdd session")
+        .setDescription("Start a new QuickAdd session")
         .addStringOption((opt) =>
           opt
             .setName("type")
-            .setDescription("Type of QuickAdd")
+            .setDescription("Select data type to collect")
             .setRequired(true)
             .addChoices(
               { name: "Donations", value: "DONATIONS_POINTS" },
-              { name: "Duel", value: "DUEL_POINTS" },
+              { name: "Duel Points", value: "DUEL_POINTS" },
               { name: "RR Signups", value: "RR_SIGNUPS" },
               { name: "RR Results", value: "RR_RESULTS" }
             )
@@ -28,51 +43,54 @@ export function buildQuickAddCommand() {
     )
 
     .addSubcommand((sub) =>
-      sub.setName("preview").setDescription("Show parsed data preview")
+      sub
+        .setName("preview")
+        .setDescription("Show current parsed entries")
     )
 
     .addSubcommand((sub) =>
       sub
         .setName("adjust")
-        .setDescription("Adjust entry manually")
+        .setDescription("Manually adjust entry")
         .addIntegerOption((opt) =>
           opt.setName("id").setDescription("Entry ID").setRequired(true)
         )
         .addStringOption((opt) =>
-          opt.setName("nickname").setDescription("New nickname")
+          opt.setName("nickname").setDescription("Correct nickname")
         )
         .addIntegerOption((opt) =>
-          opt.setName("value").setDescription("New value")
+          opt.setName("value").setDescription("Correct value")
         )
     )
 
     .addSubcommand((sub) =>
-      sub.setName("fix").setDescription("Auto-fix entries")
+      sub
+        .setName("fix")
+        .setDescription("Apply automatic fixes (suggestions)")
     )
 
-    // =====================================
-    // 🔥 CONFIRM (FIXED)
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("confirm")
-        .setDescription("Confirm and save entries")
-
-        // ❗ NOT REQUIRED → allows Stage 1
+        .setDescription("Confirm entries (2-step process)")
         .addStringOption((opt) =>
           opt
             .setName("target")
-            .setDescription("Select week or event")
+            .setDescription("Select week or event (step 2)")
             .setRequired(false)
             .setAutocomplete(true)
         )
     )
 
     .addSubcommand((sub) =>
-      sub.setName("cancel").setDescription("Cancel confirmation stage")
+      sub
+        .setName("cancel")
+        .setDescription("Clear buffer (keep session active)")
     )
 
     .addSubcommand((sub) =>
-      sub.setName("end").setDescription("End QuickAdd session")
+      sub
+        .setName("end")
+        .setDescription("End session and cleanup")
     );
 }
