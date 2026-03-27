@@ -2,12 +2,11 @@
 // 📁 src/quickadd/core/QuickAddSession.ts
 // =====================================
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../debug/logger";
 import { createSessionId } from "./IdGenerator";
-
-const log = createScopedLogger(import.meta.url);
-
 import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
+
+const log = createScopedLogger(__filename);
 
 type SessionData = {
   guildId: string;
