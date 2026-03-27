@@ -11,6 +11,8 @@
  * - NO validation
  * - traceId REQUIRED (STRICT)
  * - FULL logging
+ * - RETRY (limit 5)
+ * - TIMING (observability)
  */
 
 import {
@@ -31,6 +33,8 @@ const NICKNAME_TAB = "quickadd_nicknames";
 const POINTS_QUEUE_TAB = "quickadd_points_queue";
 const EVENTS_QUEUE_TAB = "quickadd_events_queue";
 
+const RETRY_LIMIT = 5;
+
 // =====================================
 // 🧠 HELPERS
 // =====================================
@@ -45,6 +49,33 @@ function safeSheet(data: any[][] | null | undefined): any[][] {
   return data && data.length ? data : [];
 }
 
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  traceId: string,
+  label: string
+): Promise<T> {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt++;
+
+      log.warn("retry_attempt", {
+        traceId,
+        label,
+        attempt,
+      });
+
+      if (attempt >= RETRY_LIMIT) {
+        log.error("retry_failed", err, traceId);
+        throw err;
+      }
+    }
+  }
+}
+
 // =====================================
 // ✏️ SAVE ADJUSTED
 // =====================================
@@ -57,12 +88,16 @@ export async function saveAdjusted(
 
   if (!entries.length) return;
 
+  const startedAt = Date.now();
+
   try {
     log.trace("adjusted_save_start", traceId, {
       count: entries.length,
     });
 
-    let sheet = safeSheet(await readSheet(NICKNAME_TAB));
+    let sheet = safeSheet(
+      await withRetry(() => readSheet(NICKNAME_TAB), traceId, "read_nicknames")
+    );
 
     if (sheet.length === 0) {
       sheet = [[
@@ -99,7 +134,11 @@ export async function saveAdjusted(
         if (!ocrRaw) continue;
 
         if (clean(ocrRaw) === cleaned) {
-          await updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted);
+          await withRetry(
+            () => updateCell(NICKNAME_TAB, i, adjustedIndex, entry.adjusted),
+            traceId,
+            "update_cell_adjusted"
+          );
 
           log.trace("adjusted_updated", traceId, {
             from: ocrRaw,
@@ -129,10 +168,15 @@ export async function saveAdjusted(
       }
     }
 
-    await writeSheet(NICKNAME_TAB, sheet);
+    await withRetry(
+      () => writeSheet(NICKNAME_TAB, sheet),
+      traceId,
+      "write_nicknames"
+    );
 
     log.trace("adjusted_save_done", traceId, {
       count: entries.length,
+      durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
@@ -158,12 +202,16 @@ export async function enqueuePoints(
 
   if (!entries.length) return;
 
+  const startedAt = Date.now();
+
   try {
     log.trace("points_queue_start", traceId, {
       count: entries.length,
     });
 
-    const existing = safeSheet(await readSheet(POINTS_QUEUE_TAB));
+    const existing = safeSheet(
+      await withRetry(() => readSheet(POINTS_QUEUE_TAB), traceId, "read_points")
+    );
 
     const rows = entries.map((e) => [
       e.guildId,
@@ -175,12 +223,15 @@ export async function enqueuePoints(
       Date.now(),
     ]);
 
-    const newData = [...existing, ...rows];
-
-    await writeSheet(POINTS_QUEUE_TAB, newData);
+    await withRetry(
+      () => writeSheet(POINTS_QUEUE_TAB, [...existing, ...rows]),
+      traceId,
+      "write_points"
+    );
 
     log.trace("points_queue_done", traceId, {
       count: rows.length,
+      durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
@@ -206,12 +257,16 @@ export async function enqueueEvents(
 
   if (!entries.length) return;
 
+  const startedAt = Date.now();
+
   try {
     log.trace("events_queue_start", traceId, {
       count: entries.length,
     });
 
-    const existing = safeSheet(await readSheet(EVENTS_QUEUE_TAB));
+    const existing = safeSheet(
+      await withRetry(() => readSheet(EVENTS_QUEUE_TAB), traceId, "read_events")
+    );
 
     const rows = entries.map((e) => [
       e.guildId,
@@ -222,10 +277,15 @@ export async function enqueueEvents(
       Date.now(),
     ]);
 
-    await writeSheet(EVENTS_QUEUE_TAB, [...existing, ...rows]);
+    await withRetry(
+      () => writeSheet(EVENTS_QUEUE_TAB, [...existing, ...rows]),
+      traceId,
+      "write_events"
+    );
 
     log.trace("events_queue_done", traceId, {
       count: rows.length,
+      durationMs: Date.now() - startedAt,
     });
 
   } catch (err) {
@@ -241,11 +301,16 @@ export async function enqueueEvents(
 export async function getLearningData(traceId: string): Promise<any[][]> {
   assertTrace(traceId, "getLearningData");
 
+  const startedAt = Date.now();
+
   try {
-    const data = safeSheet(await readSheet(NICKNAME_TAB));
+    const data = safeSheet(
+      await withRetry(() => readSheet(NICKNAME_TAB), traceId, "read_learning")
+    );
 
     log.trace("learning_loaded", traceId, {
       rows: data.length,
+      durationMs: Date.now() - startedAt,
     });
 
     return data;
