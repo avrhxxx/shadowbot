@@ -87,8 +87,10 @@ export async function handleEnd(
     // 🧹 CLEANUP (🔥 FUTURE-PROOF)
     // =====================================
 
-    QuickAddBuffer.clear(sessionId, traceId); // 🔥 KEY CHANGE
-    QuickAddSession.end(guildId, traceId);
+    QuickAddBuffer.clear(sessionId, traceId);
+
+    // 🔥 FIX: MULTI-SESSION SAFE
+    QuickAddSession.end(guildId, userId, traceId);
 
     log.emit({
       event: "session_ended",
