@@ -2,26 +2,9 @@
 // 📁 src/quickadd/parsing/donations/DonationsParser.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Domain parser for DONATIONS.
- *
- * Responsible for:
- * - extracting nickname + value pairs
- * - cleaning OCR noise
- * - validating raw entries
- *
- * ❗ RULES:
- * - ALL cleaning happens here (not in OCR / layout)
- * - NO external dependencies (pure logic)
- * - deterministic behavior
- */
-
-import { createScopedLogger } from "../../debug/logger";
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
 import { ParsedEntry } from "../../core/QuickAddTypes";
-
-const log = createScopedLogger(__filename);
+import { log } from "../../logger";
 
 // =====================================
 // 🔥 MAIN — LAYOUT MODE (PRIMARY)
@@ -35,10 +18,12 @@ export function parseDonationsFromLayout(
     throw new Error("traceId is required in parseDonationsFromLayout");
   }
 
-  const layout = input?.layout ?? [];
+  const { layout } = input;
 
-  log.trace("parse_layout_start", traceId, {
-    rows: layout.length,
+  log.emit({
+    event: "parse_layout_start",
+    traceId,
+    data: { rows: layout.length },
   });
 
   const extracted: { nickname: string; valueRaw: string }[] = [];
@@ -66,23 +51,22 @@ export function parseDonationsFromLayout(
 
     if (!nickname) continue;
 
-    extracted.push({
-      nickname,
-      valueRaw,
-    });
+    extracted.push({ nickname, valueRaw });
 
-    log.trace("layout_row_used", traceId, {
-      cells: cellTexts,
-      nickname,
-      valueRaw,
+    log.emit({
+      event: "layout_row_used",
+      traceId,
+      data: { cells: cellTexts, nickname, valueRaw },
     });
   }
 
   const cleaned = cleanEntries(extracted, traceId);
   const final = finalizeEntries(cleaned, traceId);
 
-  log.trace("parse_layout_done", traceId, {
-    parsed: final.length,
+  log.emit({
+    event: "parse_layout_done",
+    traceId,
+    data: { parsed: final.length },
   });
 
   return final;
@@ -100,13 +84,13 @@ export function parseDonations(
     throw new Error("traceId is required in parseDonations");
   }
 
-  const safeLines = lines ?? [];
-
-  log.trace("parse_lines_start", traceId, {
-    lines: safeLines.length,
+  log.emit({
+    event: "parse_lines_start",
+    traceId,
+    data: { lines: lines.length },
   });
 
-  const candidates = extractCandidates(safeLines);
+  const candidates = extractCandidates(lines);
   const paired = pairCandidates(candidates);
   const cleaned = cleanEntries(paired, traceId);
   const final = finalizeEntries(cleaned, traceId);
@@ -115,7 +99,7 @@ export function parseDonations(
 }
 
 // =====================================
-// 🔍 STAGE 1 — EXTRACT (LINES)
+// 🔍 STAGE 1 — EXTRACT
 // =====================================
 
 type Candidate = {
@@ -199,8 +183,10 @@ function cleanEntries(
     });
   }
 
-  log.trace("clean_done", traceId, {
-    count: results.length,
+  log.emit({
+    event: "clean_done",
+    traceId,
+    data: { count: results.length },
   });
 
   return results;
@@ -222,11 +208,17 @@ function finalizeEntries(
 
     results.push(e);
 
-    log.trace("parsed_entry", traceId, e);
+    log.emit({
+      event: "parsed_entry",
+      traceId,
+      data: e,
+    });
   }
 
-  log.trace("final_done", traceId, {
-    count: results.length,
+  log.emit({
+    event: "final_done",
+    traceId,
+    data: { count: results.length },
   });
 
   return results;
