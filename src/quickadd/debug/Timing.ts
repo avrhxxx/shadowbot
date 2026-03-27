@@ -7,18 +7,11 @@
  * Execution timing helper.
  *
  * Responsible for:
- * - measuring durations (ms)
- * - supporting performance monitoring
+ * - measuring durations
  *
  * ❗ RULES:
- * - NO logging here
+ * - NO logging
  * - NO side effects
- * - must be paired start() → end()
- *
- * ✅ USE CASES:
- * - pipeline duration
- * - OCR time
- * - validation time
  */
 
 import { LOGGER_CONFIG } from "./LoggerConfig";
