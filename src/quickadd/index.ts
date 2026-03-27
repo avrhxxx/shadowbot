@@ -56,8 +56,9 @@ export * from "./mapping/NicknameResolver";
 export { validateEntries } from "./validation/QuickAddValidator";
 
 // =====================================
-// 🔹 STORAGE
+// 🔹 STORAGE (INTERNAL — NOT EXPORTED)
 // =====================================
 
-export * from "./storage/QuickAddRepository";
-export * from "./storage/QuickAddBuffer";
+// ❌ DO NOT EXPORT:
+// - QuickAddRepository (internal persistence layer)
+// - QuickAddBuffer (session state layer)
