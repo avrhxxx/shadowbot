@@ -5,18 +5,53 @@
 /**
  * 🧠 ROLE:
  * Finalizes QuickAdd session (STRICT MODE).
+ *
+ * ❗ RULES:
+ * - OK ONLY (block otherwise)
+ * - branch by session.type
+ * - uses autocomplete target (week / event)
+ * - full cleanup after success
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { enqueuePoints } from "../../../storage/QuickAddRepository";
-import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
+import {
+  enqueuePoints,
+  enqueueEvents,
+} from "../../../storage/QuickAddRepository";
+
+import {
+  validateQuickAddContext,
+  validateSessionOwner,
+} from "../../../rules/QuickAddGuards";
+
+import { QuickAddType } from "../../../core/QuickAddTypes";
 
 import { createScopedLogger } from "@/quickadd/debug/logger";
 
 const log = createScopedLogger(import.meta.url);
+
+// =====================================
+// 🧠 MODE RESOLVER
+// =====================================
+
+function resolveMode(type: QuickAddType): "points" | "events" {
+  if (type === "DONATIONS_POINTS" || type === "DUEL_POINTS") {
+    return "points";
+  }
+
+  if (type === "RR_SIGNUPS" || type === "RR_RESULTS") {
+    return "events";
+  }
+
+  throw new Error("Unknown QuickAddType");
+}
+
+// =====================================
+// 🚀 HANDLER
+// =====================================
 
 export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
@@ -25,34 +60,52 @@ export async function handleConfirm(
   const startedAt = Date.now();
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({ content: "❌ Guild only command", ephemeral: true });
+    await interaction.reply({
+      content: "❌ Guild only command",
+      ephemeral: true,
+    });
     return;
   }
 
   const session = QuickAddSession.get(guildId);
+
   const contextError = validateQuickAddContext(interaction, session);
+  const ownerError = validateSessionOwner(interaction, session);
 
-  if (contextError || !session) {
-    await interaction.reply({ content: contextError ?? "❌ Session not found", ephemeral: true });
-    return;
-  }
-
-  if (session.ownerId !== interaction.user.id) {
-    await interaction.reply({ content: "❌ Only session owner can confirm", ephemeral: true });
+  if (contextError || ownerError || !session) {
+    await interaction.reply({
+      content: contextError ?? ownerError ?? "❌ Session not found",
+      ephemeral: true,
+    });
     return;
   }
 
   try {
-    log.trace("confirm_start", traceId, { sessionId: session.sessionId });
+    log.trace("confirm_start", traceId, {
+      sessionId: session.sessionId,
+      type: session.type,
+    });
+
+    // =====================================
+    // 📥 BUFFER
+    // =====================================
 
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     if (!entries.length) {
-      await interaction.reply({ content: "⚠️ Nothing to confirm", ephemeral: true });
+      await interaction.reply({
+        content: "⚠️ Nothing to confirm",
+        ephemeral: true,
+      });
       return;
     }
+
+    // =====================================
+    // ❗ OK ONLY RULE
+    // =====================================
 
     const invalid = entries.filter((e) => e.status !== "OK");
 
@@ -64,18 +117,77 @@ export async function handleConfirm(
       return;
     }
 
-    await enqueuePoints(
-      entries.map((e) => ({
-        guildId,
-        category: session.type,
-        week: "CURRENT",
-        nickname: e.nickname,
-        points: e.value,
-      })),
-      traceId
-    );
+    // =====================================
+    // 🎯 TARGET (AUTOCOMPLETE VALUE)
+    // =====================================
+
+    const target =
+      interaction.options.getString("week") ||
+      interaction.options.getString("event");
+
+    if (!target) {
+      await interaction.reply({
+        content: "❌ Missing target (week/event)",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const mode = resolveMode(session.type);
+
+    // =====================================
+    // 🟦 POINTS
+    // =====================================
+
+    if (mode === "points") {
+      await enqueuePoints(
+        entries.map((e) => ({
+          guildId,
+          category: session.type,
+          week: target,
+          nickname: e.nickname,
+          points: e.value,
+        })),
+        traceId
+      );
+
+      log.trace("confirm_points_enqueued", traceId, {
+        count: entries.length,
+        week: target,
+      });
+    }
+
+    // =====================================
+    // 🟥 EVENTS
+    // =====================================
+
+    if (mode === "events") {
+      await enqueueEvents(
+        entries.map((e) => ({
+          guildId,
+          eventId: target,
+          type: session.type,
+          nickname: e.nickname,
+        })),
+        traceId
+      );
+
+      log.trace("confirm_events_enqueued", traceId, {
+        count: entries.length,
+        eventId: target,
+      });
+    }
+
+    // =====================================
+    // 🧹 CLEANUP
+    // =====================================
 
     QuickAddBuffer.clear(guildId, traceId);
+    QuickAddSession.end(guildId, traceId);
+
+    // =====================================
+    // 📤 RESPONSE
+    // =====================================
 
     await interaction.reply({
       content: `✅ Submitted ${entries.length} entries`,
@@ -84,6 +196,7 @@ export async function handleConfirm(
 
     log.trace("confirm_done", traceId, {
       sessionId: session.sessionId,
+      mode,
       durationMs: Date.now() - startedAt,
     });
 
