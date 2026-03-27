@@ -4,63 +4,68 @@
 
 /**
  * 🪵 ROLE:
- * TRACE LOGGER (FINAL v3 — TRACE TYPE AWARE)
+ * Core logging engine (TRACE + SYSTEM).
  *
- * ✔ SINGLE ID SYSTEM (traceId ONLY)
- * ✔ traceType: USER | SYSTEM (metadata)
- * ✔ bucketed logs
- * ✔ auto flush on terminal events
+ * Responsible for:
+ * - buffering trace logs (grouped by traceId)
+ * - flushing logs on terminal events
+ * - handling system logs (background processes)
  *
  * ❗ RULES:
- * - traceId REQUIRED
- * - NO fake IDs
- * - traceType NOT part of ID
+ * - traceId REQUIRED for trace logs
+ * - NO traceId fallback
+ * - SYSTEM logs do NOT use traceId
+ * - NO external dependencies (except IdGenerator)
+ *
+ * 🔥 TRACE TYPES:
+ * - "user"   → user flow (commands, pipeline)
+ * - "system" → background (worker, cron)
+ *
+ * ✅ FINAL:
+ * - zero config needed in business files
+ * - works via global facade (logger.ts)
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
+import { LOGGER_CONFIG } from "./LoggerConfig";
+import { resolveScope, getTime } from "./LoggerRuntime";
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
-export type TraceType = "USER" | "SYSTEM";
+type TraceType = "user" | "system";
 
-type TraceLogger = {
-  trace: (event: string, traceId: string, data?: any) => void;
-  warn: (event: string, traceId: string, data?: any) => void;
-  error: (event: string, error: any, traceId: string) => void;
+type TraceLog = {
+  time: string;
+  scope: string;
+  event: string;
+  data?: any;
 };
-
-// =====================================
-// 🔹 CONFIG
-// =====================================
-
-const MAX_BUCKET_SIZE = 500;
 
 // =====================================
 // 🔹 STATE
 // =====================================
 
-type TraceLog = {
-  time: string;
-  scope: string;
-  traceType: TraceType;
-  event: string;
-  data?: any;
-};
-
-const traceBuckets = new Map<string, TraceLog[]>();
+const buckets = new Map<string, TraceLog[]>();
 
 // =====================================
-// 🔹 HELPERS
+// 🔹 INTERNAL HELPERS
 // =====================================
 
-function getTime(): string {
-  return new Date().toISOString().split("T")[1].split(".")[0];
+function push(traceId: string, entry: TraceLog) {
+  const logs = buckets.get(traceId) || [];
+
+  if (logs.length >= LOGGER_CONFIG.MAX_BUCKET_SIZE) {
+    logs.shift();
+  }
+
+  logs.push(entry);
+  buckets.set(traceId, logs);
 }
 
-function flushTrace(traceId: string) {
-  const logs = traceBuckets.get(traceId);
+function flush(traceId: string) {
+  const logs = buckets.get(traceId);
   if (!logs?.length) return;
 
   const displayId = resolveDisplayId(traceId);
@@ -69,82 +74,90 @@ function flushTrace(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${log.time} | ${log.scope} | [${log.traceType}] | ${log.event}`,
+      `${log.time} | ${log.scope} | ${log.event}`,
       log.data || ""
     );
   }
 
   console.log("\n=========================================\n");
 
-  traceBuckets.delete(traceId);
+  buckets.delete(traceId);
 }
 
-function push(traceId: string, entry: TraceLog) {
-  const logs = traceBuckets.get(traceId) || [];
-
-  if (logs.length >= MAX_BUCKET_SIZE) {
-    logs.shift();
+function ensure(traceId?: string) {
+  if (!traceId) {
+    throw new Error("Missing traceId");
   }
-
-  logs.push(entry);
-  traceBuckets.set(traceId, logs);
 }
 
 // =====================================
-// 🔒 TRACE LOGGER
+// 🔥 PUBLIC LOGGER API
 // =====================================
 
-export function __createTraceLogger(
-  scope: string,
-  traceType: TraceType
-): TraceLogger {
-  function ensure(traceId: string) {
-    if (!traceId) {
-      throw new Error(`[TRACE ERROR] Missing traceId in ${scope}`);
+export const log = {
+  /**
+   * 🔍 TRACE LOG
+   */
+  trace(
+    event: string,
+    traceId: string,
+    data?: any,
+    type: TraceType = "user"
+  ) {
+    if (!LOGGER_CONFIG.ENABLE_TRACE) return;
+
+    ensure(traceId);
+
+    const scope = resolveScope();
+
+    push(traceId, {
+      time: getTime(),
+      scope: `${scope}:${type}`,
+      event,
+      data,
+    });
+
+    if (LOGGER_CONFIG.FLUSH_EVENTS.includes(event)) {
+      flush(traceId);
     }
-  }
+  },
 
-  return {
-    trace(event, traceId, data) {
-      ensure(traceId);
+  /**
+   * ⚠️ WARNING
+   */
+  warn(event: string, traceId: string, data?: any) {
+    this.trace(event, traceId, data);
+  },
 
-      push(traceId, {
-        time: getTime(),
-        scope,
-        traceType,
-        event,
-        data,
-      });
+  /**
+   * ❌ ERROR (auto flush)
+   */
+  error(event: string, error: any, traceId: string) {
+    ensure(traceId);
 
-      if (event === "pipeline_done" || event === "pipeline_error") {
-        flushTrace(traceId);
-      }
-    },
+    const scope = resolveScope();
 
-    warn(event, traceId, data) {
-      ensure(traceId);
+    push(traceId, {
+      time: getTime(),
+      scope,
+      event,
+      data: { error },
+    });
 
-      push(traceId, {
-        time: getTime(),
-        scope,
-        traceType,
-        event,
-        data,
-      });
-    },
+    flush(traceId);
+  },
 
-    error(event, error, traceId) {
-      ensure(traceId);
+  /**
+   * 🖥️ SYSTEM LOG (no traceId)
+   */
+  system(event: string, data?: any) {
+    if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
 
-      push(traceId, {
-        time: getTime(),
-        scope,
-        traceType,
-        event,
-        data: { error },
-      });
+    const scope = resolveScope();
 
-      flushTrace(traceId);
-    },
-  };
-}
+    console.log(
+      `${getTime()} | ${scope}:SYSTEM | ${event}`,
+      data || ""
+    );
+  },
+};
