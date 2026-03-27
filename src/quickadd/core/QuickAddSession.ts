@@ -18,7 +18,7 @@ import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 
 type SessionData = {
   guildId: string;
-  threadId: string;
+  threadId: string | null;
   ownerId: string;
 
   type: QuickAddType;
@@ -54,6 +54,7 @@ export const QuickAddSession = {
 
     const session: SessionData = {
       ...data,
+      threadId: data.threadId ?? null,
       sessionId: createSessionId(),
       stage: "COLLECTING",
       createdAt: Date.now(),
@@ -74,7 +75,6 @@ export const QuickAddSession = {
     return sessions.get(guildId) || null;
   },
 
-  // 🔥 NEW: attach thread AFTER session creation
   setThreadId(guildId: string, threadId: string, traceId: string) {
     const session = sessions.get(guildId);
 
