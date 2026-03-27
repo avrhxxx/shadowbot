@@ -2,23 +2,6 @@
 // 📁 src/quickadd/discord/actions/start/start.ts
 // =====================================
 
-/**
- * ⚙️ ROLE:
- * Starts a new QuickAdd session.
- *
- * ❗ RULES:
- * - NO import aliases
- * - traceId injected ONLY
- * - CJS SAFE (__filename)
- * - no duplicate logs vs core
- * - cleanup on failure
- *
- * ✅ LOGGER:
- * - uses global log.emit ONLY
- * - no direct logger usage
- * - future-proof (zero refactor needed)
- */
-
 import {
   ChatInputCommandInteraction,
   ChannelType,
@@ -136,7 +119,6 @@ export async function handleStart(
       traceId
     );
 
-    // ❗ HARD GUARD
     if (!session) {
       log.emit({
         event: "start_session_null",
@@ -215,9 +197,12 @@ export async function handleStart(
       } catch {}
     }
 
-    await interaction.reply({
-      content: "❌ Failed to start session",
-      ephemeral: true,
-    });
+    // 🔥 FIX: SAFE REPLY
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: "❌ Failed to start session",
+        ephemeral: true,
+      });
+    }
   }
 }
