@@ -5,7 +5,6 @@
 import {
   ChatInputCommandInteraction,
   ChannelType,
-  TextChannel,
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -68,7 +67,7 @@ export async function handleStart(
       {
         guildId,
         ownerId: userId,
-        threadId: "PENDING", // 🔥 placeholder
+        threadId: null,
         type,
       },
       traceId
@@ -85,7 +84,7 @@ export async function handleStart(
     // =====================================
     // 📢 CHANNEL GUARD
     // =====================================
-    if (!interaction.channel || !(interaction.channel instanceof TextChannel)) {
+    if (!interaction.channel || !interaction.channel.isTextBased()) {
       throw new Error("Invalid channel type");
     }
 
@@ -109,15 +108,18 @@ export async function handleStart(
     QuickAddSession.setThreadId(guildId, thread.id, traceId);
 
     // =====================================
+    // 📤 SEND THREAD MESSAGE FIRST
+    // =====================================
+    await thread.send({
+      content: "🚀 QuickAdd session started\n\nSend screenshots here.",
+    });
+
+    // =====================================
     // 📤 RESPONSE
     // =====================================
     await interaction.reply({
       content: `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`,
       ephemeral: true,
-    });
-
-    await thread.send({
-      content: "🚀 QuickAdd session started\n\nSend screenshots here.",
     });
 
     log.emit({
@@ -145,7 +147,7 @@ export async function handleStart(
     QuickAddSession.end(guildId, traceId);
 
     // ❗ CLEANUP THREAD
-    if (threadId && interaction.channel instanceof TextChannel) {
+    if (threadId && interaction.channel?.isTextBased()) {
       try {
         const thread = await interaction.channel.threads.fetch(threadId);
         await thread?.delete();
