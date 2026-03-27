@@ -5,6 +5,15 @@
 /**
  * 🎯 ROLE:
  * Command router (traceId injected)
+ *
+ * ❗ RULES:
+ * - NO ID generation
+ * - traceId MUST be injected
+ * - no business logic
+ *
+ * ✅ FINAL:
+ * - pure router
+ * - fully aligned with trace system
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
