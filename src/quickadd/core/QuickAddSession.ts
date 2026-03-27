@@ -83,10 +83,11 @@ export const QuickAddSession = {
       log.emit({
         event: "session_setStage_missing",
         traceId,
-        level: "warn",
+        level: "error",
         data: { guildId },
       });
-      return;
+
+      throw new Error("Session not found");
     }
 
     const allowed = ALLOWED_TRANSITIONS[session.stage] || [];
@@ -95,14 +96,17 @@ export const QuickAddSession = {
       log.emit({
         event: "session_invalid_transition",
         traceId,
-        level: "warn",
+        level: "error",
         data: {
           sessionId: session.sessionId,
           from: session.stage,
           to: nextStage,
         },
       });
-      return;
+
+      throw new Error(
+        `Invalid stage transition: ${session.stage} → ${nextStage}`
+      );
     }
 
     const updated: SessionData = {
