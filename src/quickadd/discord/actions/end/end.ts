@@ -2,23 +2,6 @@
 // 📁 src/quickadd/discord/actions/end/end.ts
 // =====================================
 
-/**
- * 🛑 ROLE:
- * Terminates QuickAdd session completely.
- *
- * ❗ RULES:
- * - destructive
- * - owner only
- * - traceId MUST be injected
- * - NO traceId fallback
- *
- * ✅ FINAL:
- * - log.emit only
- * - full cleanup (buffer + session)
- * - safe Discord thread deletion
- * - full observability (metrics + timing)
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -88,30 +71,30 @@ export async function handleEnd(
   try {
     metrics.increment("end_started");
 
-    const threadId = session.threadId;
+    const { sessionId, threadId } = session;
 
     log.emit({
       event: "end_start",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         guildId,
         threadId,
       },
     });
 
     // =====================================
-    // 🧹 CLEANUP
+    // 🧹 CLEANUP (🔥 FUTURE-PROOF)
     // =====================================
 
-    QuickAddBuffer.clear(guildId, traceId);
+    QuickAddBuffer.clear(sessionId, traceId); // 🔥 KEY CHANGE
     QuickAddSession.end(guildId, traceId);
 
     log.emit({
       event: "session_ended",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         guildId,
         threadId,
       },
@@ -145,7 +128,7 @@ export async function handleEnd(
           event: "thread_deleted",
           traceId,
           data: {
-            sessionId: session.sessionId,
+            sessionId,
             threadId,
           },
         });
@@ -158,7 +141,7 @@ export async function handleEnd(
         traceId,
         level: "warn",
         data: {
-          sessionId: session.sessionId,
+          sessionId,
           error: err,
         },
       });
@@ -172,7 +155,7 @@ export async function handleEnd(
       event: "end_done",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         durationMs: duration,
       },
     });
