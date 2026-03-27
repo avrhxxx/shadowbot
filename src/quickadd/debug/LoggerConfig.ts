@@ -23,31 +23,15 @@
  */
 
 export const LOGGER_CONFIG = {
-  // =====================================
-  // 🔹 MODES
-  // =====================================
+  ENABLE_TRACE: true,
+  ENABLE_SYSTEM: true,
 
-  ENABLE_TRACE: true,   // user/system trace logs (buffered)
-  ENABLE_SYSTEM: true,  // direct console logs
-
-  // =====================================
-  // 🔹 PERFORMANCE
-  // =====================================
-
-  MAX_BUCKET_SIZE: 500, // max logs per trace
-
-  // =====================================
-  // 🔹 FLUSH CONTROL
-  // =====================================
+  MAX_BUCKET_SIZE: 500,
 
   FLUSH_EVENTS: [
     "pipeline_done",
     "pipeline_error",
   ],
-
-  // =====================================
-  // 🔹 OBSERVABILITY
-  // =====================================
 
   ENABLE_METRICS: true,
   ENABLE_TIMING: true,
