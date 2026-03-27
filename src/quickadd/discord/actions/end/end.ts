@@ -102,7 +102,7 @@ export async function handleEnd(
         });
       }
     } catch (err) {
-      log.warn("thread_delete_failed", {
+      log.warn("thread_delete_failed", traceId, {
         sessionId: session.sessionId,
         error: err,
       });
