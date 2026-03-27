@@ -36,14 +36,17 @@ async function runWithPSM(
 
   const result = await Tesseract.recognize(buffer, "eng", {
     logger: () => {},
-    // ✅ FIX: bez WorkerParams hacka
-    tessedit_pageseg_mode: psm,
+    config: {
+      tessedit_pageseg_mode: String(psm),
+    },
   });
 
   const text = result.data.text || "";
   const lines = text.split("\n");
 
-  const tokens: OCRToken[] = (result.data.words || []).map((w) => ({
+  const words = result.data.words || [];
+
+  const tokens: OCRToken[] = words.map((w: any) => ({
     text: w.text,
     x: w.bbox.x0,
     y: w.bbox.y0,
@@ -146,7 +149,9 @@ export const OCREngine = {
 
     const result = await Tesseract.recognize(buffer, "eng", {
       logger: () => {},
-      tessedit_create_hocr: "1", // ✅ FIX
+      config: {
+        tessedit_create_hocr: "1",
+      },
     });
 
     const hocr = result.data.hocr || "";
