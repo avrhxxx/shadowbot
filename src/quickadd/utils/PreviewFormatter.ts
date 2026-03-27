@@ -17,9 +17,7 @@
  * - pure function
  */
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
-
-const log = createScopedLogger(import.meta.url);
+import { log } from "../logger";
 
 type PreviewEntry = {
   id: number;
@@ -39,12 +37,20 @@ export function formatPreview(
     throw new Error("traceId is required in formatPreview");
   }
 
-  log.trace("format_preview_start", traceId, {
-    entries: entries.length,
+  log.emit({
+    event: "format_preview_start",
+    traceId,
+    data: {
+      entries: entries.length,
+    },
   });
 
   if (!entries.length) {
-    log.trace("format_preview_empty", traceId);
+    log.emit({
+      event: "format_preview_empty",
+      traceId,
+    });
+
     return "⚠️ No data";
   }
 
@@ -140,11 +146,15 @@ ${suggestions}
 ━━━━━━━━━━━━━━━━━━
 `;
 
-  log.trace("format_preview_done", traceId, {
-    entries: entries.length,
-    hasConfidence: !!confidenceList,
-    hasSuggestions: !!suggestions,
-    length: output.length,
+  log.emit({
+    event: "format_preview_done",
+    traceId,
+    data: {
+      entries: entries.length,
+      hasConfidence: !!confidenceList,
+      hasSuggestions: !!suggestions,
+      length: output.length,
+    },
   });
 
   return output.trim();
