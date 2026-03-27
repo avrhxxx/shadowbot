@@ -126,7 +126,10 @@ export async function validateEntries(
         resolved,
       });
     } catch (err) {
-      log.warn("resolve_failed", err, traceId);
+      log.warn("resolve_failed", {
+        traceId,
+        error: err,
+      });
     }
 
     const finalNickname = resolved || entry.nickname;
