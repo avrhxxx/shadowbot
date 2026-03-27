@@ -106,7 +106,7 @@ export function isInQuickAddThread(
 }
 
 // =====================================
-// 🧠 VALIDATORS (USER-FACING)
+// 🧠 VALIDATORS
 // =====================================
 
 export function validateQuickAddContext(
@@ -118,15 +118,11 @@ export function validateQuickAddContext(
   const userId = interaction.user.id;
   const channelId = interaction.channel?.id;
 
-  if (!isSessionActive(session, traceId)) {
+  if (!session) {
     log.emit({
       event: "guard_fail_no_session",
       traceId,
-      data: {
-        guildId,
-        userId,
-        channelId,
-      },
+      data: { guildId, userId, channelId },
       level: "warn",
     });
 
@@ -152,11 +148,7 @@ export function validateQuickAddContext(
   log.emit({
     event: "guard_context_ok",
     traceId,
-    data: {
-      guildId,
-      userId,
-      channelId,
-    },
+    data: { guildId, userId, channelId },
   });
 
   return null;
@@ -170,14 +162,11 @@ export function validateSessionOwner(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  if (!isSessionActive(session, traceId)) {
+  if (!session) {
     log.emit({
       event: "guard_owner_no_session",
       traceId,
-      data: {
-        guildId,
-        userId,
-      },
+      data: { guildId, userId },
       level: "warn",
     });
 
@@ -202,10 +191,7 @@ export function validateSessionOwner(
   log.emit({
     event: "guard_owner_ok",
     traceId,
-    data: {
-      guildId,
-      userId,
-    },
+    data: { guildId, userId },
   });
 
   return null;
