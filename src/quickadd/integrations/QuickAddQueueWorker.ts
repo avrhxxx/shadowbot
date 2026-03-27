@@ -13,14 +13,20 @@
  * ❗ RULES:
  * - no business logic (yet)
  * - safe loop
+ * - queueId used ONLY when processing single entries
  *
- * 🔥 LOGGER UPDATE:
- * - uses createScopedLogger
- * - SYSTEM traceId per tick
+ * 🔥 LOGGER:
+ * - createScopedLogger (auto scope)
+ * - traceId per tick
+ *
+ * 🚀 READY:
+ * - prepared for queueId
+ * - prepared for retry system
+ * - prepared for batch processing
  */
 
 import { getQueue } from "../storage/QuickAddRepository";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
 const log = createScopedLogger(import.meta.url);
@@ -30,6 +36,15 @@ const log = createScopedLogger(import.meta.url);
 // =====================================
 
 const INTERVAL_MS = 10_000; // 10s
+
+// =====================================
+// 🧱 FUTURE TYPES (LOCAL SAFE CONTRACT)
+// =====================================
+
+type QueueEntry = {
+  queueId?: string; // 🔥 future (prefix q)
+  // other fields unknown yet (storage contract)
+};
 
 // =====================================
 // 🚀 START WORKER
@@ -43,7 +58,7 @@ export function startQuickAddWorker() {
   });
 
   setInterval(async () => {
-    const traceId = createTraceId(); // 🔥 NEW TRACE PER TICK
+    const traceId = createTraceId();
     const startedAt = Date.now();
 
     try {
@@ -52,7 +67,9 @@ export function startQuickAddWorker() {
       // =====================================
       // 📥 LOAD QUEUE (POINTS)
       // =====================================
-      const points = await getQueue("quickadd_points_queue");
+      const points = (await getQueue(
+        "quickadd_points_queue"
+      )) as QueueEntry[];
 
       log.trace("queue_loaded", traceId, {
         type: "points",
@@ -60,7 +77,7 @@ export function startQuickAddWorker() {
       });
 
       // =====================================
-      // 🔍 EMPTY QUEUE SIGNAL (IMPORTANT)
+      // 🔍 EMPTY QUEUE SIGNAL
       // =====================================
       if (!points.length) {
         log.trace("queue_empty", traceId, {
@@ -69,9 +86,20 @@ export function startQuickAddWorker() {
       }
 
       // =====================================
-      // 🔮 FUTURE PROCESSING
+      // 🔄 FUTURE PROCESSING LOOP
       // =====================================
-      // TODO: process queue
+      for (const entry of points) {
+        log.trace("queue_item_received", traceId, {
+          queueId: entry.queueId, // 🔥 SAFE (optional)
+        });
+
+        // =====================================
+        // 🧠 FUTURE:
+        // - processing logic
+        // - retry handling
+        // - status updates
+        // =====================================
+      }
 
       // =====================================
       // ✅ TICK DONE
