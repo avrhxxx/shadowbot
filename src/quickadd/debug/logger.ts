@@ -4,17 +4,11 @@
 
 /**
  * 🧠 ROLE:
- * Central logging entrypoint for QuickAdd system (ENFORCED)
+ * Central logging entrypoint (FINAL)
  *
  * ❗ RULES:
- * - ALWAYS import from this file
- * - DO NOT import DebugLogger directly
- * - DO NOT import createScopedLogger directly
- * - This is the ONLY allowed entrypoint
+ * - ALWAYS import from here
+ * - NEVER import DebugLogger directly
  */
-
-// =====================================
-// 🔒 EXPORT CONTROL
-// =====================================
 
 export { createScopedLogger } from "./createScopedLogger";
