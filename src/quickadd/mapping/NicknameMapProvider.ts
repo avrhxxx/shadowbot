@@ -2,43 +2,29 @@
 // 📁 src/quickadd/mapping/NicknameMapProvider.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Loads and builds nickname mapping from persistent storage (Google Sheets).
- *
- * This is a DATA PROVIDER (not resolver).
- *
- * Responsible for:
- * - loading learning data
- * - building normalized OCR → correct nickname map
- *
- * ❗ RULES:
- * - NO caching here (resolver handles it)
- * - NO business logic
- * - PURE data transformation
- */
-
 import { getLearningData } from "../storage/QuickAddRepository";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("MAP_PROVIDER");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 🔥 LOAD + BUILD MAP
 // =====================================
 
-export async function loadNicknameMap(): Promise<Record<string, string>> {
+export async function loadNicknameMap(
+  traceId: string
+): Promise<Record<string, string>> {
   try {
-    log.trace("map_load_start");
+    log.trace("map_load_start", traceId);
 
-    const rows = await getLearningData();
+    const rows = await getLearningData(traceId);
 
-    log.trace("sheet_loaded", {
+    log.trace("sheet_loaded", traceId, {
       rows: rows?.length || 0,
     });
 
     if (!rows || rows.length < 2) {
-      log.warn("empty_sheet", {
+      log.warn("empty_sheet", traceId, {
         rows: rows?.length || 0,
       });
       return {};
@@ -47,16 +33,12 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
-    // =====================================
-    // 🔍 COLUMN DETECTION
-    // =====================================
-
     const ocrIndex = headers.indexOf("ocr_raw");
     const parserIndex = headers.indexOf("parser_output");
     const adjustedIndex = headers.indexOf("adjusted");
     const overrideIndex = headers.indexOf("override");
 
-    log.trace("columns_detected", {
+    log.trace("columns_detected", traceId, {
       ocrIndex,
       parserIndex,
       adjustedIndex,
@@ -64,24 +46,16 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
     });
 
     if (ocrIndex === -1) {
-      log.warn("missing_ocr_column");
+      log.warn("missing_ocr_column", traceId);
       return {};
     }
 
     const map: Record<string, string> = {};
 
-    // =====================================
-    // 📊 STATS
-    // =====================================
-
     let processed = 0;
     let skippedNoOCR = 0;
     let skippedNoValue = 0;
     let skippedInvalidKey = 0;
-
-    // =====================================
-    // 🔄 BUILD MAP
-    // =====================================
 
     for (const row of dataRows) {
       processed++;
@@ -96,9 +70,6 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
         continue;
       }
 
-      // =====================================
-      // 🔥 PRIORITY
-      // =====================================
       const finalValue =
         (override && override.trim()) ||
         (adjusted && adjusted.trim()) ||
@@ -118,11 +89,7 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
       map[cleaned] = finalValue;
     }
 
-    // =====================================
-    // 📊 RESULT LOG
-    // =====================================
-
-    log.trace("map_stats", {
+    log.trace("map_stats", traceId, {
       processed,
       valid: Object.keys(map).length,
       skippedNoOCR,
@@ -130,21 +97,17 @@ export async function loadNicknameMap(): Promise<Record<string, string>> {
       skippedInvalidKey,
     });
 
-    log.trace("map_built", {
+    log.trace("map_built", traceId, {
       size: Object.keys(map).length,
     });
 
     return map;
 
   } catch (err) {
-    log.error("map_load_failed", err);
+    log.error("map_load_failed", err, traceId);
     return {};
   }
 }
-
-// =====================================
-// 🧼 NORMALIZER (ONLY FOR KEYS)
-// =====================================
 
 function clean(input: string): string {
   return input
