@@ -2,35 +2,12 @@
 // 📁 src/quickadd/ocr/VisionOCRExtractor.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Adapter that transforms Google Vision OCR response
- * into unified OCRToken format used in QuickAdd.
- *
- * Responsibilities:
- * - extract words from Vision response
- * - map bounding boxes → OCRToken
- *
- * ❗ RULES:
- * - NO business logic
- * - NO validation
- * - NO filtering
- * - deterministic
- * - STRICT typing (no any)
- */
-
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { OCRToken } from "./OCRTypes";
 
 const log = createScopedLogger(import.meta.url);
 
-// =====================================
-// 🧱 TYPES (MINIMAL VISION CONTRACT)
-// =====================================
-
-type VisionSymbol = {
-  text: string;
-};
+type VisionSymbol = { text: string };
 
 type VisionWord = {
   symbols?: VisionSymbol[];
@@ -39,36 +16,21 @@ type VisionWord = {
   };
 };
 
-type VisionParagraph = {
-  words?: VisionWord[];
-};
-
-type VisionBlock = {
-  paragraphs?: VisionParagraph[];
-};
-
-type VisionPage = {
-  blocks?: VisionBlock[];
-};
-
-type VisionFullText = {
-  pages?: VisionPage[];
-};
+type VisionParagraph = { words?: VisionWord[] };
+type VisionBlock = { paragraphs?: VisionParagraph[] };
+type VisionPage = { blocks?: VisionBlock[] };
+type VisionFullText = { pages?: VisionPage[] };
 
 type VisionResponse = {
   fullTextAnnotation?: VisionFullText;
 };
-
-// =====================================
-// 🔥 ADAPTER
-// =====================================
 
 export function mapVisionToTokens(
   result: VisionResponse | null,
   traceId: string
 ): OCRToken[] {
   if (!traceId) {
-    throw new Error("traceId is required in VisionOCRAdapter");
+    throw new Error("traceId is required in VisionOCRExtractor");
   }
 
   const startedAt = Date.now();
@@ -82,9 +44,6 @@ export function mapVisionToTokens(
 
   const tokens: OCRToken[] = [];
 
-  // =====================================
-  // 🧠 PARSE WORDS
-  // =====================================
   for (const page of fullText.pages ?? []) {
     for (const block of page.blocks ?? []) {
       for (const paragraph of block.paragraphs ?? []) {
@@ -95,7 +54,6 @@ export function mapVisionToTokens(
           if (!text) continue;
 
           const vertices = word.boundingBox?.vertices;
-
           if (!vertices || vertices.length < 4) continue;
 
           const x = vertices[0]?.x ?? 0;
