@@ -19,9 +19,19 @@
 
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
 import { ParsedEntry } from "../../core/QuickAddTypes";
-// import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
-// const log = createScopedLogger(import.meta.url);
+// ❗ CJS SAFE
+const log = createScopedLogger(__filename);
+
+// =====================================
+// 🧱 INTERNAL TYPES (SAFE FUTURE CONTRACT)
+// =====================================
+
+type DuelRawEntry = {
+  nickname: string;
+  valueRaw: string;
+};
 
 // =====================================
 // 🔥 MAIN
@@ -37,131 +47,130 @@ export function parseDuel(
 
   const { layout } = input;
 
-  // =====================================
-  // 🔹 FUTURE LOGGER (UNCOMMENT WHEN IMPLEMENTING)
-  // =====================================
-  // log.trace("duel_parse_start", traceId, {
-  //   rows: layout.length,
-  // });
+  log.trace("duel_parse_start", traceId, {
+    rows: layout.length,
+  });
 
   // =====================================
-  // 🔹 STAGE 1 — EXTRACT
+  // 🔹 CURRENT: SAFE PLACEHOLDER
   // =====================================
-  // const extracted = extract(layout, traceId);
 
-  // =====================================
-  // 🔹 STAGE 2 — PAIR
-  // =====================================
-  // const paired = pair(extracted, traceId);
+  const result: ParsedEntry[] = [];
 
-  // =====================================
-  // 🔹 STAGE 3 — CLEAN
-  // =====================================
-  // const cleaned = clean(paired, traceId);
+  log.trace("duel_parse_done", traceId, {
+    entries: result.length,
+  });
 
-  // =====================================
-  // 🔹 STAGE 4 — FINALIZE
-  // =====================================
-  // const final = finalize(cleaned, traceId);
-
-  // =====================================
-  // 🔹 FUTURE LOGGER
-  // =====================================
-  // log.trace("duel_parse_done", traceId, {
-  //   entries: final.length,
-  // });
-
-  // 🔥 CURRENT: RETURN EMPTY (SAFE)
-  return [];
+  return result;
 }
 
 // =====================================
 // 🔍 STAGE 1 — EXTRACT
 // =====================================
 
-// function extract(layout: LayoutRow[], traceId: string) {
-//   log.trace("duel_extract_start", traceId, {
-//     rows: layout.length,
-//   });
+/*
+function extract(
+  layout: LayoutRow[],
+  traceId: string
+): DuelRawEntry[] {
+  log.trace("duel_extract_start", traceId, {
+    rows: layout.length,
+  });
 
-//   // TODO:
-//   // - detect nickname cells
-//   // - detect value cells (points)
-//   // - ignore UI / headers
+  const result: DuelRawEntry[] = [];
 
-//   const result: any[] = [];
+  // TODO:
+  // - detect nickname cells
+  // - detect value cells (points)
+  // - ignore UI / headers
 
-//   log.trace("duel_extract_done", traceId, {
-//     extracted: result.length,
-//   });
+  log.trace("duel_extract_done", traceId, {
+    extracted: result.length,
+  });
 
-//   return result;
-// }
+  return result;
+}
+*/
 
 // =====================================
 // 🔗 STAGE 2 — PAIR
 // =====================================
 
-// function pair(entries: any[], traceId: string) {
-//   log.trace("duel_pair_start", traceId, {
-//     entries: entries.length,
-//   });
+/*
+function pair(
+  entries: DuelRawEntry[],
+  traceId: string
+): DuelRawEntry[] {
+  log.trace("duel_pair_start", traceId, {
+    entries: entries.length,
+  });
 
-//   // TODO:
-//   // - match nickname with value
-//   // - handle row alignment issues
+  const result: DuelRawEntry[] = [];
 
-//   const result: any[] = [];
+  // TODO:
+  // - match nickname with value
+  // - handle row alignment issues
 
-//   log.trace("duel_pair_done", traceId, {
-//     pairs: result.length,
-//   });
+  log.trace("duel_pair_done", traceId, {
+    pairs: result.length,
+  });
 
-//   return result;
-// }
+  return result;
+}
+*/
 
 // =====================================
 // 🧼 STAGE 3 — CLEAN
 // =====================================
 
-// function clean(entries: any[], traceId: string) {
-//   log.trace("duel_clean_start", traceId, {
-//     entries: entries.length,
-//   });
+/*
+function clean(
+  entries: DuelRawEntry[],
+  traceId: string
+): ParsedEntry[] {
+  log.trace("duel_clean_start", traceId, {
+    entries: entries.length,
+  });
 
-//   // TODO:
-//   // - normalize nickname
-//   // - parse numbers
-//   // - remove OCR noise
+  const result: ParsedEntry[] = [];
 
-//   const result: ParsedEntry[] = [];
+  // TODO:
+  // - normalize nickname
+  // - parse numbers
+  // - remove OCR noise
 
-//   log.trace("duel_clean_done", traceId, {
-//     cleaned: result.length,
-//   });
+  log.trace("duel_clean_done", traceId, {
+    cleaned: result.length,
+  });
 
-//   return result;
-// }
+  return result;
+}
+*/
 
 // =====================================
 // ✅ STAGE 4 — FINALIZE
 // =====================================
 
-// function finalize(entries: ParsedEntry[], traceId: string) {
-//   log.trace("duel_finalize_start", traceId, {
-//     entries: entries.length,
-//   });
+/*
+function finalize(
+  entries: ParsedEntry[],
+  traceId: string
+): ParsedEntry[] {
+  log.trace("duel_finalize_start", traceId, {
+    entries: entries.length,
+  });
 
-//   // TODO:
-//   // - filter invalid entries
-//   // - ensure value > 0
-//   // - deduplicate
+  const result: ParsedEntry[] = [];
 
-//   const result: ParsedEntry[] = [];
+  // TODO:
+  // - filter invalid entries
+  // - ensure value > 0
+  // - deduplicate
 
-//   log.trace("duel_finalize_done", traceId, {
-//     final: result.length,
-//   });
+  log.trace("duel_finalize_done", traceId, {
+    final: result.length,
+  });
 
-//   return result;
-// }
+  return result;
+}
+*/
