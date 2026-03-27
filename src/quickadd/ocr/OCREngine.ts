@@ -5,13 +5,21 @@
 import Tesseract from "tesseract.js";
 import { log } from "../logger";
 import { OCRToken } from "./OCRTypes";
-import { extractTextGoogle } from "../../google/GoogleVisionService";
+import { runVisionOCR } from "../../google/GoogleVisionService";
+
+// =====================================
+// 🧱 TYPES
+// =====================================
 
 type OCRRunResult = {
   text: string;
   lines: string[];
   tokens: OCRToken[];
 };
+
+// =====================================
+// 🧠 TESSERACT RUNNER
+// =====================================
 
 async function runWithPSM(
   buffer: Buffer,
@@ -28,10 +36,9 @@ async function runWithPSM(
 
   const result = await Tesseract.recognize(buffer, "eng", {
     logger: () => {},
-    config: {
-      tessedit_pageseg_mode: String(psm),
-    },
-  } as unknown as Tesseract.WorkerParams);
+    // ✅ FIX: bez WorkerParams hacka
+    tessedit_pageseg_mode: psm,
+  });
 
   const text = result.data.text || "";
   const lines = text.split("\n");
@@ -59,6 +66,10 @@ async function runWithPSM(
   return { text, lines, tokens };
 }
 
+// =====================================
+// 🧠 GOOGLE VISION
+// =====================================
+
 async function runVision(
   buffer: Buffer,
   traceId: string
@@ -70,17 +81,23 @@ async function runVision(
   });
 
   try {
-    const text = await extractTextGoogle(buffer);
+    const result = await runVisionOCR(buffer);
+
+    const text =
+      result?.fullTextAnnotation?.text ?? "";
+
     const lines = text.split("\n").filter(Boolean);
 
-    const tokens: OCRToken[] = lines.map((line, i) => ({
-      text: line,
-      x: 0,
-      y: i * 10,
-      width: line.length * 6,
-      height: 10,
-      confidence: 90,
-    }));
+    const tokens: OCRToken[] = lines.map(
+      (line: string, i: number) => ({
+        text: line,
+        x: 0,
+        y: i * 10,
+        width: line.length * 6,
+        height: 10,
+        confidence: 90,
+      })
+    );
 
     log.emit({
       event: "vision_done",
@@ -106,6 +123,10 @@ async function runVision(
   }
 }
 
+// =====================================
+// 🚀 PUBLIC API
+// =====================================
+
 export const OCREngine = {
   full: (buffer: Buffer, traceId: string) =>
     runWithPSM(buffer, traceId, 6, "FULL"),
@@ -125,10 +146,8 @@ export const OCREngine = {
 
     const result = await Tesseract.recognize(buffer, "eng", {
       logger: () => {},
-      config: {
-        tessedit_create_hocr: "1",
-      },
-    } as unknown as Tesseract.WorkerParams);
+      tessedit_create_hocr: "1", // ✅ FIX
+    });
 
     const hocr = result.data.hocr || "";
 
