@@ -36,7 +36,10 @@ const ALLOWED_TRANSITIONS: Record<QuickAddStage, QuickAddStage[]> = {
 };
 
 export const QuickAddSession = {
-  start(data: Omit<SessionData, "sessionId" | "stage" | "createdAt">, traceId: string) {
+  start(
+    data: Omit<SessionData, "sessionId" | "stage" | "createdAt">,
+    traceId: string
+  ) {
     const existing = sessions.get(data.guildId);
 
     if (existing) {
@@ -68,6 +71,57 @@ export const QuickAddSession = {
   },
 
   get: (guildId: string) => sessions.get(guildId) || null,
+
+  setStage(
+    guildId: string,
+    nextStage: QuickAddStage,
+    traceId: string
+  ) {
+    const session = sessions.get(guildId);
+
+    if (!session) {
+      log.emit({
+        event: "session_setStage_missing",
+        traceId,
+        level: "warn",
+        data: { guildId },
+      });
+      return;
+    }
+
+    const allowed = ALLOWED_TRANSITIONS[session.stage] || [];
+
+    if (!allowed.includes(nextStage)) {
+      log.emit({
+        event: "session_invalid_transition",
+        traceId,
+        level: "warn",
+        data: {
+          sessionId: session.sessionId,
+          from: session.stage,
+          to: nextStage,
+        },
+      });
+      return;
+    }
+
+    const updated: SessionData = {
+      ...session,
+      stage: nextStage,
+    };
+
+    sessions.set(guildId, updated);
+
+    log.emit({
+      event: "session_stage_updated",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        from: session.stage,
+        to: nextStage,
+      },
+    });
+  },
 
   end(guildId: string, traceId: string) {
     const session = sessions.get(guildId);
