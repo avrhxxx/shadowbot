@@ -16,8 +16,8 @@
  * - queueId used ONLY when processing single entries
  *
  * 🔥 LOGGER:
- * - createScopedLogger (auto scope)
- * - traceId per tick
+ * - uses log.emit ONLY
+ * - system-level logs
  *
  * 🚀 READY:
  * - prepared for queueId
@@ -26,10 +26,8 @@
  */
 
 import { getQueue } from "../storage/QuickAddRepository";
-import { createScopedLogger } from "../debug/logger";
+import { log } from "../logger";
 import { createTraceId } from "../core/IdGenerator";
-
-const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 📌 CONFIG
@@ -38,12 +36,11 @@ const log = createScopedLogger(import.meta.url);
 const INTERVAL_MS = 10_000; // 10s
 
 // =====================================
-// 🧱 FUTURE TYPES (LOCAL SAFE CONTRACT)
+// 🧱 TYPES
 // =====================================
 
 type QueueEntry = {
-  queueId?: string; // 🔥 future (prefix q)
-  // other fields unknown yet (storage contract)
+  queueId?: string;
 };
 
 // =====================================
@@ -53,8 +50,13 @@ type QueueEntry = {
 export function startQuickAddWorker() {
   const systemTraceId = createTraceId();
 
-  log.trace("worker_started", systemTraceId, {
-    intervalMs: INTERVAL_MS,
+  log.emit({
+    event: "worker_started",
+    traceId: systemTraceId,
+    type: "system",
+    data: {
+      intervalMs: INTERVAL_MS,
+    },
   });
 
   setInterval(async () => {
@@ -62,57 +64,90 @@ export function startQuickAddWorker() {
     const startedAt = Date.now();
 
     try {
-      log.trace("worker_tick_start", traceId);
+      log.emit({
+        event: "worker_tick_start",
+        traceId,
+        type: "system",
+      });
 
       // =====================================
-      // 📥 LOAD QUEUE (POINTS)
+      // 📥 LOAD QUEUE
       // =====================================
       const points = (await getQueue(
         "quickadd_points_queue"
       )) as QueueEntry[];
 
-      log.trace("queue_loaded", traceId, {
-        type: "points",
-        rows: points.length,
+      log.emit({
+        event: "queue_loaded",
+        traceId,
+        type: "system",
+        data: {
+          type: "points",
+          rows: points.length,
+        },
       });
 
       // =====================================
-      // 🔍 EMPTY QUEUE SIGNAL
+      // 🔍 EMPTY QUEUE
       // =====================================
       if (!points.length) {
-        log.trace("queue_empty", traceId, {
-          type: "points",
+        log.emit({
+          event: "queue_empty",
+          traceId,
+          type: "system",
+          data: {
+            type: "points",
+          },
         });
       }
 
       // =====================================
-      // 🔄 FUTURE PROCESSING LOOP
+      // 🔄 PROCESS LOOP (FUTURE)
       // =====================================
       for (const entry of points) {
-        log.trace("queue_item_received", traceId, {
-          queueId: entry.queueId, // 🔥 SAFE (optional)
+        log.emit({
+          event: "queue_item_received",
+          traceId,
+          type: "system",
+          data: {
+            queueId: entry.queueId,
+          },
         });
 
-        // =====================================
-        // 🧠 FUTURE:
-        // - processing logic
-        // - retry handling
-        // - status updates
-        // =====================================
+        // future logic
       }
 
       // =====================================
-      // ✅ TICK DONE
+      // ✅ DONE
       // =====================================
-      log.trace("worker_tick_done", traceId, {
-        durationMs: Date.now() - startedAt,
+      log.emit({
+        event: "worker_tick_done",
+        traceId,
+        type: "system",
+        data: {
+          durationMs: Date.now() - startedAt,
+        },
       });
 
     } catch (err) {
-      log.error("worker_error", err, traceId);
+      log.emit({
+        event: "worker_error",
+        traceId,
+        type: "system",
+        level: "error",
+        data: {
+          error: err,
+        },
+      });
 
-      log.trace("worker_tick_failed", traceId, {
-        durationMs: Date.now() - startedAt,
+      log.emit({
+        event: "worker_tick_failed",
+        traceId,
+        type: "system",
+        level: "error",
+        data: {
+          durationMs: Date.now() - startedAt,
+        },
       });
     }
   }, INTERVAL_MS);
