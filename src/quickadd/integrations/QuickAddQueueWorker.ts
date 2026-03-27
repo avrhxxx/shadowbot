@@ -13,12 +13,17 @@
  * ❗ RULES:
  * - no business logic (yet)
  * - safe loop
+ *
+ * 🔥 LOGGER UPDATE:
+ * - uses createScopedLogger
+ * - SYSTEM traceId per tick
  */
 
 import { getQueue } from "../storage/QuickAddRepository";
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createTraceId } from "../core/IdGenerator";
 
-const log = createLogger("WORKER");
+const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 📌 CONFIG
@@ -31,22 +36,25 @@ const INTERVAL_MS = 10_000; // 10s
 // =====================================
 
 export function startQuickAddWorker() {
-  log.trace("worker_started", {
+  const systemTraceId = createTraceId();
+
+  log.trace("worker_started", systemTraceId, {
     intervalMs: INTERVAL_MS,
   });
 
   setInterval(async () => {
+    const traceId = createTraceId(); // 🔥 NEW TRACE PER TICK
     const startedAt = Date.now();
 
     try {
-      log.trace("worker_tick_start");
+      log.trace("worker_tick_start", traceId);
 
       // =====================================
       // 📥 LOAD QUEUE (POINTS)
       // =====================================
       const points = await getQueue("quickadd_points_queue");
 
-      log.trace("queue_loaded", {
+      log.trace("queue_loaded", traceId, {
         type: "points",
         rows: points.length,
       });
@@ -55,7 +63,7 @@ export function startQuickAddWorker() {
       // 🔍 EMPTY QUEUE SIGNAL (IMPORTANT)
       // =====================================
       if (!points.length) {
-        log.trace("queue_empty", {
+        log.trace("queue_empty", traceId, {
           type: "points",
         });
       }
@@ -68,14 +76,14 @@ export function startQuickAddWorker() {
       // =====================================
       // ✅ TICK DONE
       // =====================================
-      log.trace("worker_tick_done", {
+      log.trace("worker_tick_done", traceId, {
         durationMs: Date.now() - startedAt,
       });
 
     } catch (err) {
-      log.error("worker_error", err);
+      log.error("worker_error", err, traceId);
 
-      log.trace("worker_tick_failed", {
+      log.trace("worker_tick_failed", traceId, {
         durationMs: Date.now() - startedAt,
       });
     }
