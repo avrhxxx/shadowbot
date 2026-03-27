@@ -7,10 +7,10 @@
  * Centralized ID generator for QuickAdd system.
  *
  * Responsibilities:
- * - generate sessionId
- * - generate traceId (USER FLOW)
- * - generate systemTraceId (SYSTEM FLOW)
- * - generate queueId
+ * - generate sessionId (real + display)
+ * - generate traceId (real + display)
+ * - generate queueId (real + display)
+ * - generate systemId (real + display)
  * - maintain realId → displayId mapping
  *
  * ❗ RULES:
@@ -27,9 +27,9 @@ import crypto from "crypto";
 // =====================================
 
 const traceCounters = new Map<string, number>();
-const systemTraceCounters = new Map<string, number>();
 const sessionCounters = new Map<string, number>();
 const queueCounters = new Map<string, number>();
+const systemCounters = new Map<string, number>(); // 🔥 NEW
 
 const idDisplayMap = new Map<string, string>();
 
@@ -82,7 +82,7 @@ function generateUUID(): string {
 // =====================================
 
 function buildId(
-  prefix: "s" | "t" | "x" | "q",
+  prefix: "s" | "t" | "q" | "sys",
   counterMap: Map<string, number>
 ) {
   const dateKey = getDateKey();
@@ -94,19 +94,9 @@ function buildId(
   const uuid = generateUUID();
   const shortUuid = uuid.slice(0, 6);
 
-  // =====================================
-  // 🔥 REAL ID
-  // =====================================
   const realId = `${prefix}-${dateKey}-${counterStr}-${uuid}`;
-
-  // =====================================
-  // 🔥 DISPLAY ID
-  // =====================================
   const displayId = `${prefix.toUpperCase()}-${dateKey}-${counterStr}-${shortUuid}`;
 
-  // =====================================
-  // 🔗 MAPPING
-  // =====================================
   idDisplayMap.set(realId, displayId);
 
   return {
@@ -119,32 +109,21 @@ function buildId(
 // 🔥 PUBLIC API
 // =====================================
 
-/**
- * 🔹 USER FLOW TRACE
- */
 export function createTraceId(): string {
   return buildId("t", traceCounters).realId;
 }
 
-/**
- * 🔹 SYSTEM FLOW TRACE
- */
-export function createSystemTraceId(): string {
-  return buildId("x", systemTraceCounters).realId;
-}
-
-/**
- * 🔹 SESSION
- */
 export function createSessionId(): string {
   return buildId("s", sessionCounters).realId;
 }
 
-/**
- * 🔹 QUEUE
- */
 export function createQueueId(): string {
   return buildId("q", queueCounters).realId;
+}
+
+// 🔥 NEW
+export function createSystemId(): string {
+  return buildId("sys", systemCounters).realId;
 }
 
 // =====================================
