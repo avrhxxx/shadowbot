@@ -135,7 +135,8 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.setEntries(guildId, merged, traceId);
+    // 🔥 FIX: replaceEntries zamiast setEntries
+    QuickAddBuffer.replaceEntries(guildId, merged, traceId);
 
     log.emit({
       event: "adjust_applied",
