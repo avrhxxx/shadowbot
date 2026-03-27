@@ -15,7 +15,7 @@
  * 🎯 DESIGN GOALS:
  * - zero refactor on logger changes
  * - minimal input required
- * - automatic scope resolution
+ * - automatic scope resolution (inside DebugLogger)
  * - clear separation:
  *    - level → severity
  *    - type  → flow (user/system)
