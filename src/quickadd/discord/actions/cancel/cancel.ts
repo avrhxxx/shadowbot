@@ -31,6 +31,19 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -42,16 +55,14 @@ export async function handleCancel(
   timing.start(timerId);
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -66,13 +77,10 @@ export async function handleCancel(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.reply({
-      content:
-        contextError ??
-        ownerError ??
-        "❌ Session not found",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      contextError ?? ownerError ?? "❌ Session not found"
+    );
     return;
   }
 
@@ -98,10 +106,10 @@ export async function handleCancel(
       },
     });
 
-    await interaction.reply({
-      content: "🧹 Buffer cleared (session still active)",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "🧹 Buffer cleared (session still active)"
+    );
 
     const duration = timing.end(timerId);
 
@@ -131,9 +139,9 @@ export async function handleCancel(
       },
     });
 
-    await interaction.reply({
-      content: "❌ Failed to clear buffer",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "❌ Failed to clear buffer"
+    );
   }
 }
