@@ -4,7 +4,7 @@
 
 /**
  * 🎯 ROLE:
- * Command router + traceId injector
+ * Command router (traceId injected)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -13,7 +13,6 @@ import {
   QuickAddSubcommand,
 } from "./CommandRegistry";
 import { createScopedLogger } from "@/quickadd/debug/logger";
-import { createTraceId } from "../core/IdGenerator";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -22,11 +21,10 @@ const log = createScopedLogger(import.meta.url);
 // =====================================
 
 export async function handleQuickAddCommand(
-  interaction: ChatInputCommandInteraction
+  interaction: ChatInputCommandInteraction,
+  traceId: string
 ) {
   if (!interaction.isChatInputCommand()) return;
-
-  const traceId = createTraceId();
 
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
@@ -38,9 +36,6 @@ export async function handleQuickAddCommand(
     const subcommand =
       interaction.options.getSubcommand() as QuickAddSubcommand;
 
-    // =====================================
-    // 📥 INPUT
-    // =====================================
     log.trace("command_received", traceId, {
       userId,
       guildId,
@@ -50,9 +45,6 @@ export async function handleQuickAddCommand(
 
     const handler = getCommandHandler(subcommand);
 
-    // =====================================
-    // 🚀 EXECUTION START
-    // =====================================
     log.trace("command_execution_start", traceId, {
       userId,
       guildId,
@@ -62,9 +54,6 @@ export async function handleQuickAddCommand(
 
     await handler(interaction, traceId);
 
-    // =====================================
-    // ✅ EXECUTION DONE
-    // =====================================
     log.trace("command_execution_done", traceId, {
       userId,
       guildId,
