@@ -4,44 +4,43 @@
 
 /**
  * 🪵 ROLE:
- * Core logging engine (TRACE + SYSTEM).
+ * Core logging engine (EVENT-BASED).
  *
- * Responsible for:
- * - buffering trace logs (grouped by traceId)
- * - flushing logs on terminal events
- * - handling system logs (background processes)
- *
- * ❗ RULES:
- * - traceId REQUIRED for trace logs
- * - NO traceId fallback
- * - SYSTEM logs do NOT use traceId
- * - NO external dependencies (except IdGenerator)
- *
- * 🔥 TRACE TYPES:
- * - "user"   → user flow
- * - "system" → background flow
- *
- * ✅ FINAL:
- * - zero config needed in business files
- * - works via global facade (logger.ts)
+ * ❗ IMPORTANT:
+ * - ONLY works with emit(eventObject)
+ * - NO knowledge about business layer
+ * - FULLY replaceable without refactor
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
 import { LOGGER_CONFIG } from "./LoggerConfig";
-import { resolveScope, getTime } from "./LoggerRuntime";
+import { getTime } from "./LoggerRuntime";
 
-type TraceType = "user" | "system";
+// =====================================
+// 🔹 TYPES
+// =====================================
 
-type TraceLog = {
-  time: string;
+type LogLevel = "trace" | "warn" | "error" | "system";
+
+type LogEvent = {
   scope: string;
   event: string;
+  traceId?: string;
   data?: any;
+  level?: LogLevel;
 };
 
-const buckets = new Map<string, TraceLog[]>();
+// =====================================
+// 🔹 STATE
+// =====================================
 
-function push(traceId: string, entry: TraceLog) {
+const buckets = new Map<string, LogEvent[]>();
+
+// =====================================
+// 🔹 INTERNAL
+// =====================================
+
+function push(traceId: string, entry: LogEvent) {
   const logs = buckets.get(traceId) || [];
 
   if (logs.length >= LOGGER_CONFIG.MAX_BUCKET_SIZE) {
@@ -62,7 +61,7 @@ function flush(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${log.time} | ${log.scope} | ${log.event}`,
+      `${getTime()} | ${log.scope} | ${log.event}`,
       log.data || ""
     );
   }
@@ -72,64 +71,43 @@ function flush(traceId: string) {
   buckets.delete(traceId);
 }
 
-function ensure(traceId?: string) {
-  if (!traceId) {
-    throw new Error("Missing traceId");
-  }
-}
+// =====================================
+// 🔥 CORE ENGINE
+// =====================================
 
-export const log = {
-  trace(
-    event: string,
-    traceId: string,
-    data?: any,
-    type: TraceType = "user"
-  ) {
+export const DebugLogger = {
+  emit(input: LogEvent) {
+    if (!LOGGER_CONFIG.ENABLE_LOGS) return;
+
+    const level = input.level || "trace";
+
+    // =====================================
+    // SYSTEM LOG (NO TRACE)
+    // =====================================
+    if (level === "system" || !input.traceId) {
+      if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
+
+      console.log(
+        `${getTime()} | ${input.scope}:SYSTEM | ${input.event}`,
+        input.data || ""
+      );
+
+      return;
+    }
+
+    // =====================================
+    // TRACE LOG
+    // =====================================
     if (!LOGGER_CONFIG.ENABLE_TRACE) return;
 
-    ensure(traceId);
+    push(input.traceId, input);
 
-    const scope = resolveScope();
-
-    push(traceId, {
-      time: getTime(),
-      scope: `${scope}:${type}`,
-      event,
-      data,
-    });
-
-    if (LOGGER_CONFIG.FLUSH_EVENTS.includes(event)) {
-      flush(traceId);
+    if (LOGGER_CONFIG.FLUSH_EVENTS.includes(input.event)) {
+      flush(input.traceId);
     }
-  },
 
-  warn(event: string, traceId: string, data?: any) {
-    this.trace(event, traceId, data);
-  },
-
-  error(event: string, error: any, traceId: string) {
-    ensure(traceId);
-
-    const scope = resolveScope();
-
-    push(traceId, {
-      time: getTime(),
-      scope,
-      event,
-      data: { error },
-    });
-
-    flush(traceId);
-  },
-
-  system(event: string, data?: any) {
-    if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
-
-    const scope = resolveScope();
-
-    console.log(
-      `${getTime()} | ${scope}:SYSTEM | ${event}`,
-      data || ""
-    );
+    if (level === "error") {
+      flush(input.traceId);
+    }
   },
 };
