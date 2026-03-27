@@ -109,6 +109,39 @@ export const QuickAddBuffer = {
     });
   },
 
+  // 🔥 FIX: CONTROLLED REPLACE (dla adjust/fix)
+  replaceEntries(guildId: string, entries: BufferedEntry[], traceId: string) {
+    assertTrace(traceId, "replaceEntries");
+    checkTimeout(guildId, traceId);
+
+    log.emit({
+      event: "buffer_replace_start",
+      traceId,
+      data: {
+        guildId,
+        count: entries.length,
+      },
+    });
+
+    // 🔒 zachowujemy ID continuity
+    const maxId =
+      entries.length > 0
+        ? Math.max(...entries.map((e) => e.id))
+        : 0;
+
+    buffer.set(guildId, entries);
+    idCounters.set(guildId, maxId + 1);
+
+    log.emit({
+      event: "buffer_replace_done",
+      traceId,
+      data: {
+        guildId,
+        nextId: maxId + 1,
+      },
+    });
+  },
+
   getEntries(guildId: string, traceId: string): BufferedEntry[] {
     assertTrace(traceId, "getEntries");
     checkTimeout(guildId, traceId);
