@@ -9,23 +9,31 @@
  * ❗ RULES:
  * - destructive
  * - owner only
- * - traceId MUST be injected (from router)
- * - NO traceId fallback (STRICT)
+ * - traceId MUST be injected
+ * - NO traceId fallback
  * - sessionId included in logs
+ * - CJS SAFE
+ *
+ * ✅ FINAL:
+ * - full cleanup (buffer + session)
+ * - safe Discord thread deletion
+ * - guarded execution
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
+
 import {
   validateQuickAddContext,
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
-const log = createScopedLogger(import.meta.url);
+// ❗ CJS SAFE
+const log = createScopedLogger(__filename);
 
 // =====================================
 // 🚀 HANDLER
@@ -50,18 +58,14 @@ export async function handleEnd(
   const session = QuickAddSession.get(guildId);
 
   const contextError = validateQuickAddContext(interaction, session);
-  if (contextError || !session) {
-    await interaction.reply({
-      content: contextError ?? "❌ Session not found",
-      ephemeral: true,
-    });
-    return;
-  }
-
   const ownerError = validateSessionOwner(interaction, session);
-  if (ownerError) {
+
+  if (contextError || ownerError || !session) {
     await interaction.reply({
-      content: ownerError,
+      content:
+        contextError ??
+        ownerError ??
+        "❌ Session not found",
       ephemeral: true,
     });
     return;
@@ -76,6 +80,10 @@ export async function handleEnd(
       threadId,
     });
 
+    // =====================================
+    // 🧹 CLEANUP
+    // =====================================
+
     QuickAddBuffer.clear(guildId, traceId);
     QuickAddSession.end(guildId, traceId);
 
@@ -85,15 +93,28 @@ export async function handleEnd(
       threadId,
     });
 
+    // =====================================
+    // 📤 RESPONSE
+    // =====================================
+
     await interaction.reply({
       content: "🛑 QuickAdd session ended",
       ephemeral: true,
     });
 
+    // =====================================
+    // 🧵 THREAD DELETE (SAFE)
+    // =====================================
+
     try {
       const channel = interaction.channel;
 
-      if (channel && "deletable" in channel && channel.deletable) {
+      if (
+        channel &&
+        typeof channel === "object" &&
+        "deletable" in channel &&
+        channel.deletable
+      ) {
         await channel.delete();
 
         log.trace("thread_deleted", traceId, {
