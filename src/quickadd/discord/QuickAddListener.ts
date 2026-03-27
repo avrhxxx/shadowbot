@@ -21,7 +21,7 @@ import { handleQuickAddCommand } from "./CommandRouter";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
-// 🔥 NEW (autocomplete handler)
+// 🔥 AUTOCOMPLETE HANDLER
 import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
 
 const log = createScopedLogger(import.meta.url);
@@ -45,13 +45,20 @@ export function registerQuickAddListener(client: Client) {
       if (interaction.isAutocomplete()) {
         if (interaction.commandName !== "q") return;
 
+        const subcommand = interaction.options.getSubcommand();
+
         log.trace("autocomplete_received", traceId, {
           userId,
           guildId,
           channelId,
+          subcommand,
         });
 
-        await handleConfirmAutocomplete(interaction, traceId);
+        // 🔹 ROUTING BY SUBCOMMAND
+        if (subcommand === "confirm") {
+          await handleConfirmAutocomplete(interaction, traceId);
+        }
+
         return;
       }
 
