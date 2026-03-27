@@ -14,9 +14,9 @@
  * - no business logic
  * - no session logic
  *
- * 🔥 LOGGER UPDATE:
- * - uses createScopedLogger
- * - SYSTEM traceId generated locally
+ * 🔥 LOGGER:
+ * - uses log.emit ONLY
+ * - system-level logs (type: "system")
  */
 
 import {
@@ -25,10 +25,8 @@ import {
   TextChannel,
 } from "discord.js";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { log } from "../logger";
 import { createTraceId } from "../core/IdGenerator";
-
-const log = createScopedLogger(import.meta.url);
 
 // =====================================
 // 📌 CONFIG
@@ -46,9 +44,14 @@ export async function ensureQuickAddChannel(
   const traceId = createTraceId(); // 🔥 SYSTEM TRACE
   const guildId = guild.id;
 
-  log.trace("channel_ensure_start", traceId, {
-    guildId,
-    expectedName: CHANNEL_NAME,
+  log.emit({
+    event: "channel_ensure_start",
+    traceId,
+    type: "system",
+    data: {
+      guildId,
+      expectedName: CHANNEL_NAME,
+    },
   });
 
   // =====================================
@@ -61,10 +64,15 @@ export async function ensureQuickAddChannel(
   ) as TextChannel | undefined;
 
   if (existing) {
-    log.trace("channel_found", traceId, {
-      guildId,
-      channelId: existing.id,
-      name: existing.name,
+    log.emit({
+      event: "channel_found",
+      traceId,
+      type: "system",
+      data: {
+        guildId,
+        channelId: existing.id,
+        name: existing.name,
+      },
     });
 
     return existing;
@@ -73,9 +81,14 @@ export async function ensureQuickAddChannel(
   // =====================================
   // 🏗️ CREATE CHANNEL
   // =====================================
-  log.trace("channel_create_start", traceId, {
-    guildId,
-    name: CHANNEL_NAME,
+  log.emit({
+    event: "channel_create_start",
+    traceId,
+    type: "system",
+    data: {
+      guildId,
+      name: CHANNEL_NAME,
+    },
   });
 
   const created = await guild.channels.create({
@@ -83,10 +96,15 @@ export async function ensureQuickAddChannel(
     type: ChannelType.GuildText,
   });
 
-  log.trace("channel_created", traceId, {
-    guildId,
-    channelId: created.id,
-    name: created.name,
+  log.emit({
+    event: "channel_created",
+    traceId,
+    type: "system",
+    data: {
+      guildId,
+      channelId: created.id,
+      name: created.name,
+    },
   });
 
   return created;
