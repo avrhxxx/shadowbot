@@ -85,6 +85,8 @@ export async function handleConfirm(
     return;
   }
 
+  const sessionId = session.sessionId;
+
   try {
     metrics.increment("confirm_started");
 
@@ -92,13 +94,14 @@ export async function handleConfirm(
       event: "confirm_start",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         stage: session.stage,
         type: session.type,
       },
     });
 
-    const entries = QuickAddBuffer.getEntries(guildId, traceId);
+    // 🔥 SESSION-BASED BUFFER
+    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
       await safeReply(interaction, "⚠️ Nothing to confirm");
@@ -141,7 +144,7 @@ export async function handleConfirm(
         event: "confirm_stage_entered",
         traceId,
         data: {
-          sessionId: session.sessionId,
+          sessionId,
         },
       });
 
@@ -199,7 +202,8 @@ export async function handleConfirm(
       );
     }
 
-    QuickAddBuffer.clear(guildId, traceId);
+    // 🔥 SESSION-BASED CLEANUP
+    QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
 
     await safeReply(
@@ -215,7 +219,7 @@ export async function handleConfirm(
       event: "confirm_done",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         durationMs: duration,
       },
     });
