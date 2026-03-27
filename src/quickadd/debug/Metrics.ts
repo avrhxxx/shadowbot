@@ -7,18 +7,12 @@
  * Lightweight metrics layer (counters).
  *
  * Responsible for:
- * - counting events (pipelines, errors, etc.)
- * - exposing simple observability data
+ * - counting events
+ * - exposing observability data
  *
  * ❗ RULES:
- * - NO logging here
+ * - NO logging
  * - NO side effects
- * - safe to call anywhere
- *
- * ✅ USE CASES:
- * - pipeline_runs
- * - validation_errors
- * - queue_processed
  */
 
 import { LOGGER_CONFIG } from "./LoggerConfig";
