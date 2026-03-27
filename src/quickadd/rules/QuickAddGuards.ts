@@ -7,7 +7,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
-import { log } from "@/quickadd/debug/logger";
+import { log } from "../logger";
 
 // =====================================
 // 🧠 CORE GUARDS (PURE)
@@ -20,7 +20,6 @@ export function isSessionActive(
   const result = !!session;
 
   log.emit({
-    scope: "QuickAddGuards",
     event: "guard_session_active",
     traceId,
     data: { result },
@@ -37,7 +36,6 @@ export function isSessionOwner(
   const result = session?.ownerId === userId;
 
   log.emit({
-    scope: "QuickAddGuards",
     event: "guard_session_owner",
     traceId,
     data: {
@@ -57,7 +55,6 @@ export function isInQuickAddThread(
 ): boolean {
   if (!channel || !session) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_thread_missing_context",
       traceId,
       data: {
@@ -69,10 +66,8 @@ export function isInQuickAddThread(
     return false;
   }
 
-  // MAIN THREAD
   if (channel.id === session.threadId) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_thread_match_main",
       traceId,
       data: {
@@ -84,10 +79,8 @@ export function isInQuickAddThread(
     return true;
   }
 
-  // CHILD THREAD (Discord ThreadChannel)
   if ("parentId" in channel && channel.parentId === session.threadId) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_thread_match_child",
       traceId,
       data: {
@@ -101,7 +94,6 @@ export function isInQuickAddThread(
   }
 
   log.emit({
-    scope: "QuickAddGuards",
     event: "guard_thread_mismatch",
     traceId,
     data: {
@@ -128,7 +120,6 @@ export function validateQuickAddContext(
 
   if (!isSessionActive(session, traceId)) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_fail_no_session",
       traceId,
       data: {
@@ -144,7 +135,6 @@ export function validateQuickAddContext(
 
   if (!isInQuickAddThread(interaction.channel, session, traceId)) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_fail_wrong_thread",
       traceId,
       data: {
@@ -160,7 +150,6 @@ export function validateQuickAddContext(
   }
 
   log.emit({
-    scope: "QuickAddGuards",
     event: "guard_context_ok",
     traceId,
     data: {
@@ -183,7 +172,6 @@ export function validateSessionOwner(
 
   if (!isSessionActive(session, traceId)) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_owner_no_session",
       traceId,
       data: {
@@ -198,7 +186,6 @@ export function validateSessionOwner(
 
   if (!isSessionOwner(userId, session, traceId)) {
     log.emit({
-      scope: "QuickAddGuards",
       event: "guard_owner_mismatch",
       traceId,
       data: {
@@ -213,7 +200,6 @@ export function validateSessionOwner(
   }
 
   log.emit({
-    scope: "QuickAddGuards",
     event: "guard_owner_ok",
     traceId,
     data: {
