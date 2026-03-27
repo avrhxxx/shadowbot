@@ -81,11 +81,12 @@ export async function handleStart(
     }
 
     // =====================================
-    // 🧠 START SESSION FIRST
+    // 🧠 START SESSION FIRST (FIX: userId BACK)
     // =====================================
     const session = QuickAddSession.start(
       {
         guildId,
+        userId, // ✅ REQUIRED
         ownerId: userId,
         threadId: null,
         type,
