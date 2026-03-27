@@ -4,43 +4,61 @@
 
 /**
  * 🪵 ROLE:
- * Core logging engine (EVENT-BASED).
+ * Core logging engine (EVENT-BASED, FINAL).
  *
  * ❗ IMPORTANT:
- * - ONLY works with emit(eventObject)
- * - NO knowledge about business layer
- * - FULLY replaceable without refactor
+ * - ONLY works with log.emit({...})
+ * - NO scope passed from outside (auto-resolved)
+ * - supports:
+ *    - trace logs (buffered)
+ *    - system logs (direct)
+ *    - levels (info/warn/error)
+ *    - types (user/system)
+ *
+ * ✅ DESIGN:
+ * - fully replaceable
+ * - zero refactor impact on business files
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
 import { LOGGER_CONFIG } from "./LoggerConfig";
-import { getTime } from "./LoggerRuntime";
+import { getTime, resolveScope } from "./LoggerRuntime";
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
-type LogLevel = "trace" | "warn" | "error" | "system";
+type LogLevel = "info" | "warn" | "error";
+type TraceType = "user" | "system";
 
 type LogEvent = {
-  scope: string;
   event: string;
   traceId?: string;
   data?: any;
+
   level?: LogLevel;
+  type?: TraceType;
+};
+
+type InternalLog = {
+  time: string;
+  scope: string;
+  event: string;
+  level: LogLevel;
+  data?: any;
 };
 
 // =====================================
 // 🔹 STATE
 // =====================================
 
-const buckets = new Map<string, LogEvent[]>();
+const buckets = new Map<string, InternalLog[]>();
 
 // =====================================
-// 🔹 INTERNAL
+// 🔹 INTERNAL HELPERS
 // =====================================
 
-function push(traceId: string, entry: LogEvent) {
+function push(traceId: string, entry: InternalLog) {
   const logs = buckets.get(traceId) || [];
 
   if (logs.length >= LOGGER_CONFIG.MAX_BUCKET_SIZE) {
@@ -61,7 +79,7 @@ function flush(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${getTime()} | ${log.scope} | ${log.event}`,
+      `${log.time} | ${log.scope} | ${log.level} | ${log.event}`,
       log.data || ""
     );
   }
@@ -77,37 +95,54 @@ function flush(traceId: string) {
 
 export const DebugLogger = {
   emit(input: LogEvent) {
-    if (!LOGGER_CONFIG.ENABLE_LOGS) return;
+    const {
+      event,
+      traceId,
+      data,
+      level = "info",
+      type = "user",
+    } = input;
 
-    const level = input.level || "trace";
+    const scope = resolveScope();
 
     // =====================================
-    // SYSTEM LOG (NO TRACE)
+    // 🔹 SYSTEM LOG (NO TRACE BUFFER)
     // =====================================
-    if (level === "system" || !input.traceId) {
+
+    if (type === "system" || !traceId) {
       if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
 
       console.log(
-        `${getTime()} | ${input.scope}:SYSTEM | ${input.event}`,
-        input.data || ""
+        `${getTime()} | ${scope}:SYSTEM | ${level} | ${event}`,
+        data || ""
       );
 
       return;
     }
 
     // =====================================
-    // TRACE LOG
+    // 🔹 TRACE LOG (BUFFERED)
     // =====================================
+
     if (!LOGGER_CONFIG.ENABLE_TRACE) return;
 
-    push(input.traceId, input);
+    push(traceId, {
+      time: getTime(),
+      scope,
+      event,
+      level,
+      data,
+    });
 
-    if (LOGGER_CONFIG.FLUSH_EVENTS.includes(input.event)) {
-      flush(input.traceId);
-    }
+    // =====================================
+    // 🔹 FLUSH CONDITIONS
+    // =====================================
 
-    if (level === "error") {
-      flush(input.traceId);
+    if (
+      LOGGER_CONFIG.FLUSH_EVENTS.includes(event) ||
+      level === "error"
+    ) {
+      flush(traceId);
     }
   },
 };
