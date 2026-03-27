@@ -6,26 +6,30 @@
  * 📚 ROLE:
  * Maps subcommands to their handlers.
  *
- * Responsible for:
- * - registering all command actions
- * - providing handler lookup
- *
  * ❗ RULES:
  * - NO business logic
- * - NO Discord logic
- * - only mapping layer
+ * - ONLY mapping
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 // =====================================
-// 🧱 TYPE
+// 🧱 TYPES
 // =====================================
 
 export type CommandHandler = (
   interaction: ChatInputCommandInteraction,
   traceId: string
 ) => Promise<void>;
+
+export type QuickAddSubcommand =
+  | "start"
+  | "preview"
+  | "adjust"
+  | "fix"
+  | "confirm"
+  | "cancel"
+  | "end";
 
 // =====================================
 // 📦 IMPORT HANDLERS
@@ -43,7 +47,7 @@ import { handleEnd } from "./actions/end/end";
 // 🧠 REGISTRY
 // =====================================
 
-const registry: Record<string, CommandHandler> = {
+const registry: Record<QuickAddSubcommand, CommandHandler> = {
   start: handleStart,
   preview: handlePreview,
   adjust: handleAdjust,
@@ -58,7 +62,7 @@ const registry: Record<string, CommandHandler> = {
 // =====================================
 
 export function getCommandHandler(
-  subcommand: string
-): CommandHandler | null {
-  return registry[subcommand] || null;
+  subcommand: QuickAddSubcommand
+): CommandHandler {
+  return registry[subcommand];
 }
