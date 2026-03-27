@@ -33,10 +33,10 @@ export function buildQuickAddCommand() {
             .setDescription("QuickAdd mode")
             .setRequired(true)
             .addChoices(
-              { name: "Donations", value: "DONATIONS_POINTS" },
-              { name: "Duel", value: "DUEL_POINTS" },
-              { name: "RR Signups", value: "RR_SIGNUPS" },
-              { name: "RR Results", value: "RR_RESULTS" }
+              { name: "Donations Points", value: "DONATIONS_POINTS" },
+              { name: "Duel Points", value: "DUEL_POINTS" },
+              { name: "Reservoir Signups", value: "RR_SIGNUPS" },
+              { name: "Reservoir Results", value: "RR_RESULTS" }
             )
         )
     )
