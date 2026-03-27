@@ -24,6 +24,15 @@ type SessionData = {
 
 const sessions = new Map<string, SessionData>();
 
+// =====================================
+// 🧠 ALLOWED TRANSITIONS
+// =====================================
+
+const ALLOWED_TRANSITIONS: Record<QuickAddStage, QuickAddStage[]> = {
+  COLLECTING: ["CONFIRM_PENDING"],
+  CONFIRM_PENDING: [],
+};
+
 export const QuickAddSession = {
   start(
     data: {
@@ -97,7 +106,7 @@ export const QuickAddSession = {
 
   setStage(
     guildId: string,
-    stage: QuickAddStage,
+    nextStage: QuickAddStage,
     traceId: string
   ) {
     const session = sessions.get(guildId);
@@ -105,20 +114,49 @@ export const QuickAddSession = {
     if (!session) {
       log.warn("session_setStage_missing", traceId, {
         guildId,
-        nextStage: stage,
+        nextStage,
       });
       return;
     }
 
     const prevStage = session.stage;
 
-    session.stage = stage;
+    // =====================================
+    // ❌ INVALID TRANSITION GUARD
+    // =====================================
+
+    const allowed = ALLOWED_TRANSITIONS[prevStage] || [];
+
+    if (!allowed.includes(nextStage)) {
+      log.warn("session_invalid_transition", traceId, {
+        sessionId: session.sessionId,
+        guildId,
+        from: prevStage,
+        to: nextStage,
+      });
+      return;
+    }
+
+    // =====================================
+    // ❌ DUPLICATE TRANSITION GUARD
+    // =====================================
+
+    if (prevStage === nextStage) {
+      log.warn("session_duplicate_transition", traceId, {
+        sessionId: session.sessionId,
+        guildId,
+        stage: prevStage,
+      });
+      return;
+    }
+
+    session.stage = nextStage;
 
     log.trace("session_stage_updated", traceId, {
       sessionId: session.sessionId,
       guildId,
       from: prevStage,
-      to: stage,
+      to: nextStage,
     });
   },
 };
