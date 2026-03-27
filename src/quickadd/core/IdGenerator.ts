@@ -7,9 +7,10 @@
  * Centralized ID generator for QuickAdd system.
  *
  * Responsibilities:
- * - generate sessionId (real + display)
- * - generate traceId (real + display)
- * - generate queueId (real + display)
+ * - generate sessionId
+ * - generate traceId (USER FLOW)
+ * - generate systemTraceId (SYSTEM FLOW)
+ * - generate queueId
  * - maintain realId → displayId mapping
  *
  * ❗ RULES:
@@ -26,6 +27,7 @@ import crypto from "crypto";
 // =====================================
 
 const traceCounters = new Map<string, number>();
+const systemTraceCounters = new Map<string, number>();
 const sessionCounters = new Map<string, number>();
 const queueCounters = new Map<string, number>();
 
@@ -80,7 +82,7 @@ function generateUUID(): string {
 // =====================================
 
 function buildId(
-  prefix: "s" | "t" | "q",
+  prefix: "s" | "t" | "x" | "q",
   counterMap: Map<string, number>
 ) {
   const dateKey = getDateKey();
@@ -117,14 +119,30 @@ function buildId(
 // 🔥 PUBLIC API
 // =====================================
 
+/**
+ * 🔹 USER FLOW TRACE
+ */
 export function createTraceId(): string {
   return buildId("t", traceCounters).realId;
 }
 
+/**
+ * 🔹 SYSTEM FLOW TRACE
+ */
+export function createSystemTraceId(): string {
+  return buildId("x", systemTraceCounters).realId;
+}
+
+/**
+ * 🔹 SESSION
+ */
 export function createSessionId(): string {
   return buildId("s", sessionCounters).realId;
 }
 
+/**
+ * 🔹 QUEUE
+ */
 export function createQueueId(): string {
   return buildId("q", queueCounters).realId;
 }
