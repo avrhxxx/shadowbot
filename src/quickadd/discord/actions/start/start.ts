@@ -1,4 +1,4 @@
-// =====================================
+l// =====================================
 // 📁 src/quickadd/discord/actions/start/start.ts
 // =====================================
 
@@ -95,13 +95,19 @@ export async function handleStart(
     }
 
     // =====================================
-    // 🧵 CREATE THREAD
+    // 📩 CREATE STARTER MESSAGE
     // =====================================
-    const thread = await interaction.channel.threads.create({
+    const starterMessage = await interaction.channel.send({
+      content: `🚀 QuickAdd session: ${type}`,
+    });
+
+    // =====================================
+    // 🔒 CREATE PRIVATE THREAD
+    // =====================================
+    const thread = await starterMessage.startThread({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
       type: ChannelType.PrivateThread,
-      reason: "QuickAdd session",
     });
 
     threadId = thread.id;
@@ -114,7 +120,7 @@ export async function handleStart(
     QuickAddSession.setThreadId(guildId, thread.id, traceId);
 
     // =====================================
-    // 📤 SEND THREAD MESSAGE FIRST
+    // 📤 THREAD MESSAGE
     // =====================================
     await thread.send({
       content: "🚀 QuickAdd session started\n\nSend screenshots here.",
@@ -124,7 +130,7 @@ export async function handleStart(
     // 📤 RESPONSE
     // =====================================
     await interaction.reply({
-      content: `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`,
+      content: `✅ QuickAdd started\n🔒 Private thread: <#${thread.id}>`,
       ephemeral: true,
     });
 
@@ -152,7 +158,7 @@ export async function handleStart(
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, traceId);
 
-    // ❗ CLEANUP THREAD (TYPE-SAFE)
+    // ❗ CLEANUP THREAD
     if (
       threadId &&
       interaction.channel &&
