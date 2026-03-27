@@ -22,9 +22,6 @@ export function buildQuickAddCommand() {
     .setName("q")
     .setDescription("QuickAdd system commands")
 
-    // =====================================
-    // 🚀 START
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("start")
@@ -43,52 +40,31 @@ export function buildQuickAddCommand() {
         )
     )
 
-    // =====================================
-    // 👀 PREVIEW
-    // =====================================
     .addSubcommand((sub) =>
-      sub
-        .setName("preview")
-        .setDescription("Show current parsed entries")
+      sub.setName("preview").setDescription("Show current parsed entries")
     )
 
-    // =====================================
-    // ✏️ ADJUST
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("adjust")
         .setDescription("Manually adjust entry")
         .addIntegerOption((opt) =>
-          opt
-            .setName("id")
-            .setDescription("Entry ID")
-            .setRequired(true)
+          opt.setName("id").setDescription("Entry ID").setRequired(true)
         )
         .addStringOption((opt) =>
-          opt
-            .setName("nickname")
-            .setDescription("New nickname")
+          opt.setName("nickname").setDescription("New nickname")
         )
         .addIntegerOption((opt) =>
-          opt
-            .setName("value")
-            .setDescription("New value")
+          opt.setName("value").setDescription("New value")
         )
     )
 
-    // =====================================
-    // 🤖 FIX
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("fix")
         .setDescription("Auto-fix entries using suggestions")
     )
 
-    // =====================================
-    // 🔥 CONFIRM (2-STAGE)
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("confirm")
@@ -102,18 +78,10 @@ export function buildQuickAddCommand() {
         )
     )
 
-    // =====================================
-    // ❌ CANCEL
-    // =====================================
     .addSubcommand((sub) =>
-      sub
-        .setName("cancel")
-        .setDescription("Clear buffer (keep session)")
+      sub.setName("cancel").setDescription("Clear buffer (keep session)")
     )
 
-    // =====================================
-    // 🛑 END
-    // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("end")
