@@ -17,6 +17,7 @@ import { SlashCommandBuilder } from "discord.js";
  * - stage-based confirm (target optional)
  * - consistent descriptions
  */
+
 export function buildQuickAddCommand() {
   return new SlashCommandBuilder()
     .setName("q")
@@ -88,3 +89,6 @@ export function buildQuickAddCommand() {
         .setDescription("End QuickAdd session completely")
     );
 }
+
+// 🔥 FIX: to jest brakujący export wymagany przez index.ts
+export const qCommand = buildQuickAddCommand();
