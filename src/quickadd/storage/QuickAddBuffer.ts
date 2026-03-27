@@ -63,7 +63,7 @@ function checkTimeout(guildId: string, traceId: string) {
       event: "buffer_timeout",
       traceId,
       data: { guildId, before },
-      type: "system",
+      level: "warn",
     });
 
     buffer.delete(guildId);
