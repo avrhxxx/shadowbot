@@ -36,7 +36,7 @@ export type ParsedEntry = {
 };
 
 // =====================================
-// 🔹 VALIDATED ENTRY (AFTER VALIDATION)
+// 🔹 ENTRY STATUS
 // =====================================
 
 export type EntryStatus =
@@ -45,6 +45,10 @@ export type EntryStatus =
   | "UNRESOLVED"
   | "DUPLICATE"
   | "INVALID_VALUE";
+
+// =====================================
+// 🔹 VALIDATED ENTRY (AFTER VALIDATION)
+// =====================================
 
 export type ValidatedEntry = {
   id: number;
