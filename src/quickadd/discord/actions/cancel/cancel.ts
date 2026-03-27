@@ -12,8 +12,9 @@
  * - NO fallback
  *
  * ✅ FINAL:
- * - relative imports (Node-safe)
- * - validator API unified (traceId)
+ * - global logger (log.emit)
+ * - full observability (metrics + timing)
+ * - zero logger coupling
  * - Discord-safe replies
  */
 
@@ -27,9 +28,7 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-const log = createScopedLogger(import.meta.url);
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🚀 HANDLER
@@ -39,7 +38,8 @@ export async function handleCancel(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `cancel-${traceId}`;
+  timing.start(timerId);
 
   const guildId = interaction.guildId;
 
@@ -77,15 +77,25 @@ export async function handleCancel(
   }
 
   try {
-    log.trace("cancel_start", traceId, {
-      sessionId: session.sessionId,
-      guildId,
+    metrics.increment("cancel_started");
+
+    log.emit({
+      event: "cancel_start",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+      },
     });
 
     QuickAddBuffer.clear(guildId, traceId);
 
-    log.trace("cancel_buffer_cleared", traceId, {
-      sessionId: session.sessionId,
+    log.emit({
+      event: "cancel_buffer_cleared",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+      },
     });
 
     await interaction.reply({
@@ -93,13 +103,33 @@ export async function handleCancel(
       ephemeral: true,
     });
 
-    log.trace("cancel_done", traceId, {
-      sessionId: session.sessionId,
-      durationMs: Date.now() - startedAt,
+    const duration = timing.end(timerId);
+
+    metrics.increment("cancel_success");
+
+    log.emit({
+      event: "cancel_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
-    log.error("cancel_failed", err, traceId);
+    const duration = timing.end(timerId);
+
+    metrics.increment("cancel_error");
+
+    log.emit({
+      event: "cancel_failed",
+      traceId,
+      level: "error",
+      data: {
+        error: err,
+        durationMs: duration,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to clear buffer",
