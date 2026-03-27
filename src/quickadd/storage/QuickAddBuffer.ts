@@ -2,20 +2,8 @@
 // 📁 src/quickadd/storage/QuickAddBuffer.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * In-memory state for QuickAdd session entries.
- *
- * ❗ RULES:
- * - IMMUTABLE OUTSIDE
- * - state can ONLY be modified via API
- * - traceId REQUIRED (STRICT)
- * - sliding timeout
- * - returns SAFE COPIES ONLY
- */
-
 import { log } from "../logger";
-import { EntryStatus } from "../validation/QuickAddValidator";
+import { EntryStatus } from "../core/QuickAddTypes";
 
 type ParsedEntry = {
   nickname: string;
@@ -74,10 +62,8 @@ function checkTimeout(guildId: string, traceId: string) {
     log.emit({
       event: "buffer_timeout",
       traceId,
-      data: {
-        guildId,
-        before,
-      },
+      data: { guildId, before },
+      type: "system",
     });
 
     buffer.delete(guildId);
@@ -109,10 +95,7 @@ export const QuickAddBuffer = {
     log.emit({
       event: "buffer_add_start",
       traceId,
-      data: {
-        guildId,
-        incoming: entries.length,
-      },
+      data: { guildId, incoming: entries.length },
     });
 
     const current = buffer.get(guildId) || [];
@@ -161,11 +144,7 @@ export const QuickAddBuffer = {
     log.emit({
       event: "buffer_replace_start",
       traceId,
-      data: {
-        guildId,
-        before,
-        incoming: entries.length,
-      },
+      data: { guildId, before, incoming: entries.length },
     });
 
     const cloned = cloneEntries(entries);
@@ -200,10 +179,7 @@ export const QuickAddBuffer = {
     log.emit({
       event: "buffer_get",
       traceId,
-      data: {
-        guildId,
-        count: entries.length,
-      },
+      data: { guildId, count: entries.length },
     });
 
     return cloneEntries(entries);
@@ -217,10 +193,7 @@ export const QuickAddBuffer = {
     log.emit({
       event: "buffer_clear_start",
       traceId,
-      data: {
-        guildId,
-        before,
-      },
+      data: { guildId, before },
     });
 
     buffer.delete(guildId);
@@ -230,9 +203,7 @@ export const QuickAddBuffer = {
     log.emit({
       event: "buffer_clear_done",
       traceId,
-      data: {
-        guildId,
-      },
+      data: { guildId },
     });
   },
 };
