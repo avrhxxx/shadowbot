@@ -7,7 +7,7 @@ import { AutocompleteInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -33,7 +33,6 @@ function resolveMode(type: QuickAddType): "points" | "events" {
   if (type === "DONATIONS_POINTS" || type === "DUEL_POINTS") {
     return "points";
   }
-
   return "events";
 }
 
@@ -51,20 +50,8 @@ export async function handleConfirmAutocomplete(
 
   const session = QuickAddSession.get(guildId);
 
-  // =====================================
-  // ❌ NO SESSION
-  // =====================================
-
-  if (!session) {
-    await interaction.respond([]);
-    return;
-  }
-
-  // =====================================
-  // ❌ WRONG STAGE
-  // =====================================
-
-  if (session.stage !== "CONFIRM_PENDING") {
+  // ❌ NO SESSION OR WRONG STAGE
+  if (!session || session.stage !== "CONFIRM_PENDING") {
     await interaction.respond([]);
     return;
   }
@@ -75,10 +62,6 @@ export async function handleConfirmAutocomplete(
 
   const options =
     mode === "points" ? WEEK_OPTIONS : EVENT_OPTIONS;
-
-  // =====================================
-  // 🔍 FILTERING
-  // =====================================
 
   const filtered = options.filter((opt) =>
     opt.name.toLowerCase().includes(focused.toLowerCase())
