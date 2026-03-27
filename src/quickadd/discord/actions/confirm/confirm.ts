@@ -2,22 +2,6 @@
 // 📁 src/quickadd/discord/actions/confirm/confirm.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Finalizes QuickAdd session (STRICT MODE).
- *
- * ❗ RULES:
- * - OK ONLY
- * - 2-stage flow
- * - owner only
- * - traceId injected
- *
- * ✅ FINAL:
- * - log.emit only (no scoped logger)
- * - full observability (metrics + timing)
- * - zero logger coupling
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -133,9 +117,15 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage === "COLLECTING") {
-      QuickAddSession.setStage(
-        guildId,
-        "CONFIRM_PENDING",
+      // ❗ FIX: zamiast setStage → restart sesji z nowym stage
+      QuickAddSession.start(
+        {
+          guildId,
+          ownerId: session.ownerId,
+          threadId: session.threadId,
+          type: session.type,
+          stage: "CONFIRM_PENDING",
+        },
         traceId
       );
 
