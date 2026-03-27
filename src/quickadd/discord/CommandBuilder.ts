@@ -14,10 +14,6 @@
  * ❗ RULES:
  * - NO logic
  * - only structure
- *
- * ✅ FINAL:
- * - fully compliant
- * - no changes required
  */
 
 import { SlashCommandBuilder } from "discord.js";
@@ -68,8 +64,22 @@ export function buildQuickAddCommand() {
       sub.setName("fix").setDescription("Auto-fix entries")
     )
 
+    // =====================================
+    // 🔥 CONFIRM (UPDATED)
+    // =====================================
     .addSubcommand((sub) =>
-      sub.setName("confirm").setDescription("Confirm and save entries")
+      sub
+        .setName("confirm")
+        .setDescription("Confirm and save entries")
+
+        // 🔹 TYPE (derived from session but needed for autocomplete separation)
+        .addStringOption((opt) =>
+          opt
+            .setName("target")
+            .setDescription("Select week or event")
+            .setRequired(true)
+            .setAutocomplete(true)
+        )
     )
 
     .addSubcommand((sub) =>
