@@ -14,6 +14,7 @@
  * ✅ FINAL:
  * - uses log.emit
  * - proper autocomplete routing
+ * - SAFE reply handling (🔥 FIX 40060 / 10062)
  */
 
 import { Client, Interaction } from "discord.js";
@@ -87,13 +88,24 @@ export function registerQuickAddListener(client: Client) {
         level: "error",
       });
 
+      // =====================================
+      // 🔥 SAFE RESPONSE (NO DOUBLE REPLY)
+      // =====================================
       if (interaction.isRepliable()) {
-        await interaction
-          .reply({
-            content: "❌ QuickAdd listener error",
-            ephemeral: true,
-          })
-          .catch(() => null);
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({
+              content: "❌ QuickAdd listener error",
+            });
+          } else if (!interaction.replied) {
+            await interaction.reply({
+              content: "❌ QuickAdd listener error",
+              ephemeral: true,
+            });
+          }
+        } catch {
+          // ignore Discord hard errors
+        }
       }
     }
   });
