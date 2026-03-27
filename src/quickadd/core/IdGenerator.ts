@@ -6,18 +6,23 @@
  * 🧠 ROLE:
  * Centralized ID generator for QuickAdd system.
  *
- * Responsibilities:
- * - generate sessionId
- * - generate traceId
- * - generate queueId
- * - maintain realId → displayId mapping
+ * Responsible for:
+ * - generating unique IDs:
+ *    - sessionId
+ *    - traceId
+ *    - queueId
+ * - maintaining realId → displayId mapping
  *
  * ❗ RULES:
  * - single source of truth
  * - NO logging
- * - NO external dependencies
+ * - NO external dependencies (except crypto)
  * - deterministic structure
  * - NO systemId → use traceType instead
+ *
+ * ⚠️ NOTE:
+ * - displayId is for logs/UI only
+ * - NEVER use displayId in logic
  */
 
 import crypto from "crypto";
@@ -41,21 +46,19 @@ const idDisplayMap = new Map<string, string>();
 function getDateKey(): string {
   const now = new Date();
 
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const min = String(now.getMinutes()).padStart(2, "0");
-
-  return `${dd}${mm}${hh}${min}`;
+  return `${String(now.getDate()).padStart(2, "0")}${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}${String(now.getHours()).padStart(2, "0")}${String(
+    now.getMinutes()
+  ).padStart(2, "0")}`;
 }
 
 function getDayKey(): string {
   const now = new Date();
 
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-
-  return `${dd}${mm}`;
+  return `${String(now.getDate()).padStart(2, "0")}${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}`;
 }
 
 function getNextCounter(map: Map<string, number>, dayKey: string): number {
@@ -76,21 +79,17 @@ function generateUUID(): string {
 // 🔹 CORE BUILDER
 // =====================================
 
-function buildId(
-  prefix: "s" | "t" | "q",
-  counterMap: Map<string, number>
-) {
+function buildId(prefix: "s" | "t" | "q", map: Map<string, number>) {
   const dateKey = getDateKey();
   const dayKey = getDayKey();
 
-  const counter = getNextCounter(counterMap, dayKey);
-  const counterStr = padCounter(counter);
+  const counter = padCounter(getNextCounter(map, dayKey));
 
   const uuid = generateUUID();
   const shortUuid = uuid.slice(0, 6);
 
-  const realId = `${prefix}-${dateKey}-${counterStr}-${uuid}`;
-  const displayId = `${prefix.toUpperCase()}-${dateKey}-${counterStr}-${shortUuid}`;
+  const realId = `${prefix}-${dateKey}-${counter}-${uuid}`;
+  const displayId = `${prefix.toUpperCase()}-${dateKey}-${counter}-${shortUuid}`;
 
   idDisplayMap.set(realId, displayId);
 
@@ -101,17 +100,9 @@ function buildId(
 // 🔥 PUBLIC API
 // =====================================
 
-export function createTraceId(): string {
-  return buildId("t", counters.trace);
-}
-
-export function createSessionId(): string {
-  return buildId("s", counters.session);
-}
-
-export function createQueueId(): string {
-  return buildId("q", counters.queue);
-}
+export const createTraceId = () => buildId("t", counters.trace);
+export const createSessionId = () => buildId("s", counters.session);
+export const createQueueId = () => buildId("q", counters.queue);
 
 // =====================================
 // 🔍 RESOLVER
