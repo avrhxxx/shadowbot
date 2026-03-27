@@ -46,30 +46,6 @@ export async function handleStart(
     return;
   }
 
-  const existing = QuickAddSession.get(guildId);
-
-  // =====================================
-  // 🔒 SESSION EXISTS
-  // =====================================
-  if (existing) {
-    log.emit({
-      event: "start_blocked_existing_session",
-      traceId,
-      data: {
-        guildId,
-        owner: existing.ownerId,
-      },
-      level: "warn",
-    });
-
-    await interaction.reply({
-      content: "⚠️ A session is already active",
-      ephemeral: true,
-    });
-
-    return;
-  }
-
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
@@ -82,9 +58,30 @@ export async function handleStart(
 
   const type: QuickAddType = rawType;
 
-  let createdThreadId: string | null = null;
+  let threadId: string | null = null;
 
   try {
+    // =====================================
+    // 🧠 START SESSION FIRST
+    // =====================================
+    const session = QuickAddSession.start(
+      {
+        guildId,
+        ownerId: userId,
+        threadId: "PENDING", // 🔥 placeholder
+        type,
+      },
+      traceId
+    );
+
+    if (!session) {
+      await interaction.reply({
+        content: "⚠️ A session is already active",
+        ephemeral: true,
+      });
+      return;
+    }
+
     // =====================================
     // 📢 CHANNEL GUARD
     // =====================================
@@ -102,60 +99,14 @@ export async function handleStart(
       reason: "QuickAdd session",
     });
 
-    createdThreadId = thread.id;
+    threadId = thread.id;
 
     await thread.members.add(userId);
 
     // =====================================
-    // 🧠 START SESSION
+    // 🔗 ATTACH THREAD TO SESSION
     // =====================================
-    const session = QuickAddSession.start(
-      {
-        guildId,
-        threadId: thread.id,
-        ownerId: userId,
-        type,
-      },
-      traceId
-    );
-
-    if (!session) {
-      log.emit({
-        event: "start_session_null",
-        traceId,
-        data: {
-          guildId,
-          threadId: thread.id,
-        },
-        level: "error",
-      });
-
-      try {
-        await thread.delete();
-      } catch {}
-
-      await interaction.reply({
-        content: "❌ Failed to start session",
-        ephemeral: true,
-      });
-
-      return;
-    }
-
-    // =====================================
-    // 🔍 LOG
-    // =====================================
-    log.emit({
-      event: "start_initialized",
-      traceId,
-      data: {
-        sessionId: session.sessionId,
-        guildId,
-        threadId: thread.id,
-        userId,
-        type,
-      },
-    });
+    QuickAddSession.setThreadId(guildId, thread.id, traceId);
 
     // =====================================
     // 📤 RESPONSE
@@ -174,6 +125,7 @@ export async function handleStart(
       traceId,
       data: {
         sessionId: session.sessionId,
+        threadId,
         durationMs: Date.now() - startedAt,
       },
     });
@@ -182,22 +134,25 @@ export async function handleStart(
     log.emit({
       event: "start_failed",
       traceId,
+      level: "error",
       data: {
         error: err,
         guildId,
       },
-      level: "error",
     });
 
-    // ❗ CLEANUP ORPHAN THREAD
-    if (createdThreadId && interaction.channel instanceof TextChannel) {
+    // ❗ CLEANUP SESSION
+    QuickAddSession.end(guildId, traceId);
+
+    // ❗ CLEANUP THREAD
+    if (threadId && interaction.channel instanceof TextChannel) {
       try {
-        const thread = await interaction.channel.threads.fetch(createdThreadId);
+        const thread = await interaction.channel.threads.fetch(threadId);
         await thread?.delete();
       } catch {}
     }
 
-    // 🔥 FIX: SAFE REPLY
+    // ❗ SAFE REPLY
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: "❌ Failed to start session",
