@@ -5,17 +5,35 @@
 /**
  * ❌ ROLE:
  * Clears current QuickAdd buffer WITHOUT ending session.
+ *
+ * ❗ RULES:
+ * - owner only (destructive operation)
+ * - traceId MUST be injected
+ * - NO fallback
+ *
+ * ✅ FINAL:
+ * - relative imports (Node-safe)
+ * - validator API unified (traceId)
+ * - Discord-safe replies
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import {
+  validateQuickAddContext,
+  validateSessionOwner,
+} from "../../../rules/QuickAddGuards";
+
+import { createScopedLogger } from "../../../debug/logger";
 
 const log = createScopedLogger(import.meta.url);
+
+// =====================================
+// 🚀 HANDLER
+// =====================================
 
 export async function handleCancel(
   interaction: ChatInputCommandInteraction,
@@ -26,24 +44,49 @@ export async function handleCancel(
   const guildId = interaction.guildId;
 
   if (!guildId) {
-    await interaction.reply({ content: "❌ Guild only command", ephemeral: true });
+    await interaction.reply({
+      content: "❌ Guild only command",
+      ephemeral: true,
+    });
     return;
   }
 
   const session = QuickAddSession.get(guildId);
-  const contextError = validateQuickAddContext(interaction, session);
 
-  if (contextError || !session) {
-    await interaction.reply({ content: contextError ?? "❌ Session not found", ephemeral: true });
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
+
+  const ownerError = validateSessionOwner(
+    interaction,
+    session,
+    traceId
+  );
+
+  if (contextError || ownerError || !session) {
+    await interaction.reply({
+      content:
+        contextError ??
+        ownerError ??
+        "❌ Session not found",
+      ephemeral: true,
+    });
     return;
   }
 
   try {
-    log.trace("cancel_start", traceId, { sessionId: session.sessionId, guildId });
+    log.trace("cancel_start", traceId, {
+      sessionId: session.sessionId,
+      guildId,
+    });
 
     QuickAddBuffer.clear(guildId, traceId);
 
-    log.trace("cancel_buffer_cleared", traceId, { sessionId: session.sessionId });
+    log.trace("cancel_buffer_cleared", traceId, {
+      sessionId: session.sessionId,
+    });
 
     await interaction.reply({
       content: "🧹 Buffer cleared (session still active)",
