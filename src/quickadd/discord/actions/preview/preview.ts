@@ -30,6 +30,19 @@ import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -41,19 +54,17 @@ export async function handlePreview(
   timing.start(timerId);
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   // =====================================
   // ❌ GUILD GUARD
   // =====================================
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -62,10 +73,10 @@ export async function handlePreview(
   );
 
   if (contextError || !session) {
-    await interaction.reply({
-      content: contextError ?? "❌ Session not found",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      contextError ?? "❌ Session not found"
+    );
     return;
   }
 
@@ -94,10 +105,7 @@ export async function handlePreview(
     // ⚠️ EMPTY STATE
     // =====================================
     if (!entries.length) {
-      await interaction.reply({
-        content: "⚠️ Buffer is empty",
-        ephemeral: true,
-      });
+      await safeReply(interaction, "⚠️ Buffer is empty");
 
       metrics.increment("preview_empty");
 
@@ -115,15 +123,12 @@ export async function handlePreview(
     // =====================================
     // 🖥️ FORMAT OUTPUT
     // =====================================
-    const output = formatPreview(entries, traceId); // ✅ FIX
+    const output = formatPreview(entries, traceId);
 
     // =====================================
     // 📤 RESPONSE
     // =====================================
-    await interaction.reply({
-      content: output,
-      ephemeral: true,
-    });
+    await safeReply(interaction, output);
 
     const duration = timing.end(timerId);
 
@@ -154,9 +159,9 @@ export async function handlePreview(
       },
     });
 
-    await interaction.reply({
-      content: "❌ Failed to generate preview",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "❌ Failed to generate preview"
+    );
   }
 }
