@@ -2,24 +2,8 @@
 // 📁 src/quickadd/ocr/layout/LayoutBuilder.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Pure layout builder (NOT a parser).
- *
- * Responsible for:
- * - transforming OCR tokens into structured layout (rows → cells)
- * - preserving geometry (no business logic)
- *
- * ❗ RULES:
- * - NO cleaning
- * - NO parsing
- * - ONLY structure
- */
-
 import { OCRToken } from "../OCRTypes";
-import { createScopedLogger } from "@/quickadd/debug/logger";
-
-const log = createScopedLogger(import.meta.url);
+import { log } from "../../logger";
 
 // =====================================
 // 🧱 TYPES
@@ -50,8 +34,10 @@ export function buildLayout(
   tokens: OCRToken[],
   traceId: string
 ): LayoutRow[] {
-  log.trace("layout_start", traceId, {
-    tokens: tokens.length,
+  log.emit({
+    event: "layout_start",
+    traceId,
+    data: { tokens: tokens.length },
   });
 
   if (!tokens.length) return [];
@@ -61,8 +47,10 @@ export function buildLayout(
   const rows = groupIntoRows(filtered, traceId);
   const structured = buildRowStructure(rows, traceId);
 
-  log.trace("layout_done", traceId, {
-    rows: structured.length,
+  log.emit({
+    event: "layout_done",
+    traceId,
+    data: { rows: structured.length },
   });
 
   return structured;
@@ -90,8 +78,10 @@ function normalizeTokens(
     ny: maxY ? t.y / maxY : 0,
   }));
 
-  log.trace("layout_normalized", traceId, {
-    count: normalized.length,
+  log.emit({
+    event: "layout_normalized",
+    traceId,
+    data: { count: normalized.length },
   });
 
   return normalized;
@@ -117,9 +107,13 @@ function filterTokens(
     return t.confidence > 20;
   });
 
-  log.trace("layout_filter_done", traceId, {
-    before: tokens.length,
-    after: filtered.length,
+  log.emit({
+    event: "layout_filter_done",
+    traceId,
+    data: {
+      before: tokens.length,
+      after: filtered.length,
+    },
   });
 
   return filtered;
@@ -156,8 +150,10 @@ function groupIntoRows(
     }
   }
 
-  log.trace("layout_rows_grouped", traceId, {
-    rows: rows.length,
+  log.emit({
+    event: "layout_rows_grouped",
+    traceId,
+    data: { rows: rows.length },
   });
 
   return rows;
@@ -213,14 +209,20 @@ function buildRowStructure(
       raw: sorted,
     });
 
-    log.trace("layout_row_cells", traceId, {
-      rowIndex: i,
-      cells: cells.map((c) => c.text),
+    log.emit({
+      event: "layout_row_cells",
+      traceId,
+      data: {
+        rowIndex: i,
+        cells: cells.map((c) => c.text),
+      },
     });
   }
 
-  log.trace("layout_structure_done", traceId, {
-    rows: result.length,
+  log.emit({
+    event: "layout_structure_done",
+    traceId,
+    data: { rows: result.length },
   });
 
   return result;
