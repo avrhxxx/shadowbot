@@ -1,20 +1,7 @@
+
 // =====================================
 // 📁 src/quickadd/ocr/OCRTypes.ts
 // =====================================
-
-/**
- * 📦 ROLE:
- * Contract definitions for OCR layer.
- *
- * Used by:
- * - OCRProcessor
- * - OCREngine
- * - LayoutBuilder
- *
- * 🧠 NOTE:
- * - Supports multiple OCR providers (Vision + Tesseract)
- * - Tokens must be unified across engines
- */
 
 export type OCRToken = {
   text: string;
@@ -22,12 +9,8 @@ export type OCRToken = {
   y: number;
   width: number;
   height: number;
-  confidence?: number; // Vision may not provide confidence
+  confidence?: number;
 };
-
-// =====================================
-// 🧱 SOURCE TYPES
-// =====================================
 
 export type OCRSourceType =
   | "VISION"
@@ -35,10 +18,6 @@ export type OCRSourceType =
   | "TESSERACT_LINE"
   | "TESSERACT_BOX"
   | "TESSERACT_HOCR";
-
-// =====================================
-// 🧱 SOURCE STRUCTURES (STRICT)
-// =====================================
 
 export interface OCRTextSource {
   source:
@@ -56,12 +35,7 @@ export interface OCRTokenSource {
   tokens: OCRToken[];
 }
 
-// 🔥 DISCRIMINATED UNION
 export type OCRSource = OCRTextSource | OCRTokenSource;
-
-// =====================================
-// 📤 FINAL RESULT
-// =====================================
 
 export interface OCRResult {
   sources: OCRSource[];
