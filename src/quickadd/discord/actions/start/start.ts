@@ -6,6 +6,7 @@ import {
   ChatInputCommandInteraction,
   TextChannel,
   NewsChannel,
+  ChannelType,
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -87,8 +88,10 @@ export async function handleStart(
     // =====================================
     if (
       !interaction.channel ||
-      !(interaction.channel instanceof TextChannel ||
-        interaction.channel instanceof NewsChannel)
+      !(
+        interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof NewsChannel
+      )
     ) {
       throw new Error("Invalid channel type");
     }
@@ -106,11 +109,12 @@ export async function handleStart(
     const thread = await starterMessage.startThread({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
-      invitable: false, // 🔥 PRIVATE THREAD (v14)
+      type: ChannelType.PrivateThread, // ✅ KLUCZOWE
     });
 
     threadId = thread.id;
 
+    // tylko owner dodany → inni userzy nie widzą
     await thread.members.add(userId);
 
     // =====================================
@@ -157,16 +161,19 @@ export async function handleStart(
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, traceId);
 
-    // ❗ CLEANUP THREAD
-    if (
-      threadId &&
-      interaction.channel &&
-      (interaction.channel instanceof TextChannel ||
-        interaction.channel instanceof NewsChannel)
-    ) {
+    // ❗ CLEANUP THREAD (bezpieczne)
+    if (threadId) {
       try {
-        const thread = await interaction.channel.threads.fetch(threadId);
-        await thread?.delete();
+        const channel = interaction.channel;
+
+        if (
+          channel &&
+          (channel instanceof TextChannel ||
+            channel instanceof NewsChannel)
+        ) {
+          const thread = await channel.threads.fetch(threadId);
+          await thread?.delete();
+        }
       } catch {}
     }
 
