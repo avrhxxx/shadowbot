@@ -17,9 +17,9 @@
  * - pure function
  */
 
-import { createLogger } from "../debug/DebugLogger";
+import { createScopedLogger } from "@/quickadd/debug/logger";
 
-const log = createLogger("FORMATTER");
+const log = createScopedLogger(import.meta.url);
 
 type PreviewEntry = {
   id: number;
@@ -31,13 +31,20 @@ type PreviewEntry = {
   suggestion?: string;
 };
 
-export function formatPreview(entries: PreviewEntry[]): string {
-  log.trace("format_preview_start", {
+export function formatPreview(
+  entries: PreviewEntry[],
+  traceId: string
+): string {
+  if (!traceId) {
+    throw new Error("traceId is required in formatPreview");
+  }
+
+  log.trace("format_preview_start", traceId, {
     entries: entries.length,
   });
 
   if (!entries.length) {
-    log.trace("format_preview_empty");
+    log.trace("format_preview_empty", traceId);
     return "⚠️ No data";
   }
 
@@ -133,7 +140,7 @@ ${suggestions}
 ━━━━━━━━━━━━━━━━━━
 `;
 
-  log.trace("format_preview_done", {
+  log.trace("format_preview_done", traceId, {
     entries: entries.length,
     hasConfidence: !!confidenceList,
     hasSuggestions: !!suggestions,
