@@ -4,7 +4,7 @@
 
 /**
  * 🪵 ROLE:
- * DUAL MODE LOGGER (TRACE + SYSTEM) — FINAL
+ * DUAL MODE LOGGER (TRACE + SYSTEM) — FINAL (FLOW AWARE)
  *
  * ✔ TRACE MODE:
  * - traceId REQUIRED
@@ -14,6 +14,9 @@
  * ✔ SYSTEM MODE:
  * - no traceId
  * - direct console output
+ *
+ * 🔥 NEW:
+ * - flowType support (USER | SYSTEM)
  *
  * ❗ RULES:
  * - DO NOT fake traceId
@@ -25,6 +28,8 @@ import { resolveDisplayId } from "../core/IdGenerator";
 // =====================================
 // 🔹 TYPES
 // =====================================
+
+export type FlowType = "USER" | "SYSTEM";
 
 type TraceLogger = {
   trace: (event: string, traceId: string, data?: any) => void;
@@ -51,6 +56,7 @@ const MAX_BUCKET_SIZE = 500;
 type TraceLog = {
   time: string;
   scope: string;
+  flow: FlowType;
   event: string;
   data?: any;
 };
@@ -75,7 +81,7 @@ function flushTrace(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${log.time} | ${log.scope} | ${log.event}`,
+      `${log.time} | ${log.scope} | [${log.flow}] | ${log.event}`,
       log.data || ""
     );
   }
@@ -100,7 +106,10 @@ function push(traceId: string, entry: TraceLog) {
 // 🔒 TRACE LOGGER
 // =====================================
 
-export function __createTraceLogger(scope: string): TraceLogger {
+export function __createTraceLogger(
+  scope: string,
+  flow: FlowType
+): TraceLogger {
   function ensure(traceId: string) {
     if (!traceId) {
       throw new Error(`[TRACE ERROR] Missing traceId in ${scope}`);
@@ -114,6 +123,7 @@ export function __createTraceLogger(scope: string): TraceLogger {
       push(traceId, {
         time: getTime(),
         scope,
+        flow,
         event,
         data,
       });
@@ -129,6 +139,7 @@ export function __createTraceLogger(scope: string): TraceLogger {
       push(traceId, {
         time: getTime(),
         scope,
+        flow,
         event,
         data,
       });
@@ -140,6 +151,7 @@ export function __createTraceLogger(scope: string): TraceLogger {
       push(traceId, {
         time: getTime(),
         scope,
+        flow,
         event,
         data: { error },
       });
@@ -153,16 +165,28 @@ export function __createTraceLogger(scope: string): TraceLogger {
 // 🔓 SYSTEM LOGGER
 // =====================================
 
-export function __createSystemLogger(scope: string): SystemLogger {
+export function __createSystemLogger(
+  scope: string,
+  flow: FlowType
+): SystemLogger {
   return {
     log(event, data) {
-      console.log(`${getTime()} | ${scope} | ${event}`, data || "");
+      console.log(
+        `${getTime()} | ${scope} | [${flow}] | ${event}`,
+        data || ""
+      );
     },
     warn(event, data) {
-      console.warn(`${getTime()} | ${scope} | ${event}`, data || "");
+      console.warn(
+        `${getTime()} | ${scope} | [${flow}] | ${event}`,
+        data || ""
+      );
     },
     error(event, error) {
-      console.error(`${getTime()} | ${scope} | ${event}`, error || "");
+      console.error(
+        `${getTime()} | ${scope} | [${flow}] | ${event}`,
+        error || ""
+      );
     },
   };
 }
