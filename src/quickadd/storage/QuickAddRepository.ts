@@ -2,19 +2,6 @@
 // 📁 src/quickadd/storage/QuickAddRepository.ts
 // =====================================
 
-/**
- * 💾 ROLE:
- * Persistence layer for QuickAdd (Google Sheets).
- *
- * ❗ RULES:
- * - NO business logic
- * - NO validation
- * - traceId REQUIRED (STRICT)
- * - FULL logging
- * - RETRY (limit 5)
- * - TIMING (observability)
- */
-
 import {
   readSheet,
   writeSheet,
@@ -81,6 +68,49 @@ async function withRetry<T>(
         throw err;
       }
     }
+  }
+}
+
+// =====================================
+// 📥 QUEUE READ (🔥 NEW)
+// =====================================
+
+export async function getQueue(
+  type: "points" | "events",
+  traceId: string
+): Promise<any[][]> {
+  assertTrace(traceId, "getQueue");
+
+  const startedAt = Date.now();
+
+  const tab =
+    type === "points" ? POINTS_QUEUE_TAB : EVENTS_QUEUE_TAB;
+
+  try {
+    const data = safeSheet(
+      await withRetry(() => readSheet(tab), traceId, "read_queue")
+    );
+
+    log.emit({
+      event: "queue_loaded",
+      traceId,
+      data: {
+        type,
+        rows: data.length,
+        durationMs: Date.now() - startedAt,
+      },
+    });
+
+    return data;
+  } catch (err) {
+    log.emit({
+      event: "queue_load_failed",
+      traceId,
+      data: { error: err, type },
+      level: "error",
+    });
+
+    return [];
   }
 }
 
