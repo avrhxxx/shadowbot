@@ -15,7 +15,6 @@ const log = createScopedLogger(import.meta.url);
 // 🧠 MOCK CONFIG (TEMP)
 // =====================================
 
-// TODO: replace with real config layer
 const WEEK_OPTIONS = [
   { name: "Current Week", value: "CURRENT" },
   { name: "Last Week", value: "LAST" },
@@ -43,7 +42,8 @@ function resolveMode(type: QuickAddType): "points" | "events" {
 // =====================================
 
 export async function handleConfirmAutocomplete(
-  interaction: AutocompleteInteraction
+  interaction: AutocompleteInteraction,
+  traceId: string
 ): Promise<void> {
   const guildId = interaction.guildId;
 
@@ -51,22 +51,42 @@ export async function handleConfirmAutocomplete(
 
   const session = QuickAddSession.get(guildId);
 
-  if (!session) return;
+  // =====================================
+  // ❌ NO SESSION
+  // =====================================
+
+  if (!session) {
+    await interaction.respond([]);
+    return;
+  }
+
+  // =====================================
+  // ❌ WRONG STAGE
+  // =====================================
+
+  if (session.stage !== "CONFIRM_PENDING") {
+    await interaction.respond([]);
+    return;
+  }
 
   const focused = interaction.options.getFocused();
 
   const mode = resolveMode(session.type);
 
-  let options =
+  const options =
     mode === "points" ? WEEK_OPTIONS : EVENT_OPTIONS;
 
-  // 🔍 filtering
+  // =====================================
+  // 🔍 FILTERING
+  // =====================================
+
   const filtered = options.filter((opt) =>
     opt.name.toLowerCase().includes(focused.toLowerCase())
   );
 
-  log.trace("confirm_autocomplete", "NO_TRACE", {
+  log.trace("confirm_autocomplete", traceId, {
     guildId,
+    sessionId: session.sessionId,
     mode,
     input: focused,
     results: filtered.length,
