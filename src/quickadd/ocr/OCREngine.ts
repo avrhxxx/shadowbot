@@ -3,11 +3,9 @@
 // =====================================
 
 import Tesseract from "tesseract.js";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { log } from "../logger";
 import { OCRToken } from "./OCRTypes";
 import { extractTextGoogle } from "../../google/GoogleVisionService";
-
-const log = createScopedLogger(import.meta.url);
 
 type OCRRunResult = {
   text: string;
@@ -21,7 +19,12 @@ async function runWithPSM(
   psm: number,
   label: string
 ): Promise<OCRRunResult> {
-  log.trace("ocr_psm_start", traceId, { psm, label });
+  log.emit({
+    event: "ocr_psm_start",
+    traceId,
+    type: "system",
+    data: { psm, label },
+  });
 
   const result = await Tesseract.recognize(buffer, "eng", {
     logger: () => {},
@@ -42,10 +45,15 @@ async function runWithPSM(
     confidence: w.confidence,
   }));
 
-  log.trace("ocr_psm_done", traceId, {
-    label,
-    lines: lines.length,
-    tokens: tokens.length,
+  log.emit({
+    event: "ocr_psm_done",
+    traceId,
+    type: "system",
+    data: {
+      label,
+      lines: lines.length,
+      tokens: tokens.length,
+    },
   });
 
   return { text, lines, tokens };
@@ -55,7 +63,11 @@ async function runVision(
   buffer: Buffer,
   traceId: string
 ): Promise<OCRRunResult> {
-  log.trace("vision_start", traceId);
+  log.emit({
+    event: "vision_start",
+    traceId,
+    type: "system",
+  });
 
   try {
     const text = await extractTextGoogle(buffer);
@@ -70,14 +82,25 @@ async function runVision(
       confidence: 90,
     }));
 
-    log.trace("vision_done", traceId, {
-      lines: lines.length,
-      tokens: tokens.length,
+    log.emit({
+      event: "vision_done",
+      traceId,
+      type: "system",
+      data: {
+        lines: lines.length,
+        tokens: tokens.length,
+      },
     });
 
     return { text, lines, tokens };
   } catch (error) {
-    log.warn("vision_failed", traceId, { error });
+    log.emit({
+      event: "vision_failed",
+      traceId,
+      type: "system",
+      level: "warn",
+      data: { error },
+    });
 
     return { text: "", lines: [], tokens: [] };
   }
@@ -94,7 +117,11 @@ export const OCREngine = {
     runWithPSM(buffer, traceId, 4, "BOX"),
 
   async hocr(buffer: Buffer, traceId: string) {
-    log.trace("hocr_start", traceId);
+    log.emit({
+      event: "hocr_start",
+      traceId,
+      type: "system",
+    });
 
     const result = await Tesseract.recognize(buffer, "eng", {
       logger: () => {},
@@ -105,8 +132,11 @@ export const OCREngine = {
 
     const hocr = result.data.hocr || "";
 
-    log.trace("hocr_done", traceId, {
-      length: hocr.length,
+    log.emit({
+      event: "hocr_done",
+      traceId,
+      type: "system",
+      data: { length: hocr.length },
     });
 
     return { hocr };
