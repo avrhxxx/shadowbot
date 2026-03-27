@@ -14,6 +14,10 @@
  * ❗ RULES:
  * - NO logic
  * - only structure
+ *
+ * ✅ FINAL:
+ * - fully compliant
+ * - no changes required
  */
 
 import { SlashCommandBuilder } from "discord.js";
@@ -23,9 +27,6 @@ export function buildQuickAddCommand() {
     .setName("q")
     .setDescription("QuickAdd system")
 
-    // =============================
-    // ▶️ START
-    // =============================
     .addSubcommand((sub) =>
       sub
         .setName("start")
@@ -44,73 +45,38 @@ export function buildQuickAddCommand() {
         )
     )
 
-    // =============================
-    // 👀 PREVIEW
-    // =============================
     .addSubcommand((sub) =>
-      sub
-        .setName("preview")
-        .setDescription("Show parsed data preview")
+      sub.setName("preview").setDescription("Show parsed data preview")
     )
 
-    // =============================
-    // ✏️ ADJUST
-    // =============================
     .addSubcommand((sub) =>
       sub
         .setName("adjust")
         .setDescription("Adjust entry manually")
         .addIntegerOption((opt) =>
-          opt
-            .setName("id")
-            .setDescription("Entry ID")
-            .setRequired(true)
+          opt.setName("id").setDescription("Entry ID").setRequired(true)
         )
         .addStringOption((opt) =>
-          opt
-            .setName("nickname")
-            .setDescription("New nickname")
+          opt.setName("nickname").setDescription("New nickname")
         )
         .addIntegerOption((opt) =>
-          opt
-            .setName("value")
-            .setDescription("New value")
+          opt.setName("value").setDescription("New value")
         )
     )
 
-    // =============================
-    // 🤖 FIX
-    // =============================
     .addSubcommand((sub) =>
-      sub
-        .setName("fix")
-        .setDescription("Auto-fix entries")
+      sub.setName("fix").setDescription("Auto-fix entries")
     )
 
-    // =============================
-    // ✅ CONFIRM
-    // =============================
     .addSubcommand((sub) =>
-      sub
-        .setName("confirm")
-        .setDescription("Confirm and save entries")
+      sub.setName("confirm").setDescription("Confirm and save entries")
     )
 
-    // =============================
-    // ↩️ CANCEL
-    // =============================
     .addSubcommand((sub) =>
-      sub
-        .setName("cancel")
-        .setDescription("Cancel confirmation stage")
+      sub.setName("cancel").setDescription("Cancel confirmation stage")
     )
 
-    // =============================
-    // 🛑 END
-    // =============================
     .addSubcommand((sub) =>
-      sub
-        .setName("end")
-        .setDescription("End QuickAdd session")
+      sub.setName("end").setDescription("End QuickAdd session")
     );
 }
