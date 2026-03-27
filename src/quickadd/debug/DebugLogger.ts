@@ -4,23 +4,17 @@
 
 /**
  * 🪵 ROLE:
- * DUAL MODE LOGGER (TRACE + SYSTEM) — FINAL (FLOW AWARE)
+ * TRACE LOGGER (FINAL v3 — TRACE TYPE AWARE)
  *
- * ✔ TRACE MODE:
- * - traceId REQUIRED
- * - grouped logs (buckets)
- * - flushed on terminal events
- *
- * ✔ SYSTEM MODE:
- * - no traceId
- * - direct console output
- *
- * 🔥 NEW:
- * - flowType support (USER | SYSTEM)
+ * ✔ SINGLE ID SYSTEM (traceId ONLY)
+ * ✔ traceType: USER | SYSTEM (metadata)
+ * ✔ bucketed logs
+ * ✔ auto flush on terminal events
  *
  * ❗ RULES:
- * - DO NOT fake traceId
- * - use correct mode depending on context
+ * - traceId REQUIRED
+ * - NO fake IDs
+ * - traceType NOT part of ID
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
@@ -29,18 +23,12 @@ import { resolveDisplayId } from "../core/IdGenerator";
 // 🔹 TYPES
 // =====================================
 
-export type FlowType = "USER" | "SYSTEM";
+export type TraceType = "USER" | "SYSTEM";
 
 type TraceLogger = {
   trace: (event: string, traceId: string, data?: any) => void;
   warn: (event: string, traceId: string, data?: any) => void;
   error: (event: string, error: any, traceId: string) => void;
-};
-
-type SystemLogger = {
-  log: (event: string, data?: any) => void;
-  warn: (event: string, data?: any) => void;
-  error: (event: string, error?: any) => void;
 };
 
 // =====================================
@@ -56,7 +44,7 @@ const MAX_BUCKET_SIZE = 500;
 type TraceLog = {
   time: string;
   scope: string;
-  flow: FlowType;
+  traceType: TraceType;
   event: string;
   data?: any;
 };
@@ -81,7 +69,7 @@ function flushTrace(traceId: string) {
 
   for (const log of logs) {
     console.log(
-      `${log.time} | ${log.scope} | [${log.flow}] | ${log.event}`,
+      `${log.time} | ${log.scope} | [${log.traceType}] | ${log.event}`,
       log.data || ""
     );
   }
@@ -108,7 +96,7 @@ function push(traceId: string, entry: TraceLog) {
 
 export function __createTraceLogger(
   scope: string,
-  flow: FlowType
+  traceType: TraceType
 ): TraceLogger {
   function ensure(traceId: string) {
     if (!traceId) {
@@ -123,7 +111,7 @@ export function __createTraceLogger(
       push(traceId, {
         time: getTime(),
         scope,
-        flow,
+        traceType,
         event,
         data,
       });
@@ -139,7 +127,7 @@ export function __createTraceLogger(
       push(traceId, {
         time: getTime(),
         scope,
-        flow,
+        traceType,
         event,
         data,
       });
@@ -151,42 +139,12 @@ export function __createTraceLogger(
       push(traceId, {
         time: getTime(),
         scope,
-        flow,
+        traceType,
         event,
         data: { error },
       });
 
       flushTrace(traceId);
-    },
-  };
-}
-
-// =====================================
-// 🔓 SYSTEM LOGGER
-// =====================================
-
-export function __createSystemLogger(
-  scope: string,
-  flow: FlowType
-): SystemLogger {
-  return {
-    log(event, data) {
-      console.log(
-        `${getTime()} | ${scope} | [${flow}] | ${event}`,
-        data || ""
-      );
-    },
-    warn(event, data) {
-      console.warn(
-        `${getTime()} | ${scope} | [${flow}] | ${event}`,
-        data || ""
-      );
-    },
-    error(event, error) {
-      console.error(
-        `${getTime()} | ${scope} | [${flow}] | ${event}`,
-        error || ""
-      );
     },
   };
 }
