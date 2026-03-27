@@ -6,7 +6,6 @@ import {
   ChatInputCommandInteraction,
   TextChannel,
   NewsChannel,
-  ChannelType,
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -88,33 +87,26 @@ export async function handleStart(
     // =====================================
     if (
       !interaction.channel ||
-      !(
-        interaction.channel instanceof TextChannel ||
-        interaction.channel instanceof NewsChannel
-      )
+      !(interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof NewsChannel)
     ) {
       throw new Error("Invalid channel type");
     }
 
-    // =====================================
-    // 📩 CREATE STARTER MESSAGE
-    // =====================================
-    const starterMessage = await interaction.channel.send({
-      content: `🚀 QuickAdd session: ${type}`,
-    });
+    const channel = interaction.channel as TextChannel;
 
     // =====================================
-    // 🔒 CREATE PRIVATE THREAD
+    // 🔒 CREATE PRIVATE THREAD (JAK WCZEŚNIEJ)
     // =====================================
-    const thread = await starterMessage.startThread({
+    const thread = await channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
-      type: ChannelType.PrivateThread, // ✅ KLUCZOWE
+      type: 12, // 🔥 PRIVATE THREAD (ChannelType.PrivateThread)
     });
 
     threadId = thread.id;
 
-    // tylko owner dodany → inni userzy nie widzą
+    // tylko owner → prywatność dla userów
     await thread.members.add(userId);
 
     // =====================================
@@ -161,19 +153,16 @@ export async function handleStart(
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, traceId);
 
-    // ❗ CLEANUP THREAD (bezpieczne)
-    if (threadId) {
+    // ❗ CLEANUP THREAD
+    if (
+      threadId &&
+      interaction.channel &&
+      (interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof NewsChannel)
+    ) {
       try {
-        const channel = interaction.channel;
-
-        if (
-          channel &&
-          (channel instanceof TextChannel ||
-            channel instanceof NewsChannel)
-        ) {
-          const thread = await channel.threads.fetch(threadId);
-          await thread?.delete();
-        }
+        const thread = await interaction.channel.threads.fetch(threadId);
+        await thread?.delete();
       } catch {}
     }
 
