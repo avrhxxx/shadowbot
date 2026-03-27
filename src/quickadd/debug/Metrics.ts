@@ -2,19 +2,6 @@
 // 📁 src/quickadd/debug/Metrics.ts
 // =====================================
 
-/**
- * 📊 ROLE:
- * Lightweight metrics layer (counters).
- *
- * Responsible for:
- * - counting events
- * - exposing observability data
- *
- * ❗ RULES:
- * - NO logging
- * - NO side effects
- */
-
 import { LOGGER_CONFIG } from "./LoggerConfig";
 
 const counters = new Map<string, number>();
