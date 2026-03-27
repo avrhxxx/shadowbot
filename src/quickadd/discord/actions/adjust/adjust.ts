@@ -18,19 +18,6 @@ import { validateEntries } from "../../../validation/QuickAddValidator";
 import { log } from "../../../logger";
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -44,7 +31,7 @@ export async function handleAdjust(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
@@ -63,8 +50,7 @@ export async function handleAdjust(
   );
 
   if (contextError || ownerError || !session) {
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -96,8 +82,7 @@ export async function handleAdjust(
     const index = entries.findIndex((e) => e.id === id);
 
     if (index === -1) {
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         `❌ Entry with ID ${id} not found`
       );
       return;
@@ -180,8 +165,7 @@ export async function handleAdjust(
       });
     }
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       `✅ Updated entry [${id}]`
     );
 
@@ -206,8 +190,7 @@ export async function handleAdjust(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to adjust entry"
     );
   }
