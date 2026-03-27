@@ -2,20 +2,6 @@
 // 📁 src/quickadd/discord/CommandBuilder.ts
 // =====================================
 
-/**
- * 🏗️ ROLE:
- * Defines slash command structure for QuickAdd.
- *
- * Responsible for:
- * - building /q command schema
- * - defining subcommands
- * - defining options
- *
- * ❗ RULES:
- * - NO logic
- * - only structure
- */
-
 import { SlashCommandBuilder } from "discord.js";
 
 export function buildQuickAddCommand() {
@@ -65,19 +51,19 @@ export function buildQuickAddCommand() {
     )
 
     // =====================================
-    // 🔥 CONFIRM (UPDATED)
+    // 🔥 CONFIRM (FIXED)
     // =====================================
     .addSubcommand((sub) =>
       sub
         .setName("confirm")
         .setDescription("Confirm and save entries")
 
-        // 🔹 TYPE (derived from session but needed for autocomplete separation)
+        // ❗ NOT REQUIRED → allows Stage 1
         .addStringOption((opt) =>
           opt
             .setName("target")
             .setDescription("Select week or event")
-            .setRequired(true)
+            .setRequired(false)
             .setAutocomplete(true)
         )
     )
