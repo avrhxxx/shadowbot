@@ -19,9 +19,17 @@ import {
 // 🔹 HELPERS
 // =====================================
 
-function extractScope(fileUrl: string): string {
+function extractScope(input: string): string {
   try {
-    const file = fileUrl.split("/").pop() || "UNKNOWN";
+    // handle file:// (ESM fallback)
+    if (input.startsWith("file://")) {
+      input = input.replace("file://", "");
+    }
+
+    // normalize Windows paths
+    const normalized = input.replace(/\\/g, "/");
+
+    const file = normalized.split("/").pop() || "UNKNOWN";
 
     return file
       .replace(".ts", "")
