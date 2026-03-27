@@ -34,10 +34,14 @@ async function runWithPSM(
     data: { psm, label },
   });
 
-  const result = await Tesseract.recognize(buffer, "eng", {
-    logger: () => {},
-    tessedit_pageseg_mode: psm, // ✅ FIX (bez config)
-  });
+  const result = await Tesseract.recognize(
+    buffer,
+    "eng",
+    {
+      logger: () => {},
+      tessedit_pageseg_mode: psm,
+    } as any // ✅ FIX: typings workaround (tesseract.js issue)
+  );
 
   const text = result.data.text || "";
   const lines = text.split("\n");
@@ -145,10 +149,14 @@ export const OCREngine = {
       type: "system",
     });
 
-    const result = await Tesseract.recognize(buffer, "eng", {
-      logger: () => {},
-      tessedit_create_hocr: "1", // ✅ FIX (bez config)
-    });
+    const result = await Tesseract.recognize(
+      buffer,
+      "eng",
+      {
+        logger: () => {},
+        tessedit_create_hocr: "1",
+      } as any // ✅ FIX
+    );
 
     const hocr = result.data.hocr || "";
 
