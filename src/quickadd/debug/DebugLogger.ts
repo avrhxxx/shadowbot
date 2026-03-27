@@ -2,7 +2,26 @@
 // 📁 src/quickadd/debug/DebugLogger.ts
 // =====================================
 
+/**
+ * 🪵 ROLE:
+ * STRICT TRACE LOGGER (ENFORCED MODE — FINAL)
+ *
+ * ✔ ONE unified API
+ * ✔ traceId REQUIRED for ALL logs
+ * ✔ Groups logs per traceId
+ * ✔ Flushes on terminal events
+ * ✔ Uses displayId
+ *
+ * ❗ RULES:
+ * - NOT exported directly
+ * - ONLY used via createScopedLogger
+ */
+
 import { resolveDisplayId } from "../core/IdGenerator";
+
+// =====================================
+// 🔹 TYPES
+// =====================================
 
 type Logger = {
   trace: (event: string, traceId: string, data?: any) => void;
@@ -10,21 +29,18 @@ type Logger = {
   error: (event: string, error: any, traceId: string) => void;
 };
 
-const USE_COLORS = true;
+// =====================================
+// 🔹 CONFIG
+// =====================================
+
 const MAX_BUCKET_SIZE = 500;
 
-const C = {
-  reset: "\x1b[0m",
-  gray: "\x1b[90m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  magenta: "\x1b[35m",
-};
+// =====================================
+// 🔹 STATE
+// =====================================
 
 type TraceLog = {
   time: string;
-  group: string;
   scope: string;
   event: string;
   data?: any;
@@ -32,23 +48,12 @@ type TraceLog = {
 
 const traceBuckets = new Map<string, TraceLog[]>();
 
+// =====================================
+// 🔹 HELPERS
+// =====================================
+
 function getTime(): string {
   return new Date().toISOString().split("T")[1].split(".")[0];
-}
-
-function color(text: string, c: string) {
-  return USE_COLORS ? c + text + C.reset : text;
-}
-
-function resolveGroup(scope: string): string {
-  if (scope.startsWith("OCR")) return "OCR";
-  if (scope.startsWith("PARSER")) return "PARSER";
-  if (scope.startsWith("VALIDATION")) return "VALIDATION";
-  if (scope.startsWith("STORAGE") || scope.startsWith("BUFFER"))
-    return "STORAGE";
-  if (scope.startsWith("COMMAND")) return "COMMAND";
-  if (scope.startsWith("DISCORD")) return "DISCORD";
-  return "GENERAL";
 }
 
 function flushTrace(traceId: string) {
@@ -74,13 +79,18 @@ function flushTrace(traceId: string) {
 function push(traceId: string, entry: TraceLog) {
   const logs = traceBuckets.get(traceId) || [];
 
-  if (logs.length >= MAX_BUCKET_SIZE) logs.shift();
+  if (logs.length >= MAX_BUCKET_SIZE) {
+    logs.shift();
+  }
 
   logs.push(entry);
   traceBuckets.set(traceId, logs);
 }
 
-// ❗ NOT EXPORTED OUTSIDE logger.ts
+// =====================================
+// 🔒 INTERNAL LOGGER (NOT EXPORTED)
+// =====================================
+
 export function __createLoggerInternal(scope: string): Logger {
   function ensure(traceId: string) {
     if (!traceId) {
@@ -91,9 +101,9 @@ export function __createLoggerInternal(scope: string): Logger {
   return {
     trace(event, traceId, data) {
       ensure(traceId);
+
       push(traceId, {
         time: getTime(),
-        group: resolveGroup(scope),
         scope,
         event,
         data,
@@ -106,9 +116,9 @@ export function __createLoggerInternal(scope: string): Logger {
 
     warn(event, traceId, data) {
       ensure(traceId);
+
       push(traceId, {
         time: getTime(),
-        group: resolveGroup(scope),
         scope,
         event,
         data,
@@ -117,9 +127,9 @@ export function __createLoggerInternal(scope: string): Logger {
 
     error(event, error, traceId) {
       ensure(traceId);
+
       push(traceId, {
         time: getTime(),
-        group: resolveGroup(scope),
         scope,
         event,
         data: { error },
