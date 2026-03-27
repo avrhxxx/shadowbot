@@ -8,7 +8,6 @@
  *
  * Responsible for:
  * - session lifecycle (start / end)
- * - access control (owner, thread)
  * - storing session context (type, stage)
  *
  * ❗ RULES:
@@ -40,7 +39,7 @@ type SessionData = {
 
   createdAt: number;
 
-  sessionId: string; // ✅ FIX
+  sessionId: string;
 };
 
 // =====================================
@@ -64,8 +63,20 @@ export const QuickAddSession = {
       ownerId: string;
       type: QuickAddType;
     },
-    traceId: string // ✅ INJECTED
-  ) {
+    traceId: string
+  ): SessionData | null {
+    const existing = sessions.get(data.guildId);
+
+    if (existing) {
+      log.warn("session_start_blocked_existing", {
+        traceId,
+        guildId: data.guildId,
+        existingSessionId: existing.sessionId,
+      });
+
+      return null;
+    }
+
     const sessionId = createSessionId();
 
     log.trace("session_start_requested", traceId, {
@@ -99,9 +110,7 @@ export const QuickAddSession = {
   // 📥 GET SESSION
   // =============================
   get(guildId: string): SessionData | null {
-    const session = sessions.get(guildId) || null;
-
-    return session;
+    return sessions.get(guildId) || null;
   },
 
   // =============================
@@ -136,6 +145,7 @@ export const QuickAddSession = {
 
     if (!session) {
       log.warn("session_setStage_missing", {
+        traceId,
         guildId,
         nextStage: stage,
       });
@@ -152,21 +162,5 @@ export const QuickAddSession = {
       from: prevStage,
       to: stage,
     });
-  },
-
-  // =============================
-  // 🔒 CHECK OWNER
-  // =============================
-  isOwner(guildId: string, userId: string): boolean {
-    const session = sessions.get(guildId);
-    return session ? session.ownerId === userId : false;
-  },
-
-  // =============================
-  // 🔒 CHECK THREAD CONTEXT
-  // =============================
-  isInSession(guildId: string, channelId: string): boolean {
-    const session = sessions.get(guildId);
-    return session ? session.threadId === channelId : false;
   },
 };
