@@ -157,7 +157,8 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.setEntries(guildId, merged, traceId);
+    // 🔥 FIX: replaceEntries zamiast setEntries
+    QuickAddBuffer.replaceEntries(guildId, merged, traceId);
 
     // =====================================
     // 📤 RESPONSE
