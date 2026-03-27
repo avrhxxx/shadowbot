@@ -31,6 +31,19 @@ import { validateEntries } from "../../../validation/QuickAddValidator";
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -42,16 +55,14 @@ export async function handleFix(
   timing.start(timerId);
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -60,10 +71,10 @@ export async function handleFix(
   );
 
   if (contextError || !session) {
-    await interaction.reply({
-      content: contextError ?? "❌ Session not found",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      contextError ?? "❌ Session not found"
+    );
     return;
   }
 
@@ -82,10 +93,7 @@ export async function handleFix(
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     if (!entries.length) {
-      await interaction.reply({
-        content: "⚠️ Nothing to fix",
-        ephemeral: true,
-      });
+      await safeReply(interaction, "⚠️ Nothing to fix");
       return;
     }
 
@@ -139,10 +147,10 @@ export async function handleFix(
         },
       });
 
-      await interaction.reply({
-        content: "❌ Internal error (revalidation mismatch)",
-        ephemeral: true,
-      });
+      await safeReply(
+        interaction,
+        "❌ Internal error (revalidation mismatch)"
+      );
       return;
     }
 
@@ -157,20 +165,18 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
-    // 🔥 FIX: replaceEntries zamiast setEntries
     QuickAddBuffer.replaceEntries(guildId, merged, traceId);
 
     // =====================================
     // 📤 RESPONSE
     // =====================================
 
-    await interaction.reply({
-      content:
-        applied > 0
-          ? `🤖 Fixed ${applied} entries automatically`
-          : "⚠️ No entries to fix",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      applied > 0
+        ? `🤖 Fixed ${applied} entries automatically`
+        : "⚠️ No entries to fix"
+    );
 
     const duration = timing.end(timerId);
 
@@ -201,9 +207,9 @@ export async function handleFix(
       },
     });
 
-    await interaction.reply({
-      content: "❌ Failed to apply fixes",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "❌ Failed to apply fixes"
+    );
   }
 }
