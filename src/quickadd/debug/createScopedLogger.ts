@@ -19,16 +19,9 @@ import {
 // 🔹 HELPERS
 // =====================================
 
-function extractScope(input: string): string {
+function extractScope(filePath: string): string {
   try {
-    // handle file:// (ESM fallback)
-    if (input.startsWith("file://")) {
-      input = input.replace("file://", "");
-    }
-
-    // normalize Windows paths
-    const normalized = input.replace(/\\/g, "/");
-
+    const normalized = filePath.replace(/\\/g, "/");
     const file = normalized.split("/").pop() || "UNKNOWN";
 
     return file
@@ -44,8 +37,8 @@ function extractScope(input: string): string {
 // 🔹 FACTORY
 // =====================================
 
-export function createScopedLogger(fileUrl: string) {
-  const scope = extractScope(fileUrl);
+export function createScopedLogger(filePath: string) {
+  const scope = extractScope(filePath);
 
   const trace = __createTraceLogger(scope);
   const system = __createSystemLogger(scope);
