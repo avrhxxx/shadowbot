@@ -23,7 +23,7 @@ import { googleAuth } from "./googleSheetsClient";
 
 // 🔥 używamy WSPÓLNEGO AUTH
 const client = new vision.ImageAnnotatorClient({
-  auth: googleAuth,
+  auth: googleAuth as any, // 🔥 FIX: type mismatch workaround
 });
 
 export async function runVisionOCR(buffer: Buffer) {
