@@ -36,9 +36,7 @@ async function runWithPSM(
 
   const result = await Tesseract.recognize(buffer, "eng", {
     logger: () => {},
-    config: {
-      tessedit_pageseg_mode: String(psm),
-    },
+    tessedit_pageseg_mode: psm, // ✅ FIX (bez config)
   });
 
   const text = result.data.text || "";
@@ -149,9 +147,7 @@ export const OCREngine = {
 
     const result = await Tesseract.recognize(buffer, "eng", {
       logger: () => {},
-      config: {
-        tessedit_create_hocr: "1",
-      },
+      tessedit_create_hocr: "1", // ✅ FIX (bez config)
     });
 
     const hocr = result.data.hocr || "";
