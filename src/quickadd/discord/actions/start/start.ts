@@ -26,6 +26,19 @@ function isQuickAddType(value: string): value is QuickAddType {
 }
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -39,20 +52,14 @@ export async function handleStart(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
-    await interaction.reply({
-      content: "❌ Invalid QuickAdd type",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Invalid QuickAdd type");
     return;
   }
 
@@ -76,10 +83,10 @@ export async function handleStart(
     );
 
     if (!session) {
-      await interaction.reply({
-        content: "⚠️ You already have an active session",
-        ephemeral: true,
-      });
+      await safeReply(
+        interaction,
+        "⚠️ You already have an active session"
+      );
       return;
     }
 
@@ -102,7 +109,7 @@ export async function handleStart(
     });
 
     // =====================================
-    // 🧵 THREAD (normalny, potem ograniczamy dostęp)
+    // 🧵 THREAD (public → ograniczamy dostęp)
     // =====================================
     const thread = await starterMessage.startThread({
       name: `quickadd-${type.toLowerCase()}`,
@@ -111,7 +118,7 @@ export async function handleStart(
 
     threadId = thread.id;
 
-    // 🔒 tylko owner + admini widzą
+    // 🔒 dodaj ownera (reszta nie widzi jeśli brak dostępu do kanału)
     await thread.members.add(userId);
 
     // =====================================
@@ -134,10 +141,10 @@ export async function handleStart(
     // =====================================
     // 📤 RESPONSE
     // =====================================
-    await interaction.reply({
-      content: `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`,
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
+    );
 
     log.emit({
       event: "start_done",
@@ -163,25 +170,22 @@ export async function handleStart(
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, userId, traceId);
 
-    // ❗ CLEANUP THREAD
-    if (
-      threadId &&
-      interaction.channel &&
-      (interaction.channel instanceof TextChannel ||
-        interaction.channel instanceof NewsChannel)
-    ) {
+    // ❗ CLEANUP THREAD (SAFE)
+    if (threadId) {
       try {
-        const thread = await interaction.channel.threads.fetch(threadId);
-        await thread?.delete();
+        const thread = await interaction.client.channels.fetch(
+          threadId
+        );
+
+        if (thread && "delete" in thread) {
+          await thread.delete();
+        }
       } catch {}
     }
 
-    // ❗ SAFE REPLY
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "❌ Failed to start session",
-        ephemeral: true,
-      });
-    }
+    await safeReply(
+      interaction,
+      "❌ Failed to start session"
+    );
   }
 }
