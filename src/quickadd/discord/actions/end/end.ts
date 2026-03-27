@@ -84,13 +84,11 @@ export async function handleEnd(
     });
 
     // =====================================
-    // 🧹 CLEANUP (🔥 FUTURE-PROOF)
+    // 🧹 CLEANUP (FIXED)
     // =====================================
 
-    QuickAddBuffer.clear(sessionId, traceId);
-
-    // 🔥 FIX: MULTI-SESSION SAFE
-    QuickAddSession.end(guildId, userId, traceId);
+    QuickAddBuffer.clear(guildId, traceId); // ✅ FIX
+    QuickAddSession.end(guildId, userId, traceId); // ✅ FIX
 
     log.emit({
       event: "session_ended",
@@ -101,10 +99,6 @@ export async function handleEnd(
         threadId,
       },
     });
-
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
 
     await safeReply(
       interaction,
