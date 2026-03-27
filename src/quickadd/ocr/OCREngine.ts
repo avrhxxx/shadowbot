@@ -2,36 +2,25 @@
 // 📁 src/quickadd/ocr/OCREngine.ts
 // =====================================
 
-/**
- * 🔧 ROLE:
- * Low-level OCR execution (multi-engine).
- *
- * Responsible for:
- * - running OCR with different engines (Tesseract + Vision)
- * - extracting tokens / lines / text
- *
- * ❗ NO orchestration here
- */
-
 import Tesseract from "tesseract.js";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { OCRToken } from "./OCRTypes";
-
-// 🔥 NEW
 import { extractTextGoogle } from "../../google/GoogleVisionService";
 
 const log = createScopedLogger(import.meta.url);
 
-// =====================================
-// 🔧 TESSERACT CORE
-// =====================================
+type OCRRunResult = {
+  text: string;
+  lines: string[];
+  tokens: OCRToken[];
+};
 
 async function runWithPSM(
   buffer: Buffer,
   traceId: string,
   psm: number,
   label: string
-) {
+): Promise<OCRRunResult> {
   log.trace("ocr_psm_start", traceId, { psm, label });
 
   const result = await Tesseract.recognize(buffer, "eng", {
@@ -39,12 +28,12 @@ async function runWithPSM(
     config: {
       tessedit_pageseg_mode: String(psm),
     },
-  } as any);
+  } as unknown as Tesseract.WorkerParams);
 
   const text = result.data.text || "";
   const lines = text.split("\n");
 
-  const tokens: OCRToken[] = (result.data.words || []).map((w: any) => ({
+  const tokens: OCRToken[] = (result.data.words || []).map((w) => ({
     text: w.text,
     x: w.bbox.x0,
     y: w.bbox.y0,
@@ -62,16 +51,14 @@ async function runWithPSM(
   return { text, lines, tokens };
 }
 
-// =====================================
-// 🔥 VISION ENGINE
-// =====================================
-
-async function runVision(buffer: Buffer, traceId: string) {
+async function runVision(
+  buffer: Buffer,
+  traceId: string
+): Promise<OCRRunResult> {
   log.trace("vision_start", traceId);
 
   try {
     const text = await extractTextGoogle(buffer);
-
     const lines = text.split("\n").filter(Boolean);
 
     const tokens: OCRToken[] = lines.map((line, i) => ({
@@ -89,24 +76,12 @@ async function runVision(buffer: Buffer, traceId: string) {
     });
 
     return { text, lines, tokens };
+  } catch (error) {
+    log.warn("vision_failed", traceId, { error });
 
-  } catch (err) {
-    log.warn("vision_failed", {
-      traceId,
-      error: err,
-    });
-
-    return {
-      text: "",
-      lines: [],
-      tokens: [],
-    };
+    return { text: "", lines: [], tokens: [] };
   }
 }
-
-// =====================================
-// 🔹 MODES
-// =====================================
 
 export const OCREngine = {
   full: (buffer: Buffer, traceId: string) =>
@@ -126,7 +101,7 @@ export const OCREngine = {
       config: {
         tessedit_create_hocr: "1",
       },
-    } as any);
+    } as unknown as Tesseract.WorkerParams);
 
     const hocr = result.data.hocr || "";
 
