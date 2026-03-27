@@ -110,9 +110,8 @@ function filterTokens(
       return false;
     }
 
-    // 🔥 FIX: Vision compatibility
     if (t.confidence === undefined) {
-      return true; // accept Vision tokens
+      return true;
     }
 
     return t.confidence > 20;
