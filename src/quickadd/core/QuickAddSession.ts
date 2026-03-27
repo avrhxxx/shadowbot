@@ -20,7 +20,9 @@ import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 type SessionData = {
   guildId: string;
   threadId: string | null;
-  ownerId: string;
+
+  userId: string;   // 🔥 PRIMARY KEY (logic)
+  ownerId: string;  // 🔥 semantic (for future extensions)
 
   type: QuickAddType;
   stage: QuickAddStage;
@@ -54,7 +56,7 @@ export const QuickAddSession = {
     data: Omit<SessionData, "sessionId" | "stage" | "createdAt">,
     traceId: string
   ) {
-    const key = buildKey(data.guildId, data.ownerId);
+    const key = buildKey(data.guildId, data.userId);
 
     const existing = sessions.get(key);
 
@@ -65,7 +67,7 @@ export const QuickAddSession = {
         level: "warn",
         data: {
           sessionId: existing.sessionId,
-          ownerId: existing.ownerId,
+          userId: existing.userId,
         },
       });
       return null;
@@ -86,7 +88,7 @@ export const QuickAddSession = {
       traceId,
       data: {
         sessionId: session.sessionId,
-        ownerId: session.ownerId,
+        userId: session.userId,
       },
     });
 
@@ -197,7 +199,7 @@ export const QuickAddSession = {
       traceId,
       data: {
         sessionId: session?.sessionId,
-        ownerId: userId,
+        userId,
       },
     });
   },
