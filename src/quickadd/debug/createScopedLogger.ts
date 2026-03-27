@@ -4,13 +4,16 @@
 
 /**
  * 🪵 ROLE:
- * Scoped logger factory (FINAL)
+ * Scoped logger factory (DUAL MODE)
  *
- * ✔ Auto scope from file path
- * ✔ ONLY entry to DebugLogger
+ * ✔ trace() → TRACE LOGGER (requires traceId)
+ * ✔ log()   → SYSTEM LOGGER (no traceId)
  */
 
-import { __createLoggerInternal } from "./DebugLogger";
+import {
+  __createTraceLogger,
+  __createSystemLogger,
+} from "./DebugLogger";
 
 // =====================================
 // 🔹 HELPERS
@@ -34,5 +37,18 @@ function extractScope(fileUrl: string): string {
 // =====================================
 
 export function createScopedLogger(fileUrl: string) {
-  return __createLoggerInternal(extractScope(fileUrl));
+  const scope = extractScope(fileUrl);
+
+  const trace = __createTraceLogger(scope);
+  const system = __createSystemLogger(scope);
+
+  return {
+    trace: trace.trace,
+    warn: trace.warn,
+    error: trace.error,
+
+    log: system.log,
+    sysWarn: system.warn,
+    sysError: system.error,
+  };
 }
