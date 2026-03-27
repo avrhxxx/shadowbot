@@ -2,30 +2,10 @@
 // 📁 src/quickadd/core/QuickAddSession.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * In-memory session manager for QuickAdd.
- *
- * Responsible for:
- * - session lifecycle (start / end)
- * - storing session context (type, stage)
- *
- * ❗ RULES:
- * - NO business logic
- * - pure state manager
- * - one session per guild
- * - sessionId GENERATED HERE
- * - traceId ONLY for logging (injected)
- */
-
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createSessionId } from "./IdGenerator";
 
 const log = createScopedLogger(import.meta.url);
-
-// =====================================
-// 🔹 TYPES
-// =====================================
 
 import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 
@@ -42,20 +22,9 @@ type SessionData = {
   sessionId: string;
 };
 
-// =====================================
-// 🔹 STORAGE (IN-MEMORY)
-// =====================================
-
 const sessions = new Map<string, SessionData>();
 
-// =====================================
-// 🔹 SESSION MANAGER
-// =====================================
-
 export const QuickAddSession = {
-  // =============================
-  // 🚀 START SESSION
-  // =============================
   start(
     data: {
       guildId: string;
@@ -68,8 +37,7 @@ export const QuickAddSession = {
     const existing = sessions.get(data.guildId);
 
     if (existing) {
-      log.warn("session_start_blocked_existing", {
-        traceId,
+      log.warn("session_start_blocked_existing", traceId, {
         guildId: data.guildId,
         existingSessionId: existing.sessionId,
       });
@@ -106,16 +74,10 @@ export const QuickAddSession = {
     return session;
   },
 
-  // =============================
-  // 📥 GET SESSION
-  // =============================
   get(guildId: string): SessionData | null {
     return sessions.get(guildId) || null;
   },
 
-  // =============================
-  // 🛑 END SESSION
-  // =============================
   end(guildId: string, traceId: string) {
     const session = sessions.get(guildId);
 
@@ -133,9 +95,6 @@ export const QuickAddSession = {
     });
   },
 
-  // =============================
-  // 🔁 UPDATE STAGE
-  // =============================
   setStage(
     guildId: string,
     stage: QuickAddStage,
@@ -144,8 +103,7 @@ export const QuickAddSession = {
     const session = sessions.get(guildId);
 
     if (!session) {
-      log.warn("session_setStage_missing", {
-        traceId,
+      log.warn("session_setStage_missing", traceId, {
         guildId,
         nextStage: stage,
       });
