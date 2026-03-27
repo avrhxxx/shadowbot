@@ -62,8 +62,8 @@ function checkTimeout(sessionId: string, traceId: string) {
     log.emit({
       event: "buffer_timeout",
       traceId,
-      data: { sessionId, before },
       level: "warn",
+      data: { sessionId, before },
     });
 
     buffer.delete(sessionId);
@@ -79,7 +79,11 @@ function checkTimeout(sessionId: string, traceId: string) {
 // =====================================
 
 export const QuickAddBuffer = {
-  addEntries(sessionId: string, entries: ParsedEntry[], traceId: string) {
+  addEntries(
+    sessionId: string,
+    entries: ParsedEntry[],
+    traceId: string
+  ) {
     assertTrace(traceId, "addEntries");
     checkTimeout(sessionId, traceId);
 
@@ -144,7 +148,10 @@ export const QuickAddBuffer = {
     });
   },
 
-  getEntries(sessionId: string, traceId: string): BufferedEntry[] {
+  getEntries(
+    sessionId: string,
+    traceId: string
+  ): BufferedEntry[] {
     assertTrace(traceId, "getEntries");
     checkTimeout(sessionId, traceId);
 
