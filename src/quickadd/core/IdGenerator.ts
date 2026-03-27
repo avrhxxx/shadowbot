@@ -9,6 +9,7 @@
  * Responsibilities:
  * - generate sessionId (real + display)
  * - generate traceId (real + display)
+ * - generate queueId (real + display)
  * - maintain realId → displayId mapping
  *
  * ❗ RULES:
@@ -26,6 +27,7 @@ import crypto from "crypto";
 
 const traceCounters = new Map<string, number>();
 const sessionCounters = new Map<string, number>();
+const queueCounters = new Map<string, number>();
 
 const idDisplayMap = new Map<string, string>();
 
@@ -41,7 +43,7 @@ function getDateKey(): string {
   const hh = String(now.getHours()).padStart(2, "0");
   const min = String(now.getMinutes()).padStart(2, "0");
 
-  return `${dd}${mm}${hh}${min}`; // DDMMHHmm
+  return `${dd}${mm}${hh}${min}`;
 }
 
 function getDayKey(): string {
@@ -50,7 +52,7 @@ function getDayKey(): string {
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
 
-  return `${dd}${mm}`; // reset per day
+  return `${dd}${mm}`;
 }
 
 function getNextCounter(
@@ -78,11 +80,11 @@ function generateUUID(): string {
 // =====================================
 
 function buildId(
-  prefix: "s" | "t",
+  prefix: "s" | "t" | "q",
   counterMap: Map<string, number>
 ) {
-  const dateKey = getDateKey(); // DDMMHHmm
-  const dayKey = getDayKey(); // DDMM
+  const dateKey = getDateKey();
+  const dayKey = getDayKey();
 
   const counter = getNextCounter(counterMap, dayKey);
   const counterStr = padCounter(counter);
@@ -121,6 +123,10 @@ export function createTraceId(): string {
 
 export function createSessionId(): string {
   return buildId("s", sessionCounters).realId;
+}
+
+export function createQueueId(): string {
+  return buildId("q", queueCounters).realId;
 }
 
 // =====================================
