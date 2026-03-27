@@ -62,6 +62,7 @@ export async function handleFix(
     return;
   }
 
+  // 🔥 MULTI-SESSION FIX
   const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
@@ -90,6 +91,7 @@ export async function handleFix(
       },
     });
 
+    // 🔥 (NA RAZIE) BUFFER PO GUILD — później przejdziemy na sessionId
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     if (!entries.length) {
@@ -165,6 +167,7 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
+    // 🔥 (NA RAZIE) BUFFER PO GUILD
     QuickAddBuffer.replaceEntries(guildId, merged, traceId);
 
     // =====================================
