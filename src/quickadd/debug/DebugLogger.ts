@@ -18,8 +18,8 @@
  * - NO external dependencies (except IdGenerator)
  *
  * 🔥 TRACE TYPES:
- * - "user"   → user flow (commands, pipeline)
- * - "system" → background (worker, cron)
+ * - "user"   → user flow
+ * - "system" → background flow
  *
  * ✅ FINAL:
  * - zero config needed in business files
@@ -30,10 +30,6 @@ import { resolveDisplayId } from "../core/IdGenerator";
 import { LOGGER_CONFIG } from "./LoggerConfig";
 import { resolveScope, getTime } from "./LoggerRuntime";
 
-// =====================================
-// 🔹 TYPES
-// =====================================
-
 type TraceType = "user" | "system";
 
 type TraceLog = {
@@ -43,15 +39,7 @@ type TraceLog = {
   data?: any;
 };
 
-// =====================================
-// 🔹 STATE
-// =====================================
-
 const buckets = new Map<string, TraceLog[]>();
-
-// =====================================
-// 🔹 INTERNAL HELPERS
-// =====================================
 
 function push(traceId: string, entry: TraceLog) {
   const logs = buckets.get(traceId) || [];
@@ -90,14 +78,7 @@ function ensure(traceId?: string) {
   }
 }
 
-// =====================================
-// 🔥 PUBLIC LOGGER API
-// =====================================
-
 export const log = {
-  /**
-   * 🔍 TRACE LOG
-   */
   trace(
     event: string,
     traceId: string,
@@ -122,16 +103,10 @@ export const log = {
     }
   },
 
-  /**
-   * ⚠️ WARNING
-   */
   warn(event: string, traceId: string, data?: any) {
     this.trace(event, traceId, data);
   },
 
-  /**
-   * ❌ ERROR (auto flush)
-   */
   error(event: string, error: any, traceId: string) {
     ensure(traceId);
 
@@ -147,9 +122,6 @@ export const log = {
     flush(traceId);
   },
 
-  /**
-   * 🖥️ SYSTEM LOG (no traceId)
-   */
   system(event: string, data?: any) {
     if (!LOGGER_CONFIG.ENABLE_SYSTEM) return;
 
