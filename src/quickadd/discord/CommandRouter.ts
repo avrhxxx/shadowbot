@@ -14,6 +14,7 @@
  * ✅ FINAL:
  * - uses log.emit
  * - safe execution
+ * - CENTRAL deferReply (🔥 CRITICAL FIX)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -55,6 +56,22 @@ export async function handleQuickAddCommand(
     });
 
     const handler = getCommandHandler(subcommand);
+
+    // 🔒 SAFETY GUARD
+    if (!handler) {
+      log.emit({
+        event: "command_handler_missing",
+        traceId,
+        level: "error",
+        data: { subcommand },
+      });
+      return;
+    }
+
+    // =====================================
+    // 🔥 CRITICAL FIX: ALWAYS ACK FIRST
+    // =====================================
+    await interaction.deferReply({ ephemeral: true });
 
     log.emit({
       event: "command_execution_start",
