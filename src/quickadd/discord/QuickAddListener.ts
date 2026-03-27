@@ -6,20 +6,20 @@
  * 🎧 ROLE:
  * Registers QuickAdd interaction listener.
  *
- * Responsible for:
- * - listening to Discord interactions
- * - filtering QuickAdd command
- * - delegating to CommandRouter
- *
  * ❗ RULES:
+ * - ENTRYPOINT → MUST create traceId
  * - NO business logic
- * - NO parsing
  * - ONLY routing
+ *
+ * ✅ FINAL:
+ * - traceId generated HERE (correct layer)
+ * - fully compatible with logger system
  */
 
 import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
 import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createTraceId } from "../core/IdGenerator";
 
 const log = createScopedLogger(import.meta.url);
 
@@ -28,58 +28,27 @@ const log = createScopedLogger(import.meta.url);
 // =====================================
 
 export function registerQuickAddListener(client: Client) {
-  // 🔧 FIX: no traceId allowed here → use base logger (non-trace)
-  log("listener_registered", {});
-
   client.on("interactionCreate", async (interaction: Interaction) => {
-    const userId = interaction.isRepliable()
-      ? interaction.user?.id
-      : undefined;
+    if (!interaction.isChatInputCommand()) return;
+    if (interaction.commandName !== "q") return;
 
-    const guildId =
-      "guildId" in interaction ? interaction.guildId : undefined;
+    const traceId = createTraceId();
 
-    const channelId =
-      "channelId" in interaction ? interaction.channelId : undefined;
+    const userId = interaction.user.id;
+    const guildId = interaction.guildId;
+    const channelId = interaction.channelId;
 
     try {
-      // =====================================
-      // 🔍 IGNORE NON-COMMANDS
-      // =====================================
-      if (!interaction.isChatInputCommand()) return;
-
-      // =====================================
-      // 🎯 FILTER — ONLY /q COMMAND
-      // =====================================
-      if (interaction.commandName !== "q") {
-        return;
-      }
-
-      // =====================================
-      // 📥 ENTRY POINT
-      // =====================================
-      log("interaction_received", {
+      log.trace("interaction_received", traceId, {
         userId,
         guildId,
         channelId,
-        command: interaction.commandName,
       });
 
-      // =====================================
-      // 🔁 DELEGATION
-      // =====================================
-      await handleQuickAddCommand(interaction);
+      await handleQuickAddCommand(interaction, traceId);
 
     } catch (err) {
-      // =====================================
-      // 💥 ERROR
-      // =====================================
-      log.warn("listener_error", {
-        userId,
-        guildId,
-        channelId,
-        error: err,
-      });
+      log.error("listener_error", err, traceId);
 
       if (interaction.isRepliable()) {
         await interaction
