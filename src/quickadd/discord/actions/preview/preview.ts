@@ -9,13 +9,13 @@
  * ❗ RULES:
  * - read-only (NO mutations)
  * - traceId MUST be injected (STRICT)
- * - sessionId included in logs
- * - CJS SAFE
  *
  * ✅ FINAL:
+ * - log.emit only (no scoped logger)
  * - safe buffer read
  * - empty state handling
  * - deterministic output
+ * - full observability (metrics + timing)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -27,10 +27,7 @@ import { formatPreview } from "../../../utils/PreviewFormatter";
 
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🚀 HANDLER
@@ -40,7 +37,8 @@ export async function handlePreview(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `preview-${traceId}`;
+  timing.start(timerId);
 
   const guildId = interaction.guildId;
 
@@ -57,7 +55,11 @@ export async function handlePreview(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
 
   if (contextError || !session) {
     await interaction.reply({
@@ -68,6 +70,8 @@ export async function handlePreview(
   }
 
   try {
+    metrics.increment("preview_requested");
+
     // =====================================
     // 📥 LOAD BUFFER
     // =====================================
@@ -76,10 +80,14 @@ export async function handlePreview(
       traceId
     );
 
-    log.trace("preview_requested", traceId, {
-      sessionId: session.sessionId,
-      guildId,
-      count: entries.length,
+    log.emit({
+      event: "preview_requested",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+        count: entries.length,
+      },
     });
 
     // =====================================
@@ -91,8 +99,14 @@ export async function handlePreview(
         ephemeral: true,
       });
 
-      log.trace("preview_empty", traceId, {
-        sessionId: session.sessionId,
+      metrics.increment("preview_empty");
+
+      log.emit({
+        event: "preview_empty",
+        traceId,
+        data: {
+          sessionId: session.sessionId,
+        },
       });
 
       return;
@@ -111,14 +125,34 @@ export async function handlePreview(
       ephemeral: true,
     });
 
-    log.trace("preview_done", traceId, {
-      sessionId: session.sessionId,
-      count: entries.length,
-      durationMs: Date.now() - startedAt,
+    const duration = timing.end(timerId);
+
+    metrics.increment("preview_success");
+
+    log.emit({
+      event: "preview_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        count: entries.length,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
-    log.error("preview_failed", err, traceId);
+    const duration = timing.end(timerId);
+
+    metrics.increment("preview_error");
+
+    log.emit({
+      event: "preview_failed",
+      traceId,
+      level: "error",
+      data: {
+        error: err,
+        durationMs: duration,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to generate preview",
