@@ -32,19 +32,6 @@ function resolveMode(type: QuickAddType): "points" | "events" {
 }
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -59,7 +46,7 @@ export async function handleConfirm(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
@@ -78,8 +65,7 @@ export async function handleConfirm(
   );
 
   if (contextError || ownerError || !session) {
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -104,7 +90,7 @@ export async function handleConfirm(
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
-      await safeReply(interaction, "⚠️ Nothing to confirm");
+      await interaction.editReply("⚠️ Nothing to confirm");
       return;
     }
 
@@ -113,8 +99,7 @@ export async function handleConfirm(
     if (invalid.length > 0) {
       metrics.increment("confirm_blocked_invalid");
 
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         `❌ Cannot confirm. ${invalid.length} entries are not OK.`
       );
       return;
@@ -132,8 +117,7 @@ export async function handleConfirm(
         traceId
       );
 
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         "⚠️ Confirmation step started.\n\n" +
           "➡️ Now run:\n" +
           "`/q confirm target:<week/event>`\n\n" +
@@ -156,7 +140,7 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
-      await safeReply(interaction, "❌ Invalid session stage");
+      await interaction.editReply("❌ Invalid session stage");
       return;
     }
 
@@ -167,8 +151,7 @@ export async function handleConfirm(
     const target = interaction.options.getString("target");
 
     if (!target) {
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         "❌ Missing target.\n\n" +
           "➡️ Use:\n" +
           "`/q confirm target:<week/event>`\n\n" +
@@ -206,8 +189,7 @@ export async function handleConfirm(
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       `✅ Submitted ${entries.length} entries`
     );
 
@@ -239,8 +221,7 @@ export async function handleConfirm(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to confirm entries"
     );
   }
