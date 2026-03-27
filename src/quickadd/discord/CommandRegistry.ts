@@ -36,7 +36,7 @@ export type QuickAddSubcommand =
   | "end";
 
 // =====================================
-// 📦 IMPORT HANDLERS (RELATIVE → NODE SAFE)
+// 📦 IMPORT HANDLERS
 // =====================================
 
 import { handleStart } from "./actions/start/start";
