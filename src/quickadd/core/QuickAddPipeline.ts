@@ -14,6 +14,20 @@ import { buildLayout } from "../ocr/layout/LayoutBuilder";
 import { QuickAddSession } from "./QuickAddSession";
 import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
 
+/**
+ * 🧠 ROLE:
+ * Main processing pipeline for QuickAdd OCR input.
+ *
+ * Responsible for:
+ * - OCR → parsing → validation → selection
+ * - pushing entries into buffer
+ *
+ * ❗ RULES:
+ * - NO ID generation
+ * - MUST use provided traceId
+ * - FULL observability (log + metrics + timing)
+ */
+
 export async function processImageInput(
   message: Message,
   session: ReturnType<typeof QuickAddSession.get>,
@@ -26,31 +40,35 @@ export async function processImageInput(
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
-  log.trace("pipeline_context_check", traceId, {
-    sessionId: session?.sessionId,
-    guildId,
-    userId,
-    hasSession: !!session,
+  log.emit({
+    event: "pipeline_context_check",
+    traceId,
+    data: { sessionId: session?.sessionId, guildId, userId },
   });
 
   if (!guildId || !session) {
     metrics.increment("pipeline_invalid_context");
 
-    log.warn("pipeline_invalid_context", traceId, {
-      sessionId: session?.sessionId,
-      guildId,
-      userId,
+    log.emit({
+      event: "pipeline_invalid_context",
+      traceId,
+      level: "warn",
+      data: { guildId, userId },
     });
+
     return;
   }
 
   try {
     metrics.increment("pipeline_started");
 
-    log.trace("pipeline_start", traceId, {
-      sessionId: session.sessionId,
-      type: session.type,
-      imageUrl,
+    log.emit({
+      event: "pipeline_start",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        type: session.type,
+      },
     });
 
     const ocrResult = await runOCR(imageUrl, traceId);
@@ -58,13 +76,16 @@ export async function processImageInput(
     if (!ocrResult.sources.length) {
       metrics.increment("pipeline_ocr_empty");
 
-      log.warn("pipeline_soft_error_ocr_empty", traceId, {
-        sessionId: session.sessionId,
+      log.emit({
+        event: "pipeline_ocr_empty",
+        traceId,
+        level: "warn",
       });
+
       return;
     }
 
-    const pipelineResults: {
+    const results: {
       source: string;
       entries: ValidatedEntry[];
       validCount: number;
@@ -72,14 +93,7 @@ export async function processImageInput(
 
     for (const source of ocrResult.sources) {
       try {
-        log.trace("pipeline_source_start", traceId, {
-          sessionId: session.sessionId,
-          source: source.source,
-        });
-
-        if (!("tokens" in source) || !source.tokens?.length) {
-          continue;
-        }
+        if (!("tokens" in source) || !source.tokens?.length) continue;
 
         const layout = buildLayout(source.tokens, traceId);
         if (!layout.length) continue;
@@ -100,39 +114,37 @@ export async function processImageInput(
           traceId
         );
 
-        const validCount = validated.filter(
-          (v) => v.status === "OK"
-        ).length;
-
-        pipelineResults.push({
+        results.push({
           source: source.source,
           entries: validated,
-          validCount,
+          validCount: validated.filter((v) => v.status === "OK").length,
         });
 
       } catch (err) {
         metrics.increment("pipeline_source_error");
 
-        log.warn("pipeline_source_failed", traceId, {
-          sessionId: session.sessionId,
-          source: source.source,
-          error: err,
+        log.emit({
+          event: "pipeline_source_error",
+          traceId,
+          level: "warn",
+          data: { error: err },
         });
       }
     }
 
-    if (!pipelineResults.length) {
+    if (!results.length) {
       metrics.increment("pipeline_no_results");
 
-      log.warn("pipeline_soft_error_no_results", traceId, {
-        sessionId: session.sessionId,
+      log.emit({
+        event: "pipeline_no_results",
+        traceId,
+        level: "warn",
       });
+
       return;
     }
 
-    const best = pipelineResults.sort((a, b) =>
-      b.validCount - a.validCount
-    )[0];
+    const best = results.sort((a, b) => b.validCount - a.validCount)[0];
 
     QuickAddBuffer.addEntries(
       guildId,
@@ -147,19 +159,26 @@ export async function processImageInput(
       traceId
     );
 
-    const total = QuickAddBuffer.getEntries(guildId, traceId).length;
-
     const duration = timing.end(timerId);
 
-    log.trace("pipeline_done", traceId, {
-      sessionId: session.sessionId,
-      total,
-      durationMs: duration,
+    log.emit({
+      event: "pipeline_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        total: best.entries.length,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
     metrics.increment("pipeline_error");
 
-    log.error("pipeline_error", err, traceId);
+    log.emit({
+      event: "pipeline_error",
+      traceId,
+      level: "error",
+      data: { error: err },
+    });
   }
 }
