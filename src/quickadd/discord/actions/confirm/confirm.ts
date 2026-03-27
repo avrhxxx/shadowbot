@@ -7,13 +7,14 @@
  * Finalizes QuickAdd session (STRICT MODE).
  *
  * ❗ RULES:
- * - OK ONLY
+ * - OK ONLY (block otherwise)
  * - 2-stage confirm flow
  * - owner only
  * - traceId required
  *
  * ✅ FINAL:
- * - unified validators
+ * - improved UX messaging
+ * - unified guards
  * - Node-safe imports
  */
 
@@ -21,7 +22,6 @@ import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-
 import {
   enqueuePoints,
   enqueueEvents,
@@ -71,17 +71,8 @@ export async function handleConfirm(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(
-    interaction,
-    session,
-    traceId
-  );
-
-  const ownerError = validateSessionOwner(
-    interaction,
-    session,
-    traceId
-  );
+  const contextError = validateQuickAddContext(interaction, session);
+  const ownerError = validateSessionOwner(interaction, session);
 
   if (contextError || ownerError || !session) {
     await interaction.reply({
@@ -121,6 +112,10 @@ export async function handleConfirm(
       return;
     }
 
+    // =====================================
+    // 🧠 STAGE 1
+    // =====================================
+
     if (session.stage === "COLLECTING") {
       QuickAddSession.setStage(
         guildId,
@@ -130,12 +125,23 @@ export async function handleConfirm(
 
       await interaction.reply({
         content:
-          "⚠️ Confirm stage started.\nUse /q confirm with target.",
+          "⚠️ Confirmation step started.\n\n" +
+          "➡️ Now run:\n" +
+          "`/q confirm target:<week/event>`\n\n" +
+          "💡 Start typing in 'target' to see suggestions.",
         ephemeral: true,
+      });
+
+      log.trace("confirm_stage_entered", traceId, {
+        sessionId: session.sessionId,
       });
 
       return;
     }
+
+    // =====================================
+    // 🧠 STAGE GUARD
+    // =====================================
 
     if (session.stage !== "CONFIRM_PENDING") {
       await interaction.reply({
@@ -145,11 +151,19 @@ export async function handleConfirm(
       return;
     }
 
+    // =====================================
+    // 🎯 STAGE 2
+    // =====================================
+
     const target = interaction.options.getString("target");
 
     if (!target) {
       await interaction.reply({
-        content: "❌ Target required",
+        content:
+          "❌ Missing target.\n\n" +
+          "➡️ Use:\n" +
+          "`/q confirm target:<week/event>`\n\n" +
+          "💡 Autocomplete is enabled.",
         ephemeral: true,
       });
       return;
@@ -168,6 +182,12 @@ export async function handleConfirm(
         })),
         traceId
       );
+
+      log.trace("confirm_points_enqueued", traceId, {
+        sessionId: session.sessionId,
+        count: entries.length,
+        week: target,
+      });
     } else {
       await enqueueEvents(
         entries.map((e) => ({
@@ -178,6 +198,12 @@ export async function handleConfirm(
         })),
         traceId
       );
+
+      log.trace("confirm_events_enqueued", traceId, {
+        sessionId: session.sessionId,
+        count: entries.length,
+        eventId: target,
+      });
     }
 
     QuickAddBuffer.clear(guildId, traceId);
@@ -190,6 +216,7 @@ export async function handleConfirm(
 
     log.trace("confirm_done", traceId, {
       sessionId: session.sessionId,
+      mode,
       durationMs: Date.now() - startedAt,
     });
 
