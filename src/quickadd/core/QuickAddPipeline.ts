@@ -3,7 +3,7 @@
 // =====================================
 
 import { Message } from "discord.js";
-import { createScopedLogger } from "../debug/logger";
+import { log, metrics, timing } from "../logger";
 
 import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
@@ -14,15 +14,14 @@ import { buildLayout } from "../ocr/layout/LayoutBuilder";
 import { QuickAddSession } from "./QuickAddSession";
 import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
 
-const log = createScopedLogger(__filename);
-
 export async function processImageInput(
   message: Message,
   session: ReturnType<typeof QuickAddSession.get>,
   imageUrl: string,
   traceId: string
 ) {
-  const startedAt = Date.now();
+  const timerId = `pipeline-${traceId}`;
+  timing.start(timerId);
 
   const guildId = message.guild?.id;
   const userId = message.author?.id;
@@ -35,6 +34,8 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
+    metrics.increment("pipeline_invalid_context");
+
     log.warn("pipeline_invalid_context", traceId, {
       sessionId: session?.sessionId,
       guildId,
@@ -44,6 +45,8 @@ export async function processImageInput(
   }
 
   try {
+    metrics.increment("pipeline_started");
+
     log.trace("pipeline_start", traceId, {
       sessionId: session.sessionId,
       type: session.type,
@@ -53,6 +56,8 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
+      metrics.increment("pipeline_ocr_empty");
+
       log.warn("pipeline_soft_error_ocr_empty", traceId, {
         sessionId: session.sessionId,
       });
@@ -72,25 +77,12 @@ export async function processImageInput(
           source: source.source,
         });
 
-        let layout = [];
-
-        if ("tokens" in source && source.tokens?.length) {
-          layout = buildLayout(source.tokens, traceId);
-        } else {
-          log.trace("layout_skipped_no_tokens", traceId, {
-            sessionId: session.sessionId,
-            source: source.source,
-          });
+        if (!("tokens" in source) || !source.tokens?.length) {
           continue;
         }
 
-        if (!layout.length) {
-          log.trace("layout_empty_for_source", traceId, {
-            sessionId: session.sessionId,
-            source: source.source,
-          });
-          continue;
-        }
+        const layout = buildLayout(source.tokens, traceId);
+        if (!layout.length) continue;
 
         const parsed: ParsedEntry[] = parseByType(
           session.type,
@@ -98,13 +90,7 @@ export async function processImageInput(
           traceId
         );
 
-        if (!parsed.length) {
-          log.trace("parser_empty_for_source", traceId, {
-            sessionId: session.sessionId,
-            source: source.source,
-          });
-          continue;
-        }
+        if (!parsed.length) continue;
 
         const validated = await validateEntries(
           parsed.map((p) => ({
@@ -124,14 +110,9 @@ export async function processImageInput(
           validCount,
         });
 
-        log.trace("pipeline_source_done", traceId, {
-          sessionId: session.sessionId,
-          source: source.source,
-          entries: validated.length,
-          validCount,
-        });
-
       } catch (err) {
+        metrics.increment("pipeline_source_error");
+
         log.warn("pipeline_source_failed", traceId, {
           sessionId: session.sessionId,
           source: source.source,
@@ -141,33 +122,17 @@ export async function processImageInput(
     }
 
     if (!pipelineResults.length) {
+      metrics.increment("pipeline_no_results");
+
       log.warn("pipeline_soft_error_no_results", traceId, {
         sessionId: session.sessionId,
       });
       return;
     }
 
-    const best = pipelineResults.sort((a, b) => {
-      if (b.entries.length !== a.entries.length) {
-        return b.entries.length - a.entries.length;
-      }
-
-      if (b.validCount !== a.validCount) {
-        return b.validCount - a.validCount;
-      }
-
-      if (a.source === "VISION") return -1;
-      if (b.source === "VISION") return 1;
-
-      return 0;
-    })[0];
-
-    log.trace("pipeline_selected", traceId, {
-      sessionId: session.sessionId,
-      source: best.source,
-      entries: best.entries.length,
-      valid: best.validCount,
-    });
+    const best = pipelineResults.sort((a, b) =>
+      b.validCount - a.validCount
+    )[0];
 
     QuickAddBuffer.addEntries(
       guildId,
@@ -182,19 +147,19 @@ export async function processImageInput(
       traceId
     );
 
-    const total = QuickAddBuffer.getEntries(
-      guildId,
-      traceId
-    ).length;
+    const total = QuickAddBuffer.getEntries(guildId, traceId).length;
+
+    const duration = timing.end(timerId);
 
     log.trace("pipeline_done", traceId, {
       sessionId: session.sessionId,
-      source: best.source,
       total,
-      durationMs: Date.now() - startedAt,
+      durationMs: duration,
     });
 
   } catch (err) {
+    metrics.increment("pipeline_error");
+
     log.error("pipeline_error", err, traceId);
   }
 }
