@@ -4,7 +4,7 @@
 
 /**
  * 🧠 ROLE:
- * Central logging entrypoint (FINAL)
+ * Central logging entrypoint
  *
  * ❗ RULES:
  * - ALWAYS import from here
@@ -12,4 +12,4 @@
  */
 
 export { createScopedLogger } from "./createScopedLogger";
-export type { FlowType } from "./DebugLogger";
+export type { TraceType } from "./DebugLogger";
