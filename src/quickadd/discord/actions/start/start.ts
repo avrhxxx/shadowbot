@@ -26,18 +26,13 @@ function isQuickAddType(value: string): value is QuickAddType {
 }
 
 // =====================================
-// 🔐 SAFE REPLY (FIX: defer support)
+// 🔐 SAFE REPLY
 // =====================================
 
 async function safeReply(
   interaction: ChatInputCommandInteraction,
   content: string
 ) {
-  if (interaction.deferred && !interaction.replied) {
-    await interaction.editReply({ content });
-    return;
-  }
-
   if (!interaction.replied && !interaction.deferred) {
     await interaction.reply({ content, ephemeral: true });
   }
@@ -74,19 +69,12 @@ export async function handleStart(
 
   try {
     // =====================================
-    // ⚡ FIX: ACK INTERACTION ASAP
-    // =====================================
-    if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ ephemeral: true });
-    }
-
-    // =====================================
-    // 🧠 START SESSION FIRST (FIX: userId BACK)
+    // 🧠 START SESSION FIRST
     // =====================================
     const session = QuickAddSession.start(
       {
         guildId,
-        userId, // ✅ REQUIRED
+        userId, // 🔥 FIX — BRAKOWAŁO TEGO
         ownerId: userId,
         threadId: null,
         type,
@@ -178,10 +166,8 @@ export async function handleStart(
       },
     });
 
-    // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, userId, traceId);
 
-    // ❗ CLEANUP THREAD (SAFE)
     if (threadId) {
       try {
         const thread = await interaction.client.channels.fetch(
