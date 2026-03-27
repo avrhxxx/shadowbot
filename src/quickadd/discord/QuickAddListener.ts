@@ -21,6 +21,9 @@ import { handleQuickAddCommand } from "./CommandRouter";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
+// 🔥 NEW (autocomplete handler)
+import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
+
 const log = createScopedLogger(import.meta.url);
 
 // =====================================
@@ -29,16 +32,35 @@ const log = createScopedLogger(import.meta.url);
 
 export function registerQuickAddListener(client: Client) {
   client.on("interactionCreate", async (interaction: Interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-    if (interaction.commandName !== "q") return;
-
     const traceId = createTraceId();
 
-    const userId = interaction.user.id;
+    const userId = interaction.user?.id;
     const guildId = interaction.guildId;
     const channelId = interaction.channelId;
 
     try {
+      // =====================================
+      // 🔥 AUTOCOMPLETE HANDLER
+      // =====================================
+      if (interaction.isAutocomplete()) {
+        if (interaction.commandName !== "q") return;
+
+        log.trace("autocomplete_received", traceId, {
+          userId,
+          guildId,
+          channelId,
+        });
+
+        await handleConfirmAutocomplete(interaction, traceId);
+        return;
+      }
+
+      // =====================================
+      // 🔹 COMMAND HANDLER
+      // =====================================
+      if (!interaction.isChatInputCommand()) return;
+      if (interaction.commandName !== "q") return;
+
       log.trace("interaction_received", traceId, {
         userId,
         guildId,
