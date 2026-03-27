@@ -47,7 +47,7 @@ export async function processImageInput(
   const userId = message.author?.id;
 
   log.trace("pipeline_context_check", traceId, {
-    sessionId: session?.sessionId, // ✅ NEW
+    sessionId: session?.sessionId,
     guildId,
     userId,
     hasSession: !!session,
@@ -55,6 +55,8 @@ export async function processImageInput(
 
   if (!guildId || !session) {
     log.warn("pipeline_invalid_context", {
+      traceId,
+      sessionId: session?.sessionId,
       guildId,
       userId,
     });
@@ -63,7 +65,7 @@ export async function processImageInput(
 
   try {
     log.trace("pipeline_start", traceId, {
-      sessionId: session.sessionId, // ✅ NEW
+      sessionId: session.sessionId,
       type: session.type,
       imageUrl,
     });
@@ -74,7 +76,10 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.warn("ocr_empty");
+      log.warn("pipeline_soft_error_ocr_empty", {
+        traceId,
+        sessionId: session.sessionId,
+      });
       return;
     }
 
@@ -90,7 +95,7 @@ export async function processImageInput(
     for (const source of ocrResult.sources) {
       try {
         log.trace("pipeline_source_start", traceId, {
-          sessionId: session.sessionId, // ✅ NEW
+          sessionId: session.sessionId,
           source: source.source,
         });
 
@@ -100,7 +105,7 @@ export async function processImageInput(
           layout = buildLayout(source.tokens, traceId);
         } else {
           log.trace("layout_skipped_no_tokens", traceId, {
-            sessionId: session.sessionId, // ✅ NEW
+            sessionId: session.sessionId,
             source: source.source,
           });
           continue;
@@ -108,7 +113,7 @@ export async function processImageInput(
 
         if (!layout.length) {
           log.trace("layout_empty_for_source", traceId, {
-            sessionId: session.sessionId, // ✅ NEW
+            sessionId: session.sessionId,
             source: source.source,
           });
           continue;
@@ -122,13 +127,20 @@ export async function processImageInput(
 
         if (!parsed.length) {
           log.trace("parser_empty_for_source", traceId, {
-            sessionId: session.sessionId, // ✅ NEW
+            sessionId: session.sessionId,
             source: source.source,
           });
           continue;
         }
 
-        const validated = await validateEntries(parsed, traceId);
+        // ✅ STRICT INPUT SHAPE
+        const validated = await validateEntries(
+          parsed.map((p) => ({
+            nickname: p.nickname,
+            value: p.value,
+          })),
+          traceId
+        );
 
         const validCount = validated.filter(
           (v) => v.status === "OK"
@@ -141,7 +153,7 @@ export async function processImageInput(
         });
 
         log.trace("pipeline_source_done", traceId, {
-          sessionId: session.sessionId, // ✅ NEW
+          sessionId: session.sessionId,
           source: source.source,
           entries: validated.length,
           validCount,
@@ -149,7 +161,8 @@ export async function processImageInput(
 
       } catch (err) {
         log.warn("pipeline_source_failed", {
-          sessionId: session.sessionId, // ✅ NEW
+          traceId,
+          sessionId: session.sessionId,
           source: source.source,
           error: err,
         });
@@ -160,9 +173,9 @@ export async function processImageInput(
     // 🔍 SELECTION (HYBRID)
     // =====================================
     if (!pipelineResults.length) {
-      log.warn("pipeline_no_results", {
-        sessionId: session.sessionId, // ✅ NEW
-        reason: "all_sources_failed_or_empty",
+      log.warn("pipeline_soft_error_no_results", {
+        traceId,
+        sessionId: session.sessionId,
       });
       return;
     }
@@ -183,7 +196,7 @@ export async function processImageInput(
     })[0];
 
     log.trace("pipeline_selected", traceId, {
-      sessionId: session.sessionId, // ✅ NEW
+      sessionId: session.sessionId,
       source: best.source,
       entries: best.entries.length,
       valid: best.validCount,
@@ -214,7 +227,7 @@ export async function processImageInput(
     // ✅ DONE
     // =====================================
     log.trace("pipeline_done", traceId, {
-      sessionId: session.sessionId, // ✅ NEW
+      sessionId: session.sessionId,
       source: best.source,
       total,
       durationMs: Date.now() - startedAt,
