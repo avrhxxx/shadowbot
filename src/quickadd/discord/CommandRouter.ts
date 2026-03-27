@@ -4,16 +4,16 @@
 
 /**
  * 🎯 ROLE:
- * Command router (traceId injected)
+ * Routes commands to handlers
  *
  * ❗ RULES:
  * - NO ID generation
  * - traceId MUST be injected
- * - no business logic
+ * - NO business logic
  *
  * ✅ FINAL:
- * - pure router
- * - fully aligned with trace system
+ * - logger standardized
+ * - safe execution
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -21,12 +21,12 @@ import {
   getCommandHandler,
   QuickAddSubcommand,
 } from "./CommandRegistry";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../debug/logger";
 
 const log = createScopedLogger(import.meta.url);
 
 // =====================================
-// 🚀 MAIN ROUTER
+// 🚀 ROUTER
 // =====================================
 
 export async function handleQuickAddCommand(
@@ -55,18 +55,12 @@ export async function handleQuickAddCommand(
     const handler = getCommandHandler(subcommand);
 
     log.trace("command_execution_start", traceId, {
-      userId,
-      guildId,
-      channelId,
       subcommand,
     });
 
     await handler(interaction, traceId);
 
     log.trace("command_execution_done", traceId, {
-      userId,
-      guildId,
-      channelId,
       subcommand,
       durationMs: Date.now() - startTime,
     });
@@ -75,9 +69,6 @@ export async function handleQuickAddCommand(
     log.error("command_router_error", err, traceId);
 
     log.trace("command_execution_failed", traceId, {
-      userId,
-      guildId,
-      channelId,
       durationMs: Date.now() - startTime,
     });
   }
