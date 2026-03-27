@@ -74,8 +74,8 @@ export function startQuickAddWorker() {
       // 📥 LOAD QUEUE
       // =====================================
       const points = (await getQueue(
-        "quickadd_points_queue",
-        traceId // ✅ FIX
+        "points", // ✅ FIX
+        traceId
       )) as QueueEntry[];
 
       log.emit({
