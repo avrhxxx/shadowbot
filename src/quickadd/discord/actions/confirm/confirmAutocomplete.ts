@@ -14,6 +14,7 @@
  * ✅ FINAL:
  * - log.emit only
  * - lightweight observability
+ * - safe respond (🔥 runtime-safe)
  */
 
 import { AutocompleteInteraction } from "discord.js";
@@ -57,41 +58,60 @@ export async function handleConfirmAutocomplete(
 
   if (!guildId) return;
 
-  const session = QuickAddSession.get(guildId, userId);
+  try {
+    const session = QuickAddSession.get(guildId, userId);
 
-  // 🔒 brak sesji lub zły stage → brak sugestii
-  if (!session || session.stage !== "CONFIRM_PENDING") {
-    await interaction.respond([]);
-    return;
+    // 🔒 brak sesji lub zły stage → brak sugestii
+    if (!session || session.stage !== "CONFIRM_PENDING") {
+      await interaction.respond([]);
+      return;
+    }
+
+    const focused = interaction.options.getFocused();
+
+    const mode = resolveMode(session.type);
+
+    const options =
+      mode === "points" ? WEEK_OPTIONS : EVENT_OPTIONS;
+
+    const filtered = options.filter((opt) =>
+      opt.name.toLowerCase().includes(focused.toLowerCase())
+    );
+
+    metrics.increment("confirm_autocomplete_used");
+
+    log.emit({
+      event: "confirm_autocomplete",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        input: focused,
+        results: filtered.length,
+      },
+    });
+
+    await interaction.respond(
+      filtered.slice(0, 25).map((opt) => ({
+        name: opt.name,
+        value: opt.value,
+      }))
+    );
+
+  } catch (err) {
+    log.emit({
+      event: "confirm_autocomplete_failed",
+      traceId,
+      level: "warn",
+      data: {
+        error: err,
+      },
+    });
+
+    // 🔒 fail-safe → zawsze coś odpowiedz
+    try {
+      await interaction.respond([]);
+    } catch {
+      // ignore hard Discord errors
+    }
   }
-
-  const focused = interaction.options.getFocused();
-
-  const mode = resolveMode(session.type);
-
-  const options =
-    mode === "points" ? WEEK_OPTIONS : EVENT_OPTIONS;
-
-  const filtered = options.filter((opt) =>
-    opt.name.toLowerCase().includes(focused.toLowerCase())
-  );
-
-  metrics.increment("confirm_autocomplete_used");
-
-  log.emit({
-    event: "confirm_autocomplete",
-    traceId,
-    data: {
-      sessionId: session.sessionId,
-      input: focused,
-      results: filtered.length,
-    },
-  });
-
-  await interaction.respond(
-    filtered.slice(0, 25).map((opt) => ({
-      name: opt.name,
-      value: opt.value,
-    }))
-  );
 }
