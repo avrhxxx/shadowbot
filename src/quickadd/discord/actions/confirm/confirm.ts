@@ -32,6 +32,19 @@ function resolveMode(type: QuickAddType): "points" | "events" {
 }
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  if (!interaction.replied && !interaction.deferred) {
+    await interaction.reply({ content, ephemeral: true });
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -43,16 +56,14 @@ export async function handleConfirm(
   timing.start(timerId);
 
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) {
-    await interaction.reply({
-      content: "❌ Guild only command",
-      ephemeral: true,
-    });
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -67,13 +78,10 @@ export async function handleConfirm(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.reply({
-      content:
-        contextError ??
-        ownerError ??
-        "❌ Session not found",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      contextError ?? ownerError ?? "❌ Session not found"
+    );
     return;
   }
 
@@ -93,10 +101,7 @@ export async function handleConfirm(
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
 
     if (!entries.length) {
-      await interaction.reply({
-        content: "⚠️ Nothing to confirm",
-        ephemeral: true,
-      });
+      await safeReply(interaction, "⚠️ Nothing to confirm");
       return;
     }
 
@@ -105,10 +110,10 @@ export async function handleConfirm(
     if (invalid.length > 0) {
       metrics.increment("confirm_blocked_invalid");
 
-      await interaction.reply({
-        content: `❌ Cannot confirm. ${invalid.length} entries are not OK.`,
-        ephemeral: true,
-      });
+      await safeReply(
+        interaction,
+        `❌ Cannot confirm. ${invalid.length} entries are not OK.`
+      );
       return;
     }
 
@@ -117,21 +122,20 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage === "COLLECTING") {
-      // ✅ FIX: proper transition
       QuickAddSession.setStage(
         guildId,
+        userId,
         "CONFIRM_PENDING",
         traceId
       );
 
-      await interaction.reply({
-        content:
-          "⚠️ Confirmation step started.\n\n" +
+      await safeReply(
+        interaction,
+        "⚠️ Confirmation step started.\n\n" +
           "➡️ Now run:\n" +
           "`/q confirm target:<week/event>`\n\n" +
-          "💡 Start typing in 'target' to see suggestions.",
-        ephemeral: true,
-      });
+          "💡 Start typing in 'target' to see suggestions."
+      );
 
       log.emit({
         event: "confirm_stage_entered",
@@ -149,10 +153,7 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
-      await interaction.reply({
-        content: "❌ Invalid session stage",
-        ephemeral: true,
-      });
+      await safeReply(interaction, "❌ Invalid session stage");
       return;
     }
 
@@ -163,14 +164,13 @@ export async function handleConfirm(
     const target = interaction.options.getString("target");
 
     if (!target) {
-      await interaction.reply({
-        content:
-          "❌ Missing target.\n\n" +
+      await safeReply(
+        interaction,
+        "❌ Missing target.\n\n" +
           "➡️ Use:\n" +
           "`/q confirm target:<week/event>`\n\n" +
-          "💡 Autocomplete is enabled.",
-        ephemeral: true,
-      });
+          "💡 Autocomplete is enabled."
+      );
       return;
     }
 
@@ -200,12 +200,12 @@ export async function handleConfirm(
     }
 
     QuickAddBuffer.clear(guildId, traceId);
-    QuickAddSession.end(guildId, traceId);
+    QuickAddSession.end(guildId, userId, traceId);
 
-    await interaction.reply({
-      content: `✅ Submitted ${entries.length} entries`,
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      `✅ Submitted ${entries.length} entries`
+    );
 
     const duration = timing.end(timerId);
 
@@ -235,9 +235,9 @@ export async function handleConfirm(
       },
     });
 
-    await interaction.reply({
-      content: "❌ Failed to confirm entries",
-      ephemeral: true,
-    });
+    await safeReply(
+      interaction,
+      "❌ Failed to confirm entries"
+    );
   }
 }
