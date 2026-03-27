@@ -1,4 +1,3 @@
-
 // =====================================
 // 📁 src/quickadd/core/QuickAddSession.ts
 // =====================================
@@ -9,16 +8,17 @@ import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 
 /**
  * 🧠 ROLE:
- * Manages QuickAdd session lifecycle (MULTI-SESSION).
+ * Manages QuickAdd session lifecycle.
  *
  * ❗ RULES:
- * - one session per user per guild
- * - key = guildId:userId
+ * - one session per (guildId + userId)
  * - no business logic
+ * - no ID generation except sessionId
  */
 
 type SessionData = {
   guildId: string;
+  userId: string;
   threadId: string | null;
   ownerId: string;
 
@@ -29,31 +29,24 @@ type SessionData = {
   sessionId: string;
 };
 
-// =====================================
-// 🧠 INTERNAL STATE
-// =====================================
-
 const sessions = new Map<string, SessionData>();
-
-function getKey(guildId: string, userId: string): string {
-  return `${guildId}:${userId}`;
-}
 
 const ALLOWED_TRANSITIONS: Record<QuickAddStage, QuickAddStage[]> = {
   COLLECTING: ["CONFIRM_PENDING"],
   CONFIRM_PENDING: [],
 };
 
-// =====================================
-// 🚀 API
-// =====================================
+// 🔑 KEY BUILDER
+function buildKey(guildId: string, userId: string) {
+  return `${guildId}:${userId}`;
+}
 
 export const QuickAddSession = {
   start(
     data: Omit<SessionData, "sessionId" | "stage" | "createdAt">,
     traceId: string
   ) {
-    const key = getKey(data.guildId, data.ownerId);
+    const key = buildKey(data.guildId, data.userId);
 
     const existing = sessions.get(key);
 
@@ -62,11 +55,7 @@ export const QuickAddSession = {
         event: "session_start_blocked",
         traceId,
         level: "warn",
-        data: {
-          sessionId: existing.sessionId,
-          guildId: data.guildId,
-          userId: data.ownerId,
-        },
+        data: { existingSessionId: existing.sessionId },
       });
       return null;
     }
@@ -87,7 +76,7 @@ export const QuickAddSession = {
       data: {
         sessionId: session.sessionId,
         guildId: data.guildId,
-        userId: data.ownerId,
+        userId: data.userId,
       },
     });
 
@@ -95,7 +84,7 @@ export const QuickAddSession = {
   },
 
   get(guildId: string, userId: string) {
-    return sessions.get(getKey(guildId, userId)) || null;
+    return sessions.get(buildKey(guildId, userId)) || null;
   },
 
   setThreadId(
@@ -104,7 +93,7 @@ export const QuickAddSession = {
     threadId: string,
     traceId: string
   ) {
-    const key = getKey(guildId, userId);
+    const key = buildKey(guildId, userId);
     const session = sessions.get(key);
 
     if (!session) {
@@ -140,7 +129,7 @@ export const QuickAddSession = {
     nextStage: QuickAddStage,
     traceId: string
   ) {
-    const key = getKey(guildId, userId);
+    const key = buildKey(guildId, userId);
     const session = sessions.get(key);
 
     if (!session) {
@@ -188,7 +177,7 @@ export const QuickAddSession = {
   },
 
   end(guildId: string, userId: string, traceId: string) {
-    const key = getKey(guildId, userId);
+    const key = buildKey(guildId, userId);
     const session = sessions.get(key);
 
     sessions.delete(key);
