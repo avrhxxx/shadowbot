@@ -4,15 +4,19 @@
 
 /**
  * 🪵 ROLE:
- * Scoped logger factory (DUAL MODE)
+ * Scoped logger factory (DUAL MODE + FLOW AWARE)
  *
  * ✔ trace() → TRACE LOGGER (requires traceId)
  * ✔ log()   → SYSTEM LOGGER (no traceId)
+ *
+ * 🔥 NEW:
+ * - flowType injected at creation (USER | SYSTEM)
  */
 
 import {
   __createTraceLogger,
   __createSystemLogger,
+  FlowType,
 } from "./DebugLogger";
 
 // =====================================
@@ -37,11 +41,14 @@ function extractScope(filePath: string): string {
 // 🔹 FACTORY
 // =====================================
 
-export function createScopedLogger(filePath: string) {
+export function createScopedLogger(
+  filePath: string,
+  flow: FlowType = "USER"
+) {
   const scope = extractScope(filePath);
 
-  const trace = __createTraceLogger(scope);
-  const system = __createSystemLogger(scope);
+  const trace = __createTraceLogger(scope, flow);
+  const system = __createSystemLogger(scope, flow);
 
   return {
     trace: trace.trace,
