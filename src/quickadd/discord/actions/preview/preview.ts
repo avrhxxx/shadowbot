@@ -7,10 +7,15 @@
  * Displays current QuickAdd buffer preview.
  *
  * ❗ RULES:
- * - read-only
- * - traceId MUST be injected (from router)
- * - NO traceId fallback (STRICT)
+ * - read-only (NO mutations)
+ * - traceId MUST be injected (STRICT)
  * - sessionId included in logs
+ * - CJS SAFE
+ *
+ * ✅ FINAL:
+ * - safe buffer read
+ * - empty state handling
+ * - deterministic output
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -20,13 +25,12 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 
 import { formatPreview } from "../../../utils/PreviewFormatter";
 
-import {
-  validateQuickAddContext,
-} from "../../../rules/QuickAddGuards";
+import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../../../debug/logger";
 
-const log = createScopedLogger(import.meta.url);
+// ❗ CJS SAFE
+const log = createScopedLogger(__filename);
 
 // =====================================
 // 🚀 HANDLER
@@ -40,6 +44,9 @@ export async function handlePreview(
 
   const guildId = interaction.guildId;
 
+  // =====================================
+  // ❌ GUILD GUARD
+  // =====================================
   if (!guildId) {
     await interaction.reply({
       content: "❌ Guild only command",
@@ -83,6 +90,11 @@ export async function handlePreview(
         content: "⚠️ Buffer is empty",
         ephemeral: true,
       });
+
+      log.trace("preview_empty", traceId, {
+        sessionId: session.sessionId,
+      });
+
       return;
     }
 
