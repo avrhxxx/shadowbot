@@ -9,10 +9,11 @@ import { QuickAddType } from "../../../core/QuickAddTypes";
 
 import { createScopedLogger } from "../../../debug/logger";
 
-const log = createScopedLogger(import.meta.url);
+// ❗ CJS SAFE
+const log = createScopedLogger(__filename);
 
 // =====================================
-// 🧠 MOCK CONFIG (TEMP)
+// MOCK
 // =====================================
 
 const WEEK_OPTIONS = [
@@ -26,8 +27,6 @@ const EVENT_OPTIONS = [
 ];
 
 // =====================================
-// 🧠 MODE RESOLVER
-// =====================================
 
 function resolveMode(type: QuickAddType): "points" | "events" {
   if (type === "DONATIONS_POINTS" || type === "DUEL_POINTS") {
@@ -36,8 +35,6 @@ function resolveMode(type: QuickAddType): "points" | "events" {
   return "events";
 }
 
-// =====================================
-// 🚀 HANDLER
 // =====================================
 
 export async function handleConfirmAutocomplete(
@@ -50,7 +47,6 @@ export async function handleConfirmAutocomplete(
 
   const session = QuickAddSession.get(guildId);
 
-  // ❌ NO SESSION OR WRONG STAGE
   if (!session || session.stage !== "CONFIRM_PENDING") {
     await interaction.respond([]);
     return;
@@ -68,9 +64,7 @@ export async function handleConfirmAutocomplete(
   );
 
   log.trace("confirm_autocomplete", traceId, {
-    guildId,
     sessionId: session.sessionId,
-    mode,
     input: focused,
     results: filtered.length,
   });
