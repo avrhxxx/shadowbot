@@ -5,6 +5,8 @@
 import {
   ChatInputCommandInteraction,
   ChannelType,
+  TextChannel,
+  NewsChannel,
 } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -84,7 +86,11 @@ export async function handleStart(
     // =====================================
     // 📢 CHANNEL GUARD
     // =====================================
-    if (!interaction.channel || !interaction.channel.isTextBased()) {
+    if (
+      !interaction.channel ||
+      !(interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof NewsChannel)
+    ) {
       throw new Error("Invalid channel type");
     }
 
@@ -146,8 +152,13 @@ export async function handleStart(
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, traceId);
 
-    // ❗ CLEANUP THREAD
-    if (threadId && interaction.channel?.isTextBased()) {
+    // ❗ CLEANUP THREAD (TYPE-SAFE)
+    if (
+      threadId &&
+      interaction.channel &&
+      (interaction.channel instanceof TextChannel ||
+        interaction.channel instanceof NewsChannel)
+    ) {
       try {
         const thread = await interaction.channel.threads.fetch(threadId);
         await thread?.delete();
