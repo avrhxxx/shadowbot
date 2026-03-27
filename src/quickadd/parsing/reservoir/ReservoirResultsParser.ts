@@ -6,30 +6,25 @@
  * 🧠 ROLE:
  * Domain parser for RESERVOIR RESULTS.
  *
- * 🔥 SYSTEM POSITION:
- * OCR → Layout → Parser → Validator
- *
- * This file is STRICTLY responsible for:
- * - extracting nickname + result value pairs from layout
- * - cleaning OCR artifacts (ONLY here)
- * - producing raw ParsedEntry[]
- *
- * ❗ RULES:
- * - NO OCR logic
- * - NO layout logic
- * - NO validation decisions (only basic filtering)
- * - deterministic output
- * - traceId REQUIRED (no fallback)
- *
  * ❗ CURRENT STATE:
- * - SAFE SCAFFOLD (returns empty array)
- * - structure ready for full implementation
+ * - SAFE PLACEHOLDER (no parsing logic yet)
+ * - fully compatible with parser pipeline
  *
- * 🧩 TARGET PIPELINE:
- * 1. extract   → raw layout → candidate fields
- * 2. pair      → match nickname with result
- * 3. clean     → normalize + parse values
- * 4. finalize  → minimal filtering (NOT validation layer)
+ * 🧩 TARGET PIPELINE (FUTURE IMPLEMENTATION):
+ * 1. extract  → read layout cells (nickname + raw results)
+ * 2. pair     → align nickname with correct result value
+ * 3. clean    → normalize nickname + parse numbers
+ * 4. finalize → validate + filter + deduplicate
+ *
+ * ❗ IMPORTANT RULES:
+ * - ALL cleaning happens here (NOT in OCR / layout)
+ * - MUST be deterministic (same input → same output)
+ * - NO external dependencies
+ * - layout is treated as raw structured input
+ *
+ * 🔒 CURRENT BEHAVIOR:
+ * - returns empty array (SAFE)
+ * - NO logging (placeholder mode)
  */
 
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
@@ -49,125 +44,51 @@ export function parseReservoirResults(
 
   const { layout } = input;
 
-  // =====================================
-  // 🔹 FUTURE IMPLEMENTATION ENTRY
-  // =====================================
-  // Planned flow:
-  //
-  // const extracted = extract(layout, traceId);
-  // const paired = pair(extracted, traceId);
-  // const cleaned = clean(paired, traceId);
-  // const final = finalize(cleaned, traceId);
-  //
-  // return final;
+  // 🔒 SAFE PLACEHOLDER
+  const result: ParsedEntry[] = [];
 
-  // 🔥 CURRENT: SAFE NO-OP
-  return [];
+  return result;
 }
 
 // =====================================
-// 🔍 STAGE 1 — EXTRACT
+// 🔍 STAGE 1 — EXTRACT (FUTURE)
 // =====================================
 
-/**
- * PURPOSE:
- * - read LayoutRow[]
- * - detect candidate nickname + value fields
- *
- * INPUT:
- * - raw layout (cells with text)
- *
- * OUTPUT:
- * - loosely structured candidates (no guarantees)
- *
- * NOTES:
- * - DO NOT clean text here
- * - DO NOT parse numbers here
- */
-//
-// function extract(layout: LayoutRow[], traceId: string) {
-//   // TODO:
-//   // - detect nickname cells
-//   // - detect result cells (points / rank / score)
-//   // - ignore headers / UI noise
-//
-//   return [];
-// }
+/*
+TODO:
+- detect nickname cells
+- detect result values (points / rank / score)
+- ignore headers / UI
+*/
 
 // =====================================
-// 🔗 STAGE 2 — PAIR
+// 🔗 STAGE 2 — PAIR (FUTURE)
 // =====================================
 
-/**
- * PURPOSE:
- * - match nickname ↔ result value
- *
- * INPUT:
- * - extracted candidates
- *
- * OUTPUT:
- * - paired structures (still raw)
- *
- * NOTES:
- * - handle row misalignment
- * - handle multi-column layouts
- */
-//
-// function pair(entries: any[], traceId: string) {
-//   // TODO:
-//   // - match nickname with correct result value
-//   // - resolve ambiguous rows
-//
-//   return [];
-// }
+/*
+TODO:
+- match nickname with correct result value
+- handle layout misalignment
+*/
 
 // =====================================
-// 🧼 STAGE 3 — CLEAN
+// 🧼 STAGE 3 — CLEAN (FUTURE)
 // =====================================
 
-/**
- * PURPOSE:
- * - normalize nickname
- * - parse numeric values
- * - remove OCR noise
- *
- * OUTPUT:
- * - ParsedEntry[]
- *
- * NOTES:
- * - ALL cleaning MUST happen here (central rule)
- */
-//
-// function clean(entries: any[], traceId: string): ParsedEntry[] {
-//   // TODO:
-//   // - normalize nicknames
-//   // - parse numbers
-//   // - remove artifacts (symbols, junk)
-//
-//   return [];
-// }
+/*
+TODO:
+- normalize nicknames
+- parse numeric values
+- remove OCR artifacts
+*/
 
 // =====================================
-// ✅ STAGE 4 — FINALIZE
+// ✅ STAGE 4 — FINALIZE (FUTURE)
 // =====================================
 
-/**
- * PURPOSE:
- * - minimal filtering
- *
- * ALLOWED:
- * - remove empty nicknames
- * - remove invalid values (<= 0)
- *
- * FORBIDDEN:
- * - NO duplicate detection (validator layer)
- * - NO business validation
- */
-//
-// function finalize(entries: ParsedEntry[], traceId: string) {
-//   // TODO:
-//   // - filter invalid entries
-//   // - ensure value > 0
-//
-//   return [];
-// }
+/*
+TODO:
+- validate entries
+- filter invalid rows
+- deduplicate
+*/
