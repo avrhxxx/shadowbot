@@ -11,7 +11,11 @@
  * - 2-stage flow
  * - owner only
  * - traceId injected
- * - CJS SAFE (no import.meta)
+ *
+ * ✅ FINAL:
+ * - log.emit only (no scoped logger)
+ * - full observability (metrics + timing)
+ * - zero logger coupling
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -30,10 +34,7 @@ import {
 
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🧠 MODE RESOLVER
@@ -54,7 +55,8 @@ export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `confirm-${traceId}`;
+  timing.start(timerId);
 
   const guildId = interaction.guildId;
 
@@ -68,8 +70,17 @@ export async function handleConfirm(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session);
-  const ownerError = validateSessionOwner(interaction, session);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
+
+  const ownerError = validateSessionOwner(
+    interaction,
+    session,
+    traceId
+  );
 
   if (contextError || ownerError || !session) {
     await interaction.reply({
@@ -83,10 +94,16 @@ export async function handleConfirm(
   }
 
   try {
-    log.trace("confirm_start", traceId, {
-      sessionId: session.sessionId,
-      stage: session.stage,
-      type: session.type,
+    metrics.increment("confirm_started");
+
+    log.emit({
+      event: "confirm_start",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        stage: session.stage,
+        type: session.type,
+      },
     });
 
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
@@ -102,6 +119,8 @@ export async function handleConfirm(
     const invalid = entries.filter((e) => e.status !== "OK");
 
     if (invalid.length > 0) {
+      metrics.increment("confirm_blocked_invalid");
+
       await interaction.reply({
         content: `❌ Cannot confirm. ${invalid.length} entries are not OK.`,
         ephemeral: true,
@@ -129,8 +148,12 @@ export async function handleConfirm(
         ephemeral: true,
       });
 
-      log.trace("confirm_stage_entered", traceId, {
-        sessionId: session.sessionId,
+      log.emit({
+        event: "confirm_stage_entered",
+        traceId,
+        data: {
+          sessionId: session.sessionId,
+        },
       });
 
       return;
@@ -199,13 +222,33 @@ export async function handleConfirm(
       ephemeral: true,
     });
 
-    log.trace("confirm_done", traceId, {
-      sessionId: session.sessionId,
-      durationMs: Date.now() - startedAt,
+    const duration = timing.end(timerId);
+
+    metrics.increment("confirm_success");
+
+    log.emit({
+      event: "confirm_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
-    log.error("confirm_failed", err, traceId);
+    const duration = timing.end(timerId);
+
+    metrics.increment("confirm_error");
+
+    log.emit({
+      event: "confirm_failed",
+      traceId,
+      level: "error",
+      data: {
+        error: err,
+        durationMs: duration,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to confirm entries",
