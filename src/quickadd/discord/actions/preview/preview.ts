@@ -115,7 +115,7 @@ export async function handlePreview(
     // =====================================
     // 🖥️ FORMAT OUTPUT
     // =====================================
-    const output = formatPreview(entries);
+    const output = formatPreview(entries, traceId); // ✅ FIX
 
     // =====================================
     // 📤 RESPONSE
