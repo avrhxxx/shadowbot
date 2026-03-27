@@ -70,7 +70,40 @@ export const QuickAddSession = {
     return session;
   },
 
-  get: (guildId: string) => sessions.get(guildId) || null,
+  get(guildId: string) {
+    return sessions.get(guildId) || null;
+  },
+
+  // 🔥 NEW: attach thread AFTER session creation
+  setThreadId(guildId: string, threadId: string, traceId: string) {
+    const session = sessions.get(guildId);
+
+    if (!session) {
+      log.emit({
+        event: "session_setThread_missing",
+        traceId,
+        level: "warn",
+        data: { guildId },
+      });
+      return;
+    }
+
+    const updated: SessionData = {
+      ...session,
+      threadId,
+    };
+
+    sessions.set(guildId, updated);
+
+    log.emit({
+      event: "session_thread_attached",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        threadId,
+      },
+    });
+  },
 
   setStage(
     guildId: string,
@@ -83,11 +116,10 @@ export const QuickAddSession = {
       log.emit({
         event: "session_setStage_missing",
         traceId,
-        level: "error",
+        level: "warn",
         data: { guildId },
       });
-
-      throw new Error("Session not found");
+      return;
     }
 
     const allowed = ALLOWED_TRANSITIONS[session.stage] || [];
@@ -96,17 +128,14 @@ export const QuickAddSession = {
       log.emit({
         event: "session_invalid_transition",
         traceId,
-        level: "error",
+        level: "warn",
         data: {
           sessionId: session.sessionId,
           from: session.stage,
           to: nextStage,
         },
       });
-
-      throw new Error(
-        `Invalid stage transition: ${session.stage} → ${nextStage}`
-      );
+      return;
     }
 
     const updated: SessionData = {
