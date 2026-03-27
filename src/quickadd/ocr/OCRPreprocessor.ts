@@ -2,13 +2,6 @@
 // 📁 src/quickadd/ocr/OCRPreprocessor.ts
 // =====================================
 
-/**
- * 🧼 ROLE:
- * Image preprocessing before OCR.
- *
- * Optional step controlled by OCRProcessor.
- */
-
 import sharp from "sharp";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 
@@ -21,8 +14,8 @@ export const OCRPreprocessor = {
         .rotate()
         .resize({ width: 1500, withoutEnlargement: true })
         .toBuffer();
-    } catch (err) {
-      log.error("pre_base_failed", err, traceId);
+    } catch (error) {
+      log.error("pre_base_failed", error, traceId);
       return buffer;
     }
   },
@@ -34,8 +27,8 @@ export const OCRPreprocessor = {
         .normalize()
         .sharpen()
         .toBuffer();
-    } catch (err) {
-      log.error("pre_enhance_failed", err, traceId);
+    } catch (error) {
+      log.error("pre_enhance_failed", error, traceId);
       return buffer;
     }
   },
