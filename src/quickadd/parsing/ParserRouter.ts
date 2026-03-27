@@ -84,16 +84,14 @@ export function parseByType(
   const parser = registry.get(type);
 
   if (!parser) {
-    log.warn("parser_not_found", {
-      traceId,
+    log.warn("parser_not_found", traceId, {
       type,
     });
     return [];
   }
 
   if (!layout.length) {
-    log.warn("parser_empty_layout", {
-      traceId,
+    log.warn("parser_empty_layout", traceId, {
       type,
     });
     return [];
@@ -110,8 +108,7 @@ export function parseByType(
     return result;
 
   } catch (err) {
-    log.warn("parser_failed", {
-      traceId,
+    log.warn("parser_failed", traceId, {
       type,
       error: err,
     });
