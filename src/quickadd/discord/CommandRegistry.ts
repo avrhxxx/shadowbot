@@ -9,6 +9,10 @@
  * ❗ RULES:
  * - NO business logic
  * - ONLY mapping
+ *
+ * ✅ FINAL:
+ * - strongly typed subcommands
+ * - no null handling needed (safe contract)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
