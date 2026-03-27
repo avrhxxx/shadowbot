@@ -12,3 +12,4 @@
  */
 
 export { createScopedLogger } from "./createScopedLogger";
+export type { FlowType } from "./DebugLogger";
