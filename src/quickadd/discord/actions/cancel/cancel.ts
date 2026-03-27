@@ -2,22 +2,6 @@
 // 📁 src/quickadd/discord/actions/cancel/cancel.ts
 // =====================================
 
-/**
- * ❌ ROLE:
- * Clears current QuickAdd buffer WITHOUT ending session.
- *
- * ❗ RULES:
- * - owner only (destructive operation)
- * - traceId MUST be injected
- * - NO fallback
- *
- * ✅ FINAL:
- * - global logger (log.emit)
- * - full observability (metrics + timing)
- * - zero logger coupling
- * - Discord-safe replies
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -84,6 +68,8 @@ export async function handleCancel(
     return;
   }
 
+  const sessionId = session.sessionId;
+
   try {
     metrics.increment("cancel_started");
 
@@ -91,18 +77,19 @@ export async function handleCancel(
       event: "cancel_start",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         guildId,
       },
     });
 
-    QuickAddBuffer.clear(guildId, traceId);
+    // 🔥 SESSION-BASED BUFFER
+    QuickAddBuffer.clear(sessionId, traceId);
 
     log.emit({
       event: "cancel_buffer_cleared",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
       },
     });
 
@@ -119,7 +106,7 @@ export async function handleCancel(
       event: "cancel_done",
       traceId,
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         durationMs: duration,
       },
     });
