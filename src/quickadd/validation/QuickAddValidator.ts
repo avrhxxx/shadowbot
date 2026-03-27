@@ -22,32 +22,13 @@
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { resolveNickname } from "../mapping/NicknameResolver";
 
+import {
+  ParsedEntry,
+  ValidatedEntry,
+  EntryStatus,
+} from "../core/QuickAddTypes";
+
 const log = createScopedLogger(import.meta.url);
-
-// =====================================
-// 🧱 TYPES
-// =====================================
-
-export type EntryStatus =
-  | "OK"
-  | "LOW_CONFIDENCE"
-  | "UNRESOLVED"
-  | "DUPLICATE"
-  | "INVALID_VALUE";
-
-export type ValidatedEntry = {
-  id: number; // ⚠️ temporary validation id
-
-  nickname: string;
-  value: number;
-
-  originalNickname: string;
-
-  status: EntryStatus;
-  confidence: number;
-
-  suggestion?: string;
-};
 
 // =====================================
 // 🧠 HELPERS
@@ -89,7 +70,7 @@ function pickHigherStatus(
 // =====================================
 
 export async function validateEntries(
-  entries: { nickname: string; value: number }[],
+  entries: ParsedEntry[],
   traceId: string
 ): Promise<ValidatedEntry[]> {
   assertTrace(traceId);
@@ -145,10 +126,7 @@ export async function validateEntries(
         resolved,
       });
     } catch (err) {
-      log.warn("resolve_failed", {
-        traceId,
-        error: err,
-      });
+      log.warn("resolve_failed", err, traceId);
     }
 
     const finalNickname = resolved || entry.nickname;
@@ -199,7 +177,7 @@ export async function validateEntries(
     }
 
     // =====================================
-    // 🔁 DUPLICATE DETECTION (FIXED)
+    // 🔁 DUPLICATE DETECTION
     // =====================================
     const key = `${normalize(finalNickname)}:${entry.value}`;
 
