@@ -15,19 +15,6 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -42,7 +29,7 @@ export async function handleEnd(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
@@ -61,17 +48,16 @@ export async function handleEnd(
   );
 
   if (contextError || ownerError || !session) {
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
   }
 
+  const { sessionId, threadId } = session;
+
   try {
     metrics.increment("end_started");
-
-    const { sessionId, threadId } = session;
 
     log.emit({
       event: "end_start",
@@ -84,11 +70,11 @@ export async function handleEnd(
     });
 
     // =====================================
-    // 🧹 CLEANUP (FIXED)
+    // 🧹 CLEANUP (🔥 FIXED PROPERLY)
     // =====================================
 
-    QuickAddBuffer.clear(guildId, traceId); // ✅ FIX
-    QuickAddSession.end(guildId, userId, traceId); // ✅ FIX
+    QuickAddBuffer.clear(sessionId, traceId); // ✅ NAJWAŻNIEJSZY FIX
+    QuickAddSession.end(guildId, userId, traceId);
 
     log.emit({
       event: "session_ended",
@@ -100,8 +86,7 @@ export async function handleEnd(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "🛑 QuickAdd session ended"
     );
 
@@ -171,8 +156,7 @@ export async function handleEnd(
       },
     });
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to end session"
     );
   }
