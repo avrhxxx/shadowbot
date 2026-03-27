@@ -117,7 +117,7 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage === "COLLECTING") {
-      // ✅ FIX: proper stage transition
+      // ✅ FIX: proper transition
       QuickAddSession.setStage(
         guildId,
         "CONFIRM_PENDING",
