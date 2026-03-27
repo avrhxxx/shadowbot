@@ -3,29 +3,28 @@
 // =====================================
 
 import { getLearningData } from "../storage/QuickAddRepository";
-import { createScopedLogger } from "@/quickadd/debug/logger";
-
-const log = createScopedLogger(import.meta.url);
-
-// =====================================
-// 🔥 LOAD + BUILD MAP
-// =====================================
+import { log } from "../logger";
 
 export async function loadNicknameMap(
   traceId: string
 ): Promise<Record<string, string>> {
   try {
-    log.trace("map_load_start", traceId);
+    log.emit({ event: "map_load_start", traceId });
 
     const rows = await getLearningData(traceId);
 
-    log.trace("sheet_loaded", traceId, {
-      rows: rows?.length || 0,
+    log.emit({
+      event: "sheet_loaded",
+      traceId,
+      data: { rows: rows?.length || 0 },
     });
 
     if (!rows || rows.length < 2) {
-      log.warn("empty_sheet", traceId, {
-        rows: rows?.length || 0,
+      log.emit({
+        event: "empty_sheet",
+        traceId,
+        level: "warn",
+        data: { rows: rows?.length || 0 },
       });
       return {};
     }
@@ -38,73 +37,65 @@ export async function loadNicknameMap(
     const adjustedIndex = headers.indexOf("adjusted");
     const overrideIndex = headers.indexOf("override");
 
-    log.trace("columns_detected", traceId, {
-      ocrIndex,
-      parserIndex,
-      adjustedIndex,
-      overrideIndex,
+    log.emit({
+      event: "columns_detected",
+      traceId,
+      data: {
+        ocrIndex,
+        parserIndex,
+        adjustedIndex,
+        overrideIndex,
+      },
     });
 
     if (ocrIndex === -1) {
-      log.warn("missing_ocr_column", traceId);
+      log.emit({
+        event: "missing_ocr_column",
+        traceId,
+        level: "warn",
+      });
       return {};
     }
 
     const map: Record<string, string> = {};
 
-    let processed = 0;
-    let skippedNoOCR = 0;
-    let skippedNoValue = 0;
-    let skippedInvalidKey = 0;
-
     for (const row of dataRows) {
-      processed++;
-
       const ocrRaw = row[ocrIndex];
       const parser = parserIndex !== -1 ? row[parserIndex] : "";
       const adjusted = adjustedIndex !== -1 ? row[adjustedIndex] : "";
       const override = overrideIndex !== -1 ? row[overrideIndex] : "";
 
-      if (!ocrRaw || typeof ocrRaw !== "string") {
-        skippedNoOCR++;
-        continue;
-      }
+      if (!ocrRaw || typeof ocrRaw !== "string") continue;
 
       const finalValue =
         (override && override.trim()) ||
         (adjusted && adjusted.trim()) ||
         (parser && parser.trim());
 
-      if (!finalValue) {
-        skippedNoValue++;
-        continue;
-      }
+      if (!finalValue) continue;
 
       const cleaned = clean(ocrRaw);
-      if (!cleaned) {
-        skippedInvalidKey++;
-        continue;
-      }
+      if (!cleaned) continue;
 
       map[cleaned] = finalValue;
     }
 
-    log.trace("map_stats", traceId, {
-      processed,
-      valid: Object.keys(map).length,
-      skippedNoOCR,
-      skippedNoValue,
-      skippedInvalidKey,
-    });
-
-    log.trace("map_built", traceId, {
-      size: Object.keys(map).length,
+    log.emit({
+      event: "map_built",
+      traceId,
+      data: { size: Object.keys(map).length },
     });
 
     return map;
 
   } catch (err) {
-    log.error("map_load_failed", err, traceId);
+    log.emit({
+      event: "map_load_failed",
+      traceId,
+      level: "error",
+      data: err,
+    });
+
     return {};
   }
 }
