@@ -4,17 +4,20 @@
 
 /**
  * 🪵 ROLE:
- * STRICT TRACE LOGGER (ENFORCED MODE — FINAL)
+ * DUAL MODE LOGGER (TRACE + SYSTEM) — FINAL
  *
- * ✔ ONE unified API
- * ✔ traceId REQUIRED for ALL logs
- * ✔ Groups logs per traceId
- * ✔ Flushes on terminal events
- * ✔ Uses displayId
+ * ✔ TRACE MODE:
+ * - traceId REQUIRED
+ * - grouped logs (buckets)
+ * - flushed on terminal events
+ *
+ * ✔ SYSTEM MODE:
+ * - no traceId
+ * - direct console output
  *
  * ❗ RULES:
- * - NOT exported directly
- * - ONLY used via createScopedLogger
+ * - DO NOT fake traceId
+ * - use correct mode depending on context
  */
 
 import { resolveDisplayId } from "../core/IdGenerator";
@@ -23,10 +26,16 @@ import { resolveDisplayId } from "../core/IdGenerator";
 // 🔹 TYPES
 // =====================================
 
-type Logger = {
+type TraceLogger = {
   trace: (event: string, traceId: string, data?: any) => void;
   warn: (event: string, traceId: string, data?: any) => void;
   error: (event: string, error: any, traceId: string) => void;
+};
+
+type SystemLogger = {
+  log: (event: string, data?: any) => void;
+  warn: (event: string, data?: any) => void;
+  error: (event: string, error?: any) => void;
 };
 
 // =====================================
@@ -88,10 +97,10 @@ function push(traceId: string, entry: TraceLog) {
 }
 
 // =====================================
-// 🔒 INTERNAL LOGGER (NOT EXPORTED)
+// 🔒 TRACE LOGGER
 // =====================================
 
-export function __createLoggerInternal(scope: string): Logger {
+export function __createTraceLogger(scope: string): TraceLogger {
   function ensure(traceId: string) {
     if (!traceId) {
       throw new Error(`[TRACE ERROR] Missing traceId in ${scope}`);
@@ -136,6 +145,24 @@ export function __createLoggerInternal(scope: string): Logger {
       });
 
       flushTrace(traceId);
+    },
+  };
+}
+
+// =====================================
+// 🔓 SYSTEM LOGGER
+// =====================================
+
+export function __createSystemLogger(scope: string): SystemLogger {
+  return {
+    log(event, data) {
+      console.log(`${getTime()} | ${scope} | ${event}`, data || "");
+    },
+    warn(event, data) {
+      console.warn(`${getTime()} | ${scope} | ${event}`, data || "");
+    },
+    error(event, error) {
+      console.error(`${getTime()} | ${scope} | ${event}`, error || "");
     },
   };
 }
