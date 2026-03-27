@@ -1,4 +1,3 @@
-
 // =====================================
 // 📁 src/quickadd/discord/actions/confirm/confirmAutocomplete.ts
 // =====================================
@@ -54,11 +53,13 @@ export async function handleConfirmAutocomplete(
   traceId: string
 ): Promise<void> {
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
 
   if (!guildId) return;
 
-  const session = QuickAddSession.get(guildId);
+  const session = QuickAddSession.get(guildId, userId);
 
+  // 🔒 brak sesji lub zły stage → brak sugestii
   if (!session || session.stage !== "CONFIRM_PENDING") {
     await interaction.respond([]);
     return;
