@@ -25,7 +25,7 @@ type BufferedEntry = {
 };
 
 // =====================================
-// 🧠 INTERNAL STATE
+// 🧠 INTERNAL STATE (🔥 sessionId-based)
 // =====================================
 
 const buffer = new Map<string, BufferedEntry[]>();
@@ -52,26 +52,26 @@ function cloneEntries(entries: BufferedEntry[]): BufferedEntry[] {
   return entries.map(cloneEntry);
 }
 
-function checkTimeout(guildId: string, traceId: string) {
-  const last = lastAccess.get(guildId);
+function checkTimeout(sessionId: string, traceId: string) {
+  const last = lastAccess.get(sessionId);
   const now = Date.now();
 
   if (last && now - last > TIMEOUT_MS) {
-    const before = buffer.get(guildId)?.length || 0;
+    const before = buffer.get(sessionId)?.length || 0;
 
     log.emit({
       event: "buffer_timeout",
       traceId,
-      data: { guildId, before },
+      data: { sessionId, before },
       level: "warn",
     });
 
-    buffer.delete(guildId);
-    idCounters.delete(guildId);
-    lastAccess.delete(guildId);
+    buffer.delete(sessionId);
+    idCounters.delete(sessionId);
+    lastAccess.delete(sessionId);
   }
 
-  lastAccess.set(guildId, now);
+  lastAccess.set(sessionId, now);
 }
 
 // =====================================
@@ -79,18 +79,18 @@ function checkTimeout(guildId: string, traceId: string) {
 // =====================================
 
 export const QuickAddBuffer = {
-  addEntries(guildId: string, entries: ParsedEntry[], traceId: string) {
+  addEntries(sessionId: string, entries: ParsedEntry[], traceId: string) {
     assertTrace(traceId, "addEntries");
-    checkTimeout(guildId, traceId);
+    checkTimeout(sessionId, traceId);
 
     log.emit({
       event: "buffer_add_start",
       traceId,
-      data: { guildId, incoming: entries.length },
+      data: { sessionId, incoming: entries.length },
     });
 
-    const current = buffer.get(guildId) || [];
-    let nextId = idCounters.get(guildId) || 1;
+    const current = buffer.get(sessionId) || [];
+    let nextId = idCounters.get(sessionId) || 1;
 
     const newEntries: BufferedEntry[] = entries.map((e) => ({
       id: nextId++,
@@ -99,75 +99,77 @@ export const QuickAddBuffer = {
 
     const updated = [...current, ...newEntries];
 
-    buffer.set(guildId, updated);
-    idCounters.set(guildId, nextId);
+    buffer.set(sessionId, updated);
+    idCounters.set(sessionId, nextId);
 
     log.emit({
       event: "buffer_add_done",
       traceId,
-      data: { guildId, after: updated.length },
+      data: { sessionId, after: updated.length },
     });
   },
 
-  // 🔥 FIX: CONTROLLED REPLACE (dla adjust/fix)
-  replaceEntries(guildId: string, entries: BufferedEntry[], traceId: string) {
+  replaceEntries(
+    sessionId: string,
+    entries: BufferedEntry[],
+    traceId: string
+  ) {
     assertTrace(traceId, "replaceEntries");
-    checkTimeout(guildId, traceId);
+    checkTimeout(sessionId, traceId);
 
     log.emit({
       event: "buffer_replace_start",
       traceId,
       data: {
-        guildId,
+        sessionId,
         count: entries.length,
       },
     });
 
-    // 🔒 zachowujemy ID continuity
     const maxId =
       entries.length > 0
         ? Math.max(...entries.map((e) => e.id))
         : 0;
 
-    buffer.set(guildId, entries);
-    idCounters.set(guildId, maxId + 1);
+    buffer.set(sessionId, entries);
+    idCounters.set(sessionId, maxId + 1);
 
     log.emit({
       event: "buffer_replace_done",
       traceId,
       data: {
-        guildId,
+        sessionId,
         nextId: maxId + 1,
       },
     });
   },
 
-  getEntries(guildId: string, traceId: string): BufferedEntry[] {
+  getEntries(sessionId: string, traceId: string): BufferedEntry[] {
     assertTrace(traceId, "getEntries");
-    checkTimeout(guildId, traceId);
+    checkTimeout(sessionId, traceId);
 
-    const entries = buffer.get(guildId) || [];
+    const entries = buffer.get(sessionId) || [];
 
     log.emit({
       event: "buffer_get",
       traceId,
-      data: { guildId, count: entries.length },
+      data: { sessionId, count: entries.length },
     });
 
     return cloneEntries(entries);
   },
 
-  clear(guildId: string, traceId: string) {
+  clear(sessionId: string, traceId: string) {
     assertTrace(traceId, "clear");
 
     log.emit({
       event: "buffer_clear",
       traceId,
-      data: { guildId },
+      data: { sessionId },
     });
 
-    buffer.delete(guildId);
-    idCounters.delete(guildId);
-    lastAccess.delete(guildId);
+    buffer.delete(sessionId);
+    idCounters.delete(sessionId);
+    lastAccess.delete(sessionId);
   },
 };
