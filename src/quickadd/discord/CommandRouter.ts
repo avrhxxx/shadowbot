@@ -12,7 +12,7 @@
  * - NO business logic
  *
  * ✅ FINAL:
- * - logger standardized
+ * - uses log.emit
  * - safe execution
  */
 
@@ -21,9 +21,7 @@ import {
   getCommandHandler,
   QuickAddSubcommand,
 } from "./CommandRegistry";
-import { createScopedLogger } from "../debug/logger";
-
-const log = createScopedLogger(import.meta.url);
+import { log } from "../logger";
 
 // =====================================
 // 🚀 ROUTER
@@ -45,31 +43,51 @@ export async function handleQuickAddCommand(
     const subcommand =
       interaction.options.getSubcommand() as QuickAddSubcommand;
 
-    log.trace("command_received", traceId, {
-      userId,
-      guildId,
-      channelId,
-      subcommand,
+    log.emit({
+      event: "command_received",
+      traceId,
+      data: {
+        userId,
+        guildId,
+        channelId,
+        subcommand,
+      },
     });
 
     const handler = getCommandHandler(subcommand);
 
-    log.trace("command_execution_start", traceId, {
-      subcommand,
+    log.emit({
+      event: "command_execution_start",
+      traceId,
+      data: { subcommand },
     });
 
     await handler(interaction, traceId);
 
-    log.trace("command_execution_done", traceId, {
-      subcommand,
-      durationMs: Date.now() - startTime,
+    log.emit({
+      event: "command_execution_done",
+      traceId,
+      data: {
+        subcommand,
+        durationMs: Date.now() - startTime,
+      },
     });
 
   } catch (err) {
-    log.error("command_router_error", err, traceId);
+    log.emit({
+      event: "command_router_error",
+      traceId,
+      data: { error: err },
+      level: "error",
+    });
 
-    log.trace("command_execution_failed", traceId, {
-      durationMs: Date.now() - startTime,
+    log.emit({
+      event: "command_execution_failed",
+      traceId,
+      data: {
+        durationMs: Date.now() - startTime,
+      },
+      level: "error",
     });
   }
 }
