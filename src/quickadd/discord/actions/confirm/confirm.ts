@@ -117,15 +117,10 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage === "COLLECTING") {
-      // ❗ FIX: zamiast setStage → restart sesji z nowym stage
-      QuickAddSession.start(
-        {
-          guildId,
-          ownerId: session.ownerId,
-          threadId: session.threadId,
-          type: session.type,
-          stage: "CONFIRM_PENDING",
-        },
+      // ✅ FIX: proper stage transition
+      QuickAddSession.setStage(
+        guildId,
+        "CONFIRM_PENDING",
         traceId
       );
 
