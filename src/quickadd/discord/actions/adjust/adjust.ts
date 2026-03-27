@@ -2,23 +2,6 @@
 // 📁 src/quickadd/discord/actions/adjust/adjust.ts
 // =====================================
 
-/**
- * ✏️ ROLE:
- * Adjust entry + REVALIDATE buffer
- *
- * ❗ RULES:
- * - owner only
- * - revalidation required
- * - traceId MUST be injected (from router)
- * - NO traceId fallback (STRICT)
- * - sessionId included in logs
- *
- * ✅ FINAL:
- * - global logger (log.emit)
- * - no scoped logger
- * - full compliance with logging system
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -87,6 +70,8 @@ export async function handleAdjust(
     return;
   }
 
+  const sessionId = session.sessionId;
+
   const id = interaction.options.getInteger("id", true);
   const newNickname = interaction.options.getString("nickname");
   const newValue = interaction.options.getInteger("value");
@@ -97,7 +82,7 @@ export async function handleAdjust(
       traceId,
       type: "user",
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         guildId,
         id,
         newNickname,
@@ -105,7 +90,8 @@ export async function handleAdjust(
       },
     });
 
-    const entries = QuickAddBuffer.getEntries(guildId, traceId);
+    // 🔥 SESSION-BASED BUFFER
+    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     const index = entries.findIndex((e) => e.id === id);
 
@@ -143,14 +129,15 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.replaceEntries(guildId, merged, traceId);
+    // 🔥 SESSION-BASED WRITE
+    QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
     log.emit({
       event: "adjust_applied",
       traceId,
       type: "user",
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         id,
         before: target,
         after: updated,
@@ -174,7 +161,7 @@ export async function handleAdjust(
           traceId,
           type: "user",
           data: {
-            sessionId: session.sessionId,
+            sessionId,
             from: target.nickname,
             to: newNickname,
           },
@@ -187,7 +174,7 @@ export async function handleAdjust(
         level: "warn",
         type: "user",
         data: {
-          sessionId: session.sessionId,
+          sessionId,
           error: err,
         },
       });
@@ -203,7 +190,7 @@ export async function handleAdjust(
       traceId,
       type: "user",
       data: {
-        sessionId: session.sessionId,
+        sessionId,
         durationMs: Date.now() - startedAt,
       },
     });
