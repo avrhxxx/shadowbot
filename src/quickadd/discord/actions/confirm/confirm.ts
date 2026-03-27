@@ -7,15 +7,11 @@
  * Finalizes QuickAdd session (STRICT MODE).
  *
  * ❗ RULES:
- * - OK ONLY (block otherwise)
- * - 2-stage confirm flow
+ * - OK ONLY
+ * - 2-stage flow
  * - owner only
- * - traceId required
- *
- * ✅ FINAL:
- * - improved UX messaging
- * - unified guards
- * - Node-safe imports
+ * - traceId injected
+ * - CJS SAFE (no import.meta)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -36,7 +32,8 @@ import { QuickAddType } from "../../../core/QuickAddTypes";
 
 import { createScopedLogger } from "../../../debug/logger";
 
-const log = createScopedLogger(import.meta.url);
+// ❗ CJS SAFE
+const log = createScopedLogger(__filename);
 
 // =====================================
 // 🧠 MODE RESOLVER
@@ -112,9 +109,9 @@ export async function handleConfirm(
       return;
     }
 
-    // =====================================
-    // 🧠 STAGE 1
-    // =====================================
+    // =============================
+    // STAGE 1
+    // =============================
 
     if (session.stage === "COLLECTING") {
       QuickAddSession.setStage(
@@ -139,9 +136,9 @@ export async function handleConfirm(
       return;
     }
 
-    // =====================================
-    // 🧠 STAGE GUARD
-    // =====================================
+    // =============================
+    // STAGE GUARD
+    // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
       await interaction.reply({
@@ -151,9 +148,9 @@ export async function handleConfirm(
       return;
     }
 
-    // =====================================
-    // 🎯 STAGE 2
-    // =====================================
+    // =============================
+    // STAGE 2
+    // =============================
 
     const target = interaction.options.getString("target");
 
@@ -182,12 +179,6 @@ export async function handleConfirm(
         })),
         traceId
       );
-
-      log.trace("confirm_points_enqueued", traceId, {
-        sessionId: session.sessionId,
-        count: entries.length,
-        week: target,
-      });
     } else {
       await enqueueEvents(
         entries.map((e) => ({
@@ -198,12 +189,6 @@ export async function handleConfirm(
         })),
         traceId
       );
-
-      log.trace("confirm_events_enqueued", traceId, {
-        sessionId: session.sessionId,
-        count: entries.length,
-        eventId: target,
-      });
     }
 
     QuickAddBuffer.clear(guildId, traceId);
@@ -216,7 +201,6 @@ export async function handleConfirm(
 
     log.trace("confirm_done", traceId, {
       sessionId: session.sessionId,
-      mode,
       durationMs: Date.now() - startedAt,
     });
 
