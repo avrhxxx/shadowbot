@@ -1,10 +1,9 @@
-l// =====================================
+// =====================================
 // 📁 src/quickadd/discord/actions/start/start.ts
 // =====================================
 
 import {
   ChatInputCommandInteraction,
-  ChannelType,
   TextChannel,
   NewsChannel,
 } from "discord.js";
@@ -107,7 +106,7 @@ export async function handleStart(
     const thread = await starterMessage.startThread({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
-      type: ChannelType.PrivateThread,
+      invitable: false, // 🔥 PRIVATE THREAD (v14)
     });
 
     threadId = thread.id;
