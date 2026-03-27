@@ -4,30 +4,29 @@
 
 /**
  * 🎧 ROLE:
- * Registers QuickAdd interaction listener.
+ * Entry point for QuickAdd interactions
  *
  * ❗ RULES:
- * - ENTRYPOINT → MUST create traceId
+ * - MUST create traceId
  * - NO business logic
  * - ONLY routing
  *
  * ✅ FINAL:
- * - traceId generated HERE (correct layer)
- * - fully compatible with logger system
+ * - Node-safe imports
+ * - proper autocomplete routing
  */
 
 import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
-import { createScopedLogger } from "@/quickadd/debug/logger";
+import { createScopedLogger } from "../debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
-// 🔥 AUTOCOMPLETE HANDLER
 import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
 
 const log = createScopedLogger(import.meta.url);
 
 // =====================================
-// 🚀 REGISTER LISTENER
+// 🚀 REGISTER
 // =====================================
 
 export function registerQuickAddListener(client: Client) {
@@ -40,7 +39,7 @@ export function registerQuickAddListener(client: Client) {
 
     try {
       // =====================================
-      // 🔥 AUTOCOMPLETE HANDLER
+      // 🔥 AUTOCOMPLETE
       // =====================================
       if (interaction.isAutocomplete()) {
         if (interaction.commandName !== "q") return;
@@ -54,7 +53,6 @@ export function registerQuickAddListener(client: Client) {
           subcommand,
         });
 
-        // 🔹 ROUTING BY SUBCOMMAND
         if (subcommand === "confirm") {
           await handleConfirmAutocomplete(interaction, traceId);
         }
@@ -63,7 +61,7 @@ export function registerQuickAddListener(client: Client) {
       }
 
       // =====================================
-      // 🔹 COMMAND HANDLER
+      // 🔹 COMMAND
       // =====================================
       if (!interaction.isChatInputCommand()) return;
       if (interaction.commandName !== "q") return;
@@ -80,12 +78,10 @@ export function registerQuickAddListener(client: Client) {
       log.error("listener_error", err, traceId);
 
       if (interaction.isRepliable()) {
-        await interaction
-          .reply({
-            content: "❌ QuickAdd listener error",
-            ephemeral: true,
-          })
-          .catch(() => null);
+        await interaction.reply({
+          content: "❌ QuickAdd listener error",
+          ephemeral: true,
+        }).catch(() => null);
       }
     }
   });
