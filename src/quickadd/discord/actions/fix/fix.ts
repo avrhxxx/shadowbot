@@ -11,13 +11,13 @@
  * - revalidation REQUIRED
  * - traceId MUST be injected
  * - NO traceId fallback
- * - sessionId included in logs
- * - CJS SAFE
  *
  * ✅ FINAL:
+ * - log.emit only (no scoped logger)
  * - safe merge after revalidation
  * - length mismatch guard
  * - deterministic behavior
+ * - full observability (metrics + timing)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -28,10 +28,7 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🚀 HANDLER
@@ -41,7 +38,8 @@ export async function handleFix(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `fix-${traceId}`;
+  timing.start(timerId);
 
   const guildId = interaction.guildId;
 
@@ -55,7 +53,11 @@ export async function handleFix(
 
   const session = QuickAddSession.get(guildId);
 
-  const contextError = validateQuickAddContext(interaction, session);
+  const contextError = validateQuickAddContext(
+    interaction,
+    session,
+    traceId
+  );
 
   if (contextError || !session) {
     await interaction.reply({
@@ -66,9 +68,15 @@ export async function handleFix(
   }
 
   try {
-    log.trace("fix_start", traceId, {
-      sessionId: session.sessionId,
-      guildId,
+    metrics.increment("fix_started");
+
+    log.emit({
+      event: "fix_start",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        guildId,
+      },
     });
 
     const entries = QuickAddBuffer.getEntries(guildId, traceId);
@@ -118,10 +126,17 @@ export async function handleFix(
     // =====================================
 
     if (revalidated.length !== updatedRaw.length) {
-      log.warn("revalidation_length_mismatch", traceId, {
-        sessionId: session.sessionId,
-        before: updatedRaw.length,
-        after: revalidated.length,
+      metrics.increment("fix_revalidation_mismatch");
+
+      log.emit({
+        event: "revalidation_length_mismatch",
+        traceId,
+        level: "warn",
+        data: {
+          sessionId: session.sessionId,
+          before: updatedRaw.length,
+          after: revalidated.length,
+        },
       });
 
       await interaction.reply({
@@ -156,14 +171,34 @@ export async function handleFix(
       ephemeral: true,
     });
 
-    log.trace("fix_done", traceId, {
-      sessionId: session.sessionId,
-      applied,
-      durationMs: Date.now() - startedAt,
+    const duration = timing.end(timerId);
+
+    metrics.increment("fix_success");
+
+    log.emit({
+      event: "fix_done",
+      traceId,
+      data: {
+        sessionId: session.sessionId,
+        applied,
+        durationMs: duration,
+      },
     });
 
   } catch (err) {
-    log.error("fix_failed", err, traceId);
+    const duration = timing.end(timerId);
+
+    metrics.increment("fix_error");
+
+    log.emit({
+      event: "fix_failed",
+      traceId,
+      level: "error",
+      data: {
+        error: err,
+        durationMs: duration,
+      },
+    });
 
     await interaction.reply({
       content: "❌ Failed to apply fixes",
