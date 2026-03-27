@@ -14,10 +14,6 @@
  * - NO business logic
  * - NO logging here
  * - PURE utility layer
- *
- * ⚠️ NOTE:
- * - stack parsing is used to avoid passing scope manually
- * - works in Node (Fly.io compatible)
  */
 
 export function resolveScope(): string {
