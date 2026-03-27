@@ -2,22 +2,6 @@
 // 📁 src/index.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Main application entry point.
- *
- * Responsible for:
- * - bootstrapping Discord client
- * - initializing modules
- * - registering QuickAdd system (commands + listener + worker)
- * - wiring global interaction handlers
- *
- * ❗ RULES:
- * - no business logic here
- * - only orchestration / initialization
- */
-
-// 🔥 INIT GOOGLE CLIENT
 import "./google/googleSheetsClient";
 
 import {
@@ -36,23 +20,14 @@ import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceN
 import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
 
 // =============================
-// 🔥 QUICKADD (NEW ARCHITECTURE)
+// 🔥 QUICKADD
 // =============================
 
-// ❗ FIX: zgodnie z repo — CommandBuilder i CommandRouter są w discord/
 import { qCommand } from "./quickadd/discord/CommandBuilder";
-import { handleQuickAddInteraction } from "./quickadd/discord/CommandRouter";
-
-// ❗ FIX: zgodnie z repo — ChannelManager (nie Service)
+import { handleQuickAddCommand } from "./quickadd/discord/CommandRouter";
 import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelManager";
-
-// ❗ FIX: listener w warstwie discord/
 import { registerQuickAddListener } from "./quickadd/discord/QuickAddListener";
-
-// 🔥 FIX — PATH
 import { ensureAllSheets } from "./google/googleSheetsStorage";
-
-// 🔥 NEW — QUEUE WORKER (zgodne z repo)
 import { startQuickAddWorker } from "./quickadd/integrations/QuickAddQueueWorker";
 
 // =============================
@@ -76,7 +51,6 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
 
-  // 🔥 SELF HEALING SHEETS (CRITICAL)
   try {
     await ensureAllSheets();
     console.log("✅ Sheets structure verified");
@@ -84,7 +58,6 @@ client.once("clientReady", async () => {
     console.error("❌ Sheets init failed:", err);
   }
 
-  // 🔥 START QUICKADD WORKER
   try {
     startQuickAddWorker();
     console.log("✅ QuickAdd worker started");
@@ -92,9 +65,6 @@ client.once("clientReady", async () => {
     console.error("❌ QuickAdd worker failed:", err);
   }
 
-  // =============================
-  // 🔥 REGISTER SLASH COMMANDS
-  // =============================
   try {
     await client.application?.commands.set([]);
 
@@ -107,16 +77,11 @@ client.once("clientReady", async () => {
     console.error("❌ Slash command registration failed:", err);
   }
 
-  // -----------------------------
-  // Init modules
-  // -----------------------------
   initTranslationModule(client);
   initModeratorPanel(client);
 
-  // 🔥 LISTENER
   registerQuickAddListener(client);
 
-  // -----------------------------
   for (const guild of client.guilds.cache.values()) {
     try {
       await ensureQuickAddChannel(guild);
@@ -135,14 +100,13 @@ client.once("clientReady", async () => {
     });
   }
 
-  // =============================
-  // 🔥 GLOBAL HANDLER
-  // =============================
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "q") {
-          await handleQuickAddInteraction(interaction);
+          const traceId = `${interaction.id}-${Date.now()}`;
+
+          await handleQuickAddCommand(interaction, traceId);
           return;
         }
       }
@@ -167,25 +131,3 @@ client.once("clientReady", async () => {
 });
 
 client.login(BOT_TOKEN);
-
-/**
- * =====================================
- * ✅ CHANGES (INDEX)
- * =====================================
- *
- * 1. Import paths verified against repo structure:
- *    - CommandBuilder → ./quickadd/discord/CommandBuilder
- *    - CommandRouter → ./quickadd/discord/CommandRouter
- *    - QuickAddListener → ./quickadd/discord/QuickAddListener
- *    - QuickAddChannelManager → integrations layer
- *    - QuickAddQueueWorker → integrations layer
- *
- * 2. Removed legacy paths:
- *    - ❌ ./quickadd/commands/*
- *    - ❌ QuickAddChannelService
- *
- * 3. File now consistent with:
- *    core → discord → integrations architecture
- *
- * 4. No logic changes — only import correctness (as required)
- */
