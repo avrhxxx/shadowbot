@@ -4,32 +4,26 @@
 
 /**
  * 🪵 ROLE:
- * Scoped logger factory (STRICT MODE)
+ * Scoped logger factory (FINAL)
  *
- * ✔ Derives scope automatically from file path
- * ✔ Enforces usage of central logger only
- *
- * ❗ RULES:
- * - ONLY used via logger.ts
- * - DO NOT import DebugLogger directly outside this file
+ * ✔ Auto scope from file path
+ * ✔ ONLY entry to DebugLogger
  */
 
-import { createLogger } from "./DebugLogger";
+import { __createLoggerInternal } from "./DebugLogger";
 
 // =====================================
 // 🔹 HELPERS
 // =====================================
 
-function extractScopeFromPath(fileUrl: string): string {
+function extractScope(fileUrl: string): string {
   try {
-    const parts = fileUrl.split("/");
-    const file = parts[parts.length - 1] || "UNKNOWN";
+    const file = fileUrl.split("/").pop() || "UNKNOWN";
 
-    const name = file
+    return file
       .replace(".ts", "")
-      .replace(".js", "");
-
-    return name.toUpperCase();
+      .replace(".js", "")
+      .toUpperCase();
   } catch {
     return "UNKNOWN";
   }
@@ -39,12 +33,6 @@ function extractScopeFromPath(fileUrl: string): string {
 // 🔹 FACTORY
 // =====================================
 
-export function createScopedLogger(
-  fileUrl: string,
-  overrideScope?: string
-) {
-  const scope =
-    overrideScope || extractScopeFromPath(fileUrl);
-
-  return createLogger(scope);
+export function createScopedLogger(fileUrl: string) {
+  return __createLoggerInternal(extractScope(fileUrl));
 }
