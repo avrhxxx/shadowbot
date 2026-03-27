@@ -12,18 +12,15 @@
  * - ONLY routing
  *
  * ✅ FINAL:
- * - Node-safe imports
+ * - uses log.emit
  * - proper autocomplete routing
  */
 
 import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
-import { createScopedLogger } from "../debug/logger";
 import { createTraceId } from "../core/IdGenerator";
-
 import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
-
-const log = createScopedLogger(import.meta.url);
+import { log } from "../logger";
 
 // =====================================
 // 🚀 REGISTER
@@ -46,11 +43,15 @@ export function registerQuickAddListener(client: Client) {
 
         const subcommand = interaction.options.getSubcommand();
 
-        log.trace("autocomplete_received", traceId, {
-          userId,
-          guildId,
-          channelId,
-          subcommand,
+        log.emit({
+          event: "autocomplete_received",
+          traceId,
+          data: {
+            userId,
+            guildId,
+            channelId,
+            subcommand,
+          },
         });
 
         if (subcommand === "confirm") {
@@ -66,22 +67,33 @@ export function registerQuickAddListener(client: Client) {
       if (!interaction.isChatInputCommand()) return;
       if (interaction.commandName !== "q") return;
 
-      log.trace("interaction_received", traceId, {
-        userId,
-        guildId,
-        channelId,
+      log.emit({
+        event: "interaction_received",
+        traceId,
+        data: {
+          userId,
+          guildId,
+          channelId,
+        },
       });
 
       await handleQuickAddCommand(interaction, traceId);
 
     } catch (err) {
-      log.error("listener_error", err, traceId);
+      log.emit({
+        event: "listener_error",
+        traceId,
+        data: { error: err },
+        level: "error",
+      });
 
       if (interaction.isRepliable()) {
-        await interaction.reply({
-          content: "❌ QuickAdd listener error",
-          ephemeral: true,
-        }).catch(() => null);
+        await interaction
+          .reply({
+            content: "❌ QuickAdd listener error",
+            ephemeral: true,
+          })
+          .catch(() => null);
       }
     }
   });
