@@ -129,6 +129,22 @@ export function validateQuickAddContext(
     return "❌ No active session";
   }
 
+  // 🔥 NOWY KLUCZOWY GUARD (multi-session isolation)
+  if (session.userId !== userId) {
+    log.emit({
+      event: "guard_fail_wrong_user",
+      traceId,
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        sessionUserId: session.userId,
+      },
+    });
+
+    return "❌ This is not your session";
+  }
+
   if (!isInQuickAddThread(interaction.channel, session, traceId)) {
     log.emit({
       event: "guard_fail_wrong_thread",
