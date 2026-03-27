@@ -5,15 +5,13 @@
 /**
  * 🎯 ROLE:
  * Command router + traceId injector
- *
- * ❗ RULES:
- * - generates traceId (via IdGenerator)
- * - injects into handlers
- * - no business logic
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
-import { getCommandHandler } from "./CommandRegistry";
+import {
+  getCommandHandler,
+  QuickAddSubcommand,
+} from "./CommandRegistry";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 import { createTraceId } from "../core/IdGenerator";
 
@@ -37,7 +35,8 @@ export async function handleQuickAddCommand(
   const startTime = Date.now();
 
   try {
-    const subcommand = interaction.options.getSubcommand();
+    const subcommand =
+      interaction.options.getSubcommand() as QuickAddSubcommand;
 
     // =====================================
     // 📥 INPUT
@@ -51,22 +50,6 @@ export async function handleQuickAddCommand(
 
     const handler = getCommandHandler(subcommand);
 
-    if (!handler) {
-      log.trace("command_unknown", traceId, {
-        userId,
-        guildId,
-        channelId,
-        subcommand,
-      });
-
-      await interaction.reply({
-        content: "❌ Unknown command",
-        ephemeral: true,
-      });
-
-      return;
-    }
-
     // =====================================
     // 🚀 EXECUTION START
     // =====================================
@@ -77,7 +60,6 @@ export async function handleQuickAddCommand(
       subcommand,
     });
 
-    // ✅ FIX: removed unsafe `as any`
     await handler(interaction, traceId);
 
     // =====================================
@@ -92,9 +74,6 @@ export async function handleQuickAddCommand(
     });
 
   } catch (err) {
-    // =====================================
-    // 💥 ERROR
-    // =====================================
     log.error("command_router_error", err, traceId);
 
     log.trace("command_execution_failed", traceId, {
