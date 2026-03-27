@@ -4,15 +4,15 @@
 
 /**
  * 📚 ROLE:
- * Maps subcommands to their handlers.
+ * Maps subcommands to handlers
  *
  * ❗ RULES:
- * - NO business logic
+ * - NO logic
  * - ONLY mapping
  *
  * ✅ FINAL:
- * - strongly typed subcommands
- * - no null handling needed (safe contract)
+ * - strongly typed
+ * - safe contract (no undefined)
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -36,7 +36,7 @@ export type QuickAddSubcommand =
   | "end";
 
 // =====================================
-// 📦 IMPORT HANDLERS
+// 📦 IMPORT HANDLERS (RELATIVE → NODE SAFE)
 // =====================================
 
 import { handleStart } from "./actions/start/start";
