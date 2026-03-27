@@ -7,9 +7,9 @@
  * Centralized ID generator for QuickAdd system.
  *
  * Responsibilities:
- * - generate sessionId (real + display)
- * - generate traceId (real + display)
- * - generate queueId (real + display)
+ * - generate sessionId
+ * - generate traceId
+ * - generate queueId
  * - maintain realId → displayId mapping
  *
  * ❗ RULES:
@@ -26,9 +26,11 @@ import crypto from "crypto";
 // 🔹 INTERNAL STATE
 // =====================================
 
-const traceCounters = new Map<string, number>();
-const sessionCounters = new Map<string, number>();
-const queueCounters = new Map<string, number>();
+const counters = {
+  trace: new Map<string, number>(),
+  session: new Map<string, number>(),
+  queue: new Map<string, number>(),
+};
 
 const idDisplayMap = new Map<string, string>();
 
@@ -56,15 +58,9 @@ function getDayKey(): string {
   return `${dd}${mm}`;
 }
 
-function getNextCounter(
-  map: Map<string, number>,
-  dayKey: string
-): number {
-  const current = map.get(dayKey) || 0;
-  const next = current + 1;
-
+function getNextCounter(map: Map<string, number>, dayKey: string): number {
+  const next = (map.get(dayKey) || 0) + 1;
   map.set(dayKey, next);
-
   return next;
 }
 
@@ -93,25 +89,12 @@ function buildId(
   const uuid = generateUUID();
   const shortUuid = uuid.slice(0, 6);
 
-  // =====================================
-  // 🔥 REAL ID
-  // =====================================
   const realId = `${prefix}-${dateKey}-${counterStr}-${uuid}`;
-
-  // =====================================
-  // 🔥 DISPLAY ID
-  // =====================================
   const displayId = `${prefix.toUpperCase()}-${dateKey}-${counterStr}-${shortUuid}`;
 
-  // =====================================
-  // 🔗 MAPPING
-  // =====================================
   idDisplayMap.set(realId, displayId);
 
-  return {
-    realId,
-    displayId,
-  };
+  return realId;
 }
 
 // =====================================
@@ -119,19 +102,19 @@ function buildId(
 // =====================================
 
 export function createTraceId(): string {
-  return buildId("t", traceCounters).realId;
+  return buildId("t", counters.trace);
 }
 
 export function createSessionId(): string {
-  return buildId("s", sessionCounters).realId;
+  return buildId("s", counters.session);
 }
 
 export function createQueueId(): string {
-  return buildId("q", queueCounters).realId;
+  return buildId("q", counters.queue);
 }
 
 // =====================================
-// 🔍 RESOLVER (FOR LOGGER)
+// 🔍 RESOLVER
 // =====================================
 
 export function resolveDisplayId(realId: string): string {
