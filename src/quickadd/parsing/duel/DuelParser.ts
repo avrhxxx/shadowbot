@@ -7,25 +7,31 @@
  * Domain parser for DUEL POINTS.
  *
  * ❗ CURRENT STATE:
- * - Placeholder (scaffold)
- * - Prepared for full implementation
+ * - SAFE PLACEHOLDER (no parsing logic yet)
+ * - fully compatible with parser pipeline
  *
- * 🧩 TARGET FLOW:
- * 1. extract
- * 2. pair
- * 3. clean
- * 4. finalize
+ * 🧩 TARGET PIPELINE (FUTURE IMPLEMENTATION):
+ * 1. extract  → read layout cells (nickname + raw values)
+ * 2. pair     → align nickname with correct value
+ * 3. clean    → normalize nickname + parse numbers
+ * 4. finalize → validate + filter + deduplicate
+ *
+ * ❗ IMPORTANT RULES:
+ * - ALL cleaning happens here (NOT in OCR / layout)
+ * - MUST be deterministic (same input → same output)
+ * - NO external dependencies
+ * - layout is treated as raw structured input
+ *
+ * 🔒 CURRENT BEHAVIOR:
+ * - returns empty array (SAFE)
+ * - NO logging (placeholder mode)
  */
 
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
 import { ParsedEntry } from "../../core/QuickAddTypes";
-import { createScopedLogger } from "../../../debug/logger";
-
-// ❗ CJS SAFE
-const log = createScopedLogger(__filename);
 
 // =====================================
-// 🧱 INTERNAL TYPES (SAFE FUTURE CONTRACT)
+// 🧱 INTERNAL TYPES (FUTURE CONTRACT)
 // =====================================
 
 type DuelRawEntry = {
@@ -47,25 +53,17 @@ export function parseDuel(
 
   const { layout } = input;
 
-  log.trace("duel_parse_start", traceId, {
-    rows: layout.length,
-  });
-
   // =====================================
   // 🔹 CURRENT: SAFE PLACEHOLDER
   // =====================================
 
   const result: ParsedEntry[] = [];
 
-  log.trace("duel_parse_done", traceId, {
-    entries: result.length,
-  });
-
   return result;
 }
 
 // =====================================
-// 🔍 STAGE 1 — EXTRACT
+// 🔍 STAGE 1 — EXTRACT (FUTURE)
 // =====================================
 
 /*
@@ -73,27 +71,18 @@ function extract(
   layout: LayoutRow[],
   traceId: string
 ): DuelRawEntry[] {
-  log.trace("duel_extract_start", traceId, {
-    rows: layout.length,
-  });
-
-  const result: DuelRawEntry[] = [];
-
   // TODO:
-  // - detect nickname cells
-  // - detect value cells (points)
-  // - ignore UI / headers
+  // - detect nickname cells (usually left-aligned)
+  // - detect numeric cells (points)
+  // - ignore headers / UI / decorative rows
+  // - support multi-cell nicknames
 
-  log.trace("duel_extract_done", traceId, {
-    extracted: result.length,
-  });
-
-  return result;
+  return [];
 }
 */
 
 // =====================================
-// 🔗 STAGE 2 — PAIR
+// 🔗 STAGE 2 — PAIR (FUTURE)
 // =====================================
 
 /*
@@ -101,26 +90,17 @@ function pair(
   entries: DuelRawEntry[],
   traceId: string
 ): DuelRawEntry[] {
-  log.trace("duel_pair_start", traceId, {
-    entries: entries.length,
-  });
-
-  const result: DuelRawEntry[] = [];
-
   // TODO:
-  // - match nickname with value
-  // - handle row alignment issues
+  // - match nickname with closest numeric value
+  // - handle broken rows / OCR shifts
+  // - prefer same-row pairing
 
-  log.trace("duel_pair_done", traceId, {
-    pairs: result.length,
-  });
-
-  return result;
+  return [];
 }
 */
 
 // =====================================
-// 🧼 STAGE 3 — CLEAN
+// 🧼 STAGE 3 — CLEAN (FUTURE)
 // =====================================
 
 /*
@@ -128,27 +108,17 @@ function clean(
   entries: DuelRawEntry[],
   traceId: string
 ): ParsedEntry[] {
-  log.trace("duel_clean_start", traceId, {
-    entries: entries.length,
-  });
-
-  const result: ParsedEntry[] = [];
-
   // TODO:
-  // - normalize nickname
-  // - parse numbers
-  // - remove OCR noise
+  // - normalize nickname (trim, remove noise)
+  // - parse numeric values safely
+  // - remove OCR artifacts (e.g. commas, spaces)
 
-  log.trace("duel_clean_done", traceId, {
-    cleaned: result.length,
-  });
-
-  return result;
+  return [];
 }
 */
 
 // =====================================
-// ✅ STAGE 4 — FINALIZE
+// ✅ STAGE 4 — FINALIZE (FUTURE)
 // =====================================
 
 /*
@@ -156,21 +126,12 @@ function finalize(
   entries: ParsedEntry[],
   traceId: string
 ): ParsedEntry[] {
-  log.trace("duel_finalize_start", traceId, {
-    entries: entries.length,
-  });
-
-  const result: ParsedEntry[] = [];
-
   // TODO:
-  // - filter invalid entries
+  // - filter invalid nicknames
   // - ensure value > 0
-  // - deduplicate
+  // - deduplicate entries
+  // - enforce final schema integrity
 
-  log.trace("duel_finalize_done", traceId, {
-    final: result.length,
-  });
-
-  return result;
+  return [];
 }
 */
