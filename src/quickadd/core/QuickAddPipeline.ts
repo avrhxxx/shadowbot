@@ -2,19 +2,6 @@
 // 📁 src/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Central orchestrator of the QuickAdd pipeline.
- *
- * Flow:
- * OCR → layout → parser → validator → selection → buffer
- *
- * ❗ RULES:
- * - NO business logic
- * - orchestration only
- * - FULL traceId propagation (STRICT)
- */
-
 import { Message } from "discord.js";
 import { createScopedLogger } from "@/quickadd/debug/logger";
 
@@ -30,10 +17,6 @@ import { buildLayout } from "../ocr/layout/LayoutBuilder";
 import { QuickAddSession } from "./QuickAddSession";
 
 const log = createScopedLogger(import.meta.url);
-
-// =====================================
-// 🚀 MAIN ENTRY
-// =====================================
 
 export async function processImageInput(
   message: Message,
@@ -54,8 +37,7 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.warn("pipeline_invalid_context", {
-      traceId,
+    log.warn("pipeline_invalid_context", traceId, {
       sessionId: session?.sessionId,
       guildId,
       userId,
@@ -70,22 +52,15 @@ export async function processImageInput(
       imageUrl,
     });
 
-    // =====================================
-    // 🔹 OCR
-    // =====================================
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.warn("pipeline_soft_error_ocr_empty", {
-        traceId,
+      log.warn("pipeline_soft_error_ocr_empty", traceId, {
         sessionId: session.sessionId,
       });
       return;
     }
 
-    // =====================================
-    // 🔥 MULTI PIPELINE
-    // =====================================
     const pipelineResults: {
       source: string;
       entries: ValidatedEntry[];
@@ -133,7 +108,6 @@ export async function processImageInput(
           continue;
         }
 
-        // ✅ STRICT INPUT SHAPE
         const validated = await validateEntries(
           parsed.map((p) => ({
             nickname: p.nickname,
@@ -160,8 +134,7 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        log.warn("pipeline_source_failed", {
-          traceId,
+        log.warn("pipeline_source_failed", traceId, {
           sessionId: session.sessionId,
           source: source.source,
           error: err,
@@ -169,12 +142,8 @@ export async function processImageInput(
       }
     }
 
-    // =====================================
-    // 🔍 SELECTION (HYBRID)
-    // =====================================
     if (!pipelineResults.length) {
-      log.warn("pipeline_soft_error_no_results", {
-        traceId,
+      log.warn("pipeline_soft_error_no_results", traceId, {
         sessionId: session.sessionId,
       });
       return;
@@ -202,9 +171,6 @@ export async function processImageInput(
       valid: best.validCount,
     });
 
-    // =====================================
-    // 🔹 BUFFER
-    // =====================================
     QuickAddBuffer.addEntries(
       guildId,
       best.entries.map((v) => ({
@@ -223,9 +189,6 @@ export async function processImageInput(
       traceId
     ).length;
 
-    // =====================================
-    // ✅ DONE
-    // =====================================
     log.trace("pipeline_done", traceId, {
       sessionId: session.sessionId,
       source: best.source,
