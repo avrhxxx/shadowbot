@@ -54,7 +54,8 @@ const BUTTON_HANDLERS: Record<
 // GLOBAL INTERACTION HANDLER (ROUTER READY)
 // -----------------------------
 export async function handlePointsInteraction(
-  interaction: Interaction<CacheType>
+  interaction: Interaction<CacheType>,
+  ctx: { traceId: string }
 ): Promise<boolean> {
   try {
     // =============================
@@ -62,6 +63,8 @@ export async function handlePointsInteraction(
     // =============================
     if (interaction.isButton()) {
       const { customId } = interaction;
+
+      console.log(`[${ctx.traceId}] points_button`, { id: customId });
 
       // STATIC BUTTONS
       const handler = BUTTON_HANDLERS[customId];
@@ -154,6 +157,8 @@ export async function handlePointsInteraction(
     if (interaction.isModalSubmit()) {
       const { customId } = interaction;
 
+      console.log(`[${ctx.traceId}] points_modal`, { id: customId });
+
       if (customId.startsWith("points_create_modal_")) {
         await PB.pointsCreate.handleCreateWeekSubmit(interaction);
         return true;
@@ -164,7 +169,7 @@ export async function handlePointsInteraction(
 
     return false;
   } catch (error) {
-    console.error("Error handling points interaction:", error);
+    console.error(`[${ctx.traceId}] points_error`, error);
 
     if (interaction.isRepliable()) {
       const payload = {
@@ -191,7 +196,7 @@ function safeReply(
   payload: any
 ) {
   if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(payload); // 🔥 FIX (było editReply → to bug w wielu flow)
+    return interaction.followUp(payload); // 🔥 poprawne dla mixed flow
   }
 
   return interaction.reply(payload);
