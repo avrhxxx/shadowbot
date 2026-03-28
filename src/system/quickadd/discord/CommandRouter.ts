@@ -2,21 +2,6 @@
 // 📁 src/quickadd/discord/CommandRouter.ts
 // =====================================
 
-/**
- * 🎯 ROLE:
- * Routes commands to handlers
- *
- * ❗ RULES:
- * - NO ID generation
- * - traceId MUST be injected
- * - NO business logic
- *
- * ✅ FINAL:
- * - uses log.emit
- * - safe execution
- * - CENTRAL deferReply (🔥 CRITICAL FIX)
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 import {
   getCommandHandler,
@@ -40,9 +25,22 @@ export async function handleQuickAddCommand(
 
   const startTime = Date.now();
 
+  let subcommand: QuickAddSubcommand | null = null;
+
   try {
-    const subcommand =
-      interaction.options.getSubcommand() as QuickAddSubcommand;
+    // 🔒 SAFE SUBCOMMAND
+    try {
+      subcommand =
+        interaction.options.getSubcommand() as QuickAddSubcommand;
+    } catch {
+      log.emit({
+        event: "command_subcommand_missing",
+        traceId,
+        level: "error",
+        data: { userId, guildId, channelId },
+      });
+      return;
+    }
 
     log.emit({
       event: "command_received",
@@ -57,7 +55,7 @@ export async function handleQuickAddCommand(
 
     const handler = getCommandHandler(subcommand);
 
-    // 🔒 SAFETY GUARD
+    // 🔒 HANDLER GUARD
     if (!handler) {
       log.emit({
         event: "command_handler_missing",
@@ -69,9 +67,11 @@ export async function handleQuickAddCommand(
     }
 
     // =====================================
-    // 🔥 CRITICAL FIX: ALWAYS ACK FIRST
+    // 🔥 CRITICAL: ACK FIRST (Discord rule)
     // =====================================
-    await interaction.deferReply({ ephemeral: true });
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true });
+    }
 
     log.emit({
       event: "command_execution_start",
@@ -90,21 +90,42 @@ export async function handleQuickAddCommand(
       },
     });
 
-  } catch (err) {
+  } catch (err: any) {
     log.emit({
       event: "command_router_error",
       traceId,
-      data: { error: err },
       level: "error",
+      data: {
+        subcommand,
+        error: {
+          message: err?.message || "unknown",
+          stack: err?.stack,
+        },
+      },
     });
 
     log.emit({
       event: "command_execution_failed",
       traceId,
+      level: "error",
       data: {
+        subcommand,
         durationMs: Date.now() - startTime,
       },
-      level: "error",
     });
+
+    // 🔥 FAILSAFE RESPONSE (Discord safety)
+    if (interaction.isRepliable()) {
+      const payload = {
+        content: "❌ Command failed.",
+        ephemeral: true,
+      };
+
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp(payload);
+      } else {
+        await interaction.reply(payload);
+      }
+    }
   }
 }
