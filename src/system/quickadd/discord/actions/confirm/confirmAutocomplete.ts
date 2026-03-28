@@ -1,21 +1,6 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/confirm/confirmAutocomplete.ts
+// 📁 src/system/quickadd/discord/actions/confirm/confirmAutocomplete.ts
 // =====================================
-
-/**
- * 🧠 ROLE:
- * Provides autocomplete suggestions for confirm target.
- *
- * ❗ RULES:
- * - requires active session
- * - stage must be CONFIRM_PENDING
- * - traceId injected
- *
- * ✅ FINAL:
- * - logger.emit only
- * - lightweight observability
- * - safe respond (🔥 runtime-safe)
- */
 
 import { AutocompleteInteraction } from "discord.js";
 
@@ -64,23 +49,31 @@ export async function handleConfirmAutocomplete(
       level: "warn",
       context: { userId },
     });
+
+    try {
+      await interaction.respond([]);
+    } catch {}
+
     return;
   }
 
   try {
     const session = QuickAddSession.get(guildId, userId);
 
-    // 🔒 brak sesji lub zły stage → brak sugestii
     if (!session || session.stage !== "CONFIRM_PENDING") {
       logger.emit({
         scope: "quickadd.confirm_autocomplete",
         event: "confirm_autocomplete_blocked",
         traceId,
         context: {
+          sessionId: session?.sessionId,
           guildId,
           userId,
           hasSession: !!session,
           stage: session?.stage,
+        },
+        stats: {
+          confirm_autocomplete_blocked: 1,
         },
       });
 
@@ -108,9 +101,13 @@ export async function handleConfirmAutocomplete(
         sessionId: session.sessionId,
         guildId,
         userId,
+        inputRaw: focusedRaw,
         input: focused,
         results: filtered.length,
         mode,
+      },
+      meta: {
+        preview: filtered.slice(0, 3).map((o) => o.value),
       },
       stats: {
         confirm_autocomplete_used: 1,
@@ -137,11 +134,8 @@ export async function handleConfirmAutocomplete(
       error: err,
     });
 
-    // 🔒 fail-safe → zawsze coś odpowiedz
     try {
       await interaction.respond([]);
-    } catch {
-      // ignore hard Discord errors
-    }
+    } catch {}
   }
 }
