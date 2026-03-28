@@ -32,6 +32,25 @@ function resolveMode(type: QuickAddType): "points" | "events" {
 }
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -45,8 +64,13 @@ export async function handleConfirm(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // 🔥 REQUIRED
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
+
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
@@ -65,7 +89,22 @@ export async function handleConfirm(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.editReply(
+    log.emit({
+      event: "confirm_guard_failed",
+      traceId,
+      type: "user",
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        hasSession: !!session,
+        contextError,
+        ownerError,
+      },
+    });
+
+    await safeReply(
+      interaction,
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -79,6 +118,7 @@ export async function handleConfirm(
     log.emit({
       event: "confirm_start",
       traceId,
+      type: "user",
       data: {
         sessionId,
         stage: session.stage,
@@ -86,11 +126,20 @@ export async function handleConfirm(
       },
     });
 
-    // 🔥 SESSION-BASED BUFFER
+    // =====================================
+    // 📥 LOAD BUFFER
+    // =====================================
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
-      await interaction.editReply("⚠️ Nothing to confirm");
+      log.emit({
+        event: "confirm_empty",
+        traceId,
+        type: "user",
+        data: { sessionId },
+      });
+
+      await safeReply(interaction, "⚠️ Nothing to confirm");
       return;
     }
 
@@ -99,7 +148,18 @@ export async function handleConfirm(
     if (invalid.length > 0) {
       metrics.increment("confirm_blocked_invalid");
 
-      await interaction.editReply(
+      log.emit({
+        event: "confirm_blocked_invalid",
+        traceId,
+        type: "user",
+        data: {
+          sessionId,
+          invalidCount: invalid.length,
+        },
+      });
+
+      await safeReply(
+        interaction,
         `❌ Cannot confirm. ${invalid.length} entries are not OK.`
       );
       return;
@@ -117,20 +177,22 @@ export async function handleConfirm(
         traceId
       );
 
-      await interaction.editReply(
+      log.emit({
+        event: "confirm_stage_entered",
+        traceId,
+        type: "user",
+        data: {
+          sessionId,
+        },
+      });
+
+      await safeReply(
+        interaction,
         "⚠️ Confirmation step started.\n\n" +
           "➡️ Now run:\n" +
           "`/q confirm target:<week/event>`\n\n" +
           "💡 Start typing in 'target' to see suggestions."
       );
-
-      log.emit({
-        event: "confirm_stage_entered",
-        traceId,
-        data: {
-          sessionId,
-        },
-      });
 
       return;
     }
@@ -140,7 +202,18 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
-      await interaction.editReply("❌ Invalid session stage");
+      log.emit({
+        event: "confirm_blocked_stage",
+        traceId,
+        type: "user",
+        level: "warn",
+        data: {
+          sessionId,
+          stage: session.stage,
+        },
+      });
+
+      await safeReply(interaction, "❌ Invalid session stage");
       return;
     }
 
@@ -151,7 +224,18 @@ export async function handleConfirm(
     const target = interaction.options.getString("target");
 
     if (!target) {
-      await interaction.editReply(
+      log.emit({
+        event: "confirm_blocked_missing_target",
+        traceId,
+        type: "user",
+        level: "warn",
+        data: {
+          sessionId,
+        },
+      });
+
+      await safeReply(
+        interaction,
         "❌ Missing target.\n\n" +
           "➡️ Use:\n" +
           "`/q confirm target:<week/event>`\n\n" +
@@ -161,6 +245,10 @@ export async function handleConfirm(
     }
 
     const mode = resolveMode(session.type);
+
+    // =====================================
+    // 📤 SUBMIT
+    // =====================================
 
     if (mode === "points") {
       await enqueuePoints(
@@ -185,11 +273,15 @@ export async function handleConfirm(
       );
     }
 
-    // 🔥 SESSION-BASED CLEANUP
+    // =====================================
+    // 🧹 CLEANUP
+    // =====================================
+
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       `✅ Submitted ${entries.length} entries`
     );
 
@@ -200,8 +292,11 @@ export async function handleConfirm(
     log.emit({
       event: "confirm_done",
       traceId,
+      type: "user",
       data: {
         sessionId,
+        mode,
+        count: entries.length,
         durationMs: duration,
       },
     });
@@ -214,14 +309,17 @@ export async function handleConfirm(
     log.emit({
       event: "confirm_failed",
       traceId,
+      type: "user",
       level: "error",
       data: {
+        sessionId,
         error: err,
         durationMs: duration,
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to confirm entries"
     );
   }
