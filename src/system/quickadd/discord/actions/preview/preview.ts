@@ -1,182 +1,128 @@
 // =====================================
-// 📁 src/system/quickadd/core/QuickAddPipeline.ts
+// 📁 src/system/quickadd/discord/actions/preview/preview.ts
 // =====================================
 
 import { Message } from "discord.js";
-import { logger } from "../../core/logger/log";
 
-import { runOCR } from "../ocr/OCRProcessor";
-import { parseByType } from "../parsing/ParserRouter";
-import { validateEntries } from "../validation/QuickAddValidator";
-import { QuickAddBuffer } from "../storage/QuickAddBuffer";
-import { buildLayout } from "../ocr/layout/LayoutBuilder";
+import { QuickAddSession } from "../../../core/QuickAddSession";
+import { processImageInput } from "../../../core/QuickAddPipeline";
 
-import { QuickAddSession } from "./QuickAddSession";
-import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
+import { logger } from "../../../../core/logger/log";
 
 /**
  * 🧠 ROLE:
- * Main processing pipeline for QuickAdd OCR input.
+ * Handles image preview input (OCR trigger).
  *
  * Responsible for:
- * - OCR → parsing → validation → selection
- * - pushing entries into buffer
+ * - validating session
+ * - extracting image URL
+ * - calling pipeline
  *
  * ❗ RULES:
- * - NO ID generation
- * - MUST use provided traceId
- * - FULL observability (logger.emit only)
+ * - NO business logic
+ * - NO OCR / parsing here
+ * - pipeline handles everything
  */
 
-export async function processImageInput(
+export async function handlePreview(
   message: Message,
-  session: ReturnType<typeof QuickAddSession.get>,
-  imageUrl: string,
   traceId: string
-) {
-  const startTime = Date.now();
-
+): Promise<void> {
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
   logger.emit({
-    event: "pipeline_context_check",
+    scope: "quickadd.preview",
+    event: "preview_received",
     traceId,
     context: {
-      sessionId: session?.sessionId,
       guildId,
       userId,
     },
   });
 
-  if (!guildId || !session) {
+  if (!guildId || !userId) {
     logger.emit({
-      event: "pipeline_invalid_context",
+      scope: "quickadd.preview",
+      event: "preview_invalid_context",
       traceId,
       level: "warn",
-      context: { guildId, userId },
+      context: {
+        guildId,
+        userId,
+      },
     });
+    return;
+  }
 
+  const session = QuickAddSession.get(guildId, userId);
+
+  if (!session) {
+    logger.emit({
+      scope: "quickadd.preview",
+      event: "preview_no_session",
+      traceId,
+      level: "warn",
+      context: {
+        guildId,
+        userId,
+      },
+    });
+    return;
+  }
+
+  const attachment = message.attachments.first();
+
+  if (!attachment?.url) {
+    logger.emit({
+      scope: "quickadd.preview",
+      event: "preview_no_image",
+      traceId,
+      level: "warn",
+      context: {
+        sessionId: session.sessionId,
+      },
+    });
     return;
   }
 
   try {
     logger.emit({
-      event: "pipeline_start",
+      scope: "quickadd.preview",
+      event: "preview_pipeline_start",
       traceId,
       context: {
         sessionId: session.sessionId,
-        type: session.type,
+        imageUrl: attachment.url,
       },
     });
 
-    const ocrResult = await runOCR(imageUrl, traceId);
-
-    if (!ocrResult.sources.length) {
-      logger.emit({
-        event: "pipeline_ocr_empty",
-        traceId,
-        level: "warn",
-      });
-
-      return;
-    }
-
-    const results: {
-      source: string;
-      entries: ValidatedEntry[];
-      validCount: number;
-    }[] = [];
-
-    for (const source of ocrResult.sources) {
-      try {
-        if (!("tokens" in source) || !source.tokens?.length) continue;
-
-        const layout = buildLayout(source.tokens, traceId);
-        if (!layout.length) continue;
-
-        const parsed: ParsedEntry[] = parseByType(
-          session.type,
-          { layout },
-          traceId
-        );
-
-        if (!parsed.length) continue;
-
-        const validated = await validateEntries(
-          parsed.map((p) => ({
-            nickname: p.nickname,
-            value: p.value,
-          })),
-          traceId
-        );
-
-        results.push({
-          source: source.source,
-          entries: validated,
-          validCount: validated.filter((v) => v.status === "OK").length,
-        });
-
-      } catch (err) {
-        logger.emit({
-          event: "pipeline_source_error",
-          traceId,
-          level: "warn",
-          error: err,
-        });
-      }
-    }
-
-    if (!results.length) {
-      logger.emit({
-        event: "pipeline_no_results",
-        traceId,
-        level: "warn",
-      });
-
-      return;
-    }
-
-    const best = results.sort((a, b) => b.validCount - a.validCount)[0];
-
-    QuickAddBuffer.addEntries(
-      guildId,
-      best.entries.map((v) => ({
-        nickname: v.nickname,
-        value: v.value,
-        status: v.status,
-        confidence: v.confidence,
-        suggestion: v.suggestion,
-        source: best.source,
-      })),
+    await processImageInput(
+      message,
+      session,
+      attachment.url,
       traceId
     );
 
-    const duration = Date.now() - startTime;
-
     logger.emit({
-      event: "pipeline_done",
+      scope: "quickadd.preview",
+      event: "preview_pipeline_done",
       traceId,
       context: {
         sessionId: session.sessionId,
-      },
-      stats: {
-        total: best.entries.length,
-        durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = Date.now() - startTime;
-
     logger.emit({
-      event: "pipeline_error",
+      scope: "quickadd.preview",
+      event: "preview_failed",
       traceId,
       level: "error",
-      error: err,
-      stats: {
-        durationMs: duration,
+      context: {
+        sessionId: session.sessionId,
       },
+      error: err,
     });
   }
 }
