@@ -12,7 +12,7 @@
  * - ONLY routing
  *
  * ✅ FINAL:
- * - uses log.emit
+ * - uses logger.emit
  * - proper autocomplete routing
  * - SAFE reply handling (🔥 FIX 40060 / 10062)
  */
@@ -21,7 +21,7 @@ import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
 import { createTraceId } from "../core/IdGenerator";
 import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 🚀 REGISTER
@@ -44,10 +44,11 @@ export function registerQuickAddListener(client: Client) {
 
         const subcommand = interaction.options.getSubcommand();
 
-        log.emit({
+        logger.emit({
+          scope: "quickadd.listener",
           event: "autocomplete_received",
           traceId,
-          data: {
+          context: {
             userId,
             guildId,
             channelId,
@@ -68,10 +69,11 @@ export function registerQuickAddListener(client: Client) {
       if (!interaction.isChatInputCommand()) return;
       if (interaction.commandName !== "q") return;
 
-      log.emit({
+      logger.emit({
+        scope: "quickadd.listener",
         event: "interaction_received",
         traceId,
-        data: {
+        context: {
           userId,
           guildId,
           channelId,
@@ -80,12 +82,18 @@ export function registerQuickAddListener(client: Client) {
 
       await handleQuickAddCommand(interaction, traceId);
 
-    } catch (err) {
-      log.emit({
+    } catch (error) {
+      logger.emit({
+        scope: "quickadd.listener",
         event: "listener_error",
         traceId,
-        data: { error: err },
         level: "error",
+        context: {
+          userId,
+          guildId,
+          channelId,
+        },
+        error,
       });
 
       // =====================================
