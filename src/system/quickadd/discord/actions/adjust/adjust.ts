@@ -65,7 +65,6 @@ export async function handleAdjust(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ flags: 64 });
   }
@@ -96,6 +95,7 @@ export async function handleAdjust(
       traceId,
       level: "warn",
       context: {
+        sessionId: session?.sessionId,
         guildId,
         userId,
         hasSession: !!session,
@@ -119,6 +119,11 @@ export async function handleAdjust(
   const newNickname = interaction.options.getString("nickname");
   const newValue = interaction.options.getInteger("value");
 
+  if (id <= 0) {
+    await safeReply(interaction, "❌ Invalid ID");
+    return;
+  }
+
   try {
     logger.emit({
       scope: "quickadd.adjust",
@@ -136,14 +141,22 @@ export async function handleAdjust(
       },
     });
 
-    // =====================================
-    // 📥 LOAD BUFFER
-    // =====================================
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     const index = entries.findIndex((e) => e.id === id);
 
     if (index === -1) {
+      logger.emit({
+        scope: "quickadd.adjust",
+        event: "entry_not_found",
+        traceId,
+        level: "warn",
+        context: {
+          sessionId,
+          id,
+        },
+      });
+
       await safeReply(
         interaction,
         `❌ Entry with ID ${id} not found`
@@ -153,9 +166,6 @@ export async function handleAdjust(
 
     const target = entries[index];
 
-    // =====================================
-    // 🔧 APPLY CHANGE
-    // =====================================
     const updated = {
       ...target,
       nickname: newNickname ?? target.nickname,
@@ -165,9 +175,6 @@ export async function handleAdjust(
     const newEntries = [...entries];
     newEntries[index] = updated;
 
-    // =====================================
-    // 🔁 REVALIDATION
-    // =====================================
     const revalidated = await validateEntries(
       newEntries.map((e) => ({
         nickname: e.nickname,
@@ -176,7 +183,6 @@ export async function handleAdjust(
       traceId
     );
 
-    // 🔥 LENGTH GUARD (IMPORTANT)
     if (revalidated.length !== newEntries.length) {
       logger.emit({
         scope: "quickadd.adjust",
@@ -207,9 +213,6 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    // =====================================
-    // 💾 SAVE BUFFER
-    // =====================================
     QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
     logger.emit({
@@ -226,9 +229,6 @@ export async function handleAdjust(
       },
     });
 
-    // =====================================
-    // 🧠 LEARNING SAVE
-    // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
         await saveAdjusted(
