@@ -34,26 +34,47 @@ const SYSTEM_HANDLERS: SystemHandler[] = [
 ];
 
 // =============================
+// 🔧 CONTEXT BUILDER
+// =============================
+
+function createContext(interaction: Interaction): TraceContext {
+  return {
+    traceId: createTraceId(),
+    userId: interaction.user?.id,
+    source: "discord",
+  };
+}
+
+// =============================
 // 🚀 ROUTER
 // =============================
 
 export async function handleSystemInteraction(
   interaction: Interaction
 ) {
-  const ctx: TraceContext = {
-    traceId: createTraceId(),
-    userId: interaction.user?.id,
-    source: "discord",
-  };
+  const ctx = createContext(interaction);
 
-  console.log(`➡️ ROUTE ${interaction.id} | ${ctx.traceId}`);
+  // 🔹 TEMP DEBUG (docelowo → logger)
+  console.log(`➡️ ROUTE ${interaction.id} | trace=${ctx.traceId}`);
 
   for (const handler of SYSTEM_HANDLERS) {
     try {
       const handled = await handler(interaction, ctx);
-      if (handled) return;
+
+      if (handled) {
+        // 🔹 DEBUG SUCCESS FLOW
+        console.log(`✅ HANDLED by ${handler.name} | trace=${ctx.traceId}`);
+        return;
+      }
+
     } catch (err) {
-      console.error("❌ System handler error:", err);
+      console.error(
+        `❌ System handler error (${handler.name}) | trace=${ctx.traceId}`,
+        err
+      );
     }
   }
+
+  // 🔹 OPTIONAL: nic nie obsłużyło
+  console.log(`⚠️ UNHANDLED interaction | trace=${ctx.traceId}`);
 }
