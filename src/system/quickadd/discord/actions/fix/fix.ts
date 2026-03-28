@@ -1,23 +1,6 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/fix/fix.ts
+// 📁 src/system/quickadd/discord/actions/fix/fix.ts
 // =====================================
-
-/**
- * 🤖 ROLE:
- * Auto-fixes entries using validator suggestions.
- *
- * ❗ RULES:
- * - non-destructive (only suggestion-based overwrite)
- * - revalidation REQUIRED
- * - traceId MUST be injected
- * - NO traceId fallback
- *
- * ✅ FINAL:
- * - logger.emit only
- * - safeReply (lifecycle safe)
- * - deferReply (prevents 10062)
- * - full observability
- */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
@@ -42,7 +25,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, ephemeral: true })
+        .reply({ content, flags: 64 })
         .catch(() => null);
     }
   }
@@ -61,14 +44,9 @@ export async function handleFix(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 CRITICAL (lifecycle fix)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
   }
-
-  // =====================================
-  // 📥 ENTRY LOG
-  // =====================================
 
   logger.emit({
     scope: "quickadd.fix",
@@ -100,6 +78,7 @@ export async function handleFix(
       traceId,
       level: "warn",
       context: {
+        sessionId: session?.sessionId,
         guildId,
         userId,
         hasSession: !!session,
@@ -134,11 +113,17 @@ export async function handleFix(
       },
     });
 
-    // =====================================
-    // 📥 LOAD BUFFER
-    // =====================================
-
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+
+    logger.emit({
+      scope: "quickadd.fix",
+      event: "fix_buffer_loaded",
+      traceId,
+      context: {
+        sessionId,
+        count: entries.length,
+      },
+    });
 
     if (!entries.length) {
       logger.emit({
@@ -153,10 +138,7 @@ export async function handleFix(
     }
 
     let applied = 0;
-
-    // =====================================
-    // 🔧 APPLY SUGGESTIONS
-    // =====================================
+    const changes: { from: string; to: string }[] = [];
 
     const updatedRaw = entries.map((entry) => {
       if (
@@ -164,6 +146,11 @@ export async function handleFix(
         entry.suggestion !== entry.nickname
       ) {
         applied++;
+        changes.push({
+          from: entry.nickname,
+          to: entry.suggestion,
+        });
+
         return {
           ...entry,
           nickname: entry.suggestion,
@@ -172,9 +159,15 @@ export async function handleFix(
       return entry;
     });
 
-    // =====================================
-    // 🔁 REVALIDATION
-    // =====================================
+    logger.emit({
+      scope: "quickadd.fix",
+      event: "fix_revalidation_start",
+      traceId,
+      context: {
+        sessionId,
+        count: updatedRaw.length,
+      },
+    });
 
     const revalidated = await validateEntries(
       updatedRaw.map((e) => ({
@@ -184,9 +177,15 @@ export async function handleFix(
       traceId
     );
 
-    // =====================================
-    // ⚠️ LENGTH GUARD
-    // =====================================
+    logger.emit({
+      scope: "quickadd.fix",
+      event: "fix_revalidation_done",
+      traceId,
+      context: {
+        sessionId,
+        count: revalidated.length,
+      },
+    });
 
     if (revalidated.length !== updatedRaw.length) {
       logger.emit({
@@ -211,10 +210,6 @@ export async function handleFix(
       return;
     }
 
-    // =====================================
-    // 🔗 MERGE RESULTS
-    // =====================================
-
     const merged = revalidated.map((v, i) => ({
       ...updatedRaw[i],
       status: v.status,
@@ -222,15 +217,21 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
-    // =====================================
-    // 💾 SAVE BUFFER
-    // =====================================
-
     QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
+    if (applied === 0) {
+      logger.emit({
+        scope: "quickadd.fix",
+        event: "fix_no_changes",
+        traceId,
+        context: {
+          sessionId,
+        },
+        stats: {
+          fix_no_changes: 1,
+        },
+      });
+    }
 
     await safeReply(
       interaction,
@@ -249,9 +250,12 @@ export async function handleFix(
         sessionId,
         applied,
       },
+      meta: {
+        durationMs: duration,
+        preview: changes.slice(0, 5),
+      },
       stats: {
         fix_success: 1,
-        durationMs: duration,
       },
     });
 
@@ -266,9 +270,11 @@ export async function handleFix(
       context: {
         sessionId,
       },
+      meta: {
+        durationMs: duration,
+      },
       stats: {
         fix_error: 1,
-        durationMs: duration,
       },
       error: err,
     });
