@@ -1,57 +1,141 @@
-// src/absencePanel/absenceInteraction.ts
-import { Interaction, ButtonInteraction, StringSelectMenuInteraction, ModalSubmitInteraction, CacheType } from "discord.js";
+// =====================================
+// 📁 src/system/absence/absenceInteraction.ts
+// =====================================
+
+import {
+  Interaction,
+  ButtonInteraction,
+  StringSelectMenuInteraction,
+  ModalSubmitInteraction,
+  CacheType,
+} from "discord.js";
+
 import * as AB from "./absenceButtons";
 
 export const IDS = {
-  BUTTONS: { 
-    ADD: "absence_add", 
-    REMOVE: "absence_remove", 
-    SHOW_LIST: "absence_list", 
+  BUTTONS: {
+    ADD: "absence_add",
+    REMOVE: "absence_remove",
+    SHOW_LIST: "absence_list",
     SETTINGS: "absence_settings",
-    HELP: "absence_help" // <- dodany Help
+    HELP: "absence_help",
   },
-  SELECTS: { SETTINGS_NOTIFICATION: "absence_settings_notification" },
-  MODALS: { ADD: "absence_add_modal", REMOVE: "absence_remove_modal" },
+  SELECTS: {
+    SETTINGS_NOTIFICATION: "absence_settings_notification",
+  },
+  MODALS: {
+    ADD: "absence_add_modal",
+    REMOVE: "absence_remove_modal",
+  },
 };
 
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
-  [IDS.BUTTONS.ADD]: async (i) => await AB.handleAddAbsence(i),
-  [IDS.BUTTONS.REMOVE]: async (i) => await AB.handleRemoveAbsence(i),
-  [IDS.BUTTONS.SHOW_LIST]: async (i) => await AB.handleAbsenceList(i),
-  [IDS.BUTTONS.SETTINGS]: async (i) => await AB.handleSettings(i),
-  [IDS.BUTTONS.HELP]: async (i) => await AB.handleAbsenceHelp(i), // <- obsługa Help
+// =============================
+// 🧩 HANDLERS
+// =============================
+
+const BUTTON_HANDLERS: Record<
+  string,
+  (i: ButtonInteraction<CacheType>) => Promise<any>
+> = {
+  [IDS.BUTTONS.ADD]: async (i) => AB.handleAddAbsence(i),
+  [IDS.BUTTONS.REMOVE]: async (i) => AB.handleRemoveAbsence(i),
+  [IDS.BUTTONS.SHOW_LIST]: async (i) => AB.handleAbsenceList(i),
+  [IDS.BUTTONS.SETTINGS]: async (i) => AB.handleSettings(i),
+  [IDS.BUTTONS.HELP]: async (i) => AB.handleAbsenceHelp(i),
 };
 
-const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await AB.handleSettingsSelect(i),
+const SELECT_HANDLERS: Record<
+  string,
+  (i: StringSelectMenuInteraction<CacheType>) => Promise<any>
+> = {
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) =>
+    AB.handleSettingsSelect(i),
 };
 
-async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
+// =============================
+// 🔧 MODALS
+// =============================
+
+async function handleModal(
+  interaction: ModalSubmitInteraction<CacheType>
+): Promise<boolean> {
   const { customId } = interaction;
-  if (customId === IDS.MODALS.ADD) return await AB.handleAddAbsenceSubmit(interaction);
-  if (customId === IDS.MODALS.REMOVE) return await AB.handleRemoveAbsenceSubmit(interaction);
+
+  if (customId === IDS.MODALS.ADD) {
+    await AB.handleAddAbsenceSubmit(interaction);
+    return true;
+  }
+
+  if (customId === IDS.MODALS.REMOVE) {
+    await AB.handleRemoveAbsenceSubmit(interaction);
+    return true;
+  }
+
+  return false;
 }
 
-export async function handleAbsenceInteraction(interaction: Interaction<CacheType>) {
+// =============================
+// 🚀 MAIN HANDLER (ROUTER READY)
+// =============================
+
+export async function handleAbsenceInteraction(
+  interaction: Interaction<CacheType>
+): Promise<boolean> {
   try {
+    // =============================
+    // 🔘 BUTTONS
+    // =============================
+
     if (interaction.isButton()) {
       const handler = BUTTON_HANDLERS[interaction.customId];
-      if (!handler) return;
-      return await handler(interaction);
+
+      if (!handler) return false;
+
+      await handler(interaction);
+      return true;
     }
+
+    // =============================
+    // 📋 SELECTS
+    // =============================
+
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
-      if (!handler) return;
-      return await handler(interaction);
+
+      if (!handler) return false;
+
+      await handler(interaction);
+      return true;
     }
-    if (interaction.isModalSubmit()) return await handleModal(interaction);
+
+    // =============================
+    // 🧾 MODALS
+    // =============================
+
+    if (interaction.isModalSubmit()) {
+      return await handleModal(interaction);
+    }
+
+    return false;
   } catch (error) {
     console.error("Error handling absence interaction:", error);
+
     if (interaction.isRepliable()) {
-      if (interaction.replied || interaction.deferred) 
-        await interaction.followUp({ content: "❌ An error occurred while processing this interaction.", ephemeral: true });
-      else 
-        await interaction.reply({ content: "❌ An error occurred while processing this interaction.", ephemeral: true });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content:
+            "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content:
+            "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      }
     }
+
+    return true; // 🔥 ważne: traktujemy jako "handled"
   }
 }
