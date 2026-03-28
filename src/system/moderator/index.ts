@@ -2,4 +2,24 @@
 // 📁 src/system/moderator/index.ts
 // =====================================
 
-export { initModeratorPanel } from "../../moderatorPanel/moderatorPanel";
+/**
+ * 🚪 Public API for Moderator system
+ */
+
+// =============================
+// 🔹 INIT
+// =============================
+
+export { initModeratorPanel } from "./moderatorPanel";
+
+// =============================
+// 🔹 PANEL
+// =============================
+
+export * from "./moderatorPanel";
+
+// =============================
+// 🔹 BUTTONS
+// =============================
+
+export * from "./moderatorButtons";
