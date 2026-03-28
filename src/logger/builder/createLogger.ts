@@ -3,14 +3,7 @@
 // =====================================
 
 import { Observability } from "../core/Observability";
-
-// =====================================
-// 🔹 TYPES
-// =====================================
-
-type Definition = {
-  [key: string]: string | Definition;
-};
+import { LogDefinitionTree } from "../observability/ObservabilityTypes";
 
 // =====================================
 // 🔹 LEVEL RESOLVER
@@ -35,10 +28,10 @@ function resolveLevel(event: string): "info" | "warn" | "error" {
 // 🔥 BUILDER (RECURSIVE)
 // =====================================
 
-export function createLogger<T extends Definition>(
+export function createLogger<T extends LogDefinitionTree>(
   defs: T
 ): BuildLogger<T> {
-  function build(obj: Definition): any {
+  function build(obj: LogDefinitionTree): any {
     const result: any = {};
 
     for (const key in obj) {
@@ -49,12 +42,14 @@ export function createLogger<T extends Definition>(
 
         result[key] = (
           traceId: string,
-          data?: unknown
+          data?: unknown,
+          meta?: Record<string, unknown>
         ) => {
           Observability.emit({
             event: eventName,
             traceId,
             data,
+            meta,
             level: resolveLevel(eventName),
           });
         };
@@ -75,6 +70,10 @@ export function createLogger<T extends Definition>(
 
 type BuildLogger<T> = {
   [K in keyof T]: T[K] extends string
-    ? (traceId: string, data?: unknown) => void
+    ? (
+        traceId: string,
+        data?: unknown,
+        meta?: Record<string, unknown>
+      ) => void
     : BuildLogger<T[K]>;
 };
