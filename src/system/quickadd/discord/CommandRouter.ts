@@ -35,10 +35,10 @@ export async function handleQuickAddCommand(
     } catch {
       logger.emit({
         scope: "quickadd.command_router",
-        event: "command_subcommand_missing",
+        event: "subcommand_missing",
         traceId,
         level: "error",
-        data: { userId, guildId, channelId },
+        context: { userId, guildId, channelId },
       });
 
       return;
@@ -46,9 +46,9 @@ export async function handleQuickAddCommand(
 
     logger.emit({
       scope: "quickadd.command_router",
-      event: "command_received",
+      event: "received",
       traceId,
-      data: {
+      context: {
         userId,
         guildId,
         channelId,
@@ -58,17 +58,16 @@ export async function handleQuickAddCommand(
 
     const handler = getCommandHandler(subcommand);
 
-    // 🔒 HANDLER GUARD
+    // 🔒 HANDLER GUARD (defensive, choć TS powinien chronić)
     if (!handler) {
       logger.emit({
         scope: "quickadd.command_router",
-        event: "command_handler_missing",
+        event: "handler_missing",
         traceId,
         level: "error",
-        data: { subcommand },
+        context: { subcommand },
       });
 
-      // 🔥 FAILSAFE RESPONSE
       if (interaction.isRepliable()) {
         const payload = {
           content: "❌ Command not supported.",
@@ -94,50 +93,38 @@ export async function handleQuickAddCommand(
 
     logger.emit({
       scope: "quickadd.command_router",
-      event: "command_execution_start",
+      event: "execution_start",
       traceId,
-      data: { subcommand },
+      context: { subcommand },
     });
 
     await handler(interaction, traceId);
 
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "command_execution_done",
-      traceId,
-      data: {
-        subcommand,
-        durationMs: Date.now() - startTime,
-      },
-    });
-
-  } catch (err: any) {
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "command_router_error",
-      traceId,
-      level: "error",
-      data: {
-        subcommand: subcommand ?? "unknown",
-        error: {
-          message: err?.message || "unknown",
-          stack: err?.stack,
-        },
-      },
-    });
+    const durationMs = Date.now() - startTime;
 
     logger.emit({
       scope: "quickadd.command_router",
-      event: "command_execution_failed",
+      event: "execution_done",
+      traceId,
+      context: { subcommand },
+      result: { durationMs },
+    });
+
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+
+    logger.emit({
+      scope: "quickadd.command_router",
+      event: "execution_failed",
       traceId,
       level: "error",
-      data: {
+      context: {
         subcommand: subcommand ?? "unknown",
-        durationMs: Date.now() - startTime,
       },
+      result: { durationMs },
+      error,
     });
 
-    // 🔥 FAILSAFE RESPONSE
     if (interaction.isRepliable()) {
       const payload = {
         content: "❌ Command failed.",
