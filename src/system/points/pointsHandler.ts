@@ -1,5 +1,11 @@
 // src/pointsPanel/pointsHandler.ts
-import { Interaction, ButtonInteraction, CacheType, ModalSubmitInteraction } from "discord.js";
+import {
+  Interaction,
+  ButtonInteraction,
+  CacheType,
+  ModalSubmitInteraction
+} from "discord.js";
+
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
@@ -19,15 +25,29 @@ type ActionType = typeof IDS.ACTIONS[number];
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
 // -----------------------------
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
-  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
+const BUTTON_HANDLERS: Record<
+  string,
+  (i: ButtonInteraction<CacheType>) => Promise<void>
+> = {
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
+    PB.pointsManagement.handlePointsManagementMain(i),
+
   [IDS.BUTTONS.GUIDE]: async (i) => {
-    await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
+    await safeReply(i, {
+      content: "📖 Guide not implemented yet.",
+      ephemeral: true
+    });
   },
+
   [IDS.BUTTONS.SETTINGS]: async (i) => {
-    await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
+    await safeReply(i, {
+      content: "⚙️ Settings not implemented yet.",
+      ephemeral: true
+    });
   },
-  [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
+
+  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
+    PB.pointsListWeeks.handleListWeeks(i)
 };
 
 // -----------------------------
@@ -43,34 +63,26 @@ export async function handlePointsInteraction(
     if (interaction.isButton()) {
       const { customId } = interaction;
 
-      // -----------------------------
       // STATIC BUTTONS
-      // -----------------------------
       const handler = BUTTON_HANDLERS[customId];
       if (handler) {
         await handler(interaction);
         return true;
       }
 
-      // -----------------------------
       // CATEGORY CLICK
-      // -----------------------------
       if (customId.startsWith("points_management_category_")) {
         await PB.pointsManagement.handlePointsManagement(interaction);
         return true;
       }
 
-      // -----------------------------
       // CREATE WEEK
-      // -----------------------------
       if (Utils.isCreateWeek(customId)) {
         await PB.pointsCreate.handleCreateWeek(interaction);
         return true;
       }
 
-      // -----------------------------
       // WEEK CLICK
-      // -----------------------------
       if (Utils.isWeek(customId)) {
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
@@ -87,11 +99,19 @@ export async function handlePointsInteraction(
         return true;
       }
 
-      // -----------------------------
-      // ACTIONS (ADD / REMOVE / LIST / COMPARE)
-      // -----------------------------
+      // ACTIONS
       if (Utils.isAction(customId)) {
-        const { action, category } = Utils.parseActionId(customId) as {
+        const parsed = Utils.parseActionId(customId);
+
+        if (!parsed) {
+          await safeReply(interaction, {
+            content: "⚠️ Invalid action format.",
+            ephemeral: true
+          });
+          return true;
+        }
+
+        const { action, category } = parsed as {
           action: ActionType;
           category: string;
           week: string;
@@ -143,12 +163,14 @@ export async function handlePointsInteraction(
     }
 
     return false;
-
   } catch (error) {
     console.error("Error handling points interaction:", error);
 
     if (interaction.isRepliable()) {
-      const payload = { content: "❌ An error occurred.", ephemeral: true };
+      const payload = {
+        content: "❌ An error occurred.",
+        ephemeral: true
+      };
 
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload);
@@ -157,7 +179,7 @@ export async function handlePointsInteraction(
       }
     }
 
-    return true; // traktujemy jako handled
+    return true; // handled
   }
 }
 
@@ -169,8 +191,9 @@ function safeReply(
   payload: any
 ) {
   if (interaction.replied || interaction.deferred) {
-    return interaction.editReply(payload);
+    return interaction.followUp(payload); // 🔥 FIX (było editReply → to bug w wielu flow)
   }
+
   return interaction.reply(payload);
 }
 
