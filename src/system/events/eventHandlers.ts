@@ -12,6 +12,7 @@ import {
 
 import * as EB from "./eventsButtons";
 import { parseEventId } from "./eventsButtons/utils";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 🔹 IDS (CENTRALIZED)
@@ -62,14 +63,6 @@ export const IDS = {
 };
 
 // =====================================
-// 🔹 SIMPLE LOGGER (TEMP)
-// =====================================
-
-function log(traceId: string, event: string, data?: unknown) {
-  console.log(`[${traceId}] ${event}`, data ?? "");
-}
-
-// =====================================
 // HANDLERS
 // =====================================
 
@@ -100,8 +93,7 @@ const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>
 // =====================================
 
 async function handleModal(
-  interaction: ModalSubmitInteraction<CacheType>,
-  ctx: { traceId: string }
+  interaction: ModalSubmitInteraction<CacheType>
 ): Promise<boolean> {
   const { customId } = interaction;
 
@@ -133,8 +125,7 @@ async function handleModal(
 // =====================================
 
 export async function handleEventInteraction(
-  interaction: Interaction<CacheType>,
-  ctx: { traceId: string }
+  interaction: Interaction<CacheType>
 ): Promise<boolean> {
   try {
     if (interaction.isButton()) {
@@ -142,7 +133,11 @@ export async function handleEventInteraction(
 
       const handler = BUTTON_HANDLERS[id];
       if (handler) {
-        log(ctx.traceId, "event_button", { id });
+        logger.emit({
+          event: "event_button",
+          data: { id },
+        });
+
         await handler(interaction);
         return true;
       }
@@ -200,7 +195,15 @@ export async function handleEventInteraction(
 
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
-      if (handler) return await handler(interaction);
+
+      if (handler) {
+        logger.emit({
+          event: "event_select",
+          data: { id: interaction.customId },
+        });
+
+        return await handler(interaction);
+      }
 
       if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
@@ -208,12 +211,19 @@ export async function handleEventInteraction(
     }
 
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction, ctx);
+      return await handleModal(interaction);
     }
 
     return false;
-  } catch (error) {
-    log(ctx.traceId, "event_error", error);
+  } catch (error: any) {
+    logger.emit({
+      event: "event_error",
+      level: "error",
+      data: {
+        message: error?.message,
+        stack: error?.stack,
+      },
+    });
 
     if (interaction.isRepliable()) {
       await interaction.reply({
