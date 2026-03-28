@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/discord/CommandRegistry.ts
+// 📁 src/system/quickadd/discord/CommandRegistry.ts
 // =====================================
 
 /**
@@ -7,8 +7,9 @@
  * Maps subcommands to handlers
  *
  * ❗ RULES:
- * - NO logic
+ * - NO business logic
  * - ONLY mapping
+ * - FULL observability
  *
  * ✅ FINAL:
  * - strongly typed
@@ -16,6 +17,7 @@
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
+import { logger } from "../../../core/logger/log";
 
 // =====================================
 // 🧱 TYPES
@@ -66,7 +68,33 @@ const registry: Record<QuickAddSubcommand, CommandHandler> = {
 // =====================================
 
 export function getCommandHandler(
-  subcommand: QuickAddSubcommand
-): CommandHandler {
-  return registry[subcommand];
+  subcommand: string,
+  traceId: string
+): CommandHandler | null {
+  const handler = registry[subcommand as QuickAddSubcommand];
+
+  if (!handler) {
+    logger.emit({
+      scope: "quickadd.registry",
+      event: "handler_not_found",
+      traceId,
+      level: "warn",
+      context: {
+        subcommand,
+      },
+    });
+
+    return null;
+  }
+
+  logger.emit({
+    scope: "quickadd.registry",
+    event: "handler_resolved",
+    traceId,
+    context: {
+      subcommand,
+    },
+  });
+
+  return handler;
 }
