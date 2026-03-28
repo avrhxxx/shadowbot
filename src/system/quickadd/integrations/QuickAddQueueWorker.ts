@@ -16,8 +16,7 @@
  * - queueId used ONLY when processing single entries
  *
  * 🔥 LOGGER:
- * - uses log.emit ONLY
- * - system-level logs
+ * - uses logger.emit ONLY
  *
  * 🚀 READY:
  * - prepared for queueId
@@ -26,7 +25,7 @@
  */
 
 import { getQueue } from "../storage/QuickAddRepository";
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 import { createTraceId } from "../core/IdGenerator";
 
 // =====================================
@@ -50,11 +49,10 @@ type QueueEntry = {
 export function startQuickAddWorker() {
   const systemTraceId = createTraceId();
 
-  log.emit({
+  logger.emit({
     event: "worker_started",
     traceId: systemTraceId,
-    type: "system",
-    data: {
+    context: {
       intervalMs: INTERVAL_MS,
     },
   });
@@ -64,26 +62,24 @@ export function startQuickAddWorker() {
     const startedAt = Date.now();
 
     try {
-      log.emit({
+      logger.emit({
         event: "worker_tick_start",
         traceId,
-        type: "system",
       });
 
       // =====================================
       // 📥 LOAD QUEUE
       // =====================================
       const points = (await getQueue(
-        "points", // ✅ FIX
+        "points",
         traceId
       )) as QueueEntry[];
 
-      log.emit({
+      logger.emit({
         event: "queue_loaded",
         traceId,
-        type: "system",
-        data: {
-          type: "points",
+        context: {
+          queueType: "points",
           rows: points.length,
         },
       });
@@ -92,12 +88,11 @@ export function startQuickAddWorker() {
       // 🔍 EMPTY QUEUE
       // =====================================
       if (!points.length) {
-        log.emit({
+        logger.emit({
           event: "queue_empty",
           traceId,
-          type: "system",
-          data: {
-            type: "points",
+          context: {
+            queueType: "points",
           },
         });
       }
@@ -106,11 +101,10 @@ export function startQuickAddWorker() {
       // 🔄 PROCESS LOOP (FUTURE)
       // =====================================
       for (const entry of points) {
-        log.emit({
+        logger.emit({
           event: "queue_item_received",
           traceId,
-          type: "system",
-          data: {
+          context: {
             queueId: entry.queueId,
           },
         });
@@ -121,33 +115,32 @@ export function startQuickAddWorker() {
       // =====================================
       // ✅ DONE
       // =====================================
-      log.emit({
+      const duration = Date.now() - startedAt;
+
+      logger.emit({
         event: "worker_tick_done",
         traceId,
-        type: "system",
-        data: {
-          durationMs: Date.now() - startedAt,
+        stats: {
+          durationMs: duration,
         },
       });
 
     } catch (err) {
-      log.emit({
+      const duration = Date.now() - startedAt;
+
+      logger.emit({
         event: "worker_error",
         traceId,
-        type: "system",
         level: "error",
-        data: {
-          error: err,
-        },
+        error: err,
       });
 
-      log.emit({
+      logger.emit({
         event: "worker_tick_failed",
         traceId,
-        type: "system",
         level: "error",
-        data: {
-          durationMs: Date.now() - startedAt,
+        stats: {
+          durationMs: duration,
         },
       });
     }
