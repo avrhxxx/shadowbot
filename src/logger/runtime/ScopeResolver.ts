@@ -12,7 +12,7 @@ export function resolveScope(): string {
 
     const callerLine = lines.find(
       (l) =>
-        !l.includes("logger") &&
+        !l.includes("/logger/") &&
         !l.includes("node_modules")
     );
 
