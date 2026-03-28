@@ -78,24 +78,19 @@ async function handleModal(
 ): Promise<boolean> {
   const { customId } = interaction;
 
-  if (customId === IDS.MODALS.ADD) {
-    logger.emit({
-      scope: "absence.modal",
-      event: "add",
-      traceId,
-    });
+  logger.emit({
+    scope: "absence.handler",
+    event: "modal_received",
+    traceId,
+    context: { customId },
+  });
 
+  if (customId === IDS.MODALS.ADD) {
     await handleAddAbsenceSubmit(interaction);
     return true;
   }
 
   if (customId === IDS.MODALS.REMOVE) {
-    logger.emit({
-      scope: "absence.modal",
-      event: "remove",
-      traceId,
-    });
-
     await handleRemoveAbsenceSubmit(interaction);
     return true;
   }
@@ -123,8 +118,8 @@ export async function handleAbsenceInteraction(
       if (!handler) return false;
 
       logger.emit({
-        scope: "absence.button",
-        event: "click",
+        scope: "absence.handler",
+        event: "button_click",
         traceId,
         context: { id },
       });
@@ -144,8 +139,8 @@ export async function handleAbsenceInteraction(
       if (!handler) return false;
 
       logger.emit({
-        scope: "absence.select",
-        event: "change",
+        scope: "absence.handler",
+        event: "select_change",
         traceId,
         context: { id },
       });
@@ -165,8 +160,8 @@ export async function handleAbsenceInteraction(
     return false;
   } catch (error) {
     logger.emit({
-      scope: "absence",
-      event: "error",
+      scope: "absence.handler",
+      event: "handler_error",
       traceId,
       level: "error",
       error,
