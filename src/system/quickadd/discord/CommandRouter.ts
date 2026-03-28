@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/discord/CommandRouter.ts
+// 📁 src/system/quickadd/discord/CommandRouter.ts
 // =====================================
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -7,7 +7,7 @@ import {
   getCommandHandler,
   QuickAddSubcommand,
 } from "./CommandRegistry";
-import { logger } from "../../core/logger/log";
+import { logger } from "../../../core/logger/log";
 
 // =====================================
 // 🚀 ROUTER
@@ -28,7 +28,6 @@ export async function handleQuickAddCommand(
   let subcommand: QuickAddSubcommand | null = null;
 
   try {
-    // 🔒 SAFE SUBCOMMAND
     try {
       subcommand =
         interaction.options.getSubcommand() as QuickAddSubcommand;
@@ -56,9 +55,8 @@ export async function handleQuickAddCommand(
       },
     });
 
-    const handler = getCommandHandler(subcommand);
+    const handler = getCommandHandler(subcommand, traceId);
 
-    // 🔒 HANDLER GUARD (defensive, choć TS powinien chronić)
     if (!handler) {
       logger.emit({
         scope: "quickadd.command_router",
@@ -107,7 +105,9 @@ export async function handleQuickAddCommand(
       event: "execution_done",
       traceId,
       context: { subcommand },
-      result: { durationMs },
+      metrics: {
+        durationMs,
+      },
     });
 
   } catch (error) {
@@ -121,7 +121,9 @@ export async function handleQuickAddCommand(
       context: {
         subcommand: subcommand ?? "unknown",
       },
-      result: { durationMs },
+      metrics: {
+        durationMs,
+      },
       error,
     });
 
