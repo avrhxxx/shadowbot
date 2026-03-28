@@ -10,7 +10,7 @@ import {
   CacheType,
 } from "discord.js";
 
-import { TraceContext } from "../../core/trace/TraceContext";
+import { logger } from "../../core/logger/log";
 
 import {
   handleAddAbsence,
@@ -74,18 +74,28 @@ const SELECT_HANDLERS: Record<
 
 async function handleModal(
   interaction: ModalSubmitInteraction<CacheType>,
-  ctx: TraceContext
+  traceId: string
 ): Promise<boolean> {
   const { customId } = interaction;
 
   if (customId === IDS.MODALS.ADD) {
-    console.log(`[${ctx.traceId}] absence.modal.add`);
+    logger.emit({
+      scope: "absence.modal",
+      event: "add",
+      traceId,
+    });
+
     await handleAddAbsenceSubmit(interaction);
     return true;
   }
 
   if (customId === IDS.MODALS.REMOVE) {
-    console.log(`[${ctx.traceId}] absence.modal.remove`);
+    logger.emit({
+      scope: "absence.modal",
+      event: "remove",
+      traceId,
+    });
+
     await handleRemoveAbsenceSubmit(interaction);
     return true;
   }
@@ -99,7 +109,7 @@ async function handleModal(
 
 export async function handleAbsenceInteraction(
   interaction: Interaction<CacheType>,
-  ctx: TraceContext
+  traceId: string
 ): Promise<boolean> {
   try {
     // =============================
@@ -112,7 +122,12 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      console.log(`[${ctx.traceId}] absence.button`, { id });
+      logger.emit({
+        scope: "absence.button",
+        event: "click",
+        traceId,
+        context: { id },
+      });
 
       await handler(interaction);
       return true;
@@ -128,7 +143,12 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      console.log(`[${ctx.traceId}] absence.select`, { id });
+      logger.emit({
+        scope: "absence.select",
+        event: "change",
+        traceId,
+        context: { id },
+      });
 
       await handler(interaction);
       return true;
@@ -139,12 +159,18 @@ export async function handleAbsenceInteraction(
     // =============================
 
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction, ctx);
+      return await handleModal(interaction, traceId);
     }
 
     return false;
   } catch (error) {
-    console.error(`[${ctx.traceId}] absence.error`, error);
+    logger.emit({
+      scope: "absence",
+      event: "error",
+      traceId,
+      level: "error",
+      error,
+    });
 
     if (interaction.isRepliable()) {
       const payload = {
@@ -159,6 +185,6 @@ export async function handleAbsenceInteraction(
       }
     }
 
-    return true; // traktujemy jako handled
+    return true;
   }
 }
