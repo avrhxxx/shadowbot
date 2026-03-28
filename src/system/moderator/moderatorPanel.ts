@@ -241,12 +241,17 @@ export async function initModeratorPanel(client: Client) {
 // =============================
 
 export async function handleModeratorInteraction(
-  interaction: Interaction
+  interaction: Interaction,
+  ctx: { traceId: string }
 ): Promise<boolean> {
   if (!interaction.isButton()) return false;
 
   try {
-    switch (interaction.customId) {
+    const id = interaction.customId;
+
+    console.log(`[${ctx.traceId}] moderator_button`, { id });
+
+    switch (id) {
       case "moderator_event_menu":
         await handleEventMenu(interaction);
         return true;
@@ -270,7 +275,7 @@ export async function handleModeratorInteraction(
 
     return false;
   } catch (error) {
-    console.error("Error handling moderator interaction:", error);
+    console.error(`[${ctx.traceId}] moderator_error`, error);
 
     if (interaction.isRepliable()) {
       if (interaction.replied || interaction.deferred) {
