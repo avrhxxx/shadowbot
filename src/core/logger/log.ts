@@ -4,14 +4,28 @@
 
 import { TraceContext } from "../trace/TraceContext";
 
+// =====================================
+// 🔹 TYPES
+// =====================================
+
 type LogLevel = "info" | "warn" | "error";
 
-type LogPayload = {
-  input?: unknown;
-  result?: unknown;
-  context?: unknown;
-  error?: unknown;
+export type LogPayload = {
+  context?: Record<string, unknown>;
+  input?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  stats?: Record<string, number>;
+  meta?: Record<string, unknown>;
+  error?: {
+    message: string;
+    stack?: string;
+    [key: string]: unknown;
+  };
 };
+
+// =====================================
+// 🔥 LOGGER
+// =====================================
 
 export function log(
   ctx: TraceContext,
