@@ -2,4 +2,12 @@
 // 📁 src/system/translation/index.ts
 // =====================================
 
-export { initTranslationModule } from "../../translation/TranslationModule";
+/**
+ * 🚪 Public API for Translation system
+ */
+
+// =============================
+// 🔹 INIT
+// =============================
+
+export { initTranslationModule } from "./TranslationModule";
