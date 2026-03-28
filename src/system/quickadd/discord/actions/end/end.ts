@@ -103,6 +103,10 @@ export async function handleEnd(
         hasSession: !!session,
         contextError,
         ownerError,
+        reason:
+          contextError ??
+          ownerError ??
+          (!session ? "no_session" : "unknown"),
       },
       stats: {
         end_blocked: 1,
@@ -157,17 +161,6 @@ export async function handleEnd(
 
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
-
-    logger.emit({
-      scope: "quickadd.end",
-      event: "session_ended",
-      traceId,
-      context: {
-        sessionId,
-        guildId,
-        threadId,
-      },
-    });
 
     await safeReply(
       interaction,
