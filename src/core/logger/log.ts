@@ -21,18 +21,14 @@ export type LogPayload = {
   stats?: Record<string, number>;
   meta?: Record<string, unknown>;
 
-  error?: {
-    message: string;
-    stack?: string;
-    [key: string]: unknown;
-  } | unknown;
+  error?: unknown;
 };
 
 // =====================================
 // 🔧 HELPERS
 // =====================================
 
-function normalizeError(err: unknown): LogPayload["error"] {
+function normalizeError(err: unknown) {
   if (!err) return undefined;
 
   if (err instanceof Error) {
@@ -52,13 +48,10 @@ function normalizeError(err: unknown): LogPayload["error"] {
 // =====================================
 
 export const logger = {
-  emit(payload: LogPayload | string) {
-    // 🔹 SHORT VERSION SUPPORT
+  emit(payload: LogPayload | string): void {
+    // 🔹 SHORT VERSION → NORMALIZE
     if (typeof payload === "string") {
-      console.log(
-        `${new Date().toISOString()} | INFO | ${payload}`
-      );
-      return;
+      payload = { event: payload };
     }
 
     const {
@@ -75,11 +68,11 @@ export const logger = {
     } = payload;
 
     const time = new Date().toISOString();
-
     const normalizedError = normalizeError(error);
+    const finalEvent = event || "unknown_event";
 
     console.log(
-      `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${event}`,
+      `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${finalEvent}`,
       {
         ...(context && { context }),
         ...(input && { input }),
