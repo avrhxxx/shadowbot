@@ -12,7 +12,7 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -27,7 +27,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 })
+        .reply({ content, ephemeral: true })
         .catch(() => null);
     }
   }
@@ -41,25 +41,25 @@ export async function handleEnd(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `end-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   // 🔥 REQUIRED (lifecycle fix)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
   }
 
   // =====================================
   // 📥 ENTRY LOG
   // =====================================
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.end",
     event: "end_requested",
     traceId,
-    data: {
+    context: {
       guildId,
       userId,
     },
@@ -85,16 +85,20 @@ export async function handleEnd(
   );
 
   if (contextError || ownerError || !session) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.end",
       event: "end_guard_failed",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         hasSession: !!session,
         contextError,
         ownerError,
+      },
+      stats: {
+        end_blocked: 1,
       },
     });
 
@@ -108,16 +112,18 @@ export async function handleEnd(
   const { sessionId, threadId, stage } = session;
 
   try {
-    metrics.increment("end_started");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.end",
       event: "end_start",
       traceId,
-      data: {
+      context: {
         sessionId,
         guildId,
         threadId,
         stage,
+      },
+      stats: {
+        end_started: 1,
       },
     });
 
@@ -128,10 +134,11 @@ export async function handleEnd(
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.end",
       event: "session_ended",
       traceId,
-      data: {
+      context: {
         sessionId,
         guildId,
         threadId,
@@ -158,56 +165,63 @@ export async function handleEnd(
       ) {
         await channel.delete();
 
-        log.emit({
+        logger.emit({
+          scope: "quickadd.end",
           event: "thread_deleted",
           traceId,
-          data: {
+          context: {
             sessionId,
             threadId,
           },
         });
       }
     } catch (err) {
-      metrics.increment("end_thread_delete_failed");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.end",
         event: "thread_delete_failed",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId,
-          error: err,
         },
+        stats: {
+          end_thread_delete_failed: 1,
+        },
+        error: err,
       });
     }
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("end_success");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.end",
       event: "end_done",
       traceId,
-      data: {
+      context: {
         sessionId,
+      },
+      stats: {
+        end_success: 1,
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("end_error");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.end",
       event: "end_failed",
       traceId,
       level: "error",
-      data: {
+      context: {
         sessionId,
-        error: err,
+      },
+      stats: {
+        end_error: 1,
         durationMs: duration,
       },
+      error: err,
     });
 
     await safeReply(
