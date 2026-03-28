@@ -1,4 +1,7 @@
-// src/pointsPanel/pointsHandler.ts
+// =====================================
+// 📁 src/system/points/pointsHandler.ts
+// =====================================
+
 import {
   Interaction,
   ButtonInteraction,
@@ -7,9 +10,8 @@ import {
 } from "discord.js";
 
 import * as PB from "./pointsButtons";
-import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
-import { logger } from "../core/logger/log";
+import { logger } from "../../core/logger/log";
 
 export const IDS = {
   BUTTONS: {
@@ -24,7 +26,7 @@ export const IDS = {
 type ActionType = typeof IDS.ACTIONS[number];
 
 // -----------------------------
-// GLOBAL BUTTON HANDLERS
+// BUTTON HANDLERS
 // -----------------------------
 const BUTTON_HANDLERS: Record<
   string,
@@ -52,10 +54,11 @@ const BUTTON_HANDLERS: Record<
 };
 
 // -----------------------------
-// GLOBAL INTERACTION HANDLER
+// MAIN HANDLER
 // -----------------------------
 export async function handlePointsInteraction(
-  interaction: Interaction<CacheType>
+  interaction: Interaction<CacheType>,
+  traceId: string
 ): Promise<boolean> {
   try {
     // =============================
@@ -65,43 +68,39 @@ export async function handlePointsInteraction(
       const { customId } = interaction;
 
       logger.emit({
-        event: "points_button",
-        data: {
-          context: { id: customId }
-        }
+        scope: "points.handler",
+        event: "button",
+        traceId,
+        context: { id: customId },
       });
 
-      // STATIC BUTTONS
       const handler = BUTTON_HANDLERS[customId];
       if (handler) {
         await handler(interaction);
         return true;
       }
 
-      // CATEGORY CLICK
       if (customId.startsWith("points_management_category_")) {
         await PB.pointsManagement.handlePointsManagement(interaction);
         return true;
       }
 
-      // CREATE WEEK
       if (Utils.isCreateWeek(customId)) {
         await PB.pointsCreate.handleCreateWeek(interaction);
         return true;
       }
 
-      // WEEK CLICK
       if (Utils.isWeek(customId)) {
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
 
         if (!module) {
           logger.emit({
-            event: "points_unknown_category",
+            scope: "points.handler",
+            event: "unknown_category",
+            traceId,
             level: "warn",
-            data: {
-              context: { category }
-            }
+            context: { category },
           });
 
           await safeReply(interaction, {
@@ -115,17 +114,16 @@ export async function handlePointsInteraction(
         return true;
       }
 
-      // ACTIONS
       if (Utils.isAction(customId)) {
         const parsed = Utils.parseActionId(customId);
 
         if (!parsed) {
           logger.emit({
-            event: "points_invalid_action",
+            scope: "points.handler",
+            event: "invalid_action",
+            traceId,
             level: "warn",
-            data: {
-              context: { customId }
-            }
+            context: { customId },
           });
 
           await safeReply(interaction, {
@@ -145,11 +143,11 @@ export async function handlePointsInteraction(
 
         if (!module) {
           logger.emit({
-            event: "points_unknown_category",
+            scope: "points.handler",
+            event: "unknown_category",
+            traceId,
             level: "warn",
-            data: {
-              context: { category }
-            }
+            context: { category },
           });
 
           await safeReply(interaction, {
@@ -159,18 +157,19 @@ export async function handlePointsInteraction(
           return true;
         }
 
+        // 🔥 IMPORTANT: delegate to buttons layer
         switch (action) {
           case "add":
-            await PS.handleAddPoints(interaction);
+            await module.handleAdd(interaction);
             break;
           case "remove":
-            await PS.handleRemovePoints(interaction);
+            await module.handleRemove(interaction);
             break;
           case "list":
-            await PS.handlePointsList(interaction);
+            await module.handleList(interaction);
             break;
           case "compare":
-            await PS.handleCompareWeeks(interaction);
+            await module.handleCompare(interaction);
             break;
         }
 
@@ -187,10 +186,10 @@ export async function handlePointsInteraction(
       const { customId } = interaction;
 
       logger.emit({
-        event: "points_modal",
-        data: {
-          context: { id: customId }
-        }
+        scope: "points.handler",
+        event: "modal",
+        traceId,
+        context: { id: customId },
       });
 
       if (customId.startsWith("points_create_modal_")) {
@@ -204,11 +203,11 @@ export async function handlePointsInteraction(
     return false;
   } catch (error) {
     logger.emit({
-      event: "points_error",
+      scope: "points.handler",
+      event: "error",
+      traceId,
       level: "error",
-      data: {
-        error
-      }
+      error,
     });
 
     if (interaction.isRepliable()) {
