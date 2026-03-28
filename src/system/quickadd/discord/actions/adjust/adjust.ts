@@ -1,6 +1,22 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/adjust/adjust.ts
+// 📁 src/system/quickadd/discord/actions/adjust/adjust.ts
 // =====================================
+
+/**
+ * 🧠 ROLE:
+ * Adjusts a single entry in buffer by ID.
+ *
+ * Responsible for:
+ * - updating nickname/value
+ * - revalidating ALL entries
+ * - saving learning (adjusted nicknames)
+ *
+ * ❗ RULES:
+ * - id-based modification ONLY
+ * - revalidation REQUIRED
+ * - owner-only
+ * - logger.emit ONLY
+ */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
@@ -15,7 +31,7 @@ import {
 
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { logger } from "../../../core/logger/log";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY (EDIT ONLY)
@@ -49,7 +65,7 @@ export async function handleAdjust(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 REQUIRED (lifecycle fix)
+  // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ flags: 64 });
   }
@@ -82,6 +98,7 @@ export async function handleAdjust(
       context: {
         guildId,
         userId,
+        hasSession: !!session,
         reason: contextError ?? ownerError ?? "no_session",
       },
       stats: {
@@ -107,7 +124,7 @@ export async function handleAdjust(
       scope: "quickadd.adjust",
       event: "adjust_start",
       traceId,
-      input: {
+      context: {
         sessionId,
         guildId,
         id,
@@ -159,6 +176,30 @@ export async function handleAdjust(
       traceId
     );
 
+    // 🔥 LENGTH GUARD (IMPORTANT)
+    if (revalidated.length !== newEntries.length) {
+      logger.emit({
+        scope: "quickadd.adjust",
+        event: "revalidation_length_mismatch",
+        traceId,
+        level: "warn",
+        context: {
+          sessionId,
+          before: newEntries.length,
+          after: revalidated.length,
+        },
+        stats: {
+          adjust_revalidation_mismatch: 1,
+        },
+      });
+
+      await safeReply(
+        interaction,
+        "❌ Internal error (revalidation mismatch)"
+      );
+      return;
+    }
+
     const merged = revalidated.map((v, i) => ({
       ...newEntries[i],
       status: v.status,
@@ -179,7 +220,7 @@ export async function handleAdjust(
         sessionId,
         id,
       },
-      result: {
+      meta: {
         before: target,
         after: updated,
       },
