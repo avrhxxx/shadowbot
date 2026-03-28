@@ -3,7 +3,7 @@
 // =====================================
 
 import { Message } from "discord.js";
-import { log } from "../../../core/logger/log";
+import { logger } from "../../../core/logger/log";
 
 import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
@@ -25,7 +25,7 @@ import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
  * ❗ RULES:
  * - NO ID generation
  * - MUST use provided traceId
- * - log.emit ONLY (no scoped logger)
+ * - logger.emit ONLY
  * - pipeline = orchestrator (NO business logic)
  *
  * FLOW:
@@ -47,10 +47,11 @@ export async function processImageInput(
   // 📥 CONTEXT CHECK
   // =====================================
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.pipeline",
     event: "pipeline_context_check",
     traceId,
-    data: {
+    context: {
       sessionId: session?.sessionId,
       guildId,
       userId,
@@ -58,11 +59,12 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.pipeline",
       event: "pipeline_invalid_context",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         hasSession: !!session,
@@ -72,10 +74,11 @@ export async function processImageInput(
   }
 
   try {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.pipeline",
       event: "pipeline_start",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         type: session.type,
       },
@@ -88,11 +91,12 @@ export async function processImageInput(
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.pipeline",
         event: "pipeline_ocr_empty",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: session.sessionId,
         },
       });
@@ -154,14 +158,15 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        log.emit({
+        logger.emit({
+          scope: "quickadd.pipeline",
           event: "pipeline_source_error",
           traceId,
           level: "warn",
-          data: {
+          context: {
             source: source?.source,
-            error: err,
           },
+          error: err,
         });
       }
     }
@@ -171,11 +176,12 @@ export async function processImageInput(
     // =====================================
 
     if (!results.length) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.pipeline",
         event: "pipeline_no_results",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: session.sessionId,
         },
       });
@@ -213,25 +219,27 @@ export async function processImageInput(
 
     const duration = Date.now() - startedAt;
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.pipeline",
       event: "pipeline_done",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         total: best.entries.length,
         valid: best.validCount,
+      },
+      stats: {
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.pipeline",
       event: "pipeline_failed",
       traceId,
       level: "error",
-      data: {
-        error: err,
-      },
+      error: err,
     });
   }
 }
