@@ -3,16 +3,34 @@
 // =====================================
 
 export type LogLevel = "info" | "warn" | "error";
+
 export type TraceType = "user" | "system";
 
-export type LogInput = {
+// =====================================
+// 🔹 CONTEXT
+// =====================================
+
+export type TraceContext = {
+  traceId: string;
+  type?: TraceType;
+};
+
+// =====================================
+// 🔹 INPUT (PUBLIC)
+// =====================================
+
+export type LoggerEmitOptions = {
   event: string;
-  traceId?: string;
+  traceId?: string; // zostawiamy dla prostoty API
   data?: unknown;
 
   level?: LogLevel;
   type?: TraceType;
 };
+
+// =====================================
+// 🔹 INTERNAL (ENGINE)
+// =====================================
 
 export type InternalLog = {
   time: string;
@@ -21,4 +39,12 @@ export type InternalLog = {
   level: LogLevel;
   type: TraceType;
   data?: unknown;
+};
+
+// =====================================
+// 🔹 DEFINITIONS (BUILDER)
+// =====================================
+
+export type LogDefinitionTree = {
+  [key: string]: string | LogDefinitionTree;
 };
