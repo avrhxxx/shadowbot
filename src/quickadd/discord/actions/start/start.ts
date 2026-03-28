@@ -10,7 +10,7 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { log } from "../../../logger";
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🔹 TYPE GUARD
@@ -33,10 +33,11 @@ export async function handleStart(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const startedAt = Date.now();
+  const timerId = `start-${traceId}`;
+  timing.start(timerId);
 
-  // 🔥 KLUCZOWE → unikamy Unknown interaction
-  await interaction.deferReply({ flags: 64 }); // ephemeral
+  // 🔥 unikamy Unknown interaction
+  await interaction.deferReply({ flags: 64 });
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -58,13 +59,25 @@ export async function handleStart(
   let threadId: string | null = null;
 
   try {
+    metrics.increment("start_started");
+
+    log.emit({
+      event: "start_start",
+      traceId,
+      data: {
+        guildId,
+        userId,
+        type,
+      },
+    });
+
     // =====================================
-    // 🧠 START SESSION FIRST (🔥 FIX: userId)
+    // 🧠 START SESSION
     // =====================================
     const session = QuickAddSession.start(
       {
         guildId,
-        userId, // ✅ FIX
+        userId,
         ownerId: userId,
         threadId: null,
         type,
@@ -91,7 +104,7 @@ export async function handleStart(
     }
 
     // =====================================
-    // 🧵 CREATE THREAD (🔥 BEZ SPAMU NA KANALE)
+    // 🧵 THREAD (NO SPAM)
     // =====================================
     const thread = await interaction.channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
@@ -121,11 +134,15 @@ export async function handleStart(
     });
 
     // =====================================
-    // 📤 RESPONSE (EPHEMERAL)
+    // 📤 RESPONSE
     // =====================================
     await interaction.editReply(
       `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
     );
+
+    const duration = timing.end(timerId);
+
+    metrics.increment("start_success");
 
     log.emit({
       event: "start_done",
@@ -133,11 +150,15 @@ export async function handleStart(
       data: {
         sessionId: session.sessionId,
         threadId,
-        durationMs: Date.now() - startedAt,
+        durationMs: duration,
       },
     });
 
   } catch (err) {
+    const duration = timing.end(timerId);
+
+    metrics.increment("start_error");
+
     log.emit({
       event: "start_failed",
       traceId,
@@ -145,13 +166,14 @@ export async function handleStart(
       data: {
         error: err,
         guildId,
+        durationMs: duration,
       },
     });
 
     // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, userId, traceId);
 
-    // ❗ CLEANUP THREAD (SAFE)
+    // ❗ CLEANUP THREAD
     if (threadId) {
       try {
         const thread = await interaction.client.channels.fetch(
