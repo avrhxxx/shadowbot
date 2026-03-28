@@ -15,6 +15,25 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -27,6 +46,11 @@ export async function handleEnd(
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
+
+  // 🔥 REQUIRED (lifecycle fix)
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
 
   // =====================================
   // 📥 ENTRY LOG
@@ -42,7 +66,7 @@ export async function handleEnd(
   });
 
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
@@ -61,7 +85,21 @@ export async function handleEnd(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.editReply(
+    log.emit({
+      event: "end_guard_failed",
+      traceId,
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        hasSession: !!session,
+        contextError,
+        ownerError,
+      },
+    });
+
+    await safeReply(
+      interaction,
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -100,7 +138,8 @@ export async function handleEnd(
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "🛑 QuickAdd session ended"
     );
 
@@ -165,12 +204,14 @@ export async function handleEnd(
       traceId,
       level: "error",
       data: {
+        sessionId,
         error: err,
         durationMs: duration,
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to end session"
     );
   }
