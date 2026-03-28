@@ -71,6 +71,7 @@ export async function handleConfirmAutocomplete(
           userId,
           hasSession: !!session,
           stage: session?.stage,
+          reason: !session ? "no_session" : "invalid_stage",
         },
         stats: {
           confirm_autocomplete_blocked: 1,
