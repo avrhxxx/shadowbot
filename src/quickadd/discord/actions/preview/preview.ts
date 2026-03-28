@@ -30,6 +30,25 @@ import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -43,11 +62,29 @@ export async function handlePreview(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // 🔥 REQUIRED (lifecycle fix)
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
+
+  // =====================================
+  // 📥 ENTRY LOG
+  // =====================================
+
+  log.emit({
+    event: "preview_requested_entry",
+    traceId,
+    data: {
+      guildId,
+      userId,
+    },
+  });
+
   // =====================================
   // ❌ GUILD GUARD
   // =====================================
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
@@ -60,7 +97,20 @@ export async function handlePreview(
   );
 
   if (contextError || !session) {
-    await interaction.editReply(
+    log.emit({
+      event: "preview_guard_failed",
+      traceId,
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        hasSession: !!session,
+        contextError,
+      },
+    });
+
+    await safeReply(
+      interaction,
       contextError ?? "❌ Session not found"
     );
     return;
@@ -72,7 +122,7 @@ export async function handlePreview(
     metrics.increment("preview_requested");
 
     // =====================================
-    // 📥 LOAD BUFFER (🔥 FIX)
+    // 📥 LOAD BUFFER
     // =====================================
     const entries = QuickAddBuffer.getEntries(
       sessionId,
@@ -93,8 +143,6 @@ export async function handlePreview(
     // ⚠️ EMPTY STATE
     // =====================================
     if (!entries.length) {
-      await interaction.editReply("⚠️ Buffer is empty");
-
       metrics.increment("preview_empty");
 
       log.emit({
@@ -105,6 +153,7 @@ export async function handlePreview(
         },
       });
 
+      await safeReply(interaction, "⚠️ Buffer is empty");
       return;
     }
 
@@ -116,7 +165,7 @@ export async function handlePreview(
     // =====================================
     // 📤 RESPONSE
     // =====================================
-    await interaction.editReply(output);
+    await safeReply(interaction, output);
 
     const duration = timing.end(timerId);
 
@@ -147,7 +196,8 @@ export async function handlePreview(
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to generate preview"
     );
   }
