@@ -1,3 +1,4 @@
+
 // =====================================
 // 📁 src/quickadd/discord/actions/confirm/confirm.ts
 // =====================================
@@ -64,7 +65,6 @@ export async function handleConfirm(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 REQUIRED
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ flags: 64 });
   }
@@ -89,6 +89,8 @@ export async function handleConfirm(
   );
 
   if (contextError || ownerError || !session) {
+    metrics.increment("confirm_blocked");
+
     log.emit({
       event: "confirm_guard_failed",
       traceId,
@@ -132,6 +134,8 @@ export async function handleConfirm(
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
+      metrics.increment("confirm_empty");
+
       log.emit({
         event: "confirm_empty",
         traceId,
@@ -202,6 +206,8 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
+      metrics.increment("confirm_blocked_stage");
+
       log.emit({
         event: "confirm_blocked_stage",
         traceId,
@@ -224,6 +230,8 @@ export async function handleConfirm(
     const target = interaction.options.getString("target");
 
     if (!target) {
+      metrics.increment("confirm_blocked_missing_target");
+
       log.emit({
         event: "confirm_blocked_missing_target",
         traceId,
