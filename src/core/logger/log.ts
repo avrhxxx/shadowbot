@@ -15,11 +15,23 @@ export type LogPayload = {
 
   level?: LogLevel;
 
+  // 🔹 STANDARD FIELDS
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
   stats?: Record<string, number>;
   meta?: Record<string, unknown>;
+
+  // 🔥 NEW: OBSERVABILITY
+  metrics?: {
+    increment?: string;
+    value?: number;
+  };
+
+  timing?: {
+    label: string;
+    durationMs: number;
+  };
 
   error?: unknown;
 };
@@ -64,6 +76,8 @@ export const logger = {
       result,
       stats,
       meta,
+      metrics,
+      timing,
       error,
     } = payload;
 
@@ -79,6 +93,11 @@ export const logger = {
         ...(result && { result }),
         ...(stats && { stats }),
         ...(meta && { meta }),
+
+        // 🔥 OBSERVABILITY
+        ...(metrics && { metrics }),
+        ...(timing && { timing }),
+
         ...(normalizedError && { error: normalizedError }),
       }
     );
