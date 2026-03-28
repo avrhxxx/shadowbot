@@ -3,7 +3,7 @@
 // =====================================
 
 import Tesseract from "tesseract.js";
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 import { OCRToken } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
 
@@ -27,11 +27,11 @@ async function runWithPSM(
   psm: number,
   label: string
 ): Promise<OCRRunResult> {
-  log.emit({
+  logger.emit({
     event: "ocr_psm_start",
     traceId,
     type: "system",
-    data: { psm, label },
+    context: { psm, label },
   });
 
   const result = await Tesseract.recognize(
@@ -57,14 +57,14 @@ async function runWithPSM(
     confidence: w.confidence,
   }));
 
-  log.emit({
+  logger.emit({
     event: "ocr_psm_done",
     traceId,
     type: "system",
-    data: {
+    context: {
       label,
-      lines: lines.length,
-      tokens: tokens.length,
+      linesCount: lines.length,
+      tokensCount: tokens.length,
     },
   });
 
@@ -79,7 +79,7 @@ async function runVision(
   buffer: Buffer,
   traceId: string
 ): Promise<OCRRunResult> {
-  log.emit({
+  logger.emit({
     event: "vision_start",
     traceId,
     type: "system",
@@ -104,24 +104,24 @@ async function runVision(
       })
     );
 
-    log.emit({
+    logger.emit({
       event: "vision_done",
       traceId,
       type: "system",
-      data: {
-        lines: lines.length,
-        tokens: tokens.length,
+      context: {
+        linesCount: lines.length,
+        tokensCount: tokens.length,
       },
     });
 
     return { text, lines, tokens };
   } catch (error) {
-    log.emit({
+    logger.emit({
       event: "vision_failed",
       traceId,
       type: "system",
       level: "warn",
-      data: { error },
+      error,
     });
 
     return { text: "", lines: [], tokens: [] };
@@ -143,7 +143,7 @@ export const OCREngine = {
     runWithPSM(buffer, traceId, 4, "BOX"),
 
   async hocr(buffer: Buffer, traceId: string) {
-    log.emit({
+    logger.emit({
       event: "hocr_start",
       traceId,
       type: "system",
@@ -160,11 +160,11 @@ export const OCREngine = {
 
     const hocr = result.data.hocr || "";
 
-    log.emit({
+    logger.emit({
       event: "hocr_done",
       traceId,
       type: "system",
-      data: { length: hocr.length },
+      context: { hocrLength: hocr.length },
     });
 
     return { hocr };
