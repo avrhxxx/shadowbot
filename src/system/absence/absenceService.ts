@@ -1,8 +1,10 @@
-// src/absencePanel/absenceService.ts
+// =====================================
+// 📁 src/system/absence/absenceService.ts
+// =====================================
 
-// 🔥 [IMPORT FIX - TOP]
 import { SheetRepository } from "../google/SheetRepository";
-import crypto from "crypto"; // 🔥 [DODANE - uuid safety]
+import crypto from "crypto";
+import { logger } from "../../core/logger/log";
 
 // =============================
 // TYPES
@@ -65,6 +67,16 @@ export async function createAbsence(
   );
 
   if (existing) {
+    logger.emit({
+      scope: "absence.service",
+      event: "create_duplicate",
+      level: "warn",
+      context: {
+        guildId: data.guildId,
+        player: data.player,
+      },
+    });
+
     throw new Error(
       `Player ${data.player} is already on absence list.`
     );
@@ -72,12 +84,22 @@ export async function createAbsence(
 
   const newAbsence: AbsenceObject = {
     ...data,
-    id: data.id ?? crypto.randomUUID(), // 🔥 [FIX - ID AUTO GENERATION]
-    year: data.year ?? new Date().getFullYear(), // 🔥 [SAFE DEFAULT]
-    createdAt: data.createdAt ?? Date.now(), // 🔥 [SAFE DEFAULT]
+    id: data.id ?? crypto.randomUUID(),
+    year: data.year ?? new Date().getFullYear(),
+    createdAt: data.createdAt ?? Date.now(),
   };
 
   await absenceRepo.create(newAbsence);
+
+  logger.emit({
+    scope: "absence.service",
+    event: "created",
+    context: {
+      guildId: data.guildId,
+      player: data.player,
+      absenceId: newAbsence.id,
+    },
+  });
 
   return newAbsence;
 }
@@ -95,9 +117,28 @@ export async function removeAbsence(
     (a) => a.player.toLowerCase() === player.toLowerCase()
   );
 
-  if (!target) return null;
+  if (!target) {
+    logger.emit({
+      scope: "absence.service",
+      event: "remove_not_found",
+      level: "warn",
+      context: { guildId, player },
+    });
+
+    return null;
+  }
 
   await absenceRepo.deleteById(target.id);
+
+  logger.emit({
+    scope: "absence.service",
+    event: "removed",
+    context: {
+      guildId,
+      player,
+      absenceId: target.id,
+    },
+  });
 
   return target;
 }
@@ -110,7 +151,6 @@ export async function getAbsenceConfig(
 ): Promise<AbsenceConfig> {
   const rows = await configRepo.findAll({ guildId });
 
-  // 🔥 [FIX - zawsze zwracaj obiekt z guildId]
   return rows[0] || { guildId };
 }
 
@@ -119,6 +159,12 @@ export async function setNotificationChannel(
   channelId: string
 ) {
   await setConfig(guildId, "notificationChannel", channelId);
+
+  logger.emit({
+    scope: "absence.service",
+    event: "set_notification_channel",
+    context: { guildId, channelId },
+  });
 }
 
 export async function setAbsenceEmbedId(
@@ -126,6 +172,12 @@ export async function setAbsenceEmbedId(
   messageId: string
 ) {
   await setConfig(guildId, "absenceEmbedId", messageId);
+
+  logger.emit({
+    scope: "absence.service",
+    event: "set_embed_id",
+    context: { guildId, messageId },
+  });
 }
 
 export async function setConfig(
@@ -137,14 +189,27 @@ export async function setConfig(
 
   if (!existing.length) {
     await configRepo.create({
-      id: crypto.randomUUID(), // 🔥 [FIX - ID REQUIRED BY REPO]
+      id: crypto.randomUUID(),
       guildId,
       [key]: value,
     });
+
+    logger.emit({
+      scope: "absence.service",
+      event: "config_created",
+      context: { guildId, key },
+    });
+
     return;
   }
 
   await configRepo.updateById(existing[0].id!, {
     [key]: value,
+  });
+
+  logger.emit({
+    scope: "absence.service",
+    event: "config_updated",
+    context: { guildId, key },
   });
 }
