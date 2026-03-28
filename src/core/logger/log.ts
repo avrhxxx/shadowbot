@@ -8,69 +8,99 @@
 
 type LogLevel = "info" | "warn" | "error";
 
-export type LogError = {
-  message: string;
-  stack?: string;
-  [key: string]: unknown;
-};
-
-export type LogMeta = Record<string, unknown>;
-export type LogData = Record<string, unknown>;
-
-export type EmitPayload = {
+export type LogPayload = {
+  scope?: string;
+  event: string;
   traceId?: string;
+
   level?: LogLevel;
-  data?: LogData;
-  meta?: LogMeta;
-  error?: LogError;
+
+  context?: Record<string, unknown>;
+  input?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  stats?: Record<string, number>;
+  meta?: Record<string, unknown>;
+
+  error?: {
+    message: string;
+    stack?: string;
+    [key: string]: unknown;
+  } | unknown;
 };
 
 // =====================================
-// 🔧 INTERNAL FORMATTER
+// 🔧 HELPERS
 // =====================================
 
-function formatLog(
-  event: string,
-  payload?: EmitPayload
-) {
-  const time = new Date().toISOString();
+function normalizeError(err: unknown): LogPayload["error"] {
+  if (!err) return undefined;
 
-  const level = payload?.level ?? "info";
-  const traceId = payload?.traceId ?? "no-trace";
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
+  }
 
   return {
-    time,
-    level,
-    event,
-    traceId,
-    data: payload?.data,
-    meta: payload?.meta,
-    error: payload?.error,
+    message: String(err),
   };
 }
 
 // =====================================
-// 🚀 LOGGER
+// 🔥 LOGGER
 // =====================================
 
 export const logger = {
-  emit(event: string, payload?: EmitPayload) {
-    try {
-      const logEntry = formatLog(event, payload);
-
-      // 🔹 Możesz tu łatwo podmienić na np. pino / winston / sentry
+  emit(payload: LogPayload | string) {
+    // 🔹 SHORT VERSION SUPPORT
+    if (typeof payload === "string") {
       console.log(
-        `${logEntry.time} | ${logEntry.traceId} | ${logEntry.level.toUpperCase()} | ${logEntry.event}`,
-        {
-          data: logEntry.data,
-          meta: logEntry.meta,
-          error: logEntry.error,
-        }
+        `${new Date().toISOString()} | INFO | ${payload}`
       );
-
-    } catch (err) {
-      // 🔥 LOGGER NEVER FAILS
-      console.error("LOGGER_FAILURE", err);
+      return;
     }
+
+    const {
+      scope,
+      event,
+      traceId,
+      level = "info",
+      context,
+      input,
+      result,
+      stats,
+      meta,
+      error,
+    } = payload;
+
+    const time = new Date().toISOString();
+
+    const normalizedError = normalizeError(error);
+
+    console.log(
+      `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${event}`,
+      {
+        ...(context && { context }),
+        ...(input && { input }),
+        ...(result && { result }),
+        ...(stats && { stats }),
+        ...(meta && { meta }),
+        ...(normalizedError && { error: normalizedError }),
+      }
+    );
+  },
+
+  // 🔹 SHORTCUTS
+  info(event: string, data?: Partial<LogPayload>) {
+    this.emit({ ...data, event, level: "info" });
+  },
+
+  warn(event: string, data?: Partial<LogPayload>) {
+    this.emit({ ...data, event, level: "warn" });
+  },
+
+  error(event: string, data?: Partial<LogPayload>) {
+    this.emit({ ...data, event, level: "error" });
   },
 };
