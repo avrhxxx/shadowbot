@@ -63,39 +63,21 @@ export const IDS = {
 };
 
 // =====================================
-// HANDLERS
-// =====================================
-
-const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
-  [IDS.BUTTONS.CREATE]: EB.handleCreate,
-  [IDS.BUTTONS.LIST]: EB.handleCategoryClick,
-  [IDS.BUTTONS.CANCEL]: EB.handleCancel,
-  [IDS.BUTTONS.CANCEL_ABORT]: EB.handleCancelAbort,
-  [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
-  [IDS.BUTTONS.HELP]: EB.handleHelp,
-  [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
-  [IDS.BUTTONS.SHOW_ALL]: EB.handleShowAllEvents,
-  [IDS.BUTTONS.SHOW_ALL_LISTS]: EB.handleShowAllLists,
-  [IDS.BUTTONS.DOWNLOAD_ALL]: EB.handleDownload,
-  [IDS.BUTTONS.COMPARE_ALL]: EB.handleCompareAll,
-};
-
-const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
-  [IDS.SELECTS.MANUAL_REMINDER]: EB.handleManualReminderSelect,
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: EB.handleSettingsSelect,
-  [IDS.SELECTS.SETTINGS_DOWNLOAD]: EB.handleSettingsSelect,
-  [IDS.SELECTS.CANCEL_SELECT]: EB.handleCancelSelect,
-  [IDS.SELECTS.CREATE_TYPE_SELECT]: EB.handleTypeSelect,
-};
-
-// =====================================
 // MODALS
 // =====================================
 
 async function handleModal(
-  interaction: ModalSubmitInteraction<CacheType>
+  interaction: ModalSubmitInteraction<CacheType>,
+  traceId: string
 ): Promise<boolean> {
   const { customId } = interaction;
+
+  logger.emit({
+    scope: "events.handler",
+    event: "modal_received",
+    traceId,
+    context: { customId },
+  });
 
   if (customId === IDS.MODALS.CREATE || customId.startsWith(`${IDS.MODALS.CREATE}_`)) {
     await EB.handleCreateSubmit(interaction);
@@ -125,7 +107,8 @@ async function handleModal(
 // =====================================
 
 export async function handleEventInteraction(
-  interaction: Interaction<CacheType>
+  interaction: Interaction<CacheType>,
+  traceId: string
 ): Promise<boolean> {
   try {
     if (interaction.isButton()) {
@@ -134,8 +117,10 @@ export async function handleEventInteraction(
       const handler = BUTTON_HANDLERS[id];
       if (handler) {
         logger.emit({
-          event: "event_button",
-          data: { id },
+          scope: "events.handler",
+          event: "button",
+          traceId,
+          context: { id },
         });
 
         await handler(interaction);
@@ -194,35 +179,38 @@ export async function handleEventInteraction(
     }
 
     if (interaction.isStringSelectMenu()) {
-      const handler = SELECT_HANDLERS[interaction.customId];
+      const id = interaction.customId;
+
+      const handler = SELECT_HANDLERS[id];
 
       if (handler) {
         logger.emit({
-          event: "event_select",
-          data: { id: interaction.customId },
+          scope: "events.handler",
+          event: "select",
+          traceId,
+          context: { id },
         });
 
         return await handler(interaction);
       }
 
-      if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
+      if (id.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
       }
     }
 
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction);
+      return await handleModal(interaction, traceId);
     }
 
     return false;
-  } catch (error: any) {
+  } catch (error) {
     logger.emit({
-      event: "event_error",
+      scope: "events.handler",
+      event: "error",
+      traceId,
       level: "error",
-      data: {
-        message: error?.message,
-        stack: error?.stack,
-      },
+      error,
     });
 
     if (interaction.isRepliable()) {
