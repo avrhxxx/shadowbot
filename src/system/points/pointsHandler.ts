@@ -14,92 +14,150 @@ export const IDS = {
   ACTIONS: ["add", "remove", "list", "compare"] as const
 };
 
-type ActionType = typeof IDS.ACTIONS[number]; // <-- Poprawione
+type ActionType = typeof IDS.ACTIONS[number];
 
 // -----------------------------
 // GLOBAL BUTTON HANDLERS
 // -----------------------------
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<void>> = {
   [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) => PB.pointsManagement.handlePointsManagementMain(i),
-  [IDS.BUTTONS.GUIDE]: async (i) => { await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true }); },
-  [IDS.BUTTONS.SETTINGS]: async (i) => { await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true }); },
+  [IDS.BUTTONS.GUIDE]: async (i) => {
+    await i.reply({ content: "📖 Guide not implemented yet.", ephemeral: true });
+  },
+  [IDS.BUTTONS.SETTINGS]: async (i) => {
+    await i.reply({ content: "⚙️ Settings not implemented yet.", ephemeral: true });
+  },
   [IDS.BUTTONS.LIST_WEEKS]: (i) => PB.pointsListWeeks.handleListWeeks(i)
 };
 
 // -----------------------------
-// GLOBAL INTERACTION HANDLER
+// GLOBAL INTERACTION HANDLER (ROUTER READY)
 // -----------------------------
-export async function handlePointsInteraction(interaction: Interaction<CacheType>) {
+export async function handlePointsInteraction(
+  interaction: Interaction<CacheType>
+): Promise<boolean> {
   try {
+    // =============================
+    // 🔘 BUTTONS
+    // =============================
     if (interaction.isButton()) {
       const { customId } = interaction;
 
-      // Global button handlers
-      if (BUTTON_HANDLERS[customId]) {
-        await BUTTON_HANDLERS[customId](interaction);
-        return;
+      // -----------------------------
+      // STATIC BUTTONS
+      // -----------------------------
+      const handler = BUTTON_HANDLERS[customId];
+      if (handler) {
+        await handler(interaction);
+        return true;
       }
 
-      // Kliknięcie kategorii w Points Management
+      // -----------------------------
+      // CATEGORY CLICK
+      // -----------------------------
       if (customId.startsWith("points_management_category_")) {
         await PB.pointsManagement.handlePointsManagement(interaction);
-        return;
+        return true;
       }
 
-      // Create Week
+      // -----------------------------
+      // CREATE WEEK
+      // -----------------------------
       if (Utils.isCreateWeek(customId)) {
         await PB.pointsCreate.handleCreateWeek(interaction);
-        return;
+        return true;
       }
 
-      // Kliknięcie tygodnia
+      // -----------------------------
+      // WEEK CLICK
+      // -----------------------------
       if (Utils.isWeek(customId)) {
         const { category, week } = Utils.parseWeekId(customId);
         const module = getCategoryModule(category);
-        if (module) {
-          // deferUpdate jest w module handleWeekClick
-          await module.handleWeekClick(interaction, week);
-        } else {
-          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
+
+        if (!module) {
+          await safeReply(interaction, {
+            content: `⚠️ Unknown category: ${category}`,
+            ephemeral: true
+          });
+          return true;
         }
-        return;
+
+        await module.handleWeekClick(interaction, week);
+        return true;
       }
 
-      // Add / Remove / List / Compare
+      // -----------------------------
+      // ACTIONS (ADD / REMOVE / LIST / COMPARE)
+      // -----------------------------
       if (Utils.isAction(customId)) {
-        const { action, category, week } = Utils.parseActionId(customId) as { action: ActionType; category: string; week: string };
+        const { action, category } = Utils.parseActionId(customId) as {
+          action: ActionType;
+          category: string;
+          week: string;
+        };
+
         const module = getCategoryModule(category);
+
         if (!module) {
-          await safeReply(interaction, { content: `⚠️ Unknown category: ${category}`, ephemeral: true });
-          return;
+          await safeReply(interaction, {
+            content: `⚠️ Unknown category: ${category}`,
+            ephemeral: true
+          });
+          return true;
         }
 
         switch (action) {
-          case "add": await PS.handleAddPoints(interaction); break;
-          case "remove": await PS.handleRemovePoints(interaction); break;
-          case "list": await PS.handlePointsList(interaction); break;
-          case "compare": await PS.handleCompareWeeks(interaction); break;
+          case "add":
+            await PS.handleAddPoints(interaction);
+            break;
+          case "remove":
+            await PS.handleRemovePoints(interaction);
+            break;
+          case "list":
+            await PS.handlePointsList(interaction);
+            break;
+          case "compare":
+            await PS.handleCompareWeeks(interaction);
+            break;
         }
-        return;
+
+        return true;
       }
+
+      return false;
     }
 
-    // Modal Submit
+    // =============================
+    // 🧾 MODALS
+    // =============================
     if (interaction.isModalSubmit()) {
       const { customId } = interaction;
+
       if (customId.startsWith("points_create_modal_")) {
         await PB.pointsCreate.handleCreateWeekSubmit(interaction);
-        return;
+        return true;
       }
+
+      return false;
     }
+
+    return false;
 
   } catch (error) {
     console.error("Error handling points interaction:", error);
+
     if (interaction.isRepliable()) {
       const payload = { content: "❌ An error occurred.", ephemeral: true };
-      if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
-      else await interaction.reply(payload);
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(payload);
+      } else {
+        await interaction.reply(payload);
+      }
     }
+
+    return true; // traktujemy jako handled
   }
 }
 
@@ -110,7 +168,9 @@ function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
 ) {
-  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  if (interaction.replied || interaction.deferred) {
+    return interaction.editReply(payload);
+  }
   return interaction.reply(payload);
 }
 
@@ -119,8 +179,11 @@ function safeReply(
 // -----------------------------
 function getCategoryModule(category: string) {
   switch (category) {
-    case "donations": return PB.pointsDonations;
-    case "duel": return PB.pointsDuel;
-    default: return null;
+    case "donations":
+      return PB.pointsDonations;
+    case "duel":
+      return PB.pointsDuel;
+    default:
+      return null;
   }
 }
