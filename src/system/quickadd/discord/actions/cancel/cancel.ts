@@ -12,7 +12,7 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -27,7 +27,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 })
+        .reply({ content, ephemeral: true })
         .catch(() => null);
     }
   }
@@ -41,15 +41,14 @@ export async function handleCancel(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `cancel-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   // 🔥 lifecycle fix (CRITICAL)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
   }
 
   if (!guildId) {
@@ -72,18 +71,20 @@ export async function handleCancel(
   );
 
   if (contextError || ownerError || !session) {
-    metrics.increment("cancel_blocked");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.cancel",
       event: "cancel_guard_failed",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         hasSession: !!session,
         contextError,
         ownerError,
+      },
+      stats: {
+        cancel_blocked: 1,
       },
     });
 
@@ -97,15 +98,17 @@ export async function handleCancel(
   const sessionId = session.sessionId;
 
   try {
-    metrics.increment("cancel_started");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.cancel",
       event: "cancel_start",
       traceId,
-      data: {
+      context: {
         sessionId,
         guildId,
         userId,
+      },
+      stats: {
+        cancel_started: 1,
       },
     });
 
@@ -114,10 +117,11 @@ export async function handleCancel(
     // =====================================
     QuickAddBuffer.clear(sessionId, traceId);
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.cancel",
       event: "cancel_buffer_cleared",
       traceId,
-      data: {
+      context: {
         sessionId,
       },
     });
@@ -127,33 +131,37 @@ export async function handleCancel(
       "🧹 Buffer cleared (session still active)"
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("cancel_success");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.cancel",
       event: "cancel_done",
       traceId,
-      data: {
+      context: {
         sessionId,
+      },
+      stats: {
+        cancel_success: 1,
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("cancel_error");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.cancel",
       event: "cancel_failed",
       traceId,
       level: "error",
-      data: {
+      context: {
         sessionId,
-        error: err,
+      },
+      stats: {
+        cancel_error: 1,
         durationMs: duration,
       },
+      error: err,
     });
 
     await safeReply(
