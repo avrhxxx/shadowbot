@@ -2,7 +2,7 @@
 // 📁 src/quickadd/core/QuickAddSession.ts
 // =====================================
 
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 import { createSessionId } from "./IdGenerator";
 import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 
@@ -61,14 +61,16 @@ export const QuickAddSession = {
     const existing = sessions.get(key);
 
     if (existing) {
-      log.emit({
-        event: "session_start_blocked",
+      logger.emit({
+        scope: "quickadd.session",
+        event: "start_blocked",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: existing.sessionId,
           userId: existing.userId,
         },
+        metrics: { increment: "session_start_blocked" },
       });
       return null;
     }
@@ -83,13 +85,15 @@ export const QuickAddSession = {
 
     sessions.set(key, session);
 
-    log.emit({
-      event: "session_started",
+    logger.emit({
+      scope: "quickadd.session",
+      event: "started",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         userId: session.userId,
       },
+      metrics: { increment: "session_started" },
     });
 
     return session;
@@ -109,11 +113,13 @@ export const QuickAddSession = {
     const session = sessions.get(key);
 
     if (!session) {
-      log.emit({
-        event: "session_setThread_missing",
+      logger.emit({
+        scope: "quickadd.session",
+        event: "set_thread_missing",
         traceId,
         level: "warn",
-        data: { guildId, userId },
+        context: { guildId, userId },
+        metrics: { increment: "session_set_thread_missing" },
       });
       return;
     }
@@ -125,10 +131,11 @@ export const QuickAddSession = {
 
     sessions.set(key, updated);
 
-    log.emit({
-      event: "session_thread_attached",
+    logger.emit({
+      scope: "quickadd.session",
+      event: "thread_attached",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         threadId,
       },
@@ -145,11 +152,13 @@ export const QuickAddSession = {
     const session = sessions.get(key);
 
     if (!session) {
-      log.emit({
-        event: "session_setStage_missing",
+      logger.emit({
+        scope: "quickadd.session",
+        event: "set_stage_missing",
         traceId,
         level: "warn",
-        data: { guildId, userId },
+        context: { guildId, userId },
+        metrics: { increment: "session_set_stage_missing" },
       });
       return;
     }
@@ -157,15 +166,17 @@ export const QuickAddSession = {
     const allowed = ALLOWED_TRANSITIONS[session.stage] || [];
 
     if (!allowed.includes(nextStage)) {
-      log.emit({
-        event: "session_invalid_transition",
+      logger.emit({
+        scope: "quickadd.session",
+        event: "invalid_transition",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: session.sessionId,
           from: session.stage,
           to: nextStage,
         },
+        metrics: { increment: "session_invalid_transition" },
       });
       return;
     }
@@ -177,10 +188,11 @@ export const QuickAddSession = {
 
     sessions.set(key, updated);
 
-    log.emit({
-      event: "session_stage_updated",
+    logger.emit({
+      scope: "quickadd.session",
+      event: "stage_updated",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         from: session.stage,
         to: nextStage,
@@ -194,13 +206,15 @@ export const QuickAddSession = {
 
     sessions.delete(key);
 
-    log.emit({
-      event: "session_ended",
+    logger.emit({
+      scope: "quickadd.session",
+      event: "ended",
       traceId,
-      data: {
+      context: {
         sessionId: session?.sessionId,
         userId,
       },
+      metrics: { increment: "session_ended" },
     });
   },
 };
