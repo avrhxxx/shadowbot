@@ -2,82 +2,142 @@
 // 📁 src/quickadd/logging/QuickAddLogDefinitions.ts
 // =====================================
 
+/**
+ * 🧾 ROLE:
+ * Single source of truth for ALL QuickAdd logs.
+ *
+ * ❗ RULES:
+ * - ONLY event names (no logic)
+ * - grouped by domain/layer
+ * - future-proof (easy to extend)
+ *
+ * ✅ USED BY:
+ * - QuickAddLogger (builder)
+ * - whole QuickAdd system
+ */
+
 export const QuickAddLogDefinitions = {
-  start: {
-    requested: "quickadd.start.requested",
-    start: "quickadd.start.start",
-    done: "quickadd.start.done",
-    failed: "quickadd.start.failed",
+  // =====================================
+  // 🚀 SESSION / COMMANDS
+  // =====================================
+
+  START: {
+    REQUESTED: "start_requested",
+    STARTED: "start_start",
+    DONE: "start_done",
+    FAILED: "start_failed",
   },
 
-  fix: {
-    requested: "quickadd.fix.requested",
-    start: "quickadd.fix.start",
-    done: "quickadd.fix.done",
-    failed: "quickadd.fix.failed",
-    mismatch: "quickadd.fix.revalidation_mismatch",
+  END: {
+    REQUESTED: "end_requested",
+    DONE: "end_done",
+    FAILED: "end_failed",
   },
 
-  preview: {
-    requested: "quickadd.preview.requested",
-    empty: "quickadd.preview.empty",
-    done: "quickadd.preview.done",
-    failed: "quickadd.preview.failed",
+  FIX: {
+    REQUESTED: "fix_requested",
+    STARTED: "fix_start",
+    DONE: "fix_done",
+    FAILED: "fix_failed",
+    REVALIDATION_MISMATCH: "fix_revalidation_mismatch",
   },
 
-  cancel: {
-    start: "quickadd.cancel.start",
-    done: "quickadd.cancel.done",
-    failed: "quickadd.cancel.failed",
-    guardFailed: "quickadd.cancel.guard_failed",
+  PREVIEW: {
+    REQUESTED: "preview_requested",
+    EMPTY: "preview_empty",
+    DONE: "preview_done",
+    FAILED: "preview_failed",
   },
 
-  confirm: {
-    start: "quickadd.confirm.start",
-    done: "quickadd.confirm.done",
-    failed: "quickadd.confirm.failed",
-    blockedInvalid: "quickadd.confirm.blocked_invalid",
-    blockedStage: "quickadd.confirm.blocked_stage",
-    missingTarget: "quickadd.confirm.missing_target",
-    empty: "quickadd.confirm.empty",
+  // =====================================
+  // 🧠 SESSION CORE
+  // =====================================
+
+  SESSION: {
+    CREATED: "session_created",
+    ENDED: "session_ended",
+    THREAD_ATTACHED: "session_thread_attached",
+    NOT_FOUND: "session_not_found",
   },
 
-  adjust: {
-    start: "quickadd.adjust.start",
-    done: "quickadd.adjust.done",
-    failed: "quickadd.adjust.failed",
-    blocked: "quickadd.adjust.blocked",
-    applied: "quickadd.adjust.applied",
+  // =====================================
+  // 🧵 THREAD
+  // =====================================
+
+  THREAD: {
+    CREATED: "thread_created",
+    DELETED: "thread_deleted",
+    DELETE_FAILED: "thread_delete_failed",
   },
 
-  end: {
-    requested: "quickadd.end.requested",
-    start: "quickadd.end.start",
-    done: "quickadd.end.done",
-    failed: "quickadd.end.failed",
-    threadDeleted: "quickadd.end.thread_deleted",
-    threadDeleteFailed: "quickadd.end.thread_delete_failed",
+  // =====================================
+  // 📦 BUFFER
+  // =====================================
+
+  BUFFER: {
+    LOADED: "buffer_loaded",
+    EMPTY: "buffer_empty",
+    CLEARED: "buffer_cleared",
+    REPLACED: "buffer_replaced",
   },
-};
 
+  // =====================================
+  // 🔍 OCR
+  // =====================================
 
+  OCR: {
+    STARTED: "ocr_started",
+    DONE: "ocr_done",
+    FAILED: "ocr_failed",
+  },
+
+  // =====================================
+  // 🧩 PARSER
+  // =====================================
+
+  PARSER: {
+    INPUT: "parser_input",
+    OUTPUT: "parser_output",
+    FAILED: "parser_failed",
+  },
+
+  // =====================================
+  // ✅ VALIDATION
+  // =====================================
+
+  VALIDATION: {
+    STARTED: "validation_started",
+    DONE: "validation_done",
+    FAILED: "validation_failed",
+    DUPLICATE: "validation_duplicate",
+  },
+
+  // =====================================
+  // 📤 STORAGE
+  // =====================================
+
+  STORAGE: {
+    QUEUED: "storage_queued",
+    SUCCESS: "storage_success",
+    FAILED: "storage_failed",
+    RETRY: "storage_retry",
+  },
+
+  // =====================================
+  // ⚙️ PIPELINE
+  // =====================================
+
+  PIPELINE: {
+    STARTED: "pipeline_started",
+    DONE: "pipeline_done",
+    ERROR: "pipeline_error",
+  },
+
+} as const;
 
 // =====================================
-// 📁 src/quickadd/logging/QuickAddLogger.ts
+// 🔹 TYPES
 // =====================================
 
-import { createLogger } from "../../logger/builder/createLogger";
-import { QuickAddLogDefinitions } from "./QuickAddLogDefinitions";
-
-// 🔥 AUTO-GENERATED LOGGER
-export const QuickAddLogger = createLogger(
-  QuickAddLogDefinitions
-);
-
-
-
-// =====================================
-// 📁 src/quickadd/logging/index.ts
-// =====================================
-
-export { QuickAddLogger } from "./QuickAddLogger";
+export type QuickAddLogDefinition =
+  (typeof QuickAddLogDefinitions)[keyof typeof QuickAddLogDefinitions][keyof any];
