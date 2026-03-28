@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/end/end.ts
+// 📁 src/system/quickadd/discord/actions/end/end.ts
 // =====================================
 
 import { ChatInputCommandInteraction } from "discord.js";
@@ -27,7 +27,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, ephemeral: true })
+        .reply({ content, flags: 64 })
         .catch(() => null);
     }
   }
@@ -46,14 +46,9 @@ export async function handleEnd(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 REQUIRED (lifecycle fix)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
   }
-
-  // =====================================
-  // 📥 ENTRY LOG
-  // =====================================
 
   logger.emit({
     scope: "quickadd.end",
@@ -71,6 +66,17 @@ export async function handleEnd(
   }
 
   const session = QuickAddSession.get(guildId, userId);
+
+  logger.emit({
+    scope: "quickadd.end",
+    event: "end_session_loaded",
+    traceId,
+    context: {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+    },
+  });
 
   const contextError = validateQuickAddContext(
     interaction,
@@ -91,6 +97,7 @@ export async function handleEnd(
       traceId,
       level: "warn",
       context: {
+        sessionId: session?.sessionId,
         guildId,
         userId,
         hasSession: !!session,
@@ -127,9 +134,26 @@ export async function handleEnd(
       },
     });
 
-    // =====================================
-    // 🧹 CLEANUP
-    // =====================================
+    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+
+    logger.emit({
+      scope: "quickadd.end",
+      event: "end_buffer_state",
+      traceId,
+      context: {
+        sessionId,
+        count: entries.length,
+      },
+    });
+
+    logger.emit({
+      scope: "quickadd.end",
+      event: "end_cleanup_start",
+      traceId,
+      context: {
+        sessionId,
+      },
+    });
 
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
@@ -150,10 +174,6 @@ export async function handleEnd(
       "🛑 QuickAdd session ended"
     );
 
-    // =====================================
-    // 🧵 THREAD DELETE (SAFE)
-    // =====================================
-
     try {
       const channel = interaction.channel;
 
@@ -171,6 +191,7 @@ export async function handleEnd(
           traceId,
           context: {
             sessionId,
+            guildId,
             threadId,
           },
         });
@@ -202,6 +223,8 @@ export async function handleEnd(
       },
       stats: {
         end_success: 1,
+      },
+      meta: {
         durationMs: duration,
       },
     });
@@ -219,6 +242,8 @@ export async function handleEnd(
       },
       stats: {
         end_error: 1,
+      },
+      meta: {
         durationMs: duration,
       },
       error: err,
