@@ -26,19 +26,6 @@ function isQuickAddType(value: string): value is QuickAddType {
 }
 
 // =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  if (!interaction.replied && !interaction.deferred) {
-    await interaction.reply({ content, ephemeral: true });
-  }
-}
-
-// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -48,18 +35,21 @@ export async function handleStart(
 ): Promise<void> {
   const startedAt = Date.now();
 
+  // 🔥 KLUCZOWE → unikamy Unknown interaction
+  await interaction.deferReply({ flags: 64 }); // ephemeral
+
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
+    await interaction.editReply("❌ Guild only command");
     return;
   }
 
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
-    await safeReply(interaction, "❌ Invalid QuickAdd type");
+    await interaction.editReply("❌ Invalid QuickAdd type");
     return;
   }
 
@@ -69,12 +59,12 @@ export async function handleStart(
 
   try {
     // =====================================
-    // 🧠 START SESSION FIRST
+    // 🧠 START SESSION FIRST (🔥 FIX: userId)
     // =====================================
     const session = QuickAddSession.start(
       {
         guildId,
-        userId, // 🔥 FIX — BRAKOWAŁO TEGO
+        userId, // ✅ FIX
         ownerId: userId,
         threadId: null,
         type,
@@ -83,8 +73,7 @@ export async function handleStart(
     );
 
     if (!session) {
-      await safeReply(
-        interaction,
+      await interaction.editReply(
         "⚠️ You already have an active session"
       );
       return;
@@ -102,18 +91,12 @@ export async function handleStart(
     }
 
     // =====================================
-    // 📩 CREATE STARTER MESSAGE
+    // 🧵 CREATE THREAD (🔥 BEZ SPAMU NA KANALE)
     // =====================================
-    const starterMessage = await interaction.channel.send({
-      content: `🚀 QuickAdd session: ${type}`,
-    });
-
-    // =====================================
-    // 🧵 THREAD
-    // =====================================
-    const thread = await starterMessage.startThread({
+    const thread = await interaction.channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
       autoArchiveDuration: 60,
+      reason: "QuickAdd session",
     });
 
     threadId = thread.id;
@@ -138,10 +121,9 @@ export async function handleStart(
     });
 
     // =====================================
-    // 📤 RESPONSE
+    // 📤 RESPONSE (EPHEMERAL)
     // =====================================
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
     );
 
@@ -166,8 +148,10 @@ export async function handleStart(
       },
     });
 
+    // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, userId, traceId);
 
+    // ❗ CLEANUP THREAD (SAFE)
     if (threadId) {
       try {
         const thread = await interaction.client.channels.fetch(
@@ -180,8 +164,7 @@ export async function handleStart(
       } catch {}
     }
 
-    await safeReply(
-      interaction,
+    await interaction.editReply(
       "❌ Failed to start session"
     );
   }
