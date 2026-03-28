@@ -2,7 +2,7 @@
 // 📁 src/quickadd/mapping/NicknameResolver.ts
 // =====================================
 
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 import { loadNicknameMap } from "./NicknameMapProvider";
 
 const localFallbackMap: Record<string, string> = {};
@@ -20,10 +20,10 @@ export async function resolveNickname(
   const cleaned = clean(nick);
   const now = Date.now();
 
-  log.emit({
+  logger.emit({
     event: "resolve_start",
     traceId,
-    data: { input: nick, cleaned },
+    context: { input: nick, cleaned },
   });
 
   try {
@@ -34,11 +34,11 @@ export async function resolveNickname(
       cachedMap = await loadNicknameMap(traceId);
       lastLoad = Date.now();
 
-      log.emit({
+      logger.emit({
         event: "cache_loaded",
         traceId,
-        data: {
-          size: Object.keys(cachedMap).length,
+        context: {
+          cacheSize: Object.keys(cachedMap).length,
         },
       });
     }
@@ -46,32 +46,32 @@ export async function resolveNickname(
     const mapped = cachedMap[cleaned];
 
     if (mapped) {
-      log.emit({
+      logger.emit({
         event: "resolved_sheet",
         traceId,
-        data: { input: nick, result: mapped },
+        context: { input: nick, result: mapped },
       });
 
       return mapped;
     }
 
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "map_failed",
       traceId,
       level: "warn",
-      data: err,
+      error: err,
     });
   }
 
   const local = localFallbackMap[cleaned];
   if (local) return local;
 
-  log.emit({
+  logger.emit({
     event: "unmapped",
     traceId,
     level: "warn",
-    data: { input: nick },
+    context: { input: nick },
   });
 
   return nick;
