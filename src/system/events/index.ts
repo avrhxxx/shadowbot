@@ -2,6 +2,36 @@
 // 📁 src/system/events/index.ts
 // =====================================
 
-export { handleEventInteraction } from "../../eventsPanel/eventHandlers";
-export { initEventReminders } from "../../eventsPanel/eventsButtons/eventsReminder";
-export * from "../../eventsPanel/eventService";
+/**
+ * 🚪 Public API for Events system
+ */
+
+// =============================
+// 🔹 HANDLERS
+// =============================
+
+export { handleEventInteraction } from "./eventHandlers";
+
+// =============================
+// 🔹 INIT
+// =============================
+
+export { initEventReminders } from "./eventsButtons/eventsReminder";
+
+// =============================
+// 🔹 PANEL
+// =============================
+
+export * from "./eventPanel";
+
+// =============================
+// 🔹 SERVICE
+// =============================
+
+export * from "./eventService";
+
+// =============================
+// 🔹 BUTTONS
+// =============================
+
+export * from "./eventsButtons";
