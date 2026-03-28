@@ -3,17 +3,22 @@
 // =====================================
 
 import { getLearningData } from "../storage/QuickAddRepository";
-import { logger } from "../core/logger/log";
+import { logger } from "../../core/logger/log";
 
 export async function loadNicknameMap(
   traceId: string
 ): Promise<Record<string, string>> {
   try {
-    logger.emit({ event: "map_load_start", traceId });
+    logger.emit({
+      scope: "quickadd.mapping",
+      event: "map_load_start",
+      traceId,
+    });
 
     const rows = await getLearningData(traceId);
 
     logger.emit({
+      scope: "quickadd.mapping",
       event: "sheet_loaded",
       traceId,
       context: { rowsCount: rows?.length || 0 },
@@ -21,6 +26,7 @@ export async function loadNicknameMap(
 
     if (!rows || rows.length < 2) {
       logger.emit({
+        scope: "quickadd.mapping",
         event: "empty_sheet",
         traceId,
         level: "warn",
@@ -29,7 +35,22 @@ export async function loadNicknameMap(
       return {};
     }
 
-    const headers = rows[0];
+    const headersRaw = rows[0];
+
+    if (!Array.isArray(headersRaw)) {
+      logger.emit({
+        scope: "quickadd.mapping",
+        event: "invalid_headers",
+        traceId,
+        level: "warn",
+      });
+      return {};
+    }
+
+    const headers = headersRaw.map((h) =>
+      typeof h === "string" ? h : String(h)
+    );
+
     const dataRows = rows.slice(1);
 
     const ocrIndex = headers.indexOf("ocr_raw");
@@ -38,6 +59,7 @@ export async function loadNicknameMap(
     const overrideIndex = headers.indexOf("override");
 
     logger.emit({
+      scope: "quickadd.mapping",
       event: "columns_detected",
       traceId,
       context: {
@@ -50,6 +72,7 @@ export async function loadNicknameMap(
 
     if (ocrIndex === -1) {
       logger.emit({
+        scope: "quickadd.mapping",
         event: "missing_ocr_column",
         traceId,
         level: "warn",
@@ -60,6 +83,8 @@ export async function loadNicknameMap(
     const map: Record<string, string> = {};
 
     for (const row of dataRows) {
+      if (!Array.isArray(row)) continue;
+
       const ocrRaw = row[ocrIndex];
       const parser = parserIndex !== -1 ? row[parserIndex] : "";
       const adjusted = adjustedIndex !== -1 ? row[adjustedIndex] : "";
@@ -68,9 +93,9 @@ export async function loadNicknameMap(
       if (!ocrRaw || typeof ocrRaw !== "string") continue;
 
       const finalValue =
-        (override && override.trim()) ||
-        (adjusted && adjusted.trim()) ||
-        (parser && parser.trim());
+        (typeof override === "string" && override.trim()) ||
+        (typeof adjusted === "string" && adjusted.trim()) ||
+        (typeof parser === "string" && parser.trim());
 
       if (!finalValue) continue;
 
@@ -81,6 +106,7 @@ export async function loadNicknameMap(
     }
 
     logger.emit({
+      scope: "quickadd.mapping",
       event: "map_built",
       traceId,
       context: { mapSize: Object.keys(map).length },
@@ -90,6 +116,7 @@ export async function loadNicknameMap(
 
   } catch (err) {
     logger.emit({
+      scope: "quickadd.mapping",
       event: "map_load_failed",
       traceId,
       level: "error",
@@ -100,7 +127,9 @@ export async function loadNicknameMap(
   }
 }
 
-function clean(input: string): string {
+function clean(input: unknown): string {
+  if (typeof input !== "string") return "";
+
   return input
     .toLowerCase()
     .replace(/[^a-z0-9]/gi, "")
