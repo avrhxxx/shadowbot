@@ -83,6 +83,9 @@ export async function handleFix(
         userId,
         hasSession: !!session,
         contextError,
+        reason:
+          contextError ??
+          (!session ? "no_session" : "unknown"),
       },
       stats: {
         fix_blocked: 1,
@@ -131,6 +134,9 @@ export async function handleFix(
         event: "fix_empty",
         traceId,
         context: { sessionId },
+        stats: {
+          fix_empty: 1,
+        },
       });
 
       await safeReply(interaction, "⚠️ Nothing to fix");
@@ -167,6 +173,9 @@ export async function handleFix(
         sessionId,
         count: updatedRaw.length,
       },
+      stats: {
+        fix_revalidation_start: 1,
+      },
     });
 
     const revalidated = await validateEntries(
@@ -184,6 +193,9 @@ export async function handleFix(
       context: {
         sessionId,
         count: revalidated.length,
+      },
+      stats: {
+        fix_revalidation_done: 1,
       },
     });
 
