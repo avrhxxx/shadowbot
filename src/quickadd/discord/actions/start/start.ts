@@ -13,6 +13,25 @@ import { QuickAddType } from "../../../core/QuickAddTypes";
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🔹 TYPE GUARD
 // =====================================
 
@@ -36,21 +55,47 @@ export async function handleStart(
   const timerId = `start-${traceId}`;
   timing.start(timerId);
 
-  // 🔥 unikamy Unknown interaction
-  await interaction.deferReply({ flags: 64 });
+  // 🔥 lifecycle safety
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // =====================================
+  // 📥 ENTRY LOG
+  // =====================================
+
+  log.emit({
+    event: "start_requested",
+    traceId,
+    data: {
+      guildId,
+      userId,
+    },
+  });
+
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
-    await interaction.editReply("❌ Invalid QuickAdd type");
+    log.emit({
+      event: "start_invalid_type",
+      traceId,
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        rawType,
+      },
+    });
+
+    await safeReply(interaction, "❌ Invalid QuickAdd type");
     return;
   }
 
@@ -86,7 +131,18 @@ export async function handleStart(
     );
 
     if (!session) {
-      await interaction.editReply(
+      log.emit({
+        event: "start_blocked_existing_session",
+        traceId,
+        level: "warn",
+        data: {
+          guildId,
+          userId,
+        },
+      });
+
+      await safeReply(
+        interaction,
         "⚠️ You already have an active session"
       );
       return;
@@ -104,7 +160,7 @@ export async function handleStart(
     }
 
     // =====================================
-    // 🧵 THREAD (NO SPAM)
+    // 🧵 THREAD
     // =====================================
     const thread = await interaction.channel.threads.create({
       name: `quickadd-${type.toLowerCase()}`,
@@ -136,7 +192,8 @@ export async function handleStart(
     // =====================================
     // 📤 RESPONSE
     // =====================================
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
     );
 
@@ -186,7 +243,8 @@ export async function handleStart(
       } catch {}
     }
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to start session"
     );
   }
