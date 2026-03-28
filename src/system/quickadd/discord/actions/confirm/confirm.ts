@@ -2,23 +2,6 @@
 // 📁 src/system/quickadd/discord/actions/confirm/confirm.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Confirms buffered entries and submits them to queue.
- *
- * Responsible for:
- * - stage transition (COLLECTING → CONFIRM_PENDING)
- * - validating entries before submit
- * - enqueueing points/events
- * - clearing session after submit
- *
- * ❗ RULES:
- * - owner-only
- * - ALL entries must be OK
- * - 2-step confirmation required
- * - logger.emit ONLY
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -61,7 +44,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 }) // 🔥 unified
+        .reply({ content, flags: 64 })
         .catch(() => null);
     }
   }
@@ -80,7 +63,6 @@ export async function handleConfirm(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ flags: 64 });
   }
@@ -111,6 +93,7 @@ export async function handleConfirm(
       traceId,
       level: "warn",
       context: {
+        sessionId: session?.sessionId,
         guildId,
         userId,
         hasSession: !!session,
@@ -146,10 +129,17 @@ export async function handleConfirm(
       },
     });
 
-    // =====================================
-    // 📥 LOAD BUFFER
-    // =====================================
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+
+    logger.emit({
+      scope: "quickadd.confirm",
+      event: "confirm_buffer_loaded",
+      traceId,
+      context: {
+        sessionId,
+        count: entries.length,
+      },
+    });
 
     if (!entries.length) {
       logger.emit({
@@ -189,10 +179,6 @@ export async function handleConfirm(
       return;
     }
 
-    // =============================
-    // STAGE 1
-    // =============================
-
     if (session.stage === "COLLECTING") {
       QuickAddSession.setStage(
         guildId,
@@ -207,6 +193,7 @@ export async function handleConfirm(
         traceId,
         context: {
           sessionId,
+          count: entries.length,
         },
       });
 
@@ -220,10 +207,6 @@ export async function handleConfirm(
 
       return;
     }
-
-    // =============================
-    // STAGE GUARD
-    // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
       logger.emit({
@@ -243,10 +226,6 @@ export async function handleConfirm(
       await safeReply(interaction, "❌ Invalid session stage");
       return;
     }
-
-    // =============================
-    // STAGE 2
-    // =============================
 
     const target = interaction.options.getString("target");
 
@@ -276,9 +255,17 @@ export async function handleConfirm(
 
     const mode = resolveMode(session.type);
 
-    // =====================================
-    // 📤 SUBMIT
-    // =====================================
+    logger.emit({
+      scope: "quickadd.confirm",
+      event: "confirm_submit",
+      traceId,
+      context: {
+        sessionId,
+        mode,
+        count: entries.length,
+        target,
+      },
+    });
 
     if (mode === "points") {
       await enqueuePoints(
@@ -303,9 +290,14 @@ export async function handleConfirm(
       );
     }
 
-    // =====================================
-    // 🧹 CLEANUP
-    // =====================================
+    logger.emit({
+      scope: "quickadd.confirm",
+      event: "confirm_cleanup",
+      traceId,
+      context: {
+        sessionId,
+      },
+    });
 
     QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
