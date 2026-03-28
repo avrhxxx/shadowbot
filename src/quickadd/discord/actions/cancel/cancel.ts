@@ -15,6 +15,25 @@ import {
 import { log, metrics, timing } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -28,8 +47,13 @@ export async function handleCancel(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // 🔥 lifecycle fix (CRITICAL)
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
+
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
@@ -48,10 +72,11 @@ export async function handleCancel(
   );
 
   if (contextError || ownerError || !session) {
+    metrics.increment("cancel_blocked");
+
     log.emit({
       event: "cancel_guard_failed",
       traceId,
-      type: "user",
       level: "warn",
       data: {
         guildId,
@@ -62,7 +87,8 @@ export async function handleCancel(
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -76,7 +102,6 @@ export async function handleCancel(
     log.emit({
       event: "cancel_start",
       traceId,
-      type: "user",
       data: {
         sessionId,
         guildId,
@@ -84,19 +109,21 @@ export async function handleCancel(
       },
     });
 
-    // 🔥 SESSION-BASED BUFFER
+    // =====================================
+    // 🧹 CLEAR BUFFER
+    // =====================================
     QuickAddBuffer.clear(sessionId, traceId);
 
     log.emit({
       event: "cancel_buffer_cleared",
       traceId,
-      type: "user",
       data: {
         sessionId,
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "🧹 Buffer cleared (session still active)"
     );
 
@@ -107,7 +134,6 @@ export async function handleCancel(
     log.emit({
       event: "cancel_done",
       traceId,
-      type: "user",
       data: {
         sessionId,
         durationMs: duration,
@@ -122,7 +148,6 @@ export async function handleCancel(
     log.emit({
       event: "cancel_failed",
       traceId,
-      type: "user",
       level: "error",
       data: {
         sessionId,
@@ -131,7 +156,8 @@ export async function handleCancel(
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to clear buffer"
     );
   }
