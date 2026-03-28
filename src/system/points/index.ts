@@ -2,5 +2,30 @@
 // 📁 src/system/points/index.ts
 // =====================================
 
-export { handlePointsInteraction } from "../../pointsPanel/pointsHandler";
-export * from "../../pointsPanel/pointsService";
+/**
+ * 🚪 Public API for Points system
+ */
+
+// =============================
+// 🔹 HANDLERS
+// =============================
+
+export { handlePointsInteraction } from "./pointsHandler";
+
+// =============================
+// 🔹 PANEL
+// =============================
+
+export * from "./pointsPanel";
+
+// =============================
+// 🔹 SERVICE
+// =============================
+
+export * from "./pointsService";
+
+// =============================
+// 🔹 BUTTONS
+// =============================
+
+export * from "./pointsButtons";
