@@ -41,7 +41,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 }) // 🔥 ujednolicone (zamiast ephemeral)
+        .reply({ content, flags: 64 })
         .catch(() => null);
     }
   }
@@ -60,9 +60,8 @@ export async function handleCancel(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // 🔥 lifecycle fix (CRITICAL)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 }); // 🔥 ujednolicone
+    await interaction.deferReply({ flags: 64 });
   }
 
   if (!guildId) {
@@ -91,6 +90,7 @@ export async function handleCancel(
       traceId,
       level: "warn",
       context: {
+        sessionId: session?.sessionId,
         guildId,
         userId,
         hasSession: !!session,
@@ -125,6 +125,30 @@ export async function handleCancel(
         cancel_started: 1,
       },
     });
+
+    // =====================================
+    // 📥 CHECK BUFFER BEFORE CLEAR
+    // =====================================
+    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+
+    logger.emit({
+      scope: "quickadd.cancel",
+      event: "cancel_buffer_before_clear",
+      traceId,
+      context: {
+        sessionId,
+        count: entries.length,
+      },
+    });
+
+    if (!entries.length) {
+      logger.emit({
+        scope: "quickadd.cancel",
+        event: "cancel_empty_buffer",
+        traceId,
+        context: { sessionId },
+      });
+    }
 
     // =====================================
     // 🧹 CLEAR BUFFER
