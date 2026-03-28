@@ -3,7 +3,7 @@
 // =====================================
 
 import Tesseract from "tesseract.js";
-import { logger } from "../core/logger/log";
+import { logger } from "../../core/logger/log";
 import { OCRToken } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
 
@@ -28,47 +28,61 @@ async function runWithPSM(
   label: string
 ): Promise<OCRRunResult> {
   logger.emit({
+    scope: "quickadd.ocr",
     event: "ocr_psm_start",
     traceId,
-    type: "system",
     context: { psm, label },
   });
 
-  const result = await Tesseract.recognize(
-    buffer,
-    "eng",
-    {
-      logger: () => {},
-      tessedit_pageseg_mode: psm,
-    } as any // ✅ FIX: typings workaround (tesseract.js issue)
-  );
+  try {
+    const result = await Tesseract.recognize(
+      buffer,
+      "eng",
+      {
+        logger: () => {},
+        tessedit_pageseg_mode: psm,
+      } as any
+    );
 
-  const text = result.data.text || "";
-  const lines = text.split("\n");
+    const text = result.data.text || "";
+    const lines = text.split("\n");
 
-  const words = result.data.words || [];
+    const words = result.data.words || [];
 
-  const tokens: OCRToken[] = words.map((w: any) => ({
-    text: w.text,
-    x: w.bbox.x0,
-    y: w.bbox.y0,
-    width: w.bbox.x1 - w.bbox.x0,
-    height: w.bbox.y1 - w.bbox.y0,
-    confidence: w.confidence,
-  }));
+    const tokens: OCRToken[] = words.map((w: any) => ({
+      text: w.text,
+      x: w.bbox.x0,
+      y: w.bbox.y0,
+      width: w.bbox.x1 - w.bbox.x0,
+      height: w.bbox.y1 - w.bbox.y0,
+      confidence: w.confidence,
+    }));
 
-  logger.emit({
-    event: "ocr_psm_done",
-    traceId,
-    type: "system",
-    context: {
-      label,
-      linesCount: lines.length,
-      tokensCount: tokens.length,
-    },
-  });
+    logger.emit({
+      scope: "quickadd.ocr",
+      event: "ocr_psm_done",
+      traceId,
+      context: {
+        label,
+        linesCount: lines.length,
+        tokensCount: tokens.length,
+      },
+    });
 
-  return { text, lines, tokens };
+    return { text, lines, tokens };
+
+  } catch (error) {
+    logger.emit({
+      scope: "quickadd.ocr",
+      event: "ocr_psm_failed",
+      traceId,
+      level: "warn",
+      context: { label },
+      error,
+    });
+
+    return { text: "", lines: [], tokens: [] };
+  }
 }
 
 // =====================================
@@ -80,9 +94,9 @@ async function runVision(
   traceId: string
 ): Promise<OCRRunResult> {
   logger.emit({
+    scope: "quickadd.ocr",
     event: "vision_start",
     traceId,
-    type: "system",
   });
 
   try {
@@ -93,6 +107,7 @@ async function runVision(
 
     const lines = text.split("\n").filter(Boolean);
 
+    // ⚠️ fallback tokens (low-quality)
     const tokens: OCRToken[] = lines.map(
       (line: string, i: number) => ({
         text: line,
@@ -100,14 +115,14 @@ async function runVision(
         y: i * 10,
         width: line.length * 6,
         height: 10,
-        confidence: 90,
+        confidence: 50, // lower confidence (important!)
       })
     );
 
     logger.emit({
+      scope: "quickadd.ocr",
       event: "vision_done",
       traceId,
-      type: "system",
       context: {
         linesCount: lines.length,
         tokensCount: tokens.length,
@@ -115,11 +130,12 @@ async function runVision(
     });
 
     return { text, lines, tokens };
+
   } catch (error) {
     logger.emit({
+      scope: "quickadd.ocr",
       event: "vision_failed",
       traceId,
-      type: "system",
       level: "warn",
       error,
     });
@@ -144,30 +160,43 @@ export const OCREngine = {
 
   async hocr(buffer: Buffer, traceId: string) {
     logger.emit({
+      scope: "quickadd.ocr",
       event: "hocr_start",
       traceId,
-      type: "system",
     });
 
-    const result = await Tesseract.recognize(
-      buffer,
-      "eng",
-      {
-        logger: () => {},
-        tessedit_create_hocr: "1",
-      } as any // ✅ FIX
-    );
+    try {
+      const result = await Tesseract.recognize(
+        buffer,
+        "eng",
+        {
+          logger: () => {},
+          tessedit_create_hocr: "1",
+        } as any
+      );
 
-    const hocr = result.data.hocr || "";
+      const hocr = result.data.hocr || "";
 
-    logger.emit({
-      event: "hocr_done",
-      traceId,
-      type: "system",
-      context: { hocrLength: hocr.length },
-    });
+      logger.emit({
+        scope: "quickadd.ocr",
+        event: "hocr_done",
+        traceId,
+        context: { hocrLength: hocr.length },
+      });
 
-    return { hocr };
+      return { hocr };
+
+    } catch (error) {
+      logger.emit({
+        scope: "quickadd.ocr",
+        event: "hocr_failed",
+        traceId,
+        level: "warn",
+        error,
+      });
+
+      return { hocr: "" };
+    }
   },
 
   vision: (buffer: Buffer, traceId: string) =>
