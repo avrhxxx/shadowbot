@@ -48,6 +48,20 @@ export async function handleCancel(
   );
 
   if (contextError || ownerError || !session) {
+    log.emit({
+      event: "cancel_guard_failed",
+      traceId,
+      type: "user",
+      level: "warn",
+      data: {
+        guildId,
+        userId,
+        hasSession: !!session,
+        contextError,
+        ownerError,
+      },
+    });
+
     await interaction.editReply(
       contextError ?? ownerError ?? "❌ Session not found"
     );
@@ -62,9 +76,11 @@ export async function handleCancel(
     log.emit({
       event: "cancel_start",
       traceId,
+      type: "user",
       data: {
         sessionId,
         guildId,
+        userId,
       },
     });
 
@@ -74,6 +90,7 @@ export async function handleCancel(
     log.emit({
       event: "cancel_buffer_cleared",
       traceId,
+      type: "user",
       data: {
         sessionId,
       },
@@ -90,6 +107,7 @@ export async function handleCancel(
     log.emit({
       event: "cancel_done",
       traceId,
+      type: "user",
       data: {
         sessionId,
         durationMs: duration,
@@ -104,8 +122,10 @@ export async function handleCancel(
     log.emit({
       event: "cancel_failed",
       traceId,
+      type: "user",
       level: "error",
       data: {
+        sessionId,
         error: err,
         durationMs: duration,
       },
