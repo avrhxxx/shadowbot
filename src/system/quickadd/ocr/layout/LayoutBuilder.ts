@@ -3,7 +3,7 @@
 // =====================================
 
 import { OCRToken } from "../OCRTypes";
-import { logger } from "../../core/logger/log";
+import { logger } from "../../../core/logger/log";
 
 // =====================================
 // 🧱 TYPES
@@ -12,6 +12,7 @@ import { logger } from "../../core/logger/log";
 export type NormalizedToken = OCRToken & {
   nx: number;
   ny: number;
+  nw: number;
 };
 
 export type LayoutCell = {
@@ -35,6 +36,7 @@ export function buildLayout(
   traceId: string
 ): LayoutRow[] {
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_start",
     traceId,
     context: { tokensCount: tokens.length },
@@ -48,6 +50,7 @@ export function buildLayout(
   const structured = buildRowStructure(rows, traceId);
 
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_done",
     traceId,
     context: { rowsCount: structured.length },
@@ -64,21 +67,18 @@ function normalizeTokens(
   tokens: OCRToken[],
   traceId: string
 ): NormalizedToken[] {
-  const maxX = tokens.length
-    ? Math.max(...tokens.map((t) => t.x + t.width))
-    : 0;
-
-  const maxY = tokens.length
-    ? Math.max(...tokens.map((t) => t.y + t.height))
-    : 0;
+  const maxX = Math.max(1, ...tokens.map((t) => t.x + t.width));
+  const maxY = Math.max(1, ...tokens.map((t) => t.y + t.height));
 
   const normalized = tokens.map((t) => ({
     ...t,
-    nx: maxX ? t.x / maxX : 0,
-    ny: maxY ? t.y / maxY : 0,
+    nx: t.x / maxX,
+    ny: t.y / maxY,
+    nw: t.width / maxX,
   }));
 
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_normalized",
     traceId,
     context: { count: normalized.length },
@@ -96,18 +96,15 @@ function filterTokens(
   traceId: string
 ): NormalizedToken[] {
   const filtered = tokens.filter((t) => {
-    if (!t.text || t.text.trim().length < 1) {
-      return false;
-    }
+    if (!t.text || t.text.trim().length < 1) return false;
 
-    if (t.confidence === undefined) {
-      return true;
-    }
+    if (t.confidence === undefined) return true;
 
     return t.confidence > 20;
   });
 
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_filter_done",
     traceId,
     context: {
@@ -151,6 +148,7 @@ function groupIntoRows(
   }
 
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_rows_grouped",
     traceId,
     context: { rowsCount: rows.length },
@@ -178,8 +176,7 @@ function buildRowStructure(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-
-    if (row.length < 1) continue;
+    if (!row.length) continue;
 
     const sorted = [...row].sort((a, b) => a.nx - b.nx);
 
@@ -190,7 +187,8 @@ function buildRowStructure(
       const prev = sorted[j - 1];
       const curr = sorted[j];
 
-      const gap = curr.nx - prev.nx;
+      const prevEnd = prev.nx + prev.nw;
+      const gap = curr.nx - prevEnd;
 
       if (gap > GAP_THRESHOLD) {
         cells.push(buildCell(currentTokens));
@@ -210,6 +208,7 @@ function buildRowStructure(
     });
 
     logger.emit({
+      scope: "quickadd.layout",
       event: "layout_row_cells",
       traceId,
       context: {
@@ -220,6 +219,7 @@ function buildRowStructure(
   }
 
   logger.emit({
+    scope: "quickadd.layout",
     event: "layout_structure_done",
     traceId,
     context: { rowsCount: result.length },
@@ -233,12 +233,12 @@ function buildRowStructure(
 // =====================================
 
 function buildCell(tokens: NormalizedToken[]): LayoutCell {
-  const sorted = [...tokens].sort((a, b) => a.x - b.x);
+  const sorted = [...tokens].sort((a, b) => a.nx - b.nx);
 
   const text = sorted.map((t) => t.text).join(" ").trim();
 
   const xStart = Math.min(...sorted.map((t) => t.nx));
-  const xEnd = Math.max(...sorted.map((t) => t.nx));
+  const xEnd = Math.max(...sorted.map((t) => t.nx + t.nw));
 
   return {
     tokens: sorted,
