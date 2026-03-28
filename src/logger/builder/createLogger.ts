@@ -8,51 +8,73 @@ import { Observability } from "../core/Observability";
 // 🔹 TYPES
 // =====================================
 
-type Definition = Record<
-  string,
-  Record<string, string>
->;
+type Definition = {
+  [key: string]: string | Definition;
+};
 
 // =====================================
-// 🔥 BUILDER
+// 🔹 LEVEL RESOLVER
 // =====================================
 
-export function createLogger<T extends Definition>(defs: T) {
-  const result: any = {};
-
-  for (const group in defs) {
-    result[group] = {};
-
-    for (const key in defs[group]) {
-      const eventName = defs[group][key];
-
-      result[group][key] = (
-        traceId: string,
-        data?: unknown
-      ) => {
-        const level =
-          eventName.endsWith("_failed")
-            ? "error"
-            : eventName.includes("blocked")
-            ? "warn"
-            : "info";
-
-        Observability.emit({
-          event: eventName,
-          traceId,
-          data,
-          level,
-        });
-      };
-    }
+function resolveLevel(event: string): "info" | "warn" | "error" {
+  if (event.endsWith("_failed") || event.endsWith("_error")) {
+    return "error";
   }
 
-  return result as {
-    [K in keyof T]: {
-      [E in keyof T[K]]: (
-        traceId: string,
-        data?: unknown
-      ) => void;
-    };
-  };
+  if (
+    event.includes("blocked") ||
+    event.endsWith("_warn")
+  ) {
+    return "warn";
+  }
+
+  return "info";
 }
+
+// =====================================
+// 🔥 BUILDER (RECURSIVE)
+// =====================================
+
+export function createLogger<T extends Definition>(
+  defs: T
+): BuildLogger<T> {
+  function build(obj: Definition): any {
+    const result: any = {};
+
+    for (const key in obj) {
+      const value = obj[key];
+
+      if (typeof value === "string") {
+        const eventName = value;
+
+        result[key] = (
+          traceId: string,
+          data?: unknown
+        ) => {
+          Observability.emit({
+            event: eventName,
+            traceId,
+            data,
+            level: resolveLevel(eventName),
+          });
+        };
+      } else {
+        result[key] = build(value);
+      }
+    }
+
+    return result;
+  }
+
+  return build(defs);
+}
+
+// =====================================
+// 🔹 TYPE INFERENCE
+// =====================================
+
+type BuildLogger<T> = {
+  [K in keyof T]: T[K] extends string
+    ? (traceId: string, data?: unknown) => void
+    : BuildLogger<T[K]>;
+};
