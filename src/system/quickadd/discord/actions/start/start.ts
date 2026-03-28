@@ -10,7 +10,7 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -52,8 +52,7 @@ export async function handleStart(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `start-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
@@ -67,10 +66,10 @@ export async function handleStart(
   // 📥 ENTRY LOG
   // =====================================
 
-  log.emit({
+  logger.emit({
     event: "start_requested",
     traceId,
-    data: {
+    context: {
       guildId,
       userId,
     },
@@ -84,11 +83,11 @@ export async function handleStart(
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
-    log.emit({
+    logger.emit({
       event: "start_invalid_type",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         rawType,
@@ -104,15 +103,16 @@ export async function handleStart(
   let threadId: string | null = null;
 
   try {
-    metrics.increment("start_started");
-
-    log.emit({
+    logger.emit({
       event: "start_start",
       traceId,
-      data: {
+      context: {
         guildId,
         userId,
         type,
+      },
+      stats: {
+        start_started: 1,
       },
     });
 
@@ -131,11 +131,11 @@ export async function handleStart(
     );
 
     if (!session) {
-      log.emit({
+      logger.emit({
         event: "start_blocked_existing_session",
         traceId,
         level: "warn",
-        data: {
+        context: {
           guildId,
           userId,
         },
@@ -197,33 +197,35 @@ export async function handleStart(
       `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("start_success");
-
-    log.emit({
+    logger.emit({
       event: "start_done",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         threadId,
+      },
+      stats: {
         durationMs: duration,
+        start_success: 1,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("start_error");
-
-    log.emit({
+    logger.emit({
       event: "start_failed",
       traceId,
       level: "error",
-      data: {
-        error: err,
+      error: err,
+      context: {
         guildId,
+      },
+      stats: {
         durationMs: duration,
+        start_error: 1,
       },
     });
 
