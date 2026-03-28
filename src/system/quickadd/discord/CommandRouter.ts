@@ -7,7 +7,7 @@ import {
   getCommandHandler,
   QuickAddSubcommand,
 } from "./CommandRegistry";
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 🚀 ROUTER
@@ -33,7 +33,7 @@ export async function handleQuickAddCommand(
       subcommand =
         interaction.options.getSubcommand() as QuickAddSubcommand;
     } catch {
-      log.emit({
+      logger.emit({
         scope: "quickadd.command_router",
         event: "command_subcommand_missing",
         traceId,
@@ -44,7 +44,7 @@ export async function handleQuickAddCommand(
       return;
     }
 
-    log.emit({
+    logger.emit({
       scope: "quickadd.command_router",
       event: "command_received",
       traceId,
@@ -60,7 +60,7 @@ export async function handleQuickAddCommand(
 
     // 🔒 HANDLER GUARD
     if (!handler) {
-      log.emit({
+      logger.emit({
         scope: "quickadd.command_router",
         event: "command_handler_missing",
         traceId,
@@ -92,7 +92,7 @@ export async function handleQuickAddCommand(
       await interaction.deferReply({ ephemeral: true });
     }
 
-    log.emit({
+    logger.emit({
       scope: "quickadd.command_router",
       event: "command_execution_start",
       traceId,
@@ -101,7 +101,7 @@ export async function handleQuickAddCommand(
 
     await handler(interaction, traceId);
 
-    log.emit({
+    logger.emit({
       scope: "quickadd.command_router",
       event: "command_execution_done",
       traceId,
@@ -112,7 +112,7 @@ export async function handleQuickAddCommand(
     });
 
   } catch (err: any) {
-    log.emit({
+    logger.emit({
       scope: "quickadd.command_router",
       event: "command_router_error",
       traceId,
@@ -126,7 +126,7 @@ export async function handleQuickAddCommand(
       },
     });
 
-    log.emit({
+    logger.emit({
       scope: "quickadd.command_router",
       event: "command_execution_failed",
       traceId,
