@@ -28,6 +28,19 @@ export async function handleEnd(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // =====================================
+  // 📥 ENTRY LOG
+  // =====================================
+
+  log.emit({
+    event: "end_requested",
+    traceId,
+    data: {
+      guildId,
+      userId,
+    },
+  });
+
   if (!guildId) {
     await interaction.editReply("❌ Guild only command");
     return;
@@ -54,7 +67,7 @@ export async function handleEnd(
     return;
   }
 
-  const { sessionId, threadId } = session;
+  const { sessionId, threadId, stage } = session;
 
   try {
     metrics.increment("end_started");
@@ -66,14 +79,15 @@ export async function handleEnd(
         sessionId,
         guildId,
         threadId,
+        stage,
       },
     });
 
     // =====================================
-    // 🧹 CLEANUP (🔥 FIXED PROPERLY)
+    // 🧹 CLEANUP
     // =====================================
 
-    QuickAddBuffer.clear(sessionId, traceId); // ✅ NAJWAŻNIEJSZY FIX
+    QuickAddBuffer.clear(sessionId, traceId);
     QuickAddSession.end(guildId, userId, traceId);
 
     log.emit({
