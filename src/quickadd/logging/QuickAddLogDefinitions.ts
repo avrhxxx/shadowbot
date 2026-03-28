@@ -71,6 +71,26 @@ export const QuickAddLogDefinitions = {
   },
 
   // =====================================
+  // 🛡️ GUARDS
+  // =====================================
+
+  GUARD: {
+    CONTEXT_INVALID: "guard_context_invalid",
+    NOT_OWNER: "guard_not_owner",
+    NO_SESSION: "guard_no_session",
+  },
+
+  // =====================================
+  // 💬 INTERACTION (Discord layer)
+  // =====================================
+
+  INTERACTION: {
+    RECEIVED: "interaction_received",
+    REPLIED: "interaction_replied",
+    FAILED: "interaction_failed",
+  },
+
+  // =====================================
   // 📦 BUFFER
   // =====================================
 
@@ -129,6 +149,9 @@ export const QuickAddLogDefinitions = {
 
   PIPELINE: {
     STARTED: "pipeline_started",
+    STEP_STARTED: "pipeline_step_started",
+    STEP_SKIPPED: "pipeline_step_skipped",
+    STEP_FAILED: "pipeline_step_failed",
     DONE: "pipeline_done",
     ERROR: "pipeline_error",
   },
