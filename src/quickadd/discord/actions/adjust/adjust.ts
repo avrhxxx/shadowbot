@@ -18,6 +18,25 @@ import { validateEntries } from "../../../validation/QuickAddValidator";
 import { log } from "../../../logger";
 
 // =====================================
+// 🔐 SAFE REPLY (EDIT ONLY)
+// =====================================
+
+async function safeReply(
+  interaction: ChatInputCommandInteraction,
+  content: string
+) {
+  try {
+    await interaction.editReply(content);
+  } catch {
+    if (!interaction.replied) {
+      await interaction
+        .reply({ content, flags: 64 })
+        .catch(() => null);
+    }
+  }
+}
+
+// =====================================
 // 🚀 HANDLER
 // =====================================
 
@@ -30,8 +49,13 @@ export async function handleAdjust(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // 🔥 REQUIRED (lifecycle fix)
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
+
   if (!guildId) {
-    await interaction.editReply("❌ Guild only command");
+    await safeReply(interaction, "❌ Guild only command");
     return;
   }
 
@@ -50,7 +74,18 @@ export async function handleAdjust(
   );
 
   if (contextError || ownerError || !session) {
-    await interaction.editReply(
+    log.emit({
+      event: "adjust_blocked",
+      traceId,
+      data: {
+        guildId,
+        userId,
+        reason: contextError ?? ownerError ?? "no_session",
+      },
+    });
+
+    await safeReply(
+      interaction,
       contextError ?? ownerError ?? "❌ Session not found"
     );
     return;
@@ -66,7 +101,6 @@ export async function handleAdjust(
     log.emit({
       event: "adjust_start",
       traceId,
-      type: "user",
       data: {
         sessionId,
         guildId,
@@ -76,13 +110,16 @@ export async function handleAdjust(
       },
     });
 
-    // 🔥 SESSION-BASED BUFFER
+    // =====================================
+    // 📥 LOAD BUFFER
+    // =====================================
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     const index = entries.findIndex((e) => e.id === id);
 
     if (index === -1) {
-      await interaction.editReply(
+      await safeReply(
+        interaction,
         `❌ Entry with ID ${id} not found`
       );
       return;
@@ -90,6 +127,9 @@ export async function handleAdjust(
 
     const target = entries[index];
 
+    // =====================================
+    // 🔧 APPLY CHANGE
+    // =====================================
     const updated = {
       ...target,
       nickname: newNickname ?? target.nickname,
@@ -99,6 +139,9 @@ export async function handleAdjust(
     const newEntries = [...entries];
     newEntries[index] = updated;
 
+    // =====================================
+    // 🔁 REVALIDATION
+    // =====================================
     const revalidated = await validateEntries(
       newEntries.map((e) => ({
         nickname: e.nickname,
@@ -114,13 +157,14 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    // 🔥 SESSION-BASED WRITE
+    // =====================================
+    // 💾 SAVE BUFFER
+    // =====================================
     QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
     log.emit({
       event: "adjust_applied",
       traceId,
-      type: "user",
       data: {
         sessionId,
         id,
@@ -129,6 +173,9 @@ export async function handleAdjust(
       },
     });
 
+    // =====================================
+    // 🧠 LEARNING SAVE
+    // =====================================
     try {
       if (newNickname && newNickname !== target.nickname) {
         await saveAdjusted(
@@ -144,7 +191,6 @@ export async function handleAdjust(
         log.emit({
           event: "learning_saved_adjust",
           traceId,
-          type: "user",
           data: {
             sessionId,
             from: target.nickname,
@@ -157,7 +203,6 @@ export async function handleAdjust(
         event: "learning_failed_adjust",
         traceId,
         level: "warn",
-        type: "user",
         data: {
           sessionId,
           error: err,
@@ -165,14 +210,14 @@ export async function handleAdjust(
       });
     }
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       `✅ Updated entry [${id}]`
     );
 
     log.emit({
       event: "adjust_done",
       traceId,
-      type: "user",
       data: {
         sessionId,
         durationMs: Date.now() - startedAt,
@@ -184,13 +229,13 @@ export async function handleAdjust(
       event: "adjust_failed",
       traceId,
       level: "error",
-      type: "user",
       data: {
         error: err,
       },
     });
 
-    await interaction.editReply(
+    await safeReply(
+      interaction,
       "❌ Failed to adjust entry"
     );
   }
