@@ -15,20 +15,14 @@ import {
 // 🧩 SYSTEMS (INDEX-BASED)
 // =============================
 
-import { initTranslationModule } from "./systems/translation";
-import { initModeratorPanel } from "./systems/moderator";
+import { initTranslationModule } from "./system/translation";
+import { initModeratorPanel } from "./system/moderator";
 
-import {
-  handleEventInteraction,
-  initEventReminders,
-} from "./systems/events";
+import { initEventReminders } from "./system/events";
+import { initAbsenceNotifications } from "./system/absence";
 
-import {
-  handleAbsenceInteraction,
-  initAbsenceNotifications,
-} from "./systems/absence";
-
-import { handlePointsInteraction } from "./systems/points";
+// 👉 SYSTEM ROUTER (NOWY)
+import { handleSystemInteraction } from "./core/systemRouter";
 
 // =============================
 // 🔥 QUICKADD (SYSTEM)
@@ -40,7 +34,7 @@ import {
   ensureQuickAddChannel,
   registerQuickAddListener,
   startQuickAddWorker,
-} from "./systems/quickadd";
+} from "./system/quickadd";
 
 // =============================
 // 🌍 INTEGRATIONS
@@ -127,6 +121,10 @@ client.once("clientReady", async () => {
 
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
+      // =============================
+      // 🔥 QUICKADD COMMAND
+      // =============================
+
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "q") {
           await handleQuickAddCommand(interaction);
@@ -134,9 +132,11 @@ client.once("clientReady", async () => {
         }
       }
 
-      await handleEventInteraction(interaction);
-      await handleAbsenceInteraction(interaction);
-      await handlePointsInteraction(interaction);
+      // =============================
+      // 🧠 SYSTEM ROUTER (NOWY)
+      // =============================
+
+      await handleSystemInteraction(interaction);
 
     } catch (err) {
       console.error("❌ interactionCreate error:", err);
