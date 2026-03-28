@@ -2,98 +2,75 @@
 // 📁 src/core/logger/log.ts
 // =====================================
 
-import { TraceContext } from "../trace/TraceContext";
-
 // =====================================
 // 🔹 TYPES
 // =====================================
 
 type LogLevel = "info" | "warn" | "error";
 
-export type LogPayload = {
+export type LogError = {
+  message: string;
+  stack?: string;
+  [key: string]: unknown;
+};
+
+export type LogMeta = Record<string, unknown>;
+export type LogData = Record<string, unknown>;
+
+export type EmitPayload = {
   traceId?: string;
-
-  context?: Record<string, unknown>;
-  input?: Record<string, unknown>;
-  result?: Record<string, unknown>;
-  stats?: Record<string, number>;
-  meta?: Record<string, unknown>;
-
-  data?: unknown; // 🔥 uniwersalne pole (NOWE)
-
-  error?: {
-    message?: string;
-    stack?: string;
-    [key: string]: unknown;
-  };
-
   level?: LogLevel;
+  data?: LogData;
+  meta?: LogMeta;
+  error?: LogError;
 };
 
 // =====================================
-// 🔧 FORMATTER
+// 🔧 INTERNAL FORMATTER
 // =====================================
 
 function formatLog(
-  traceId: string | undefined,
   event: string,
-  payload?: LogPayload,
-  level: LogLevel = "info"
+  payload?: EmitPayload
 ) {
   const time = new Date().toISOString();
 
-  return [
-    `${time} | ${traceId ?? "no-trace"} | ${level.toUpperCase()} | ${event}`,
-    payload ?? ""
-  ] as const;
+  const level = payload?.level ?? "info";
+  const traceId = payload?.traceId ?? "no-trace";
+
+  return {
+    time,
+    level,
+    event,
+    traceId,
+    data: payload?.data,
+    meta: payload?.meta,
+    error: payload?.error,
+  };
 }
 
 // =====================================
-// 🔥 BASE LOGGER (BACKWARD COMPAT)
-// =====================================
-
-export function log(
-  ctx: TraceContext,
-  event: string,
-  payload?: LogPayload,
-  level: LogLevel = "info"
-) {
-  const [header, body] = formatLog(ctx.traceId, event, payload, level);
-  console.log(header, body);
-}
-
-// =====================================
-// 🚀 MODERN LOGGER (NEW API)
+// 🚀 LOGGER
 // =====================================
 
 export const logger = {
-  emit(event: string, payload?: LogPayload) {
-    const [header, body] = formatLog(
-      payload?.traceId,
-      event,
-      payload,
-      payload?.level ?? "info"
-    );
-    console.log(header, body);
-  },
+  emit(event: string, payload?: EmitPayload) {
+    try {
+      const logEntry = formatLog(event, payload);
 
-  error(event: string, payload?: LogPayload) {
-    const [header, body] = formatLog(
-      payload?.traceId,
-      event,
-      payload,
-      "error"
-    );
-    console.log(header, body);
-  },
+      // 🔹 Możesz tu łatwo podmienić na np. pino / winston / sentry
+      console.log(
+        `${logEntry.time} | ${logEntry.traceId} | ${logEntry.level.toUpperCase()} | ${logEntry.event}`,
+        {
+          data: logEntry.data,
+          meta: logEntry.meta,
+          error: logEntry.error,
+        }
+      );
 
-  warn(event: string, payload?: LogPayload) {
-    const [header, body] = formatLog(
-      payload?.traceId,
-      event,
-      payload,
-      "warn"
-    );
-    console.log(header, body);
-  }
+    } catch (err) {
+      // 🔥 LOGGER NEVER FAILS
+      console.error("LOGGER_FAILURE", err);
+    }
+  },
 };
