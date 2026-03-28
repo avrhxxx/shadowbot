@@ -74,10 +74,11 @@ export const QuickAddSession = {
 
     if (existing) {
       logger.emit({
+        scope: "quickadd.session",
         event: "session_start_blocked",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: existing.sessionId,
           userId: existing.userId,
         },
@@ -96,9 +97,10 @@ export const QuickAddSession = {
     sessions.set(key, session);
 
     logger.emit({
+      scope: "quickadd.session",
       event: "session_started",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         userId: session.userId,
       },
@@ -122,10 +124,11 @@ export const QuickAddSession = {
 
     if (!session) {
       logger.emit({
+        scope: "quickadd.session",
         event: "session_set_thread_missing",
         traceId,
         level: "warn",
-        data: { guildId, userId },
+        context: { guildId, userId },
       });
       return;
     }
@@ -138,9 +141,10 @@ export const QuickAddSession = {
     sessions.set(key, updated);
 
     logger.emit({
+      scope: "quickadd.session",
       event: "session_thread_attached",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         threadId,
       },
@@ -158,10 +162,11 @@ export const QuickAddSession = {
 
     if (!session) {
       logger.emit({
+        scope: "quickadd.session",
         event: "session_set_stage_missing",
         traceId,
         level: "warn",
-        data: { guildId, userId },
+        context: { guildId, userId },
       });
       return;
     }
@@ -170,10 +175,11 @@ export const QuickAddSession = {
 
     if (!allowed.includes(nextStage)) {
       logger.emit({
+        scope: "quickadd.session",
         event: "session_invalid_transition",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId: session.sessionId,
           from: session.stage,
           to: nextStage,
@@ -190,9 +196,10 @@ export const QuickAddSession = {
     sessions.set(key, updated);
 
     logger.emit({
+      scope: "quickadd.session",
       event: "session_stage_updated",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         from: session.stage,
         to: nextStage,
@@ -207,9 +214,10 @@ export const QuickAddSession = {
     sessions.delete(key);
 
     logger.emit({
+      scope: "quickadd.session",
       event: "session_ended",
       traceId,
-      data: {
+      context: {
         sessionId: session?.sessionId,
         userId,
       },
