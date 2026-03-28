@@ -9,6 +9,7 @@ import {
 import * as PB from "./pointsButtons";
 import * as PS from "./pointsService";
 import * as Utils from "./pointsButtons/utils";
+import { logger } from "../core/logger/log";
 
 export const IDS = {
   BUTTONS: {
@@ -51,11 +52,10 @@ const BUTTON_HANDLERS: Record<
 };
 
 // -----------------------------
-// GLOBAL INTERACTION HANDLER (ROUTER READY)
+// GLOBAL INTERACTION HANDLER
 // -----------------------------
 export async function handlePointsInteraction(
-  interaction: Interaction<CacheType>,
-  ctx: { traceId: string }
+  interaction: Interaction<CacheType>
 ): Promise<boolean> {
   try {
     // =============================
@@ -64,7 +64,12 @@ export async function handlePointsInteraction(
     if (interaction.isButton()) {
       const { customId } = interaction;
 
-      console.log(`[${ctx.traceId}] points_button`, { id: customId });
+      logger.emit({
+        event: "points_button",
+        data: {
+          context: { id: customId }
+        }
+      });
 
       // STATIC BUTTONS
       const handler = BUTTON_HANDLERS[customId];
@@ -91,6 +96,14 @@ export async function handlePointsInteraction(
         const module = getCategoryModule(category);
 
         if (!module) {
+          logger.emit({
+            event: "points_unknown_category",
+            level: "warn",
+            data: {
+              context: { category }
+            }
+          });
+
           await safeReply(interaction, {
             content: `⚠️ Unknown category: ${category}`,
             ephemeral: true
@@ -107,6 +120,14 @@ export async function handlePointsInteraction(
         const parsed = Utils.parseActionId(customId);
 
         if (!parsed) {
+          logger.emit({
+            event: "points_invalid_action",
+            level: "warn",
+            data: {
+              context: { customId }
+            }
+          });
+
           await safeReply(interaction, {
             content: "⚠️ Invalid action format.",
             ephemeral: true
@@ -123,6 +144,14 @@ export async function handlePointsInteraction(
         const module = getCategoryModule(category);
 
         if (!module) {
+          logger.emit({
+            event: "points_unknown_category",
+            level: "warn",
+            data: {
+              context: { category }
+            }
+          });
+
           await safeReply(interaction, {
             content: `⚠️ Unknown category: ${category}`,
             ephemeral: true
@@ -157,7 +186,12 @@ export async function handlePointsInteraction(
     if (interaction.isModalSubmit()) {
       const { customId } = interaction;
 
-      console.log(`[${ctx.traceId}] points_modal`, { id: customId });
+      logger.emit({
+        event: "points_modal",
+        data: {
+          context: { id: customId }
+        }
+      });
 
       if (customId.startsWith("points_create_modal_")) {
         await PB.pointsCreate.handleCreateWeekSubmit(interaction);
@@ -169,7 +203,13 @@ export async function handlePointsInteraction(
 
     return false;
   } catch (error) {
-    console.error(`[${ctx.traceId}] points_error`, error);
+    logger.emit({
+      event: "points_error",
+      level: "error",
+      data: {
+        error
+      }
+    });
 
     if (interaction.isRepliable()) {
       const payload = {
@@ -184,7 +224,7 @@ export async function handlePointsInteraction(
       }
     }
 
-    return true; // handled
+    return true;
   }
 }
 
@@ -196,7 +236,7 @@ function safeReply(
   payload: any
 ) {
   if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(payload); // 🔥 poprawne dla mixed flow
+    return interaction.followUp(payload);
   }
 
   return interaction.reply(payload);
