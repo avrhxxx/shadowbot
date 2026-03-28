@@ -1,204 +1,182 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/preview/preview.ts
+// 📁 src/system/quickadd/core/QuickAddPipeline.ts
 // =====================================
+
+import { Message } from "discord.js";
+import { logger } from "../../core/logger/log";
+
+import { runOCR } from "../ocr/OCRProcessor";
+import { parseByType } from "../parsing/ParserRouter";
+import { validateEntries } from "../validation/QuickAddValidator";
+import { QuickAddBuffer } from "../storage/QuickAddBuffer";
+import { buildLayout } from "../ocr/layout/LayoutBuilder";
+
+import { QuickAddSession } from "./QuickAddSession";
+import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
 
 /**
- * 👀 ROLE:
- * Displays current QuickAdd buffer preview.
+ * 🧠 ROLE:
+ * Main processing pipeline for QuickAdd OCR input.
+ *
+ * Responsible for:
+ * - OCR → parsing → validation → selection
+ * - pushing entries into buffer
  *
  * ❗ RULES:
- * - read-only (NO mutations)
- * - traceId MUST be injected (STRICT)
- *
- * ✅ FINAL:
- * - log.emit only (no scoped logger)
- * - safe buffer read
- * - empty state handling
- * - deterministic output
- * - full observability (metrics + timing)
+ * - NO ID generation
+ * - MUST use provided traceId
+ * - FULL observability (logger.emit only)
  */
 
-import { ChatInputCommandInteraction } from "discord.js";
-
-import { QuickAddSession } from "../../../core/QuickAddSession";
-import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
-
-import { formatPreview } from "../../../utils/PreviewFormatter";
-
-import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
-
-import { log, metrics, timing } from "../../../logger";
-
-// =====================================
-// 🔐 SAFE REPLY
-// =====================================
-
-async function safeReply(
-  interaction: ChatInputCommandInteraction,
-  content: string
-) {
-  try {
-    await interaction.editReply(content);
-  } catch {
-    if (!interaction.replied) {
-      await interaction
-        .reply({ content, flags: 64 })
-        .catch(() => null);
-    }
-  }
-}
-
-// =====================================
-// 🚀 HANDLER
-// =====================================
-
-export async function handlePreview(
-  interaction: ChatInputCommandInteraction,
+export async function processImageInput(
+  message: Message,
+  session: ReturnType<typeof QuickAddSession.get>,
+  imageUrl: string,
   traceId: string
-): Promise<void> {
-  const timerId = `preview-${traceId}`;
-  timing.start(timerId);
+) {
+  const startTime = Date.now();
 
-  const guildId = interaction.guildId;
-  const userId = interaction.user.id;
+  const guildId = message.guild?.id;
+  const userId = message.author?.id;
 
-  // 🔥 REQUIRED (lifecycle fix)
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 });
-  }
-
-  // =====================================
-  // 📥 ENTRY LOG
-  // =====================================
-
-  log.emit({
-    event: "preview_requested_entry",
+  logger.emit({
+    event: "pipeline_context_check",
     traceId,
-    data: {
+    context: {
+      sessionId: session?.sessionId,
       guildId,
       userId,
     },
   });
 
-  // =====================================
-  // ❌ GUILD GUARD
-  // =====================================
-  if (!guildId) {
-    await safeReply(interaction, "❌ Guild only command");
-    return;
-  }
-
-  const session = QuickAddSession.get(guildId, userId);
-
-  const contextError = validateQuickAddContext(
-    interaction,
-    session,
-    traceId
-  );
-
-  if (contextError || !session) {
-    log.emit({
-      event: "preview_guard_failed",
+  if (!guildId || !session) {
+    logger.emit({
+      event: "pipeline_invalid_context",
       traceId,
       level: "warn",
-      data: {
-        guildId,
-        userId,
-        hasSession: !!session,
-        contextError,
-      },
+      context: { guildId, userId },
     });
 
-    await safeReply(
-      interaction,
-      contextError ?? "❌ Session not found"
-    );
     return;
   }
 
-  const sessionId = session.sessionId;
-
   try {
-    metrics.increment("preview_requested");
-
-    // =====================================
-    // 📥 LOAD BUFFER
-    // =====================================
-    const entries = QuickAddBuffer.getEntries(
-      sessionId,
-      traceId
-    );
-
-    log.emit({
-      event: "preview_requested",
+    logger.emit({
+      event: "pipeline_start",
       traceId,
-      data: {
-        sessionId,
-        guildId,
-        count: entries.length,
+      context: {
+        sessionId: session.sessionId,
+        type: session.type,
       },
     });
 
-    // =====================================
-    // ⚠️ EMPTY STATE
-    // =====================================
-    if (!entries.length) {
-      metrics.increment("preview_empty");
+    const ocrResult = await runOCR(imageUrl, traceId);
 
-      log.emit({
-        event: "preview_empty",
+    if (!ocrResult.sources.length) {
+      logger.emit({
+        event: "pipeline_ocr_empty",
         traceId,
-        data: {
-          sessionId,
-        },
+        level: "warn",
       });
 
-      await safeReply(interaction, "⚠️ Buffer is empty");
       return;
     }
 
-    // =====================================
-    // 🖥️ FORMAT OUTPUT
-    // =====================================
-    const output = formatPreview(entries, traceId);
+    const results: {
+      source: string;
+      entries: ValidatedEntry[];
+      validCount: number;
+    }[] = [];
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
-    await safeReply(interaction, output);
+    for (const source of ocrResult.sources) {
+      try {
+        if (!("tokens" in source) || !source.tokens?.length) continue;
 
-    const duration = timing.end(timerId);
+        const layout = buildLayout(source.tokens, traceId);
+        if (!layout.length) continue;
 
-    metrics.increment("preview_success");
+        const parsed: ParsedEntry[] = parseByType(
+          session.type,
+          { layout },
+          traceId
+        );
 
-    log.emit({
-      event: "preview_done",
+        if (!parsed.length) continue;
+
+        const validated = await validateEntries(
+          parsed.map((p) => ({
+            nickname: p.nickname,
+            value: p.value,
+          })),
+          traceId
+        );
+
+        results.push({
+          source: source.source,
+          entries: validated,
+          validCount: validated.filter((v) => v.status === "OK").length,
+        });
+
+      } catch (err) {
+        logger.emit({
+          event: "pipeline_source_error",
+          traceId,
+          level: "warn",
+          error: err,
+        });
+      }
+    }
+
+    if (!results.length) {
+      logger.emit({
+        event: "pipeline_no_results",
+        traceId,
+        level: "warn",
+      });
+
+      return;
+    }
+
+    const best = results.sort((a, b) => b.validCount - a.validCount)[0];
+
+    QuickAddBuffer.addEntries(
+      guildId,
+      best.entries.map((v) => ({
+        nickname: v.nickname,
+        value: v.value,
+        status: v.status,
+        confidence: v.confidence,
+        suggestion: v.suggestion,
+        source: best.source,
+      })),
+      traceId
+    );
+
+    const duration = Date.now() - startTime;
+
+    logger.emit({
+      event: "pipeline_done",
       traceId,
-      data: {
-        sessionId,
-        count: entries.length,
+      context: {
+        sessionId: session.sessionId,
+      },
+      stats: {
+        total: best.entries.length,
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("preview_error");
-
-    log.emit({
-      event: "preview_failed",
+    logger.emit({
+      event: "pipeline_error",
       traceId,
       level: "error",
-      data: {
-        error: err,
+      error: err,
+      stats: {
         durationMs: duration,
       },
     });
-
-    await safeReply(
-      interaction,
-      "❌ Failed to generate preview"
-    );
   }
 }
