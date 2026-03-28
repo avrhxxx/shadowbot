@@ -25,8 +25,8 @@
  */
 
 import { getQueue } from "../storage/QuickAddRepository";
-import { logger } from "../core/logger/log";
-import { createTraceId } from "../core/IdGenerator";
+import { logger } from "../../core/logger/log";
+import { createTraceId } from "../../core/IdGenerator";
 
 // =====================================
 // 📌 CONFIG
@@ -50,6 +50,7 @@ export function startQuickAddWorker() {
   const systemTraceId = createTraceId();
 
   logger.emit({
+    scope: "quickadd.worker",
     event: "worker_started",
     traceId: systemTraceId,
     context: {
@@ -63,6 +64,7 @@ export function startQuickAddWorker() {
 
     try {
       logger.emit({
+        scope: "quickadd.worker",
         event: "worker_tick_start",
         traceId,
       });
@@ -76,6 +78,7 @@ export function startQuickAddWorker() {
       )) as QueueEntry[];
 
       logger.emit({
+        scope: "quickadd.worker",
         event: "queue_loaded",
         traceId,
         context: {
@@ -89,6 +92,7 @@ export function startQuickAddWorker() {
       // =====================================
       if (!points.length) {
         logger.emit({
+          scope: "quickadd.worker",
           event: "queue_empty",
           traceId,
           context: {
@@ -102,6 +106,7 @@ export function startQuickAddWorker() {
       // =====================================
       for (const entry of points) {
         logger.emit({
+          scope: "quickadd.worker",
           event: "queue_item_received",
           traceId,
           context: {
@@ -118,6 +123,7 @@ export function startQuickAddWorker() {
       const duration = Date.now() - startedAt;
 
       logger.emit({
+        scope: "quickadd.worker",
         event: "worker_tick_done",
         traceId,
         stats: {
@@ -129,6 +135,7 @@ export function startQuickAddWorker() {
       const duration = Date.now() - startedAt;
 
       logger.emit({
+        scope: "quickadd.worker",
         event: "worker_error",
         traceId,
         level: "error",
@@ -136,6 +143,7 @@ export function startQuickAddWorker() {
       });
 
       logger.emit({
+        scope: "quickadd.worker",
         event: "worker_tick_failed",
         traceId,
         level: "error",
