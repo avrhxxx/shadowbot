@@ -15,8 +15,7 @@
  * - no session logic
  *
  * 🔥 LOGGER:
- * - uses log.emit ONLY
- * - system-level logs (type: "system")
+ * - uses logger.emit ONLY
  */
 
 import {
@@ -25,7 +24,7 @@ import {
   TextChannel,
 } from "discord.js";
 
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 import { createTraceId } from "../core/IdGenerator";
 
 // =====================================
@@ -43,12 +42,12 @@ export async function ensureQuickAddChannel(
 ): Promise<TextChannel> {
   const traceId = createTraceId(); // 🔥 SYSTEM TRACE
   const guildId = guild.id;
+  const startTime = Date.now();
 
-  log.emit({
+  logger.emit({
     event: "channel_ensure_start",
     traceId,
-    type: "system",
-    data: {
+    context: {
       guildId,
       expectedName: CHANNEL_NAME,
     },
@@ -64,14 +63,19 @@ export async function ensureQuickAddChannel(
   ) as TextChannel | undefined;
 
   if (existing) {
-    log.emit({
+    const duration = Date.now() - startTime;
+
+    logger.emit({
       event: "channel_found",
       traceId,
-      type: "system",
-      data: {
+      context: {
         guildId,
         channelId: existing.id,
         name: existing.name,
+      },
+      stats: {
+        durationMs: duration,
+        channel_found: 1,
       },
     });
 
@@ -81,11 +85,10 @@ export async function ensureQuickAddChannel(
   // =====================================
   // 🏗️ CREATE CHANNEL
   // =====================================
-  log.emit({
+  logger.emit({
     event: "channel_create_start",
     traceId,
-    type: "system",
-    data: {
+    context: {
       guildId,
       name: CHANNEL_NAME,
     },
@@ -96,14 +99,19 @@ export async function ensureQuickAddChannel(
     type: ChannelType.GuildText,
   });
 
-  log.emit({
+  const duration = Date.now() - startTime;
+
+  logger.emit({
     event: "channel_created",
     traceId,
-    type: "system",
-    data: {
+    context: {
       guildId,
       channelId: created.id,
       name: created.name,
+    },
+    stats: {
+      durationMs: duration,
+      channel_created: 1,
     },
   });
 
