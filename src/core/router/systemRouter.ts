@@ -23,14 +23,19 @@ type SystemHandler = (
   traceId: string
 ) => Promise<boolean>;
 
+type SystemHandlerEntry = {
+  name: string;
+  handler: SystemHandler;
+};
+
 // =============================
 // 🧩 REGISTRY
 // =============================
 
-const SYSTEM_HANDLERS: SystemHandler[] = [
-  handleEventInteraction,
-  handleAbsenceInteraction,
-  handlePointsInteraction,
+const SYSTEM_HANDLERS: SystemHandlerEntry[] = [
+  { name: "events", handler: handleEventInteraction },
+  { name: "absence", handler: handleAbsenceInteraction },
+  { name: "points", handler: handlePointsInteraction },
 ];
 
 // =============================
@@ -52,7 +57,9 @@ export async function handleSystemInteraction(
     },
   });
 
-  for (const handler of SYSTEM_HANDLERS) {
+  for (const { name, handler } of SYSTEM_HANDLERS) {
+    const startTime = Date.now();
+
     try {
       const handled = await handler(interaction, traceId);
 
@@ -62,7 +69,10 @@ export async function handleSystemInteraction(
           event: "handled",
           traceId,
           context: {
-            handler: handler.name,
+            handler: name,
+          },
+          stats: {
+            durationMs: Date.now() - startTime,
           },
         });
 
@@ -76,7 +86,10 @@ export async function handleSystemInteraction(
         traceId,
         level: "error",
         context: {
-          handler: handler.name,
+          handler: name,
+        },
+        stats: {
+          durationMs: Date.now() - startTime,
         },
         error: err,
       });
