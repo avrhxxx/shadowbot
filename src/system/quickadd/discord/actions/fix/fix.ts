@@ -13,7 +13,7 @@
  * - NO traceId fallback
  *
  * ✅ FINAL:
- * - log.emit only
+ * - logger.emit only
  * - safeReply (lifecycle safe)
  * - deferReply (prevents 10062)
  * - full observability
@@ -27,7 +27,7 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -42,7 +42,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 })
+        .reply({ content, ephemeral: true })
         .catch(() => null);
     }
   }
@@ -56,25 +56,25 @@ export async function handleFix(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `fix-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   // 🔥 CRITICAL (lifecycle fix)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
   }
 
   // =====================================
   // 📥 ENTRY LOG
   // =====================================
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.fix",
     event: "fix_requested",
     traceId,
-    data: {
+    context: {
       guildId,
       userId,
     },
@@ -94,15 +94,19 @@ export async function handleFix(
   );
 
   if (contextError || !session) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.fix",
       event: "fix_guard_failed",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         hasSession: !!session,
         contextError,
+      },
+      stats: {
+        fix_blocked: 1,
       },
     });
 
@@ -116,15 +120,17 @@ export async function handleFix(
   const sessionId = session.sessionId;
 
   try {
-    metrics.increment("fix_started");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.fix",
       event: "fix_start",
       traceId,
-      data: {
+      context: {
         sessionId,
         guildId,
         stage: session.stage,
+      },
+      stats: {
+        fix_started: 1,
       },
     });
 
@@ -135,10 +141,11 @@ export async function handleFix(
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.fix",
         event: "fix_empty",
         traceId,
-        data: { sessionId },
+        context: { sessionId },
       });
 
       await safeReply(interaction, "⚠️ Nothing to fix");
@@ -182,16 +189,18 @@ export async function handleFix(
     // =====================================
 
     if (revalidated.length !== updatedRaw.length) {
-      metrics.increment("fix_revalidation_mismatch");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.fix",
         event: "revalidation_length_mismatch",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId,
           before: updatedRaw.length,
           after: revalidated.length,
+        },
+        stats: {
+          fix_revalidation_mismatch: 1,
         },
       });
 
@@ -230,33 +239,38 @@ export async function handleFix(
         : "⚠️ No entries to fix"
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("fix_success");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.fix",
       event: "fix_done",
       traceId,
-      data: {
+      context: {
         sessionId,
         applied,
+      },
+      stats: {
+        fix_success: 1,
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("fix_error");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.fix",
       event: "fix_failed",
       traceId,
       level: "error",
-      data: {
-        error: err,
+      context: {
+        sessionId,
+      },
+      stats: {
+        fix_error: 1,
         durationMs: duration,
       },
+      error: err,
     });
 
     await safeReply(
