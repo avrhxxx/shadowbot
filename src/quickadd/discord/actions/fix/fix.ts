@@ -44,6 +44,19 @@ export async function handleFix(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // =====================================
+  // 📥 ENTRY LOG
+  // =====================================
+
+  log.emit({
+    event: "fix_requested",
+    traceId,
+    data: {
+      guildId,
+      userId,
+    },
+  });
+
   if (!guildId) {
     await interaction.editReply("❌ Guild only command");
     return;
@@ -75,6 +88,7 @@ export async function handleFix(
       data: {
         sessionId,
         guildId,
+        stage: session.stage,
       },
     });
 
