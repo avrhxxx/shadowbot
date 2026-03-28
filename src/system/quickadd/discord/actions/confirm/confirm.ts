@@ -1,4 +1,3 @@
-
 // =====================================
 // 📁 src/quickadd/discord/actions/confirm/confirm.ts
 // =====================================
@@ -19,7 +18,7 @@ import {
 
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🧠 MODE RESOLVER
@@ -45,7 +44,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, flags: 64 })
+        .reply({ content, ephemeral: true })
         .catch(() => null);
     }
   }
@@ -59,14 +58,13 @@ export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `confirm-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
   }
 
   if (!guildId) {
@@ -89,19 +87,20 @@ export async function handleConfirm(
   );
 
   if (contextError || ownerError || !session) {
-    metrics.increment("confirm_blocked");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm",
       event: "confirm_guard_failed",
       traceId,
-      type: "user",
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         hasSession: !!session,
         contextError,
         ownerError,
+      },
+      stats: {
+        confirm_blocked: 1,
       },
     });
 
@@ -115,16 +114,17 @@ export async function handleConfirm(
   const sessionId = session.sessionId;
 
   try {
-    metrics.increment("confirm_started");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm",
       event: "confirm_start",
       traceId,
-      type: "user",
-      data: {
+      context: {
         sessionId,
         stage: session.stage,
         type: session.type,
+      },
+      stats: {
+        confirm_started: 1,
       },
     });
 
@@ -134,13 +134,14 @@ export async function handleConfirm(
     const entries = QuickAddBuffer.getEntries(sessionId, traceId);
 
     if (!entries.length) {
-      metrics.increment("confirm_empty");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm",
         event: "confirm_empty",
         traceId,
-        type: "user",
-        data: { sessionId },
+        context: { sessionId },
+        stats: {
+          confirm_empty: 1,
+        },
       });
 
       await safeReply(interaction, "⚠️ Nothing to confirm");
@@ -150,15 +151,16 @@ export async function handleConfirm(
     const invalid = entries.filter((e) => e.status !== "OK");
 
     if (invalid.length > 0) {
-      metrics.increment("confirm_blocked_invalid");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm",
         event: "confirm_blocked_invalid",
         traceId,
-        type: "user",
-        data: {
+        context: {
           sessionId,
           invalidCount: invalid.length,
+        },
+        stats: {
+          confirm_blocked_invalid: 1,
         },
       });
 
@@ -181,11 +183,11 @@ export async function handleConfirm(
         traceId
       );
 
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm",
         event: "confirm_stage_entered",
         traceId,
-        type: "user",
-        data: {
+        context: {
           sessionId,
         },
       });
@@ -206,16 +208,17 @@ export async function handleConfirm(
     // =============================
 
     if (session.stage !== "CONFIRM_PENDING") {
-      metrics.increment("confirm_blocked_stage");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm",
         event: "confirm_blocked_stage",
         traceId,
-        type: "user",
         level: "warn",
-        data: {
+        context: {
           sessionId,
           stage: session.stage,
+        },
+        stats: {
+          confirm_blocked_stage: 1,
         },
       });
 
@@ -230,15 +233,16 @@ export async function handleConfirm(
     const target = interaction.options.getString("target");
 
     if (!target) {
-      metrics.increment("confirm_blocked_missing_target");
-
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm",
         event: "confirm_blocked_missing_target",
         traceId,
-        type: "user",
         level: "warn",
-        data: {
+        context: {
           sessionId,
+        },
+        stats: {
+          confirm_blocked_missing_target: 1,
         },
       });
 
@@ -293,37 +297,39 @@ export async function handleConfirm(
       `✅ Submitted ${entries.length} entries`
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("confirm_success");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm",
       event: "confirm_done",
       traceId,
-      type: "user",
-      data: {
+      context: {
         sessionId,
         mode,
         count: entries.length,
+      },
+      stats: {
+        confirm_success: 1,
         durationMs: duration,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    metrics.increment("confirm_error");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm",
       event: "confirm_failed",
       traceId,
-      type: "user",
       level: "error",
-      data: {
+      context: {
         sessionId,
-        error: err,
+      },
+      stats: {
+        confirm_error: 1,
         durationMs: duration,
       },
+      error: err,
     });
 
     await safeReply(
