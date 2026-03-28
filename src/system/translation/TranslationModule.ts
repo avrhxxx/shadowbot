@@ -1,4 +1,7 @@
-// src/translation/TranslationModule.ts
+// =====================================
+// 📁 src/translation/TranslationModule.ts
+// =====================================
+
 import {
   Client,
   ActionRowBuilder,
@@ -9,6 +12,12 @@ import {
   MessageFlags
 } from "discord.js";
 import fetch from "node-fetch";
+import { logger } from "../core/logger/log";
+import { createTraceId } from "../core/ids/IdGenerator";
+
+// =====================================
+// 🔹 CONFIG
+// =====================================
 
 const LIBRE_URL =
   process.env.LIBRE_URL ||
@@ -17,6 +26,10 @@ const LIBRE_URL =
 const GOOGLE_URL =
   process.env.GOOGLE_URL ||
   "https://translate.googleapis.com/translate_a/single";
+
+// =====================================
+// 🔹 TYPES
+// =====================================
 
 interface LibreResponse {
   translatedText: string;
@@ -39,8 +52,14 @@ const LANGUAGES = [
   { code: "ja", label: "Japanese", emoji: "🇯🇵" }
 ];
 
+// =====================================
+// 🚀 MODULE INIT
+// =====================================
+
 export function initTranslationModule(client: Client) {
   client.on("messageReactionAdd", async (reaction, user) => {
+    const traceId = createTraceId();
+
     try {
       if (user.bot) return;
 
@@ -52,7 +71,17 @@ export function initTranslationModule(client: Client) {
 
       const message = reaction.message;
 
-      if (!message.content) return; // 🔥 guard
+      if (!message.content) return;
+
+      logger.emit({
+        scope: "translation.module",
+        event: "reaction_trigger",
+        traceId,
+        context: {
+          messageId: message.id,
+          userId: user.id
+        }
+      });
 
       const embed = new EmbedBuilder()
         .setAuthor({
@@ -107,13 +136,21 @@ export function initTranslationModule(client: Client) {
 
           const langCode = parts[2];
 
+          logger.emit({
+            scope: "translation.module",
+            event: "language_selected",
+            traceId,
+            context: { langCode }
+          });
+
           if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
           }
 
           const translated = await translateText(
             message.content,
-            langCode
+            langCode,
+            traceId
           );
 
           await interaction.editReply({
@@ -126,8 +163,14 @@ export function initTranslationModule(client: Client) {
             ]
           });
 
-        } catch (err) {
-          console.error("Interaction error:", err);
+        } catch (error) {
+          logger.emit({
+            scope: "translation.module",
+            event: "interaction_error",
+            traceId,
+            level: "error",
+            error
+          });
 
           if (interaction.isRepliable()) {
             const payload = {
@@ -146,6 +189,12 @@ export function initTranslationModule(client: Client) {
 
       collector.on("end", async () => {
         try {
+          logger.emit({
+            scope: "translation.module",
+            event: "collector_end",
+            traceId
+          });
+
           const disabledRows = rows.map((row) => {
             row.components.forEach((c) => c.setDisabled(true));
             return row;
@@ -166,17 +215,36 @@ export function initTranslationModule(client: Client) {
             } catch {}
           }, 1000);
 
-        } catch {}
+        } catch (error) {
+          logger.emit({
+            scope: "translation.module",
+            event: "cleanup_error",
+            traceId,
+            level: "error",
+            error
+          });
+        }
       });
 
-    } catch (err) {
-      console.error("Translation module error:", err);
+    } catch (error) {
+      logger.emit({
+        scope: "translation.module",
+        event: "module_error",
+        traceId,
+        level: "error",
+        error
+      });
     }
   });
 
+  // =====================================
+  // 🌍 TRANSLATION
+  // =====================================
+
   async function translateText(
     text: string,
-    target: string
+    target: string,
+    traceId: string
   ): Promise<string> {
     // =============================
     // LIBRE
@@ -200,7 +268,15 @@ export function initTranslationModule(client: Client) {
           return data.translatedText;
         }
       }
-    } catch {}
+    } catch (error) {
+      logger.emit({
+        scope: "translation.module",
+        event: "libre_failed",
+        traceId,
+        level: "warn",
+        error
+      });
+    }
 
     // =============================
     // GOOGLE FALLBACK
@@ -225,7 +301,15 @@ export function initTranslationModule(client: Client) {
       ) {
         return data[0][0][0];
       }
-    } catch {}
+    } catch (error) {
+      logger.emit({
+        scope: "translation.module",
+        event: "google_failed",
+        traceId,
+        level: "error",
+        error
+      });
+    }
 
     return "Translation failed.";
   }
