@@ -3,5 +3,8 @@
 // =====================================
 
 export function getTime(): string {
-  return new Date().toISOString().split("T")[1].split(".")[0];
+  return new Date()
+    .toISOString()
+    .split("T")[1]
+    .split(".")[0];
 }
