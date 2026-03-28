@@ -12,7 +12,7 @@
  * - traceId injected
  *
  * ✅ FINAL:
- * - log.emit only
+ * - logger.emit only
  * - lightweight observability
  * - safe respond (🔥 runtime-safe)
  */
@@ -22,7 +22,7 @@ import { AutocompleteInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { log, metrics } from "../../../logger";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // MOCK DATA
@@ -57,12 +57,12 @@ export async function handleConfirmAutocomplete(
   const userId = interaction.user.id;
 
   if (!guildId) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm_autocomplete",
       event: "confirm_autocomplete_no_guild",
       traceId,
-      type: "user",
       level: "warn",
-      data: { userId },
+      context: { userId },
     });
     return;
   }
@@ -72,11 +72,11 @@ export async function handleConfirmAutocomplete(
 
     // 🔒 brak sesji lub zły stage → brak sugestii
     if (!session || session.stage !== "CONFIRM_PENDING") {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.confirm_autocomplete",
         event: "confirm_autocomplete_blocked",
         traceId,
-        type: "user",
-        data: {
+        context: {
           guildId,
           userId,
           hasSession: !!session,
@@ -100,19 +100,20 @@ export async function handleConfirmAutocomplete(
       opt.name.toLowerCase().includes(focused)
     );
 
-    metrics.increment("confirm_autocomplete_used");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm_autocomplete",
       event: "confirm_autocomplete",
       traceId,
-      type: "user",
-      data: {
+      context: {
         sessionId: session.sessionId,
         guildId,
         userId,
         input: focused,
         results: filtered.length,
         mode,
+      },
+      stats: {
+        confirm_autocomplete_used: 1,
       },
     });
 
@@ -124,16 +125,16 @@ export async function handleConfirmAutocomplete(
     );
 
   } catch (err) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.confirm_autocomplete",
       event: "confirm_autocomplete_failed",
       traceId,
-      type: "user",
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
-        error: err,
       },
+      error: err,
     });
 
     // 🔒 fail-safe → zawsze coś odpowiedz
