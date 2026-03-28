@@ -15,7 +15,7 @@ import {
 
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { log, metrics, timing } from "../../../logger";
+import { logger } from "../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY (EDIT ONLY)
@@ -44,9 +44,6 @@ export async function handleAdjust(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
-  const timerId = `adjust-${traceId}`;
-  timing.start(timerId);
-
   const startedAt = Date.now();
 
   const guildId = interaction.guildId;
@@ -77,15 +74,18 @@ export async function handleAdjust(
   );
 
   if (contextError || ownerError || !session) {
-    metrics.increment("adjust_blocked");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.adjust",
       event: "adjust_blocked",
       traceId,
-      data: {
+      level: "warn",
+      context: {
         guildId,
         userId,
         reason: contextError ?? ownerError ?? "no_session",
+      },
+      stats: {
+        adjust_blocked: 1,
       },
     });
 
@@ -103,17 +103,19 @@ export async function handleAdjust(
   const newValue = interaction.options.getInteger("value");
 
   try {
-    metrics.increment("adjust_started");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.adjust",
       event: "adjust_start",
       traceId,
-      data: {
+      input: {
         sessionId,
         guildId,
         id,
         newNickname,
         newValue,
+      },
+      stats: {
+        adjust_started: 1,
       },
     });
 
@@ -169,12 +171,15 @@ export async function handleAdjust(
     // =====================================
     QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.adjust",
       event: "adjust_applied",
       traceId,
-      data: {
+      context: {
         sessionId,
         id,
+      },
+      result: {
         before: target,
         after: updated,
       },
@@ -195,10 +200,11 @@ export async function handleAdjust(
           traceId
         );
 
-        log.emit({
+        logger.emit({
+          scope: "quickadd.adjust",
           event: "learning_saved_adjust",
           traceId,
-          data: {
+          context: {
             sessionId,
             from: target.nickname,
             to: newNickname,
@@ -206,14 +212,15 @@ export async function handleAdjust(
         });
       }
     } catch (err) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.adjust",
         event: "learning_failed_adjust",
         traceId,
         level: "warn",
-        data: {
+        context: {
           sessionId,
-          error: err,
         },
+        error: err,
       });
     }
 
@@ -222,32 +229,38 @@ export async function handleAdjust(
       `✅ Updated entry [${id}]`
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startedAt;
 
-    metrics.increment("adjust_success");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.adjust",
       event: "adjust_done",
       traceId,
-      data: {
+      context: {
         sessionId,
+      },
+      meta: {
         durationMs: duration,
+      },
+      stats: {
+        adjust_success: 1,
       },
     });
 
   } catch (err) {
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startedAt;
 
-    metrics.increment("adjust_error");
-
-    log.emit({
+    logger.emit({
+      scope: "quickadd.adjust",
       event: "adjust_failed",
       traceId,
       level: "error",
-      data: {
-        error: err,
+      meta: {
         durationMs: duration,
       },
+      stats: {
+        adjust_error: 1,
+      },
+      error: err,
     });
 
     await safeReply(
