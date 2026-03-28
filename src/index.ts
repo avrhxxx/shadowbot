@@ -2,7 +2,7 @@
 // 📁 src/index.ts
 // =====================================
 
-import "./google/googleSheetsClient";
+import "./integrations/google/googleSheetsClient";
 
 import {
   Client,
@@ -11,26 +11,42 @@ import {
   Interaction,
 } from "discord.js";
 
-// ✅ FIXED PATH
-import { initTranslationModule } from "./translation/TranslationModule";
-
-import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
-import { handleEventInteraction } from "./eventsPanel/eventHandlers";
-import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
-import { handleAbsenceInteraction } from "./absencePanel/absenceHandler";
-import { initAbsenceNotifications } from "./absencePanel/absenceButtons/absenceNotification";
-import { handlePointsInteraction } from "./pointsPanel/pointsHandler";
-
 // =============================
-// 🔥 QUICKADD
+// 🧩 SYSTEMS (INDEX-BASED)
 // =============================
 
-import { qCommand } from "./quickadd/discord/CommandBuilder";
-import { handleQuickAddCommand } from "./quickadd/discord/CommandRouter";
-import { ensureQuickAddChannel } from "./quickadd/integrations/QuickAddChannelManager";
-import { registerQuickAddListener } from "./quickadd/discord/QuickAddListener";
-import { ensureAllSheets } from "./google/googleSheetsStorage";
-import { startQuickAddWorker } from "./quickadd/integrations/QuickAddQueueWorker";
+import { initTranslationModule } from "./systems/translation";
+import { initModeratorPanel } from "./systems/moderator";
+
+import {
+  handleEventInteraction,
+  initEventReminders,
+} from "./systems/events";
+
+import {
+  handleAbsenceInteraction,
+  initAbsenceNotifications,
+} from "./systems/absence";
+
+import { handlePointsInteraction } from "./systems/points";
+
+// =============================
+// 🔥 QUICKADD (SYSTEM)
+// =============================
+
+import {
+  qCommand,
+  handleQuickAddCommand,
+  ensureQuickAddChannel,
+  registerQuickAddListener,
+  startQuickAddWorker,
+} from "./systems/quickadd";
+
+// =============================
+// 🌍 INTEGRATIONS
+// =============================
+
+import { ensureAllSheets } from "./integrations/google";
 
 // =============================
 
@@ -113,7 +129,6 @@ client.once("clientReady", async () => {
     try {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "q") {
-          // ❌ REMOVED traceId generation (moved to QuickAdd system)
           await handleQuickAddCommand(interaction);
           return;
         }
