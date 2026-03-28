@@ -3,28 +3,28 @@
 // =====================================
 
 import { getLearningData } from "../storage/QuickAddRepository";
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 
 export async function loadNicknameMap(
   traceId: string
 ): Promise<Record<string, string>> {
   try {
-    log.emit({ event: "map_load_start", traceId });
+    logger.emit({ event: "map_load_start", traceId });
 
     const rows = await getLearningData(traceId);
 
-    log.emit({
+    logger.emit({
       event: "sheet_loaded",
       traceId,
-      data: { rows: rows?.length || 0 },
+      context: { rowsCount: rows?.length || 0 },
     });
 
     if (!rows || rows.length < 2) {
-      log.emit({
+      logger.emit({
         event: "empty_sheet",
         traceId,
         level: "warn",
-        data: { rows: rows?.length || 0 },
+        context: { rowsCount: rows?.length || 0 },
       });
       return {};
     }
@@ -37,10 +37,10 @@ export async function loadNicknameMap(
     const adjustedIndex = headers.indexOf("adjusted");
     const overrideIndex = headers.indexOf("override");
 
-    log.emit({
+    logger.emit({
       event: "columns_detected",
       traceId,
-      data: {
+      context: {
         ocrIndex,
         parserIndex,
         adjustedIndex,
@@ -49,7 +49,7 @@ export async function loadNicknameMap(
     });
 
     if (ocrIndex === -1) {
-      log.emit({
+      logger.emit({
         event: "missing_ocr_column",
         traceId,
         level: "warn",
@@ -80,20 +80,20 @@ export async function loadNicknameMap(
       map[cleaned] = finalValue;
     }
 
-    log.emit({
+    logger.emit({
       event: "map_built",
       traceId,
-      data: { size: Object.keys(map).length },
+      context: { mapSize: Object.keys(map).length },
     });
 
     return map;
 
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "map_load_failed",
       traceId,
       level: "error",
-      data: err,
+      error: err,
     });
 
     return {};
