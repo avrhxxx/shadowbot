@@ -6,8 +6,13 @@ import { getTime } from "../runtime/Time";
 import { resolveScope } from "../runtime/ScopeResolver";
 import {
   InternalLog,
-  LogInput,
+  LoggerEmitOptions,
 } from "../observability/ObservabilityTypes";
+
+/**
+ * ❄️ FROZEN MODULE
+ * Core logging engine.
+ */
 
 // =====================================
 // 🔹 STATE
@@ -54,7 +59,7 @@ function flush(traceId: string) {
 // =====================================
 
 export const ObservabilityEngine = {
-  emit(input: LogInput) {
+  emit(input: LoggerEmitOptions) {
     const {
       event,
       traceId,
