@@ -1,6 +1,20 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/cancel/cancel.ts
+// 📁 src/system/quickadd/discord/actions/cancel/cancel.ts
 // =====================================
+
+/**
+ * 🧠 ROLE:
+ * Clears current QuickAdd buffer (without ending session).
+ *
+ * Responsible for:
+ * - clearing buffer
+ *
+ * ❗ RULES:
+ * - owner-only
+ * - session must exist
+ * - does NOT end session
+ * - logger.emit ONLY
+ */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
@@ -27,7 +41,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, ephemeral: true })
+        .reply({ content, flags: 64 }) // 🔥 ujednolicone (zamiast ephemeral)
         .catch(() => null);
     }
   }
@@ -48,7 +62,7 @@ export async function handleCancel(
 
   // 🔥 lifecycle fix (CRITICAL)
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 }); // 🔥 ujednolicone
   }
 
   if (!guildId) {
@@ -140,9 +154,11 @@ export async function handleCancel(
       context: {
         sessionId,
       },
+      meta: {
+        durationMs: duration,
+      },
       stats: {
         cancel_success: 1,
-        durationMs: duration,
       },
     });
 
@@ -157,9 +173,11 @@ export async function handleCancel(
       context: {
         sessionId,
       },
+      meta: {
+        durationMs: duration,
+      },
       stats: {
         cancel_error: 1,
-        durationMs: duration,
       },
       error: err,
     });
