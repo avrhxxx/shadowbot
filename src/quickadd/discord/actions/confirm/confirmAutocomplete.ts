@@ -56,18 +56,40 @@ export async function handleConfirmAutocomplete(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  if (!guildId) return;
+  if (!guildId) {
+    log.emit({
+      event: "confirm_autocomplete_no_guild",
+      traceId,
+      type: "user",
+      level: "warn",
+      data: { userId },
+    });
+    return;
+  }
 
   try {
     const session = QuickAddSession.get(guildId, userId);
 
     // 🔒 brak sesji lub zły stage → brak sugestii
     if (!session || session.stage !== "CONFIRM_PENDING") {
+      log.emit({
+        event: "confirm_autocomplete_blocked",
+        traceId,
+        type: "user",
+        data: {
+          guildId,
+          userId,
+          hasSession: !!session,
+          stage: session?.stage,
+        },
+      });
+
       await interaction.respond([]);
       return;
     }
 
-    const focused = interaction.options.getFocused();
+    const focusedRaw = interaction.options.getFocused();
+    const focused = String(focusedRaw ?? "").toLowerCase();
 
     const mode = resolveMode(session.type);
 
@@ -75,7 +97,7 @@ export async function handleConfirmAutocomplete(
       mode === "points" ? WEEK_OPTIONS : EVENT_OPTIONS;
 
     const filtered = options.filter((opt) =>
-      opt.name.toLowerCase().includes(focused.toLowerCase())
+      opt.name.toLowerCase().includes(focused)
     );
 
     metrics.increment("confirm_autocomplete_used");
@@ -83,10 +105,14 @@ export async function handleConfirmAutocomplete(
     log.emit({
       event: "confirm_autocomplete",
       traceId,
+      type: "user",
       data: {
         sessionId: session.sessionId,
+        guildId,
+        userId,
         input: focused,
         results: filtered.length,
+        mode,
       },
     });
 
@@ -101,8 +127,11 @@ export async function handleConfirmAutocomplete(
     log.emit({
       event: "confirm_autocomplete_failed",
       traceId,
+      type: "user",
       level: "warn",
       data: {
+        guildId,
+        userId,
         error: err,
       },
     });
