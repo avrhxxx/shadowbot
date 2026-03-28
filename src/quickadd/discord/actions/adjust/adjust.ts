@@ -15,7 +15,7 @@ import {
 
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { log } from "../../../logger";
+import { log, metrics, timing } from "../../../logger";
 
 // =====================================
 // 🔐 SAFE REPLY (EDIT ONLY)
@@ -44,6 +44,9 @@ export async function handleAdjust(
   interaction: ChatInputCommandInteraction,
   traceId: string
 ): Promise<void> {
+  const timerId = `adjust-${traceId}`;
+  timing.start(timerId);
+
   const startedAt = Date.now();
 
   const guildId = interaction.guildId;
@@ -74,6 +77,8 @@ export async function handleAdjust(
   );
 
   if (contextError || ownerError || !session) {
+    metrics.increment("adjust_blocked");
+
     log.emit({
       event: "adjust_blocked",
       traceId,
@@ -98,6 +103,8 @@ export async function handleAdjust(
   const newValue = interaction.options.getInteger("value");
 
   try {
+    metrics.increment("adjust_started");
+
     log.emit({
       event: "adjust_start",
       traceId,
@@ -215,22 +222,31 @@ export async function handleAdjust(
       `✅ Updated entry [${id}]`
     );
 
+    const duration = timing.end(timerId);
+
+    metrics.increment("adjust_success");
+
     log.emit({
       event: "adjust_done",
       traceId,
       data: {
         sessionId,
-        durationMs: Date.now() - startedAt,
+        durationMs: duration,
       },
     });
 
   } catch (err) {
+    const duration = timing.end(timerId);
+
+    metrics.increment("adjust_error");
+
     log.emit({
       event: "adjust_failed",
       traceId,
       level: "error",
       data: {
         error: err,
+        durationMs: duration,
       },
     });
 
