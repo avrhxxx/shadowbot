@@ -18,10 +18,10 @@
  * - ONE session per user (per guild)
  * - sessionId = source of truth
  * - NO business logic
- * - log.emit ONLY (no scoped logger)
+ * - logger.emit ONLY
  */
 
-import { log } from "../../../core/logger/log";
+import { logger } from "../../../core/logger/log";
 import { createSessionId } from "../../../core/ids/IdGenerator";
 import { QuickAddType, QuickAddStage } from "./QuickAddTypes";
 
@@ -73,7 +73,7 @@ export const QuickAddSession = {
     const existing = sessions.get(key);
 
     if (existing) {
-      log.emit({
+      logger.emit({
         event: "session_start_blocked",
         traceId,
         level: "warn",
@@ -95,7 +95,7 @@ export const QuickAddSession = {
 
     sessions.set(key, session);
 
-    log.emit({
+    logger.emit({
       event: "session_started",
       traceId,
       data: {
@@ -121,7 +121,7 @@ export const QuickAddSession = {
     const session = sessions.get(key);
 
     if (!session) {
-      log.emit({
+      logger.emit({
         event: "session_set_thread_missing",
         traceId,
         level: "warn",
@@ -137,7 +137,7 @@ export const QuickAddSession = {
 
     sessions.set(key, updated);
 
-    log.emit({
+    logger.emit({
       event: "session_thread_attached",
       traceId,
       data: {
@@ -157,7 +157,7 @@ export const QuickAddSession = {
     const session = sessions.get(key);
 
     if (!session) {
-      log.emit({
+      logger.emit({
         event: "session_set_stage_missing",
         traceId,
         level: "warn",
@@ -169,7 +169,7 @@ export const QuickAddSession = {
     const allowed = ALLOWED_TRANSITIONS[session.stage] || [];
 
     if (!allowed.includes(nextStage)) {
-      log.emit({
+      logger.emit({
         event: "session_invalid_transition",
         traceId,
         level: "warn",
@@ -189,7 +189,7 @@ export const QuickAddSession = {
 
     sessions.set(key, updated);
 
-    log.emit({
+    logger.emit({
       event: "session_stage_updated",
       traceId,
       data: {
@@ -206,7 +206,7 @@ export const QuickAddSession = {
 
     sessions.delete(key);
 
-    log.emit({
+    logger.emit({
       event: "session_ended",
       traceId,
       data: {
