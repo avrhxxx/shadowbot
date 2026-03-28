@@ -19,6 +19,7 @@ import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 
 import { SheetRepository } from "../google/SheetRepository";
+import crypto from "crypto";
 
 // =============================
 // TYPES
@@ -233,16 +234,58 @@ export async function initModeratorPanel(client: Client) {
       await syncModeratorPanel(modChannel!, map);
     }, 60000);
   }
+}
 
-  client.on("interactionCreate", async (interaction: Interaction) => {
-    if (!interaction.isButton()) return;
+// =============================
+// 🚀 INTERACTION HANDLER (FOR SYSTEM ROUTER)
+// =============================
 
+export async function handleModeratorInteraction(
+  interaction: Interaction
+): Promise<boolean> {
+  if (!interaction.isButton()) return false;
+
+  try {
     switch (interaction.customId) {
-      case "moderator_event_menu": return handleEventMenu(interaction);
-      case "moderator_points_menu": return handlePointsMenu(interaction);
-      case "moderator_translate_menu": return handleTranslateMenu(interaction);
-      case "moderator_absence_menu": return handleAbsenceMenu(interaction);
-      case "moderator_help": return handleModeratorHelp(interaction);
+      case "moderator_event_menu":
+        await handleEventMenu(interaction);
+        return true;
+
+      case "moderator_points_menu":
+        await handlePointsMenu(interaction);
+        return true;
+
+      case "moderator_translate_menu":
+        await handleTranslateMenu(interaction);
+        return true;
+
+      case "moderator_absence_menu":
+        await handleAbsenceMenu(interaction);
+        return true;
+
+      case "moderator_help":
+        await handleModeratorHelp(interaction);
+        return true;
     }
-  });
+
+    return false;
+  } catch (error) {
+    console.error("Error handling moderator interaction:", error);
+
+    if (interaction.isRepliable()) {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ An error occurred while processing this interaction.",
+          ephemeral: true,
+        });
+      }
+    }
+
+    return true;
+  }
 }
