@@ -34,15 +34,18 @@ export async function handleQuickAddCommand(
         interaction.options.getSubcommand() as QuickAddSubcommand;
     } catch {
       log.emit({
+        scope: "quickadd.command_router",
         event: "command_subcommand_missing",
         traceId,
         level: "error",
         data: { userId, guildId, channelId },
       });
+
       return;
     }
 
     log.emit({
+      scope: "quickadd.command_router",
       event: "command_received",
       traceId,
       data: {
@@ -58,11 +61,27 @@ export async function handleQuickAddCommand(
     // 🔒 HANDLER GUARD
     if (!handler) {
       log.emit({
+        scope: "quickadd.command_router",
         event: "command_handler_missing",
         traceId,
         level: "error",
         data: { subcommand },
       });
+
+      // 🔥 FAILSAFE RESPONSE
+      if (interaction.isRepliable()) {
+        const payload = {
+          content: "❌ Command not supported.",
+          ephemeral: true,
+        };
+
+        if (interaction.deferred || interaction.replied) {
+          await interaction.followUp(payload);
+        } else {
+          await interaction.reply(payload);
+        }
+      }
+
       return;
     }
 
@@ -74,6 +93,7 @@ export async function handleQuickAddCommand(
     }
 
     log.emit({
+      scope: "quickadd.command_router",
       event: "command_execution_start",
       traceId,
       data: { subcommand },
@@ -82,6 +102,7 @@ export async function handleQuickAddCommand(
     await handler(interaction, traceId);
 
     log.emit({
+      scope: "quickadd.command_router",
       event: "command_execution_done",
       traceId,
       data: {
@@ -92,11 +113,12 @@ export async function handleQuickAddCommand(
 
   } catch (err: any) {
     log.emit({
+      scope: "quickadd.command_router",
       event: "command_router_error",
       traceId,
       level: "error",
       data: {
-        subcommand,
+        subcommand: subcommand ?? "unknown",
         error: {
           message: err?.message || "unknown",
           stack: err?.stack,
@@ -105,16 +127,17 @@ export async function handleQuickAddCommand(
     });
 
     log.emit({
+      scope: "quickadd.command_router",
       event: "command_execution_failed",
       traceId,
       level: "error",
       data: {
-        subcommand,
+        subcommand: subcommand ?? "unknown",
         durationMs: Date.now() - startTime,
       },
     });
 
-    // 🔥 FAILSAFE RESPONSE (Discord safety)
+    // 🔥 FAILSAFE RESPONSE
     if (interaction.isRepliable()) {
       const payload = {
         content: "❌ Command failed.",
