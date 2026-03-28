@@ -5,6 +5,7 @@
 import { Interaction } from "discord.js";
 import { createTraceId } from "../ids/IdGenerator";
 import { TraceContext } from "../trace/TraceContext";
+import { log } from "../logger/log";
 
 // =============================
 // 🧩 SYSTEM IMPORTS
@@ -54,27 +55,40 @@ export async function handleSystemInteraction(
 ) {
   const ctx = createContext(interaction);
 
-  // 🔹 TEMP DEBUG (docelowo → logger)
-  console.log(`➡️ ROUTE ${interaction.id} | trace=${ctx.traceId}`);
+  log(ctx, "system_router_received", {
+    context: {
+      interactionId: interaction.id,
+      type: interaction.type,
+    },
+  });
 
   for (const handler of SYSTEM_HANDLERS) {
     try {
       const handled = await handler(interaction, ctx);
 
       if (handled) {
-        // 🔹 DEBUG SUCCESS FLOW
-        console.log(`✅ HANDLED by ${handler.name} | trace=${ctx.traceId}`);
+        log(ctx, "system_router_handled", {
+          context: {
+            handler: handler.name,
+          },
+        });
+
         return;
       }
 
     } catch (err) {
-      console.error(
-        `❌ System handler error (${handler.name}) | trace=${ctx.traceId}`,
-        err
-      );
+      log(ctx, "system_router_error", {
+        context: {
+          handler: handler.name,
+        },
+        error: err,
+      }, "error");
     }
   }
 
-  // 🔹 OPTIONAL: nic nie obsłużyło
-  console.log(`⚠️ UNHANDLED interaction | trace=${ctx.traceId}`);
+  log(ctx, "system_router_unhandled", {
+    context: {
+      interactionId: interaction.id,
+    },
+  }, "warn");
 }
