@@ -3,19 +3,11 @@
 // =====================================
 
 /**
- * 🚪 ROLE:
- * Public API for Absence system
- *
- * Exposes ONLY what external systems should use.
- * Internal structure stays hidden.
- *
- * ❗ RULES:
- * - NO logic here
- * - ONLY exports
+ * 🚪 PUBLIC API – Absence System
  */
 
 // =============================
-// 🔹 HANDLERS (ENTRY POINTS)
+// 🔹 HANDLER (ENTRY POINT)
 // =============================
 
 export { handleAbsenceInteraction } from "./absenceHandler";
@@ -27,20 +19,7 @@ export { handleAbsenceInteraction } from "./absenceHandler";
 export { initAbsenceNotifications } from "./absenceButtons/absenceNotification";
 
 // =============================
-// 🔹 PANEL
-// =============================
-
-export * from "./absencePanel";
-
-// =============================
-// 🔹 SERVICE (OPTIONAL PUBLIC)
+// 🔹 DOMAIN SERVICE (IMPORTANT)
 // =============================
 
 export * from "./absenceService";
-
-// =============================
-// 🔹 BUTTONS (INTERNAL API)
-// =============================
-
-// ⚠️ Export only if used outside
-export * from "./absenceButtons";
