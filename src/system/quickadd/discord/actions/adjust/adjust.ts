@@ -295,6 +295,9 @@ export async function handleAdjust(
       event: "adjust_failed",
       traceId,
       level: "error",
+      context: {
+        sessionId,
+      },
       meta: {
         durationMs: duration,
       },
