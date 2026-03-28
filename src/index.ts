@@ -11,7 +11,9 @@ import {
   Interaction,
 } from "discord.js";
 
-import { initTranslationModule } from "./modules/TranslationModule";
+// ✅ FIXED PATH
+import { initTranslationModule } from "./translation/TranslationModule";
+
 import { initModeratorPanel } from "./moderatorPanel/moderatorPanel";
 import { handleEventInteraction } from "./eventsPanel/eventHandlers";
 import { initEventReminders } from "./eventsPanel/eventsButtons/eventsReminder";
@@ -77,9 +79,12 @@ client.once("clientReady", async () => {
     console.error("❌ Slash command registration failed:", err);
   }
 
+  // =============================
+  // 🔧 MODULE INIT
+  // =============================
+
   initTranslationModule(client);
   initModeratorPanel(client);
-
   registerQuickAddListener(client);
 
   for (const guild of client.guilds.cache.values()) {
@@ -100,13 +105,16 @@ client.once("clientReady", async () => {
     });
   }
 
+  // =============================
+  // 🎯 INTERACTIONS
+  // =============================
+
   client.on("interactionCreate", async (interaction: Interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "q") {
-          const traceId = `${interaction.id}-${Date.now()}`;
-
-          await handleQuickAddCommand(interaction, traceId);
+          // ❌ REMOVED traceId generation (moved to QuickAdd system)
+          await handleQuickAddCommand(interaction);
           return;
         }
       }
