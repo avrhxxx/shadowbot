@@ -1,8 +1,10 @@
-// src/eventsPanel/eventService.ts
+// =====================================
+// 📁 src/eventsPanel/eventService.ts
+// =====================================
 
-// 🔥 [IMPORT FIX - OK]
 import { SheetRepository } from "../google/SheetRepository";
-import crypto from "crypto"; // 🔥 [DODANE - ID SAFETY]
+import crypto from "crypto";
+import { logger } from "../core/logger/log";
 
 // =============================
 // TYPES
@@ -20,7 +22,7 @@ export interface EventObject {
   reminderBefore?: number;
   status: "ACTIVE" | "PAST" | "CANCELED";
   participants: string[];
-  results: string[]; // 🔥 NEW
+  results: string[];
   absent: string[];
   createdAt: number;
   reminderSent: boolean;
@@ -29,7 +31,7 @@ export interface EventObject {
 }
 
 export interface EventConfig {
-  id?: string; // 🔥 [FIX - REQUIRED BY REPO]
+  id?: string;
   guildId: string;
   notificationChannel?: string;
   downloadChannel?: string;
@@ -37,13 +39,13 @@ export interface EventConfig {
 }
 
 // =============================
-// 📦 REPOS
+// REPOS
 // =============================
 const eventRepo = new SheetRepository<EventObject>("events");
 const configRepo = new SheetRepository<EventConfig>("events_config");
 
 // =============================
-// 📥 LOAD
+// 📥 LOAD (NO LOGS)
 // =============================
 export async function getEvents(guildId: string): Promise<EventObject[]> {
   return eventRepo.findAll({ guildId });
@@ -54,22 +56,22 @@ export async function getEventById(
   eventId: string
 ): Promise<EventObject | null> {
   const event = await eventRepo.findById(eventId);
-
-  // 🔥 [FIX - SECURITY / DATA SAFETY]
   if (!event || event.guildId !== guildId) return null;
-
   return event;
 }
 
 // =============================
 // ➕ CREATE
 // =============================
-export async function createEvent(data: EventObject): Promise<EventObject> {
+export async function createEvent(
+  data: EventObject,
+  traceId?: string
+): Promise<EventObject> {
   const newEvent: EventObject = {
     ...data,
-    id: data.id ?? crypto.randomUUID(), // 🔥 [CRITICAL FIX - ID REQUIRED]
+    id: data.id ?? crypto.randomUUID(),
     participants: data.participants || [],
-    results: data.results || [], // 🔥 NEW
+    results: data.results || [],
     absent: data.absent || [],
     reminderSent: data.reminderSent ?? false,
     started: data.started ?? false,
@@ -79,14 +81,35 @@ export async function createEvent(data: EventObject): Promise<EventObject> {
 
   await eventRepo.create(newEvent);
 
+  logger.emit({
+    scope: "events.service",
+    event: "event_created",
+    traceId,
+    context: {
+      eventId: newEvent.id,
+      guildId: newEvent.guildId,
+      type: newEvent.eventType,
+    },
+  });
+
   return newEvent;
 }
 
 // =============================
 // ❌ DELETE
 // =============================
-export async function deleteEvent(eventId: string) {
+export async function deleteEvent(
+  eventId: string,
+  traceId?: string
+) {
   await eventRepo.deleteById(eventId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "event_deleted",
+    traceId,
+    context: { eventId },
+  });
 }
 
 // =============================
@@ -94,9 +117,17 @@ export async function deleteEvent(eventId: string) {
 // =============================
 export async function updateEvent(
   eventId: string,
-  partial: Partial<EventObject>
+  partial: Partial<EventObject>,
+  traceId?: string
 ) {
   await eventRepo.updateById(eventId, partial);
+
+  logger.emit({
+    scope: "events.service",
+    event: "event_updated",
+    traceId,
+    context: { eventId },
+  });
 }
 
 // =============================
@@ -104,13 +135,22 @@ export async function updateEvent(
 // =============================
 export async function checkAndSetReminder(
   eventId: string,
-  reminderValue: boolean
+  reminderValue: boolean,
+  traceId?: string
 ): Promise<boolean> {
   const event = await eventRepo.findById(eventId);
   if (!event) return false;
 
   if (!event.reminderSent && reminderValue) {
     await eventRepo.updateById(eventId, { reminderSent: true });
+
+    logger.emit({
+      scope: "events.service",
+      event: "reminder_set",
+      traceId,
+      context: { eventId },
+    });
+
     return true;
   }
 
@@ -123,10 +163,21 @@ export async function checkAndSetReminder(
 export async function addParticipants(
   guildId: string,
   eventId: string,
-  nicknames: string[]
+  nicknames: string[],
+  traceId?: string
 ) {
   const event = await getEventById(guildId, eventId);
-  if (!event) throw new Error("Event not found");
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId, guildId },
+    });
+    throw new Error("Event not found");
+  }
 
   const participants = [...event.participants];
   let absent = [...event.absent];
@@ -136,7 +187,14 @@ export async function addParticipants(
     absent = absent.filter((n) => n !== nick);
   }
 
-  await updateEvent(eventId, { participants, absent });
+  await updateEvent(eventId, { participants, absent }, traceId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "participants_added",
+    traceId,
+    context: { eventId, count: nicknames.length },
+  });
 
   return participants;
 }
@@ -144,10 +202,21 @@ export async function addParticipants(
 export async function removeParticipants(
   guildId: string,
   eventId: string,
-  nicknames: string[]
+  nicknames: string[],
+  traceId?: string
 ) {
   const event = await getEventById(guildId, eventId);
-  if (!event) throw new Error("Event not found");
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId, guildId },
+    });
+    throw new Error("Event not found");
+  }
 
   const participants = event.participants.filter(
     (n) => !nicknames.includes(n)
@@ -157,7 +226,14 @@ export async function removeParticipants(
     (n) => !nicknames.includes(n)
   );
 
-  await updateEvent(eventId, { participants, absent });
+  await updateEvent(eventId, { participants, absent }, traceId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "participants_removed",
+    traceId,
+    context: { eventId, count: nicknames.length },
+  });
 
   return participants;
 }
@@ -165,10 +241,21 @@ export async function removeParticipants(
 export async function markAbsent(
   guildId: string,
   eventId: string,
-  nicknames: string[]
+  nicknames: string[],
+  traceId?: string
 ) {
   const event = await getEventById(guildId, eventId);
-  if (!event) throw new Error("Event not found");
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId, guildId },
+    });
+    throw new Error("Event not found");
+  }
 
   let participants = [...event.participants];
   let absent = [...event.absent];
@@ -183,43 +270,54 @@ export async function markAbsent(
     }
   }
 
-  await updateEvent(eventId, { participants, absent });
+  await updateEvent(eventId, { participants, absent }, traceId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "participants_marked_absent",
+    traceId,
+    context: { eventId, count: nicknames.length },
+  });
 
   return absent;
 }
 
 // =============================
-// 🧠 RESULTS (NEW)
+// 🧠 RESULTS
 // =============================
 export async function addResults(
   guildId: string,
   eventId: string,
-  nicknames: string[]
+  nicknames: string[],
+  traceId?: string
 ) {
   const event = await getEventById(guildId, eventId);
-  if (!event) throw new Error("Event not found");
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId, guildId },
+    });
+    throw new Error("Event not found");
+  }
 
   const participants = [...event.participants];
   const resultsSet = new Set(event.results || []);
 
-  // 🔥 ADD RESULTS (idempotent)
   for (const nick of nicknames) {
-    // 👉 opcja A: ignorujemy osoby spoza participants
     if (!participants.includes(nick)) continue;
-
     resultsSet.add(nick);
   }
 
   const results = Array.from(resultsSet);
 
-  // =============================
-  // 🔥 COMPUTE ABSENT
-  // =============================
   const computedAbsent = participants.filter(
     (p) => !results.includes(p)
   );
 
-  // 🔥 MERGE manual + computed
   const absentSet = new Set([
     ...(event.absent || []),
     ...computedAbsent,
@@ -227,15 +325,19 @@ export async function addResults(
 
   const absent = Array.from(absentSet);
 
-  await updateEvent(eventId, {
-    results,
-    absent,
+  await updateEvent(eventId, { results, absent }, traceId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "results_added",
+    traceId,
+    context: {
+      eventId,
+      resultsCount: results.length,
+    },
   });
 
-  return {
-    results,
-    absent,
-  };
+  return { results, absent };
 }
 
 // =============================
@@ -243,12 +345,20 @@ export async function addResults(
 // =============================
 export async function cancelEvent(
   guildId: string,
-  eventId: string
+  eventId: string,
+  traceId?: string
 ): Promise<EventObject | null> {
   const event = await getEventById(guildId, eventId);
   if (!event) return null;
 
-  await updateEvent(eventId, { status: "CANCELED" });
+  await updateEvent(eventId, { status: "CANCELED" }, traceId);
+
+  logger.emit({
+    scope: "events.service",
+    event: "event_canceled",
+    traceId,
+    context: { eventId },
+  });
 
   return { ...event, status: "CANCELED" };
 }
@@ -258,34 +368,43 @@ export async function cancelEvent(
 // =============================
 export async function saveEvents(
   guildId: string,
-  events: EventObject[]
+  events: EventObject[],
+  traceId?: string
 ) {
-  // 🔥 [OPTIONAL OPTIMIZATION - future: batch update]
   for (const event of events) {
-    await updateEvent(event.id, {
-      participants: event.participants,
-      results: event.results, // 🔥 NEW
-      absent: event.absent,
-      status: event.status,
-      reminderSent: event.reminderSent,
-      started: event.started,
-      lastBirthdayYear:
-        event.eventType === "birthdays"
-          ? event.lastBirthdayYear ?? 0
-          : undefined,
-    });
+    await updateEvent(
+      event.id,
+      {
+        participants: event.participants,
+        results: event.results,
+        absent: event.absent,
+        status: event.status,
+        reminderSent: event.reminderSent,
+        started: event.started,
+        lastBirthdayYear:
+          event.eventType === "birthdays"
+            ? event.lastBirthdayYear ?? 0
+            : undefined,
+      },
+      traceId
+    );
   }
+
+  logger.emit({
+    scope: "events.service",
+    event: "events_bulk_saved",
+    traceId,
+    context: { count: events.length },
+  });
 }
 
 // =============================
-// ⚙️ CONFIG
+// ⚙️ CONFIG (NO LOGS)
 // =============================
 export async function getConfig(
   guildId: string
 ): Promise<EventConfig> {
   const configs = await configRepo.findAll({ guildId });
-
-  // 🔥 [FIX - zawsze zwracaj guildId]
   return configs[0] || { guildId };
 }
 
@@ -296,7 +415,6 @@ export async function setConfig(
 ) {
   const existing = await configRepo.findAll({ guildId });
 
-  // 🔥 [CRITICAL FIX - brak id wcześniej]
   if (!existing.length) {
     await configRepo.create({
       id: crypto.randomUUID(),
