@@ -2,38 +2,8 @@
 // 📁 src/system/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Main processing pipeline for QuickAdd OCR input.
- *
- * Responsible for:
- * - OCR → layout → parsing → validation
- * - selecting best OCR source
- * - pushing entries into buffer
- *
- * ❗ RULES:
- * - NO ID generation (traceId is injected)
- * - NO session mutations
- * - NO business branching outside pipeline scope
- * - FULL observability via logger.emit
- *
- * 🔥 FLOW:
- * 1. Context validation
- * 2. OCR (multi-source)
- * 3. Layout building
- * 4. Parsing (type-based)
- * 5. Validation
- * 6. Best result selection (highest valid count)
- * 7. Buffer write
- *
- * ✅ NOTES:
- * - soft-fail per OCR source (never breaks whole pipeline)
- * - deterministic selection strategy
- * - metrics & timing embedded in logs
- */
-
 import { Message } from "discord.js";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
 
 import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
@@ -44,26 +14,40 @@ import { buildLayout } from "../ocr/layout/LayoutBuilder";
 import { QuickAddSession } from "./QuickAddSession";
 import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
 
-// =====================================
-// 🚀 MAIN PIPELINE
-// =====================================
+/**
+ * 🧠 ROLE:
+ * Main processing pipeline for QuickAdd OCR input.
+ *
+ * Responsible for:
+ * - OCR → layout → parsing → validation → selection
+ * - pushing best entries into buffer
+ *
+ * ❗ RULES:
+ * - NO ID generation
+ * - MUST use provided traceId
+ * - log.emit ONLY (no scoped logger)
+ * - pipeline = orchestrator (NO business logic)
+ *
+ * FLOW:
+ * OCR → Layout → Parser → Validator → Select Best → Buffer
+ */
 
 export async function processImageInput(
   message: Message,
   session: ReturnType<typeof QuickAddSession.get>,
   imageUrl: string,
   traceId: string
-) {
-  const startTime = Date.now();
+): Promise<void> {
+  const startedAt = Date.now();
 
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
   // =====================================
-  // 🔍 CONTEXT CHECK
+  // 📥 CONTEXT CHECK
   // =====================================
 
-  logger.emit({
+  log.emit({
     event: "pipeline_context_check",
     traceId,
     data: {
@@ -74,21 +58,21 @@ export async function processImageInput(
   });
 
   if (!guildId || !session) {
-    logger.emit({
+    log.emit({
       event: "pipeline_invalid_context",
       traceId,
       level: "warn",
       data: {
         guildId,
         userId,
+        hasSession: !!session,
       },
     });
-
     return;
   }
 
   try {
-    logger.emit({
+    log.emit({
       event: "pipeline_start",
       traceId,
       data: {
@@ -98,23 +82,25 @@ export async function processImageInput(
     });
 
     // =====================================
-    // 📥 OCR
+    // 🧠 OCR
     // =====================================
 
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      logger.emit({
+      log.emit({
         event: "pipeline_ocr_empty",
         traceId,
         level: "warn",
+        data: {
+          sessionId: session.sessionId,
+        },
       });
-
       return;
     }
 
     // =====================================
-    // 🔄 PROCESS SOURCES
+    // 🔄 MULTI-SOURCE PROCESSING
     // =====================================
 
     const results: {
@@ -125,17 +111,19 @@ export async function processImageInput(
 
     for (const source of ocrResult.sources) {
       try {
-        if (!("tokens" in source) || !source.tokens?.length) continue;
+        if (!("tokens" in source) || !source.tokens?.length) {
+          continue;
+        }
 
-        // =====================================
-        // 🧱 LAYOUT
-        // =====================================
+        // =============================
+        // 📐 LAYOUT
+        // =============================
         const layout = buildLayout(source.tokens, traceId);
         if (!layout.length) continue;
 
-        // =====================================
-        // 🧠 PARSE
-        // =====================================
+        // =============================
+        // 🧠 PARSER
+        // =============================
         const parsed: ParsedEntry[] = parseByType(
           session.type,
           { layout },
@@ -144,9 +132,9 @@ export async function processImageInput(
 
         if (!parsed.length) continue;
 
-        // =====================================
-        // ✅ VALIDATE
-        // =====================================
+        // =============================
+        // ✅ VALIDATION
+        // =============================
         const validated = await validateEntries(
           parsed.map((p) => ({
             nickname: p.nickname,
@@ -155,14 +143,18 @@ export async function processImageInput(
           traceId
         );
 
+        const validCount = validated.filter(
+          (v) => v.status === "OK"
+        ).length;
+
         results.push({
           source: source.source,
           entries: validated,
-          validCount: validated.filter((v) => v.status === "OK").length,
+          validCount,
         });
 
       } catch (err) {
-        logger.emit({
+        log.emit({
           event: "pipeline_source_error",
           traceId,
           level: "warn",
@@ -179,17 +171,19 @@ export async function processImageInput(
     // =====================================
 
     if (!results.length) {
-      logger.emit({
+      log.emit({
         event: "pipeline_no_results",
         traceId,
         level: "warn",
+        data: {
+          sessionId: session.sessionId,
+        },
       });
-
       return;
     }
 
     // =====================================
-    // 🏆 BEST SOURCE SELECTION
+    // 🏆 SELECT BEST SOURCE
     // =====================================
 
     const best = results.sort(
@@ -213,13 +207,13 @@ export async function processImageInput(
       traceId
     );
 
-    const duration = Date.now() - startTime;
-
     // =====================================
     // ✅ DONE
     // =====================================
 
-    logger.emit({
+    const duration = Date.now() - startedAt;
+
+    log.emit({
       event: "pipeline_done",
       traceId,
       data: {
@@ -231,8 +225,8 @@ export async function processImageInput(
     });
 
   } catch (err) {
-    logger.emit({
-      event: "pipeline_error",
+    log.emit({
+      event: "pipeline_failed",
       traceId,
       level: "error",
       data: {
