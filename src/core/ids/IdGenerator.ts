@@ -4,14 +4,34 @@
 
 import crypto from "crypto";
 
-export function createTraceId(): string {
-  return `t-${crypto.randomUUID()}`;
+// =====================================
+// 🔹 TYPES
+// =====================================
+
+export type TraceId = string;
+export type SessionId = string;
+export type QueueId = string;
+
+// =====================================
+// 🔹 GENERATORS
+// =====================================
+
+function generate(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID()}`;
 }
 
-export function createSessionId(): string {
-  return `s-${crypto.randomUUID()}`;
+// =====================================
+// 🔥 PUBLIC API
+// =====================================
+
+export function createTraceId(): TraceId {
+  return generate("t");
 }
 
-export function createQueueId(): string {
-  return `q-${crypto.randomUUID()}`;
+export function createSessionId(): SessionId {
+  return generate("s");
+}
+
+export function createQueueId(): QueueId {
+  return generate("q");
 }
