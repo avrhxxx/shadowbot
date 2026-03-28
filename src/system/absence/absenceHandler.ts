@@ -10,6 +10,8 @@ import {
   CacheType,
 } from "discord.js";
 
+import { TraceContext } from "../../core/trace/TraceContext";
+
 import {
   handleAddAbsence,
   handleRemoveAbsence,
@@ -45,14 +47,6 @@ export const IDS = {
 };
 
 // =====================================
-// 🔹 SIMPLE LOGGER (TEMP)
-// =====================================
-
-function log(traceId: string, event: string, data?: unknown) {
-  console.log(`[${traceId}] ${event}`, data ?? "");
-}
-
-// =====================================
 // 🧩 HANDLERS
 // =====================================
 
@@ -80,18 +74,18 @@ const SELECT_HANDLERS: Record<
 
 async function handleModal(
   interaction: ModalSubmitInteraction<CacheType>,
-  ctx: { traceId: string }
+  ctx: TraceContext
 ): Promise<boolean> {
   const { customId } = interaction;
 
   if (customId === IDS.MODALS.ADD) {
-    log(ctx.traceId, "absence_modal_add");
+    console.log(`[${ctx.traceId}] absence.modal.add`);
     await handleAddAbsenceSubmit(interaction);
     return true;
   }
 
   if (customId === IDS.MODALS.REMOVE) {
-    log(ctx.traceId, "absence_modal_remove");
+    console.log(`[${ctx.traceId}] absence.modal.remove`);
     await handleRemoveAbsenceSubmit(interaction);
     return true;
   }
@@ -105,7 +99,7 @@ async function handleModal(
 
 export async function handleAbsenceInteraction(
   interaction: Interaction<CacheType>,
-  ctx: { traceId: string }
+  ctx: TraceContext
 ): Promise<boolean> {
   try {
     // =============================
@@ -118,7 +112,7 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      log(ctx.traceId, "absence_button", { id });
+      console.log(`[${ctx.traceId}] absence.button`, { id });
 
       await handler(interaction);
       return true;
@@ -134,7 +128,7 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      log(ctx.traceId, "absence_select", { id });
+      console.log(`[${ctx.traceId}] absence.select`, { id });
 
       await handler(interaction);
       return true;
@@ -150,26 +144,21 @@ export async function handleAbsenceInteraction(
 
     return false;
   } catch (error) {
-    log(ctx.traceId, "absence_error", {
-      error: error instanceof Error ? error.message : error,
-    });
+    console.error(`[${ctx.traceId}] absence.error`, error);
 
     if (interaction.isRepliable()) {
+      const payload = {
+        content: "❌ An error occurred while processing this interaction.",
+        ephemeral: true,
+      };
+
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content:
-            "❌ An error occurred while processing this interaction.",
-          ephemeral: true,
-        });
+        await interaction.followUp(payload);
       } else {
-        await interaction.reply({
-          content:
-            "❌ An error occurred while processing this interaction.",
-          ephemeral: true,
-        });
+        await interaction.reply(payload);
       }
     }
 
-    return true;
+    return true; // traktujemy jako handled
   }
 }
