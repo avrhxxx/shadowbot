@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsHandler.ts
+// =====================================
+// 📁 src/system/events/eventsHandlers.ts
+// =====================================
+
 import {
   Interaction,
   ButtonInteraction,
@@ -9,6 +12,10 @@ import {
 
 import * as EB from "./eventsButtons";
 import { parseEventId } from "./eventsButtons/utils";
+
+// =====================================
+// 🔹 IDS (CENTRALIZED)
+// =====================================
 
 export const IDS = {
   BUTTONS: {
@@ -23,15 +30,29 @@ export const IDS = {
     SHOW_ALL_LISTS: "show_all_lists",
     DOWNLOAD_ALL: "download_all_events",
     COMPARE_ALL: "compare_all_events",
+
+    CANCEL_CONFIRM_PREFIX: "event_cancel_confirm_",
+    ADD_PREFIX: "event_add_",
+    REMOVE_PREFIX: "event_remove_",
+    ABSENT_PREFIX: "event_absent_",
+    SHOW_LIST_PREFIX: "event_show_list_",
+    CATEGORY_PREFIX: "event_category_",
+    DOWNLOAD_SINGLE_PREFIX: "event_download_single_",
+    COMPARE_PREFIX: "event_compare_",
+    CLEAR_CONFIRM_PREFIX: "event_clear_confirm_",
+    CLEAR_ABORT_PREFIX: "event_clear_abort_",
+    CLEAR_PREFIX: "event_clear_",
   },
+
   SELECTS: {
     MANUAL_REMINDER: "manual_reminder_select",
     SETTINGS_NOTIFICATION: "event_settings_notification",
     SETTINGS_DOWNLOAD: "event_settings_download",
     CANCEL_SELECT: "event_cancel_select",
     COMPARE_SELECT_PREFIX: "compare_select_",
-    CREATE_TYPE_SELECT: "event_type_select", // nowy select menu dla typów eventów
+    CREATE_TYPE_SELECT: "event_type_select",
   },
+
   MODALS: {
     CREATE: "event_create_modal",
     ADD_PREFIX: "event_add_modal_",
@@ -40,136 +61,167 @@ export const IDS = {
   },
 };
 
-// ----------------------------
-// Stałe button handlers
-// ----------------------------
+// =====================================
+// 🔹 SIMPLE LOGGER (TEMP)
+// =====================================
+
+function log(traceId: string, event: string, data?: unknown) {
+  console.log(`[${traceId}] ${event}`, data ?? "");
+}
+
+// =====================================
+// HANDLERS
+// =====================================
+
 const BUTTON_HANDLERS: Record<string, (i: ButtonInteraction<CacheType>) => Promise<any>> = {
-  [IDS.BUTTONS.CREATE]: async (i) => await EB.handleCreate(i),
-
-  // teraz wywołujemy kategorię zamiast od razu listy
-  [IDS.BUTTONS.LIST]: async (i) => await EB.handleCategoryClick(i),
-
-  [IDS.BUTTONS.CANCEL]: async (i) => await EB.handleCancel(i),
-  [IDS.BUTTONS.CANCEL_ABORT]: async (i) => await EB.handleCancelAbort(i),
-  [IDS.BUTTONS.SETTINGS]: async (i) => await EB.handleSettings(i),
-  [IDS.BUTTONS.HELP]: async (i) => await EB.handleHelp(i),
-  [IDS.BUTTONS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminder(i),
-  [IDS.BUTTONS.SHOW_ALL]: async (i) => await EB.handleShowAllEvents(i),
-  [IDS.BUTTONS.SHOW_ALL_LISTS]: async (i) => await EB.handleShowAllLists(i),
-  [IDS.BUTTONS.DOWNLOAD_ALL]: async (i) => await EB.handleDownload(i),
-  [IDS.BUTTONS.COMPARE_ALL]: async (i) => await EB.handleCompareAll(i),
+  [IDS.BUTTONS.CREATE]: EB.handleCreate,
+  [IDS.BUTTONS.LIST]: EB.handleCategoryClick,
+  [IDS.BUTTONS.CANCEL]: EB.handleCancel,
+  [IDS.BUTTONS.CANCEL_ABORT]: EB.handleCancelAbort,
+  [IDS.BUTTONS.SETTINGS]: EB.handleSettings,
+  [IDS.BUTTONS.HELP]: EB.handleHelp,
+  [IDS.BUTTONS.MANUAL_REMINDER]: EB.handleManualReminder,
+  [IDS.BUTTONS.SHOW_ALL]: EB.handleShowAllEvents,
+  [IDS.BUTTONS.SHOW_ALL_LISTS]: EB.handleShowAllLists,
+  [IDS.BUTTONS.DOWNLOAD_ALL]: EB.handleDownload,
+  [IDS.BUTTONS.COMPARE_ALL]: EB.handleCompareAll,
 };
 
-// ----------------------------
-// Stałe select handlers
-// ----------------------------
 const SELECT_HANDLERS: Record<string, (i: StringSelectMenuInteraction<CacheType>) => Promise<any>> = {
-  [IDS.SELECTS.MANUAL_REMINDER]: async (i) => await EB.handleManualReminderSelect(i),
-  [IDS.SELECTS.SETTINGS_NOTIFICATION]: async (i) => await EB.handleSettingsSelect(i),
-  [IDS.SELECTS.SETTINGS_DOWNLOAD]: async (i) => await EB.handleSettingsSelect(i),
-  [IDS.SELECTS.CANCEL_SELECT]: async (i) => await EB.handleCancelSelect(i),
-  [IDS.SELECTS.CREATE_TYPE_SELECT]: async (i) => await EB.handleTypeSelect(i),
+  [IDS.SELECTS.MANUAL_REMINDER]: EB.handleManualReminderSelect,
+  [IDS.SELECTS.SETTINGS_NOTIFICATION]: EB.handleSettingsSelect,
+  [IDS.SELECTS.SETTINGS_DOWNLOAD]: EB.handleSettingsSelect,
+  [IDS.SELECTS.CANCEL_SELECT]: EB.handleCancelSelect,
+  [IDS.SELECTS.CREATE_TYPE_SELECT]: EB.handleTypeSelect,
 };
 
-// ----------------------------
-// Modal submit handler
-// ----------------------------
-async function handleModal(interaction: ModalSubmitInteraction<CacheType>) {
+// =====================================
+// MODALS
+// =====================================
+
+async function handleModal(
+  interaction: ModalSubmitInteraction<CacheType>,
+  ctx: { traceId: string }
+): Promise<boolean> {
   const { customId } = interaction;
 
   if (customId === IDS.MODALS.CREATE || customId.startsWith(`${IDS.MODALS.CREATE}_`)) {
     await EB.handleCreateSubmit(interaction);
-  } else if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
-    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
-  } else if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
-    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
-  } else if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
-    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
+    return true;
   }
+
+  if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
+    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId));
+    return true;
+  }
+
+  if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
+    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId));
+    return true;
+  }
+
+  if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
+    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId));
+    return true;
+  }
+
+  return false;
 }
 
-// ----------------------------
-// Główny handler interakcji
-// ----------------------------
-export async function handleEventInteraction(interaction: Interaction<CacheType>) {
+// =====================================
+// MAIN HANDLER
+// =====================================
+
+export async function handleEventInteraction(
+  interaction: Interaction<CacheType>,
+  ctx: { traceId: string }
+): Promise<boolean> {
   try {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
       const handler = BUTTON_HANDLERS[id];
-      if (handler) return await handler(interaction);
-
-      // Cancel confirm
-      if (id.startsWith("event_cancel_confirm_")) {
-        const eventId = id.replace("event_cancel_confirm_", "");
-        return await EB.handleCancelConfirm(interaction, eventId);
+      if (handler) {
+        log(ctx.traceId, "event_button", { id });
+        await handler(interaction);
+        return true;
       }
 
-      // Notify create
-      if (id.startsWith("notify_create_yes") || id.startsWith("notify_create_no")) {
-        return await EB.handleNotificationResponse(interaction);
+      if (id.startsWith(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX)) {
+        return await EB.handleCancelConfirm(
+          interaction,
+          id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, "")
+        );
       }
 
-      // Next year
-      if (id.startsWith("next_year_yes")) return await EB.finalizeNextYearEvent(interaction);
-      if (id.startsWith("next_year_no")) return await EB.handleCancelAbort(interaction);
-
-      // Participants
-      if (id.startsWith("event_add_")) return await EB.handleAddParticipant(interaction, parseEventId(id));
-      if (id.startsWith("event_remove_")) return await EB.handleRemoveParticipant(interaction, parseEventId(id));
-      if (id.startsWith("event_absent_")) return await EB.handleAbsentParticipant(interaction, parseEventId(id));
-
-      // Event list dla pojedynczego eventu
-      if (id.startsWith("event_show_list_")) return await EB.handleShowList(interaction, parseEventId(id));
-
-      // CATEGORY CLICK
-      if (id.startsWith("event_category_")) {
-        const category = id.replace("event_category_", "");
-        return await EB.handleCategoryClick(interaction, category);
+      if (id.startsWith(IDS.BUTTONS.ADD_PREFIX)) {
+        return await EB.handleAddParticipant(interaction, parseEventId(id));
       }
 
-      // Download single
-      if (id.startsWith("event_download_single_")) return await EB.handleDownload(interaction, parseEventId(id));
+      if (id.startsWith(IDS.BUTTONS.REMOVE_PREFIX)) {
+        return await EB.handleRemoveParticipant(interaction, parseEventId(id));
+      }
 
-      // Compare events
-      if (id.startsWith("event_compare_")) return await EB.handleCompareButton(interaction, parseEventId(id));
+      if (id.startsWith(IDS.BUTTONS.ABSENT_PREFIX)) {
+        return await EB.handleAbsentParticipant(interaction, parseEventId(id));
+      }
 
-      // Compare All Download
-      if (id === "compare_all_download") return await EB.handleCompareAllDownload(interaction);
+      if (id.startsWith(IDS.BUTTONS.SHOW_LIST_PREFIX)) {
+        return await EB.handleShowList(interaction, parseEventId(id));
+      }
 
-      // Clear event
-      if (id.startsWith("event_clear_confirm_")) return await EB.handleClearEventConfirm(interaction);
-      if (id.startsWith("event_clear_abort_")) return await EB.handleClearEventAbort(interaction);
-      if (id.startsWith("event_clear_")) return await EB.handleClearEventButton(interaction, parseEventId(id));
+      if (id.startsWith(IDS.BUTTONS.CATEGORY_PREFIX)) {
+        return await EB.handleCategoryClick(
+          interaction,
+          id.replace(IDS.BUTTONS.CATEGORY_PREFIX, "")
+        );
+      }
+
+      if (id.startsWith(IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX)) {
+        return await EB.handleDownload(interaction, parseEventId(id));
+      }
+
+      if (id.startsWith(IDS.BUTTONS.COMPARE_PREFIX)) {
+        return await EB.handleCompareButton(interaction, parseEventId(id));
+      }
+
+      if (id.startsWith(IDS.BUTTONS.CLEAR_CONFIRM_PREFIX)) {
+        return await EB.handleClearEventConfirm(interaction);
+      }
+
+      if (id.startsWith(IDS.BUTTONS.CLEAR_ABORT_PREFIX)) {
+        return await EB.handleClearEventAbort(interaction);
+      }
+
+      if (id.startsWith(IDS.BUTTONS.CLEAR_PREFIX)) {
+        return await EB.handleClearEventButton(interaction, parseEventId(id));
+      }
     }
 
-    // ----------------------------
-    // Select menus
-    // ----------------------------
     if (interaction.isStringSelectMenu()) {
       const handler = SELECT_HANDLERS[interaction.customId];
       if (handler) return await handler(interaction);
 
-      // Compare select
       if (interaction.customId.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
         return await EB.handleCompareSelect(interaction);
       }
     }
 
-    // ----------------------------
-    // Modal submit
-    // ----------------------------
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction);
+      return await handleModal(interaction, ctx);
     }
+
+    return false;
   } catch (error) {
-    console.error("Error handling event interaction:", error);
+    log(ctx.traceId, "event_error", error);
 
     if (interaction.isRepliable()) {
       await interaction.reply({
         content: "❌ An error occurred while processing this interaction.",
-        ephemeral: true
+        ephemeral: true,
       });
     }
+
+    return true;
   }
 }
