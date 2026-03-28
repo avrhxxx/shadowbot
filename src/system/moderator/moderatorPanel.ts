@@ -20,6 +20,7 @@ import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 
 import { SheetRepository } from "../google/SheetRepository";
 import crypto from "crypto";
+import { logger } from "../core/logger/log";
 
 // =============================
 // TYPES
@@ -137,10 +138,15 @@ async function cleanupDeletedChannels(guild: Guild, config: ModeratorPanelConfig
 }
 
 // ---- INIT ----
+const startedGuilds = new Set<string>();
+
 export async function initModeratorPanel(client: Client) {
   if (!client.user) return;
 
   for (const guild of client.guilds.cache.values()) {
+    if (startedGuilds.has(guild.id)) continue; // 🔥 FIX duplicate intervals
+    startedGuilds.add(guild.id);
+
     let config = await getConfig();
 
     await cleanupDeletedChannels(guild, config);
@@ -237,19 +243,23 @@ export async function initModeratorPanel(client: Client) {
 }
 
 // =============================
-// 🚀 INTERACTION HANDLER (FOR SYSTEM ROUTER)
+// 🚀 INTERACTION HANDLER
 // =============================
 
 export async function handleModeratorInteraction(
-  interaction: Interaction,
-  ctx: { traceId: string }
+  interaction: Interaction
 ): Promise<boolean> {
   if (!interaction.isButton()) return false;
 
   try {
     const id = interaction.customId;
 
-    console.log(`[${ctx.traceId}] moderator_button`, { id });
+    logger.emit({
+      event: "moderator_button",
+      data: {
+        context: { id }
+      }
+    });
 
     switch (id) {
       case "moderator_event_menu":
@@ -275,19 +285,24 @@ export async function handleModeratorInteraction(
 
     return false;
   } catch (error) {
-    console.error(`[${ctx.traceId}] moderator_error`, error);
+    logger.emit({
+      event: "moderator_error",
+      level: "error",
+      data: {
+        error
+      }
+    });
 
     if (interaction.isRepliable()) {
+      const payload = {
+        content: "❌ An error occurred while processing this interaction.",
+        ephemeral: true,
+      };
+
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "❌ An error occurred while processing this interaction.",
-          ephemeral: true,
-        });
+        await interaction.followUp(payload);
       } else {
-        await interaction.reply({
-          content: "❌ An error occurred while processing this interaction.",
-          ephemeral: true,
-        });
+        await interaction.reply(payload);
       }
     }
 
