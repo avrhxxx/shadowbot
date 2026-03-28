@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/discord/CommandBuilder.ts
+// 📁 src/system/quickadd/discord/CommandBuilder.ts
 // =====================================
 
 import { SlashCommandBuilder } from "discord.js";
@@ -89,6 +89,3 @@ export function buildQuickAddCommand() {
         .setDescription("End QuickAdd session completely")
     );
 }
-
-// 🔥 FIX: to jest brakujący export wymagany przez index.ts
-export const qCommand = buildQuickAddCommand();
