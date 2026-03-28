@@ -1,6 +1,23 @@
 // =====================================
-// 📁 src/quickadd/discord/actions/confirm/confirm.ts
+// 📁 src/system/quickadd/discord/actions/confirm/confirm.ts
 // =====================================
+
+/**
+ * 🧠 ROLE:
+ * Confirms buffered entries and submits them to queue.
+ *
+ * Responsible for:
+ * - stage transition (COLLECTING → CONFIRM_PENDING)
+ * - validating entries before submit
+ * - enqueueing points/events
+ * - clearing session after submit
+ *
+ * ❗ RULES:
+ * - owner-only
+ * - ALL entries must be OK
+ * - 2-step confirmation required
+ * - logger.emit ONLY
+ */
 
 import { ChatInputCommandInteraction } from "discord.js";
 
@@ -44,7 +61,7 @@ async function safeReply(
   } catch {
     if (!interaction.replied) {
       await interaction
-        .reply({ content, ephemeral: true })
+        .reply({ content, flags: 64 }) // 🔥 unified
         .catch(() => null);
     }
   }
@@ -63,8 +80,9 @@ export async function handleConfirm(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
   }
 
   if (!guildId) {
@@ -308,9 +326,11 @@ export async function handleConfirm(
         mode,
         count: entries.length,
       },
+      meta: {
+        durationMs: duration,
+      },
       stats: {
         confirm_success: 1,
-        durationMs: duration,
       },
     });
 
@@ -325,9 +345,11 @@ export async function handleConfirm(
       context: {
         sessionId,
       },
+      meta: {
+        durationMs: duration,
+      },
       stats: {
         confirm_error: 1,
-        durationMs: duration,
       },
       error: err,
     });
