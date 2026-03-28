@@ -10,7 +10,7 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { logger } from "../../../core/logger/log";
+import { logger } from "../../../../core/logger/log";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -54,7 +54,6 @@ export async function handleStart(
 ): Promise<void> {
   const startTime = Date.now();
 
-  // 🔥 lifecycle safety
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ flags: 64 });
   }
@@ -62,11 +61,8 @@ export async function handleStart(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // =====================================
-  // 📥 ENTRY LOG
-  // =====================================
-
   logger.emit({
+    scope: "quickadd.start",
     event: "start_requested",
     traceId,
     context: {
@@ -84,6 +80,7 @@ export async function handleStart(
 
   if (!isQuickAddType(rawType)) {
     logger.emit({
+      scope: "quickadd.start",
       event: "start_invalid_type",
       traceId,
       level: "warn",
@@ -104,6 +101,7 @@ export async function handleStart(
 
   try {
     logger.emit({
+      scope: "quickadd.start",
       event: "start_start",
       traceId,
       context: {
@@ -116,9 +114,6 @@ export async function handleStart(
       },
     });
 
-    // =====================================
-    // 🧠 START SESSION
-    // =====================================
     const session = QuickAddSession.start(
       {
         guildId,
@@ -132,6 +127,7 @@ export async function handleStart(
 
     if (!session) {
       logger.emit({
+        scope: "quickadd.start",
         event: "start_blocked_existing_session",
         traceId,
         level: "warn",
@@ -148,9 +144,6 @@ export async function handleStart(
       return;
     }
 
-    // =====================================
-    // 📢 CHANNEL GUARD
-    // =====================================
     if (
       !interaction.channel ||
       !(interaction.channel instanceof TextChannel ||
@@ -159,11 +152,8 @@ export async function handleStart(
       throw new Error("Invalid channel type");
     }
 
-    // =====================================
-    // 🧵 THREAD
-    // =====================================
     const thread = await interaction.channel.threads.create({
-      name: `quickadd-${type.toLowerCase()}`,
+      name: `quickadd-${type.replace("_", "-").toLowerCase()}`,
       autoArchiveDuration: 60,
       reason: "QuickAdd session",
     });
@@ -172,9 +162,6 @@ export async function handleStart(
 
     await thread.members.add(userId);
 
-    // =====================================
-    // 🔗 ATTACH THREAD
-    // =====================================
     QuickAddSession.setThreadId(
       guildId,
       userId,
@@ -182,16 +169,10 @@ export async function handleStart(
       traceId
     );
 
-    // =====================================
-    // 📤 THREAD MESSAGE
-    // =====================================
     await thread.send({
       content: "🚀 QuickAdd session started\n\nSend screenshots here.",
     });
 
-    // =====================================
-    // 📤 RESPONSE
-    // =====================================
     await safeReply(
       interaction,
       `✅ QuickAdd started\n📍 Thread: <#${thread.id}>`
@@ -200,6 +181,7 @@ export async function handleStart(
     const duration = Date.now() - startTime;
 
     logger.emit({
+      scope: "quickadd.start",
       event: "start_done",
       traceId,
       context: {
@@ -216,12 +198,14 @@ export async function handleStart(
     const duration = Date.now() - startTime;
 
     logger.emit({
+      scope: "quickadd.start",
       event: "start_failed",
       traceId,
       level: "error",
       error: err,
       context: {
         guildId,
+        userId,
       },
       stats: {
         durationMs: duration,
@@ -229,10 +213,8 @@ export async function handleStart(
       },
     });
 
-    // ❗ CLEANUP SESSION
     QuickAddSession.end(guildId, userId, traceId);
 
-    // ❗ CLEANUP THREAD
     if (threadId) {
       try {
         const thread = await interaction.client.channels.fetch(
