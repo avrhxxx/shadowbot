@@ -3,7 +3,7 @@
 // =====================================
 
 import { OCRToken } from "../OCRTypes";
-import { log } from "../../logger";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 🧱 TYPES
@@ -34,10 +34,10 @@ export function buildLayout(
   tokens: OCRToken[],
   traceId: string
 ): LayoutRow[] {
-  log.emit({
+  logger.emit({
     event: "layout_start",
     traceId,
-    data: { tokens: tokens.length },
+    context: { tokensCount: tokens.length },
   });
 
   if (!tokens.length) return [];
@@ -47,10 +47,10 @@ export function buildLayout(
   const rows = groupIntoRows(filtered, traceId);
   const structured = buildRowStructure(rows, traceId);
 
-  log.emit({
+  logger.emit({
     event: "layout_done",
     traceId,
-    data: { rows: structured.length },
+    context: { rowsCount: structured.length },
   });
 
   return structured;
@@ -78,10 +78,10 @@ function normalizeTokens(
     ny: maxY ? t.y / maxY : 0,
   }));
 
-  log.emit({
+  logger.emit({
     event: "layout_normalized",
     traceId,
-    data: { count: normalized.length },
+    context: { count: normalized.length },
   });
 
   return normalized;
@@ -107,12 +107,12 @@ function filterTokens(
     return t.confidence > 20;
   });
 
-  log.emit({
+  logger.emit({
     event: "layout_filter_done",
     traceId,
-    data: {
-      before: tokens.length,
-      after: filtered.length,
+    context: {
+      beforeCount: tokens.length,
+      afterCount: filtered.length,
     },
   });
 
@@ -150,10 +150,10 @@ function groupIntoRows(
     }
   }
 
-  log.emit({
+  logger.emit({
     event: "layout_rows_grouped",
     traceId,
-    data: { rows: rows.length },
+    context: { rowsCount: rows.length },
   });
 
   return rows;
@@ -209,20 +209,20 @@ function buildRowStructure(
       raw: sorted,
     });
 
-    log.emit({
+    logger.emit({
       event: "layout_row_cells",
       traceId,
-      data: {
+      context: {
         rowIndex: i,
         cells: cells.map((c) => c.text),
       },
     });
   }
 
-  log.emit({
+  logger.emit({
     event: "layout_structure_done",
     traceId,
-    data: { rows: result.length },
+    context: { rowsCount: result.length },
   });
 
   return result;
