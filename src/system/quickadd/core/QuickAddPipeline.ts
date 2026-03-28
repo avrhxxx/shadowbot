@@ -1,9 +1,9 @@
 // =====================================
-// 📁 src/quickadd/core/QuickAddPipeline.ts
+// 📁 src/system/quickadd/core/QuickAddPipeline.ts
 // =====================================
 
 import { Message } from "discord.js";
-import { log, metrics, timing } from "../logger";
+import { logger } from "../../../core/logger/log";
 
 import { runOCR } from "../ocr/OCRProcessor";
 import { parseByType } from "../parsing/ParserRouter";
@@ -25,7 +25,7 @@ import { ParsedEntry, ValidatedEntry } from "./QuickAddTypes";
  * ❗ RULES:
  * - NO ID generation
  * - MUST use provided traceId
- * - FULL observability (log + metrics + timing)
+ * - FULL observability (logger only - metrics/timing via payload)
  */
 
 export async function processImageInput(
@@ -34,52 +34,56 @@ export async function processImageInput(
   imageUrl: string,
   traceId: string
 ) {
-  const timerId = `pipeline-${traceId}`;
-  timing.start(timerId);
+  const startTime = Date.now();
 
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
-  log.emit({
-    event: "pipeline_context_check",
+  logger.emit({
+    scope: "quickadd.pipeline",
+    event: "context_check",
     traceId,
-    data: { sessionId: session?.sessionId, guildId, userId },
+    context: {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+    },
   });
 
   if (!guildId || !session) {
-    metrics.increment("pipeline_invalid_context");
-
-    log.emit({
-      event: "pipeline_invalid_context",
+    logger.emit({
+      scope: "quickadd.pipeline",
+      event: "invalid_context",
       traceId,
       level: "warn",
-      data: { guildId, userId },
+      context: { guildId, userId },
+      metrics: { increment: "pipeline_invalid_context" },
     });
 
     return;
   }
 
   try {
-    metrics.increment("pipeline_started");
-
-    log.emit({
-      event: "pipeline_start",
+    logger.emit({
+      scope: "quickadd.pipeline",
+      event: "start",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
         type: session.type,
       },
+      metrics: { increment: "pipeline_started" },
     });
 
     const ocrResult = await runOCR(imageUrl, traceId);
 
     if (!ocrResult.sources.length) {
-      metrics.increment("pipeline_ocr_empty");
-
-      log.emit({
-        event: "pipeline_ocr_empty",
+      logger.emit({
+        scope: "quickadd.pipeline",
+        event: "ocr_empty",
         traceId,
         level: "warn",
+        metrics: { increment: "pipeline_ocr_empty" },
       });
 
       return;
@@ -121,24 +125,27 @@ export async function processImageInput(
         });
 
       } catch (err) {
-        metrics.increment("pipeline_source_error");
-
-        log.emit({
-          event: "pipeline_source_error",
+        logger.emit({
+          scope: "quickadd.pipeline",
+          event: "source_error",
           traceId,
           level: "warn",
-          data: { error: err },
+          error: err,
+          context: {
+            source: source?.source,
+          },
+          metrics: { increment: "pipeline_source_error" },
         });
       }
     }
 
     if (!results.length) {
-      metrics.increment("pipeline_no_results");
-
-      log.emit({
-        event: "pipeline_no_results",
+      logger.emit({
+        scope: "quickadd.pipeline",
+        event: "no_results",
         traceId,
         level: "warn",
+        metrics: { increment: "pipeline_no_results" },
       });
 
       return;
@@ -159,26 +166,34 @@ export async function processImageInput(
       traceId
     );
 
-    const duration = timing.end(timerId);
+    const duration = Date.now() - startTime;
 
-    log.emit({
-      event: "pipeline_done",
+    logger.emit({
+      scope: "quickadd.pipeline",
+      event: "done",
       traceId,
-      data: {
+      context: {
         sessionId: session.sessionId,
+      },
+      stats: {
         total: best.entries.length,
+        valid: best.validCount,
+      },
+      timing: {
+        label: "pipeline",
         durationMs: duration,
       },
+      metrics: { increment: "pipeline_done" },
     });
 
   } catch (err) {
-    metrics.increment("pipeline_error");
-
-    log.emit({
-      event: "pipeline_error",
+    logger.emit({
+      scope: "quickadd.pipeline",
+      event: "error",
       traceId,
       level: "error",
-      data: { error: err },
+      error: err,
+      metrics: { increment: "pipeline_error" },
     });
   }
 }
