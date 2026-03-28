@@ -4,8 +4,7 @@
 
 import { Interaction } from "discord.js";
 import { createTraceId } from "../ids/IdGenerator";
-import { TraceContext } from "../trace/TraceContext";
-import { log } from "../logger/log";
+import { logger } from "../logger/log";
 
 // =============================
 // 🧩 SYSTEM IMPORTS
@@ -21,7 +20,7 @@ import { handlePointsInteraction } from "../../system/points";
 
 type SystemHandler = (
   interaction: Interaction,
-  ctx: TraceContext
+  traceId: string
 ) => Promise<boolean>;
 
 // =============================
@@ -35,27 +34,18 @@ const SYSTEM_HANDLERS: SystemHandler[] = [
 ];
 
 // =============================
-// 🔧 CONTEXT BUILDER
-// =============================
-
-function createContext(interaction: Interaction): TraceContext {
-  return {
-    traceId: createTraceId(),
-    userId: interaction.user?.id,
-    source: "discord",
-  };
-}
-
-// =============================
 // 🚀 ROUTER
 // =============================
 
 export async function handleSystemInteraction(
   interaction: Interaction
 ) {
-  const ctx = createContext(interaction);
+  const traceId = createTraceId();
 
-  log(ctx, "system_router_received", {
+  logger.emit({
+    scope: "system.router",
+    event: "received",
+    traceId,
     context: {
       interactionId: interaction.id,
       type: interaction.type,
@@ -64,10 +54,13 @@ export async function handleSystemInteraction(
 
   for (const handler of SYSTEM_HANDLERS) {
     try {
-      const handled = await handler(interaction, ctx);
+      const handled = await handler(interaction, traceId);
 
       if (handled) {
-        log(ctx, "system_router_handled", {
+        logger.emit({
+          scope: "system.router",
+          event: "handled",
+          traceId,
           context: {
             handler: handler.name,
           },
@@ -77,18 +70,26 @@ export async function handleSystemInteraction(
       }
 
     } catch (err) {
-      log(ctx, "system_router_error", {
+      logger.emit({
+        scope: "system.router",
+        event: "handler_error",
+        traceId,
+        level: "error",
         context: {
           handler: handler.name,
         },
         error: err,
-      }, "error");
+      });
     }
   }
 
-  log(ctx, "system_router_unhandled", {
+  logger.emit({
+    scope: "system.router",
+    event: "unhandled",
+    traceId,
+    level: "warn",
     context: {
       interactionId: interaction.id,
     },
-  }, "warn");
+  });
 }
