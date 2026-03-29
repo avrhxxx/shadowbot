@@ -1,7 +1,16 @@
 // src/eventsPanel/eventsButtons/eventsShowAll.ts
-import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { 
+  ButtonInteraction, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  EmbedBuilder 
+} from "discord.js";
+
 import { getEvents } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // Status emojis
 const STATUS_EMOJIS: Record<string, string> = {
@@ -32,24 +41,39 @@ function createEventListText(events: any[]) {
 // SHOW ALL EVENTS
 // ==========================
 export async function handleShowAllEvents(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
   await interaction.deferReply({ ephemeral: true });
 
-  // 🔹 pobieramy wszystkie eventy poza birthdays
-  const events = (await getEvents(interaction.guildId!)).filter(e => e.eventType !== "birthdays");
+  const events = (await getEvents(guildId))
+    .filter(e => e.eventType !== "birthdays");
 
   if (!events.length) {
-    return interaction.editReply({ content: "No events found." });
+    await interaction.editReply({ content: "No events found." });
+
+    logger.emit({
+      scope: "events.show_all",
+      event: "no_events",
+      traceId,
+      context: { guildId },
+    });
+
+    return;
   }
 
-  // 🔹 przyciski Compare / Download / Show All Lists tylko dla Custom i Reservoir
-  const participantEvents = events.filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
+  const participantEvents = events.filter(e =>
+    EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType)
+  );
 
   const row = createButtonRow(
     new ButtonBuilder()
       .setCustomId("compare_all_events")
       .setLabel("Compare All")
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(participantEvents.length === 0), // blokujemy jeśli brak odpowiednich eventów
+      .setDisabled(participantEvents.length === 0),
 
     new ButtonBuilder()
       .setCustomId("download_all_events")
@@ -70,20 +94,46 @@ export async function handleShowAllEvents(interaction: ButtonInteraction) {
     content: `📅 **All Events**\n\n${listText}`,
     components: [row]
   });
+
+  logger.emit({
+    scope: "events.show_all",
+    event: "show_all_events",
+    traceId,
+    context: {
+      guildId,
+      totalEvents: events.length,
+      participantEvents: participantEvents.length,
+    },
+  });
 }
 
 // ==========================
 // SHOW ALL PARTICIPANT LISTS (Custom & Reservoir only)
 // ==========================
 export async function handleShowAllLists(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
   await interaction.deferReply({ ephemeral: true });
 
-  // 🔹 pobieramy tylko Custom i Reservoir eventy
-  const events = (await getEvents(interaction.guildId!))
+  const events = (await getEvents(guildId))
     .filter(e => EVENT_TYPES_WITH_PARTICIPANTS.includes(e.eventType));
 
   if (!events.length) {
-    return interaction.editReply({ content: "No participant lists available for Custom/Reservoir events." });
+    await interaction.editReply({
+      content: "No participant lists available for Custom/Reservoir events."
+    });
+
+    logger.emit({
+      scope: "events.show_all",
+      event: "no_participant_lists",
+      traceId,
+      context: { guildId },
+    });
+
+    return;
   }
 
   const fullText = events
@@ -122,4 +172,15 @@ ${absent}`;
       await interaction.followUp({ embeds: [embed], ephemeral: true });
     }
   }
+
+  logger.emit({
+    scope: "events.show_all",
+    event: "show_all_lists",
+    traceId,
+    context: {
+      guildId,
+      eventsCount: events.length,
+      chunks: chunks.length,
+    },
+  });
 }
