@@ -11,6 +11,16 @@ export async function handleAbsenceHelp(interaction: ButtonInteraction) {
 
   const traceId = createTraceId();
 
+  logger.emit({
+    scope: "absence.buttons",
+    event: "help_open",
+    traceId,
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+    },
+  });
+
   const embed = new EmbedBuilder()
     .setTitle("Absence Panel Guide")
     .setColor(0x1E90FF)
@@ -51,7 +61,7 @@ export async function handleAbsenceHelp(interaction: ButtonInteraction) {
   } catch (err) {
     logger.emit({
       scope: "absence.buttons",
-      event: "absence_help_failed",
+      event: "help_failed",
       traceId,
       level: "error",
       error: err,
