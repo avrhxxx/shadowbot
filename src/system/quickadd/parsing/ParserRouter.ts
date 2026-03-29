@@ -4,7 +4,7 @@
 
 import { QuickAddType, ParsedEntry } from "../core/QuickAddTypes";
 import { LayoutRow } from "../ocr/layout/LayoutBuilder";
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 
 import {
   parseDonationsFromLayout,
@@ -23,23 +23,16 @@ type ParserFn = (
   traceId: string
 ) => ParsedEntry[];
 
-const registry = new Map<QuickAddType, ParserFn>();
-
-function registerParser(
-  type: QuickAddType,
-  parser: ParserFn
-) {
-  registry.set(type, parser);
-}
-
 // =====================================
-// 🔥 REGISTER PARSERS
+// 🔥 REGISTRY (STRICT)
 // =====================================
 
-registerParser("DONATIONS_POINTS", parseDonationsFromLayout);
-registerParser("DUEL_POINTS", parseDuel);
-registerParser("RR_SIGNUPS", parseReservoirSignups);
-registerParser("RR_RESULTS", parseReservoirResults);
+const registry: Record<QuickAddType, ParserFn> = {
+  DONATIONS_POINTS: parseDonationsFromLayout,
+  DUEL_POINTS: parseDuel,
+  RR_SIGNUPS: parseReservoirSignups,
+  RR_RESULTS: parseReservoirResults,
+};
 
 // =====================================
 // 🎯 MAIN ROUTER
@@ -56,45 +49,54 @@ export function parseByType(
 
   const layout = input.layout;
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.parser",
     event: "parser_input",
     traceId,
-    data: {
+    context: {
       type,
       layoutRows: layout.length,
     },
   });
 
-  const parser = registry.get(type);
+  const parser = registry[type];
 
+  // 🔴 HARD GUARANTEE (system integrity)
   if (!parser) {
-    log.emit({
-      event: "parser_not_found",
+    logger.emit({
+      scope: "quickadd.parser",
+      event: "parser_missing",
       traceId,
-      level: "warn",
-      data: { type },
+      level: "error",
+      context: { type },
     });
-    return [];
+
+    throw new Error(`Parser not registered for type: ${type}`);
   }
 
   if (!layout.length) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.parser",
       event: "parser_empty_layout",
       traceId,
       level: "warn",
-      data: { type },
+      context: { type },
     });
+
     return [];
   }
 
   try {
     const result = parser(input, traceId);
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.parser",
       event: "parser_output",
       traceId,
-      data: {
+      context: {
         type,
+      },
+      stats: {
         entries: result.length,
       },
     });
@@ -102,14 +104,13 @@ export function parseByType(
     return result;
 
   } catch (err) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.parser",
       event: "parser_failed",
       traceId,
       level: "error",
-      data: {
-        type,
-        error: err,
-      },
+      context: { type },
+      error: err,
     });
 
     return [];
