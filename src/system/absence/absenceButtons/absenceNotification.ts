@@ -1,6 +1,11 @@
-// src/absencePanel/absenceButtons/absenceNotification.ts
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceNotification.ts
+// =====================================
+
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // HELPERS
@@ -29,6 +34,8 @@ function parseAbsenceDate(dateStr: string, year: number): Date | null {
 // GET CHANNEL
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
+  const traceId = createTraceId();
+
   const config = await AS.getAbsenceConfig(guild.id);
   if (!config.notificationChannel) return null;
 
@@ -37,7 +44,14 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
     if (!channel || !channel.isTextBased()) return null;
 
     return channel as TextChannel;
-  } catch {
+  } catch (err) {
+    logger.emit({
+      scope: "absence.notification",
+      event: "fetch_channel_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
     return null;
   }
 }
@@ -46,6 +60,8 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 // EMBED UPDATE
 // -----------------------------
 export async function updateAbsenceEmbed(guild: Guild) {
+  const traceId = createTraceId();
+
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
@@ -120,7 +136,13 @@ export async function updateAbsenceEmbed(guild: Guild) {
       await message.pin().catch(() => {});
 
   } catch (err) {
-    console.error("Error updating absence embed:", err);
+    logger.emit({
+      scope: "absence.notification",
+      event: "update_embed_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
   }
 }
 
@@ -133,6 +155,8 @@ export async function notifyAbsenceAdded(
   startDate: string,
   endDate: string
 ) {
+  const traceId = createTraceId();
+
   const absences = await AS.getAbsences(guild.id);
   const absence = absences.find(a => a.player === player);
   const year = absence?.year ?? new Date().getFullYear();
@@ -143,29 +167,62 @@ export async function notifyAbsenceAdded(
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
-  await channel.send(
-    `📌 Player **${player}** is now absent from ${formatAbsenceDate(startDate, year)} to ${formatAbsenceDate(endDate, year)} (returns <t:${unixBack}:R>).`
-  );
+  try {
+    await channel.send(
+      `📌 Player **${player}** is now absent from ${formatAbsenceDate(startDate, year)} to ${formatAbsenceDate(endDate, year)} (returns <t:${unixBack}:R>).`
+    );
 
-  await updateAbsenceEmbed(guild);
+    await updateAbsenceEmbed(guild);
+
+  } catch (err) {
+    logger.emit({
+      scope: "absence.notification",
+      event: "notify_added_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 export async function notifyAbsenceRemoved(guild: Guild, player: string) {
+  const traceId = createTraceId();
+
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
-  await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-
-  await updateAbsenceEmbed(guild);
+  try {
+    await channel.send(`🚀 **${player}** has returned, absence cleared!`);
+    await updateAbsenceEmbed(guild);
+  } catch (err) {
+    logger.emit({
+      scope: "absence.notification",
+      event: "notify_removed_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 export async function notifyAbsenceAutoClean(guild: Guild, player: string) {
+  const traceId = createTraceId();
+
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
-  await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-
-  await updateAbsenceEmbed(guild);
+  try {
+    await channel.send(`🚀 **${player}** has returned, absence cleared!`);
+    await updateAbsenceEmbed(guild);
+  } catch (err) {
+    logger.emit({
+      scope: "absence.notification",
+      event: "notify_autoclean_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 // -----------------------------
