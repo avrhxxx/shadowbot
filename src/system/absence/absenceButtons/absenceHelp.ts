@@ -3,23 +3,18 @@
 // =====================================
 
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
-export async function handleAbsenceHelp(interaction: ButtonInteraction) {
+export async function handleAbsenceHelp(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
   if (!interaction.isButton()) return;
 
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "help_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-    },
-  });
+  l.event("help_open");
 
   const embed = new EmbedBuilder()
     .setTitle("Absence Panel Guide")
@@ -59,12 +54,6 @@ export async function handleAbsenceHelp(interaction: ButtonInteraction) {
   try {
     await interaction.reply({ embeds: [embed], ephemeral: true });
   } catch (err) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "help_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("help_failed", err);
   }
 }
