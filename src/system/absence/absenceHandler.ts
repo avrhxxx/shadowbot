@@ -10,7 +10,8 @@ import {
   CacheType,
 } from "discord.js";
 
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 import {
   handleAddAbsence,
@@ -47,12 +48,12 @@ export const IDS = {
 };
 
 // =====================================
-// 🧩 HANDLERS
+// 🧩 HANDLERS (CTX VERSION)
 // =====================================
 
 const BUTTON_HANDLERS: Record<
   string,
-  (i: ButtonInteraction<CacheType>) => Promise<any>
+  (i: ButtonInteraction<CacheType>, ctx: TraceContext) => Promise<any>
 > = {
   [IDS.BUTTONS.ADD]: handleAddAbsence,
   [IDS.BUTTONS.REMOVE]: handleRemoveAbsence,
@@ -63,7 +64,7 @@ const BUTTON_HANDLERS: Record<
 
 const SELECT_HANDLERS: Record<
   string,
-  (i: StringSelectMenuInteraction<CacheType>) => Promise<any>
+  (i: StringSelectMenuInteraction<CacheType>, ctx: TraceContext) => Promise<any>
 > = {
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: handleSettingsSelect,
 };
@@ -74,24 +75,20 @@ const SELECT_HANDLERS: Record<
 
 async function handleModal(
   interaction: ModalSubmitInteraction<CacheType>,
-  traceId: string
+  ctx: TraceContext
 ): Promise<boolean> {
   const { customId } = interaction;
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.handler",
-    event: "modal_received",
-    traceId,
-    context: { customId },
-  });
+  l.event("modal_received", { customId });
 
   if (customId === IDS.MODALS.ADD) {
-    await handleAddAbsenceSubmit(interaction);
+    await handleAddAbsenceSubmit(interaction, ctx);
     return true;
   }
 
   if (customId === IDS.MODALS.REMOVE) {
-    await handleRemoveAbsenceSubmit(interaction);
+    await handleRemoveAbsenceSubmit(interaction, ctx);
     return true;
   }
 
@@ -99,13 +96,22 @@ async function handleModal(
 }
 
 // =====================================
-// 🚀 MAIN HANDLER (ROUTER READY)
+// 🚀 MAIN HANDLER (CTX READY)
 // =====================================
 
 export async function handleAbsenceInteraction(
   interaction: Interaction<CacheType>,
   traceId: string
 ): Promise<boolean> {
+  const ctx: TraceContext = {
+    traceId,
+    source: "discord",
+    system: "absence",
+    userId: interaction.user?.id,
+  };
+
+  const l = log.ctx(ctx);
+
   try {
     // =============================
     // 🔘 BUTTONS
@@ -117,14 +123,9 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      logger.emit({
-        scope: "absence.handler",
-        event: "button_click",
-        traceId,
-        context: { id },
-      });
+      l.event("button_click", { id });
 
-      await handler(interaction);
+      await handler(interaction, ctx);
       return true;
     }
 
@@ -138,14 +139,9 @@ export async function handleAbsenceInteraction(
 
       if (!handler) return false;
 
-      logger.emit({
-        scope: "absence.handler",
-        event: "select_change",
-        traceId,
-        context: { id },
-      });
+      l.event("select_change", { id });
 
-      await handler(interaction);
+      await handler(interaction, ctx);
       return true;
     }
 
@@ -154,18 +150,12 @@ export async function handleAbsenceInteraction(
     // =============================
 
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction, traceId);
+      return await handleModal(interaction, ctx);
     }
 
     return false;
   } catch (error) {
-    logger.emit({
-      scope: "absence.handler",
-      event: "handler_error",
-      traceId,
-      level: "error",
-      error,
-    });
+    l.error("handler_error", error);
 
     if (interaction.isRepliable()) {
       const payload = {
