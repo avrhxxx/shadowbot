@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/google/googleSheetsClient.ts
+// 📁 src/integrations/google/googleSheetsClient.ts
 // =====================================
 
 import { google } from "googleapis";
@@ -9,7 +9,7 @@ import { google } from "googleapis";
 // =====================================
 
 if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-  throw new Error("❌ Brakuje zmiennej GOOGLE_SERVICE_ACCOUNT!");
+  throw new Error("❌ Missing GOOGLE_SERVICE_ACCOUNT environment variable!");
 }
 
 // =====================================
@@ -21,7 +21,7 @@ let credentials: any;
 try {
   credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT as string);
 } catch (error) {
-  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT ma niepoprawny JSON format");
+  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
 }
 
 // =====================================
@@ -29,7 +29,7 @@ try {
 // =====================================
 
 if (!credentials.client_email || !credentials.private_key) {
-  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT brakuje wymaganych pól");
+  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT is missing required fields");
 }
 
 // Fix multiline private key
