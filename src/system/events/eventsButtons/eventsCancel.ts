@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsButtons/eventsCancel.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsCancel.ts
+// =====================================
+
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -9,12 +12,16 @@ import {
   EmbedBuilder
 } from "discord.js";
 import { cancelEvent, getEvents } from "../eventService";
-import { formatEventUTC } from "../../utils/timeUtils";
+import { formatEventUTC } from "../../../shared/utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 /* ======================================================
    🔹 STEP 1 – BUTTON → SELECT
 ====================================================== */
 export async function handleCancel(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
   const guildId = interaction.guildId;
   if (!guildId) return;
 
@@ -61,12 +68,24 @@ export async function handleCancel(interaction: ButtonInteraction) {
     components: [row],
     ephemeral: true
   });
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "open_select",
+    traceId,
+    context: {
+      guildId,
+      eventsCount: uniqueActiveEvents.length,
+    },
+  });
 }
 
 /* ======================================================
    🔹 STEP 2 – SELECT → CONFIRMATION
 ====================================================== */
 export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
+  const traceId = createTraceId();
+
   await interaction.deferUpdate();
 
   const guildId = interaction.guildId!;
@@ -114,12 +133,24 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
     embeds: [embed],
     components: [row]
   });
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "select_event",
+    traceId,
+    context: {
+      guildId,
+      eventId,
+    },
+  });
 }
 
 /* ======================================================
    🔹 STEP 3 – CONFIRM BUTTON
 ====================================================== */
 export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
+  const traceId = createTraceId();
+
   await interaction.deferUpdate();
 
   const guildId = interaction.guildId!;
@@ -143,15 +174,33 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
     embeds: [embed],
     components: []
   });
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "confirmed",
+    traceId,
+    context: {
+      guildId,
+      eventId,
+    },
+  });
 }
 
 /* ======================================================
    🔹 STEP 4 – ABORT BUTTON
 ====================================================== */
 export async function handleCancelAbort(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
   await interaction.update({
     content: "Cancellation aborted.",
     embeds: [],
     components: []
+  });
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "aborted",
+    traceId,
   });
 }
