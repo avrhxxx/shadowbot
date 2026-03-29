@@ -3,9 +3,10 @@
 // =====================================
 
 import Tesseract from "tesseract.js";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
 import { OCRToken } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 // =====================================
 // 🧱 TYPES
@@ -23,15 +24,15 @@ type OCRRunResult = {
 
 async function runWithPSM(
   buffer: Buffer,
-  traceId: string,
+  ctx: TraceContext,
   psm: number,
   label: string
 ): Promise<OCRRunResult> {
-  logger.emit({
-    scope: "quickadd.ocr",
-    event: "ocr_psm_start",
-    traceId,
-    context: { psm, label },
+  const l = log.ctx(ctx);
+
+  l.event("ocr_psm_start", {
+    psm,
+    label,
   });
 
   try {
@@ -58,26 +59,17 @@ async function runWithPSM(
       confidence: w.confidence,
     }));
 
-    logger.emit({
-      scope: "quickadd.ocr",
-      event: "ocr_psm_done",
-      traceId,
-      context: {
-        label,
-        linesCount: lines.length,
-        tokensCount: tokens.length,
-      },
+    l.event("ocr_psm_done", {
+      label,
+      linesCount: lines.length,
+      tokensCount: tokens.length,
     });
 
     return { text, lines, tokens };
 
   } catch (error) {
-    logger.emit({
-      scope: "quickadd.ocr",
-      event: "ocr_psm_failed",
-      traceId,
-      level: "warn",
-      context: { label },
+    l.warn("ocr_psm_failed", {
+      label,
       error,
     });
 
@@ -91,13 +83,11 @@ async function runWithPSM(
 
 async function runVision(
   buffer: Buffer,
-  traceId: string
+  ctx: TraceContext
 ): Promise<OCRRunResult> {
-  logger.emit({
-    scope: "quickadd.ocr",
-    event: "vision_start",
-    traceId,
-  });
+  const l = log.ctx(ctx);
+
+  l.event("vision_start");
 
   try {
     const result = await runVisionOCR(buffer);
@@ -115,28 +105,19 @@ async function runVision(
         y: i * 10,
         width: line.length * 6,
         height: 10,
-        confidence: 50, // lower confidence (important!)
+        confidence: 50,
       })
     );
 
-    logger.emit({
-      scope: "quickadd.ocr",
-      event: "vision_done",
-      traceId,
-      context: {
-        linesCount: lines.length,
-        tokensCount: tokens.length,
-      },
+    l.event("vision_done", {
+      linesCount: lines.length,
+      tokensCount: tokens.length,
     });
 
     return { text, lines, tokens };
 
   } catch (error) {
-    logger.emit({
-      scope: "quickadd.ocr",
-      event: "vision_failed",
-      traceId,
-      level: "warn",
+    l.warn("vision_failed", {
       error,
     });
 
@@ -149,21 +130,19 @@ async function runVision(
 // =====================================
 
 export const OCREngine = {
-  full: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 6, "FULL"),
+  full: (buffer: Buffer, ctx: TraceContext) =>
+    runWithPSM(buffer, ctx, 6, "FULL"),
 
-  line: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 11, "LINE"),
+  line: (buffer: Buffer, ctx: TraceContext) =>
+    runWithPSM(buffer, ctx, 11, "LINE"),
 
-  box: (buffer: Buffer, traceId: string) =>
-    runWithPSM(buffer, traceId, 4, "BOX"),
+  box: (buffer: Buffer, ctx: TraceContext) =>
+    runWithPSM(buffer, ctx, 4, "BOX"),
 
-  async hocr(buffer: Buffer, traceId: string) {
-    logger.emit({
-      scope: "quickadd.ocr",
-      event: "hocr_start",
-      traceId,
-    });
+  async hocr(buffer: Buffer, ctx: TraceContext) {
+    const l = log.ctx(ctx);
+
+    l.event("hocr_start");
 
     try {
       const result = await Tesseract.recognize(
@@ -177,21 +156,14 @@ export const OCREngine = {
 
       const hocr = result.data.hocr || "";
 
-      logger.emit({
-        scope: "quickadd.ocr",
-        event: "hocr_done",
-        traceId,
-        context: { hocrLength: hocr.length },
+      l.event("hocr_done", {
+        hocrLength: hocr.length,
       });
 
       return { hocr };
 
     } catch (error) {
-      logger.emit({
-        scope: "quickadd.ocr",
-        event: "hocr_failed",
-        traceId,
-        level: "warn",
+      l.warn("hocr_failed", {
         error,
       });
 
@@ -199,6 +171,6 @@ export const OCREngine = {
     }
   },
 
-  vision: (buffer: Buffer, traceId: string) =>
-    runVision(buffer, traceId),
+  vision: (buffer: Buffer, ctx: TraceContext) =>
+    runVision(buffer, ctx),
 };
