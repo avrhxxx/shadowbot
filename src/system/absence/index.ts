@@ -19,7 +19,15 @@ export { handleAbsenceInteraction } from "./absenceHandler";
 export { initAbsenceNotifications } from "./absenceButtons/absenceNotification";
 
 // =============================
-// 🔹 DOMAIN SERVICE (IMPORTANT)
+// 🔹 DOMAIN SERVICE (CONTROLLED API)
 // =============================
 
-export * from "./absenceService";
+export {
+  createAbsence,
+  removeAbsence,
+  getAbsences,
+  getAbsenceByPlayer,
+  getAbsenceConfig,
+  setNotificationChannel,
+  setAbsenceEmbedId,
+} from "./absenceService";
