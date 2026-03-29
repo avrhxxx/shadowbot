@@ -1,4 +1,4 @@
-// src/eventsPanel/eventsButtons/eventsParticipants.ts
+// src/system/events/eventsButtons/eventsParticipants.ts
 import { 
   ButtonInteraction, 
   ModalSubmitInteraction, 
@@ -9,8 +9,8 @@ import {
 } from "discord.js";
 
 import { getEventById, updateEvent, EventObject } from "../eventService";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // ==========================
 // HELPERS
@@ -80,21 +80,17 @@ export async function handleAbsentParticipant(
 async function updateParticipants(
   interaction: ModalSubmitInteraction,
   eventId: string,
+  ctx: TraceContext,
   updater: (event: EventObject, input: string[]) => string[]
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId;
 
   if (!guildId) {
-    logger.emit({
-      scope: "events.participants",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
+    l.error("missing_guild");
 
     await interaction.editReply({ content: "❌ Missing guild." }).catch(() => null);
     return;
@@ -111,6 +107,8 @@ async function updateParticipants(
     const event = await getEventById(guildId, eventId);
 
     if (!event) {
+      l.warn("event_not_found", { eventId });
+
       await interaction.editReply({ content: "Event not found." });
       return;
     }
@@ -128,28 +126,15 @@ async function updateParticipants(
         : `No changes were made for **${event.name}**.`,
     });
 
-    logger.emit({
-      scope: "events.participants",
-      event: "participants_updated",
-      traceId,
-      context: {
-        guildId,
-        eventId,
-        updatedCount: updatedItems.length,
-        inputCount: input.length,
-      },
+    l.event("participants_updated", {
+      eventId,
+      updatedCount: updatedItems.length,
+      inputCount: input.length,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.participants",
-      event: "update_failed",
-      traceId,
-      level: "error",
-      context: {
-        eventId,
-      },
-      error: err,
+    l.error("update_failed", err, {
+      eventId,
     });
 
     await interaction.editReply({
@@ -163,9 +148,10 @@ async function updateParticipants(
 // ==========================
 export async function handleAddParticipantSubmit(
   interaction: ModalSubmitInteraction,
-  eventId: string
+  eventId: string,
+  ctx: TraceContext
 ) {
-  await updateParticipants(interaction, eventId, (event, nicknames) => {
+  await updateParticipants(interaction, eventId, ctx, (event, nicknames) => {
     const added: string[] = [];
 
     for (const nick of nicknames) {
@@ -183,9 +169,10 @@ export async function handleAddParticipantSubmit(
 
 export async function handleRemoveParticipantSubmit(
   interaction: ModalSubmitInteraction,
-  eventId: string
+  eventId: string,
+  ctx: TraceContext
 ) {
-  await updateParticipants(interaction, eventId, (event, nicknames) => {
+  await updateParticipants(interaction, eventId, ctx, (event, nicknames) => {
     const removed: string[] = [];
 
     for (const nick of nicknames) {
@@ -208,9 +195,10 @@ export async function handleRemoveParticipantSubmit(
 
 export async function handleAbsentParticipantSubmit(
   interaction: ModalSubmitInteraction,
-  eventId: string
+  eventId: string,
+  ctx: TraceContext
 ) {
-  await updateParticipants(interaction, eventId, (event, nicknames) => {
+  await updateParticipants(interaction, eventId, ctx, (event, nicknames) => {
     const marked: string[] = [];
 
     for (const nick of nicknames) {
