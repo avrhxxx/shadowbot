@@ -2,15 +2,21 @@
 
 /**
  * Wyciąga ID eventu z customId przycisku lub modala.
- * BEZPIECZNE – nie używa lastIndexOf("_"), tylko znane prefixy.
+ * BEZPIECZNE – obsługuje również modale i nie polega na lastIndexOf
  *
  * Obsługiwane formaty:
  * event_add_ID
  * event_remove_ID
+ * event_absent_ID
  * event_show_list_ID
  * event_download_single_ID
  * event_compare_ID
  * event_clear_ID
+ *
+ * MODALE:
+ * event_add_modal_ID
+ * event_remove_modal_ID
+ * event_absent_modal_ID
  */
 export function parseEventId(customId: string): string {
   const prefixes = [
@@ -20,7 +26,12 @@ export function parseEventId(customId: string): string {
     "event_show_list_",
     "event_download_single_",
     "event_compare_",
-    "event_clear_"
+    "event_clear_",
+
+    // MODALE
+    "event_add_modal_",
+    "event_remove_modal_",
+    "event_absent_modal_"
   ];
 
   for (const prefix of prefixes) {
@@ -35,6 +46,8 @@ export function parseEventId(customId: string): string {
 /**
  * Specjalny parser dla:
  * compare_download_ID1_ID2
+ *
+ * BEZPIECZNY dla ID zawierających "_"
  */
 export function parseCompareIds(customId: string): { idA: string; idB: string } {
   const prefix = "compare_download_";
@@ -44,7 +57,16 @@ export function parseCompareIds(customId: string): { idA: string; idB: string } 
   }
 
   const rest = customId.slice(prefix.length);
-  const [idA, idB] = rest.split("_");
+
+  // zamiast split — bierzemy pierwszy separator
+  const separatorIndex = rest.indexOf("_");
+
+  if (separatorIndex === -1) {
+    throw new Error(`Invalid compare IDs in customId: ${customId}`);
+  }
+
+  const idA = rest.slice(0, separatorIndex);
+  const idB = rest.slice(separatorIndex + 1);
 
   if (!idA || !idB) {
     throw new Error(`Invalid compare IDs in customId: ${customId}`);
