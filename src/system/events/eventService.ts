@@ -4,7 +4,8 @@
 
 import { SheetRepository } from "../google/SheetRepository";
 import crypto from "crypto";
-import { logger } from "../core/logger/log";
+import { log } from "../core/logger/log";
+import { TraceContext } from "../core/trace/TraceContext";
 
 // =============================
 // TYPES
@@ -65,8 +66,10 @@ export async function getEventById(
 // =============================
 export async function createEvent(
   data: EventObject,
-  traceId?: string
+  ctx?: TraceContext
 ): Promise<EventObject> {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const newEvent: EventObject = {
     ...data,
     id: data.id ?? crypto.randomUUID(),
@@ -81,10 +84,7 @@ export async function createEvent(
 
   await eventRepo.create(newEvent);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_create",
-    traceId,
+  l?.event("event_create", {
     context: {
       eventId: newEvent.id,
       guildId: newEvent.guildId,
@@ -100,27 +100,20 @@ export async function createEvent(
 // =============================
 export async function deleteEvent(
   eventId: string,
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const existing = await eventRepo.findById(eventId);
 
   if (!existing) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId },
-    });
+    l?.warn("event_not_found", { eventId });
     return;
   }
 
   await eventRepo.deleteById(eventId);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_delete",
-    traceId,
+  l?.event("event_delete", {
     context: {
       eventId,
       guildId: existing.guildId,
@@ -134,14 +127,13 @@ export async function deleteEvent(
 export async function updateEvent(
   eventId: string,
   partial: Partial<EventObject>,
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   await eventRepo.updateById(eventId, partial);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_update",
-    traceId,
+  l?.event("event_update", {
     context: { eventId },
   });
 }
@@ -152,28 +144,21 @@ export async function updateEvent(
 export async function checkAndSetReminder(
   eventId: string,
   reminderValue: boolean,
-  traceId?: string
+  ctx?: TraceContext
 ): Promise<boolean> {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await eventRepo.findById(eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId },
-    });
+    l?.warn("event_not_found", { eventId });
     return false;
   }
 
   if (!event.reminderSent && reminderValue) {
     await eventRepo.updateById(eventId, { reminderSent: true });
 
-    logger.emit({
-      scope: "events.service",
-      event: "event_reminder_set",
-      traceId,
+    l?.event("event_reminder_set", {
       context: {
         eventId,
         guildId: event.guildId,
@@ -193,18 +178,14 @@ export async function addParticipants(
   guildId: string,
   eventId: string,
   nicknames: string[],
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await getEventById(guildId, eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId, guildId },
-    });
+    l?.warn("event_not_found", { eventId, guildId });
     throw new Error("Event not found");
   }
 
@@ -216,12 +197,9 @@ export async function addParticipants(
     absent = absent.filter((n) => n !== nick);
   }
 
-  await updateEvent(eventId, { participants, absent }, traceId);
+  await updateEvent(eventId, { participants, absent }, ctx);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_participants_add",
-    traceId,
+  l?.event("event_participants_add", {
     context: {
       eventId,
       guildId,
@@ -237,18 +215,14 @@ export async function removeParticipants(
   guildId: string,
   eventId: string,
   nicknames: string[],
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await getEventById(guildId, eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId, guildId },
-    });
+    l?.warn("event_not_found", { eventId, guildId });
     throw new Error("Event not found");
   }
 
@@ -260,12 +234,9 @@ export async function removeParticipants(
     (n) => !nicknames.includes(n)
   );
 
-  await updateEvent(eventId, { participants, absent }, traceId);
+  await updateEvent(eventId, { participants, absent }, ctx);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_participants_remove",
-    traceId,
+  l?.event("event_participants_remove", {
     context: {
       eventId,
       guildId,
@@ -281,18 +252,14 @@ export async function markAbsent(
   guildId: string,
   eventId: string,
   nicknames: string[],
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await getEventById(guildId, eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId, guildId },
-    });
+    l?.warn("event_not_found", { eventId, guildId });
     throw new Error("Event not found");
   }
 
@@ -309,12 +276,9 @@ export async function markAbsent(
     }
   }
 
-  await updateEvent(eventId, { participants, absent }, traceId);
+  await updateEvent(eventId, { participants, absent }, ctx);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_participants_absent",
-    traceId,
+  l?.event("event_participants_absent", {
     context: {
       eventId,
       guildId,
@@ -333,18 +297,14 @@ export async function addResults(
   guildId: string,
   eventId: string,
   nicknames: string[],
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await getEventById(guildId, eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId, guildId },
-    });
+    l?.warn("event_not_found", { eventId, guildId });
     throw new Error("Event not found");
   }
 
@@ -369,12 +329,9 @@ export async function addResults(
 
   const absent = Array.from(absentSet);
 
-  await updateEvent(eventId, { results, absent }, traceId);
+  await updateEvent(eventId, { results, absent }, ctx);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_results_add",
-    traceId,
+  l?.event("event_results_add", {
     context: {
       eventId,
       guildId,
@@ -392,27 +349,20 @@ export async function addResults(
 export async function cancelEvent(
   guildId: string,
   eventId: string,
-  traceId?: string
+  ctx?: TraceContext
 ): Promise<EventObject | null> {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const event = await getEventById(guildId, eventId);
 
   if (!event) {
-    logger.emit({
-      scope: "events.service",
-      event: "event_not_found",
-      traceId,
-      level: "warn",
-      context: { eventId, guildId },
-    });
+    l?.warn("event_not_found", { eventId, guildId });
     return null;
   }
 
-  await updateEvent(eventId, { status: "CANCELED" }, traceId);
+  await updateEvent(eventId, { status: "CANCELED" }, ctx);
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_cancel",
-    traceId,
+  l?.event("event_cancel", {
     context: {
       eventId,
       guildId,
@@ -428,8 +378,10 @@ export async function cancelEvent(
 export async function saveEvents(
   guildId: string,
   events: EventObject[],
-  traceId?: string
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   for (const event of events) {
     await updateEvent(
       event.id,
@@ -445,14 +397,11 @@ export async function saveEvents(
             ? event.lastBirthdayYear ?? 0
             : undefined,
       },
-      traceId
+      ctx
     );
   }
 
-  logger.emit({
-    scope: "events.service",
-    event: "event_bulk_save",
-    traceId,
+  l?.event("event_bulk_save", {
     context: {
       guildId,
       count: events.length,
