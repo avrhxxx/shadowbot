@@ -3,28 +3,29 @@
 // =====================================
 
 import sharp from "sharp";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 export const OCRPreprocessor = {
-  async base(buffer: Buffer, traceId: string): Promise<Buffer> {
+  async base(buffer: Buffer, ctx: TraceContext): Promise<Buffer> {
+    const l = log.ctx(ctx);
+
     try {
       return await sharp(buffer)
         .rotate()
         .resize({ width: 1500, withoutEnlargement: true })
         .toBuffer();
     } catch (error) {
-      logger.emit({
-        scope: "quickadd.ocr.preprocessor",
-        event: "pre_base_failed",
-        traceId,
-        level: "error",
+      l.error("pre_base_failed", {
         error,
       });
       return buffer;
     }
   },
 
-  async enhance(buffer: Buffer, traceId: string): Promise<Buffer> {
+  async enhance(buffer: Buffer, ctx: TraceContext): Promise<Buffer> {
+    const l = log.ctx(ctx);
+
     try {
       return await sharp(buffer)
         .grayscale()
@@ -32,11 +33,7 @@ export const OCRPreprocessor = {
         .sharpen()
         .toBuffer();
     } catch (error) {
-      logger.emit({
-        scope: "quickadd.ocr.preprocessor",
-        event: "pre_enhance_failed",
-        traceId,
-        level: "error",
+      l.error("pre_enhance_failed", {
         error,
       });
       return buffer;
