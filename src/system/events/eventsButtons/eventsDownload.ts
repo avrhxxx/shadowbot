@@ -4,7 +4,7 @@
 
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import { getEvents, getConfig, EventObject } from "../eventService";
-import { formatEventUTC } from "../../utils/timeUtils";
+import { formatEventUTC } from "../../../shared/utils/timeUtils";
 import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
@@ -136,7 +136,6 @@ export async function handleDownload(
         return;
       }
 
-      // optional: ograniczenie typów
       if (!["custom", "reservoir_raid"].includes(event.eventType)) {
         await interaction.reply({
           content: "❌ This event type cannot be downloaded.",
@@ -209,7 +208,6 @@ export async function handleDownload(
 
     const fullText = blocks.join("\n\n====================\n\n");
 
-    // chunking (bezpieczne dla Discord limit)
     const chunks = fullText.match(/[\s\S]{1,1900000}/g) || [];
 
     for (const [i, chunk] of chunks.entries()) {
