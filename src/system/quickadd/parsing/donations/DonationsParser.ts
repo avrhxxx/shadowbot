@@ -4,7 +4,7 @@
 
 import { LayoutRow } from "../../ocr/layout/LayoutBuilder";
 import { ParsedEntry } from "../../core/QuickAddTypes";
-import { log } from "../../logger";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 🔥 MAIN — LAYOUT MODE (PRIMARY)
@@ -20,10 +20,10 @@ export function parseDonationsFromLayout(
 
   const { layout } = input;
 
-  log.emit({
+  logger.emit({
     event: "parse_layout_start",
     traceId,
-    data: { rows: layout.length },
+    context: { rows: layout.length },
   });
 
   const extracted: { nickname: string; valueRaw: string }[] = [];
@@ -53,20 +53,20 @@ export function parseDonationsFromLayout(
 
     extracted.push({ nickname, valueRaw });
 
-    log.emit({
+    logger.emit({
       event: "layout_row_used",
       traceId,
-      data: { cells: cellTexts, nickname, valueRaw },
+      context: { cells: cellTexts, nickname, valueRaw },
     });
   }
 
   const cleaned = cleanEntries(extracted, traceId);
   const final = finalizeEntries(cleaned, traceId);
 
-  log.emit({
+  logger.emit({
     event: "parse_layout_done",
     traceId,
-    data: { parsed: final.length },
+    stats: { parsed: final.length },
   });
 
   return final;
@@ -84,16 +84,22 @@ export function parseDonations(
     throw new Error("traceId is required in parseDonations");
   }
 
-  log.emit({
+  logger.emit({
     event: "parse_lines_start",
     traceId,
-    data: { lines: lines.length },
+    context: { lines: lines.length },
   });
 
   const candidates = extractCandidates(lines);
   const paired = pairCandidates(candidates);
   const cleaned = cleanEntries(paired, traceId);
   const final = finalizeEntries(cleaned, traceId);
+
+  logger.emit({
+    event: "parse_lines_done",
+    traceId,
+    stats: { parsed: final.length },
+  });
 
   return final;
 }
@@ -183,10 +189,10 @@ function cleanEntries(
     });
   }
 
-  log.emit({
+  logger.emit({
     event: "clean_done",
     traceId,
-    data: { count: results.length },
+    stats: { count: results.length },
   });
 
   return results;
@@ -208,17 +214,17 @@ function finalizeEntries(
 
     results.push(e);
 
-    log.emit({
+    logger.emit({
       event: "parsed_entry",
       traceId,
-      data: e,
+      result: e,
     });
   }
 
-  log.emit({
+  logger.emit({
     event: "final_done",
     traceId,
-    data: { count: results.length },
+    stats: { count: results.length },
   });
 
   return results;
