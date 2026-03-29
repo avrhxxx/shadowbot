@@ -7,7 +7,7 @@
  * Minimal Google Vision API client.
  *
  * Responsibilities:
- * - use shared GoogleAuth
+ * - use shared GoogleAuth credentials
  * - send request
  * - return raw response
  *
@@ -21,7 +21,7 @@
 import * as vision from "@google-cloud/vision";
 import { googleCredentials } from "./googleSheetsClient";
 
-// 🔥 używamy WSPÓLNYCH credentials (bez hacków typu "as any")
+// 🔥 Shared credentials (single source of truth)
 const client = new vision.ImageAnnotatorClient({
   credentials: googleCredentials,
 });
