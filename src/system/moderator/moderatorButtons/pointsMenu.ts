@@ -2,24 +2,22 @@
 
 import { Interaction } from "discord.js";
 import { renderPointsPanel } from "../../pointsPanel/pointsPanel";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 export async function handlePointsMenu(
   interaction: Interaction,
-  traceId: string
+  ctx: TraceContext
 ) {
   if (!interaction.isButton()) return;
 
+  const l = log.ctx(ctx);
+
   const panel = renderPointsPanel();
 
-  logger.emit({
-    scope: "moderator.buttons",
-    event: "moderator_points_menu_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      id: interaction.customId,
-    },
+  l.event("moderator_points_menu_open", {
+    guildId: interaction.guildId,
+    id: interaction.customId,
   });
 
   await interaction.reply({
