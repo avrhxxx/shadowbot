@@ -12,8 +12,8 @@ import {
 } from "discord.js";
 import { getEvents, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // -----------------------------
 // STATUS COLORS
@@ -145,13 +145,17 @@ Participants: ${event.participants.length}`;
 // -----------------------------
 // CATEGORY CLICK
 // -----------------------------
-export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
+export async function handleCategoryClick(
+  interaction: ButtonInteraction,
+  category: string | undefined,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
-  const traceId = createTraceId();
-
-  if (category) return await handleListByCategory(interaction, category);
+  if (category) return await handleListByCategory(interaction, category, ctx);
 
   const guildId = interaction.guildId!;
+
   try {
     const events = await getEvents(guildId);
 
@@ -188,21 +192,13 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.list",
-      event: "categories_shown",
-      traceId,
-      context: { guildId, categories: categories.length }
+    l.event("categories_shown", {
+      guildId,
+      categories: categories.length
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.list",
-      event: "category_click_failed",
-      traceId,
-      level: "error",
-      error
-    });
+    l.error("category_click_failed", error);
 
     await interaction.reply({
       content: "❌ Failed to load categories.",
@@ -214,9 +210,12 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
 // -----------------------------
 // LIST BY CATEGORY
 // -----------------------------
-export async function handleListByCategory(interaction: ButtonInteraction, category?: string) {
-
-  const traceId = createTraceId();
+export async function handleListByCategory(
+  interaction: ButtonInteraction,
+  category: string | undefined,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
   const guildId = interaction.guildId!;
 
   try {
@@ -250,21 +249,14 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
       else await interaction.followUp(payload);
     }
 
-    logger.emit({
-      scope: "events.list",
-      event: "category_list_shown",
-      traceId,
-      context: { guildId, category, count: filteredEvents.length }
+    l.event("category_list_shown", {
+      guildId,
+      category,
+      count: filteredEvents.length
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.list",
-      event: "list_by_category_failed",
-      traceId,
-      level: "error",
-      error
-    });
+    l.error("list_by_category_failed", error);
 
     await interaction.reply({
       content: "❌ Failed to load events.",
@@ -276,9 +268,12 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 // -----------------------------
 // SHOW LIST
 // -----------------------------
-export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
-
-  const traceId = createTraceId();
+export async function handleShowList(
+  interaction: ButtonInteraction,
+  eventId: string,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
   const guildId = interaction.guildId!;
 
   try {
@@ -309,21 +304,13 @@ ${absent.join("\n")}` : "")
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
 
-    logger.emit({
-      scope: "events.list",
-      event: "show_list",
-      traceId,
-      context: { guildId, eventId }
+    l.event("show_list", {
+      guildId,
+      eventId
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.list",
-      event: "show_list_failed",
-      traceId,
-      level: "error",
-      error
-    });
+    l.error("show_list_failed", error);
 
     await interaction.reply({
       content: "❌ Failed to load list.",
@@ -335,9 +322,12 @@ ${absent.join("\n")}` : "")
 // -----------------------------
 // UPDATE EMBED
 // -----------------------------
-export async function updateEventEmbed(message: Message, eventId: string) {
-
-  const traceId = createTraceId();
+export async function updateEventEmbed(
+  message: Message,
+  eventId: string,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
   const guildId = message.guildId;
   if (!guildId) return;
 
@@ -351,20 +341,12 @@ export async function updateEventEmbed(message: Message, eventId: string) {
 
     await message.edit({ embeds: [embed], components: rows });
 
-    logger.emit({
-      scope: "events.list",
-      event: "embed_updated",
-      traceId,
-      context: { guildId, eventId }
+    l.event("embed_updated", {
+      guildId,
+      eventId
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.list",
-      event: "embed_update_failed",
-      traceId,
-      level: "error",
-      error
-    });
+    l.error("embed_update_failed", error);
   }
 }
