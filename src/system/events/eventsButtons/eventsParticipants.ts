@@ -8,7 +8,9 @@ import {
   ActionRowBuilder 
 } from "discord.js";
 
-import { getEventById, updateEvent, EventObject } from "../eventService"; // 🔥 FIX
+import { getEventById, updateEvent, EventObject } from "../eventService";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // ==========================
 // HELPERS
@@ -80,36 +82,80 @@ async function updateParticipants(
   eventId: string,
   updater: (event: EventObject, input: string[]) => string[]
 ) {
+  const traceId = createTraceId();
+
   await interaction.deferReply({ ephemeral: true });
 
-  const guildId = interaction.guildId!;
-  const inputRaw = interaction.fields.getTextInputValue("user_input");
+  const guildId = interaction.guildId;
 
-  const input = inputRaw
-    .split(",")
-    .map((n) => n.trim())
-    .filter(Boolean);
+  if (!guildId) {
+    logger.emit({
+      scope: "events.participants",
+      event: "missing_guild",
+      traceId,
+      level: "error",
+    });
 
-  const event = await getEventById(guildId, eventId);
-
-  if (!event) {
-    await interaction.editReply({ content: "Event not found." });
+    await interaction.editReply({ content: "❌ Missing guild." }).catch(() => null);
     return;
   }
 
-  const updatedItems = updater(event, input);
+  try {
+    const inputRaw = interaction.fields.getTextInputValue("user_input");
 
-  // 🔥 ZAMIANA updateEventCell → updateEvent
-  await updateEvent(eventId, {
-    participants: event.participants,
-    absent: event.absent,
-  });
+    const input = inputRaw
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
 
-  await interaction.editReply({
-    content: updatedItems.length
-      ? `${updatedItems.join(", ")} updated for **${event.name}**`
-      : `No changes were made for **${event.name}**.`,
-  });
+    const event = await getEventById(guildId, eventId);
+
+    if (!event) {
+      await interaction.editReply({ content: "Event not found." });
+      return;
+    }
+
+    const updatedItems = updater(event, input);
+
+    await updateEvent(eventId, {
+      participants: event.participants,
+      absent: event.absent,
+    });
+
+    await interaction.editReply({
+      content: updatedItems.length
+        ? `${updatedItems.join(", ")} updated for **${event.name}**`
+        : `No changes were made for **${event.name}**.`,
+    });
+
+    logger.emit({
+      scope: "events.participants",
+      event: "participants_updated",
+      traceId,
+      context: {
+        guildId,
+        eventId,
+        updatedCount: updatedItems.length,
+        inputCount: input.length,
+      },
+    });
+
+  } catch (err) {
+    logger.emit({
+      scope: "events.participants",
+      event: "update_failed",
+      traceId,
+      level: "error",
+      context: {
+        eventId,
+      },
+      error: err,
+    });
+
+    await interaction.editReply({
+      content: "❌ Failed to update participants."
+    }).catch(() => null);
+  }
 }
 
 // ==========================
