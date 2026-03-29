@@ -32,7 +32,7 @@ function parseAbsenceDate(dateStr: string, year: number): Date | null {
 }
 
 // -----------------------------
-// GET CHANNEL (NO LOG HERE)
+// GET CHANNEL
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await AS.getAbsenceConfig(guild.id);
@@ -57,7 +57,9 @@ export async function updateAbsenceEmbed(
 ) {
   const l = log.ctx(ctx);
 
-  l.event("embed_update_start");
+  l.event("embed_update_start", {
+    context: { guildId: guild.id },
+  });
 
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
@@ -122,11 +124,11 @@ export async function updateAbsenceEmbed(
         await message.edit({ embeds: [embed] });
       } catch {
         message = await channel.send({ embeds: [embed] });
-        await AS.setAbsenceEmbedId(guild.id, message.id);
+        await AS.setAbsenceEmbedId(guild.id, message.id, ctx);
       }
     } else {
       message = await channel.send({ embeds: [embed] });
-      await AS.setAbsenceEmbedId(guild.id, message.id);
+      await AS.setAbsenceEmbedId(guild.id, message.id, ctx);
     }
 
     if (!message.pinned) {
@@ -154,7 +156,9 @@ export async function notifyAbsenceAdded(
 ) {
   const l = log.ctx(ctx);
 
-  l.event("notify_added_start", { player });
+  l.event("notify_added_start", {
+    input: { player, startDate, endDate },
+  });
 
   try {
     const absences = await AS.getAbsences(guild.id);
@@ -250,9 +254,11 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
       );
 
       if (endDate && endDate < now) {
-        await AS.removeAbsence(guild.id, a.player);
+        await AS.removeAbsence(guild.id, a.player, ctx);
 
-        l.event("autoclean_removed", { player: a.player });
+        l.event("autoclean_removed", {
+          input: { player: a.player },
+        });
 
         await notifyAbsenceAutoClean(guild, a.player, ctx);
       }
@@ -270,7 +276,9 @@ export async function initAbsenceNotifications(
 ) {
   const l = log.ctx(ctx);
 
-  l.event("init");
+  l.event("init", {
+    context: { guildId: guild.id },
+  });
 
   await updateAbsenceEmbed(guild, ctx);
 }
