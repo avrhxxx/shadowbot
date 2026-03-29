@@ -64,10 +64,12 @@ async function safeReply(interaction: any, payload: any) {
 }
 
 // -----------------------------------------------------------
-// HANDLE CREATE SUBMIT
+// HANDLE CREATE SUBMIT (ENTRY → dostaje traceId z eventHandlers)
 // -----------------------------------------------------------
-export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
-  const traceId = createTraceId();
+export async function handleCreateSubmit(
+  interaction: ModalSubmitInteraction,
+  traceId: string
+) {
   const guildId = interaction.guildId!;
 
   logger.emit({
@@ -206,14 +208,13 @@ export async function handleCreateSubmit(interaction: ModalSubmitInteraction) {
 }
 
 // -----------------------------------------------------------
-// SHOW CREATE NOTIFICATION CONFIRM
+// INTERNAL (NO NEW TRACE)
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
   interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
   tempId: string,
-  traceId?: string
+  traceId: string
 ) {
-  const tid = traceId ?? createTraceId();
   const tempData = tempEventStore.get(tempId);
   if (!tempData) return;
 
@@ -231,27 +232,23 @@ export async function showCreateNotificationConfirm(
   logger.emit({
     scope: "events.create",
     event: "ask_notification",
-    traceId: tid,
+    traceId,
     context: { tempId },
   });
 }
 
-// -----------------------------------------------------------
-// FINALIZE EVENT
-// -----------------------------------------------------------
 export async function finalizeEvent(
   interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
   tempId: string,
-  traceId?: string
+  traceId: string
 ) {
-  const tid = traceId ?? createTraceId();
   const tempData = tempEventStore.get(tempId);
 
   if (!tempData) {
     logger.emit({
       scope: "events.create",
       event: "temp_missing",
-      traceId: tid,
+      traceId,
       context: { tempId },
     });
 
@@ -296,7 +293,7 @@ export async function finalizeEvent(
     logger.emit({
       scope: "events.create",
       event: "event_created",
-      traceId: tid,
+      traceId,
       context: {
         eventId: newEvent.id,
         guildId: newEvent.guildId,
@@ -308,7 +305,7 @@ export async function finalizeEvent(
     logger.emit({
       scope: "events.create",
       event: "create_failed",
-      traceId: tid,
+      traceId,
       level: "error",
       context: { tempId },
       error: err,
@@ -322,7 +319,7 @@ export async function finalizeEvent(
 }
 
 // -----------------------------------------------------------
-// HANDLE NOTIFICATION RESPONSE
+// ENTRY POINTS (NEW TRACE)
 // -----------------------------------------------------------
 export async function handleNotificationResponse(interaction: ButtonInteraction) {
   const traceId = createTraceId();
@@ -357,9 +354,6 @@ export async function handleNotificationResponse(interaction: ButtonInteraction)
   await finalizeEvent(interaction, tempId, traceId);
 }
 
-// -----------------------------------------------------------
-// FINALIZE NEXT YEAR EVENT
-// -----------------------------------------------------------
 export async function finalizeNextYearEvent(interaction: ButtonInteraction | ModalSubmitInteraction) {
   const traceId = createTraceId();
 
