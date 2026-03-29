@@ -1,6 +1,6 @@
-// src/pointsPanel/pointsButtons/pointsAdd.ts
+// src/system/points/pointsButtons/pointsAdd.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import { logger } from "../../core/logger/log";
+import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // Placeholder Add Points
