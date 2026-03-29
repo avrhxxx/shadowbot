@@ -1,4 +1,7 @@
-// src/google/SheetRepository.ts
+// =====================================
+// 📁 src/google/SheetRepository.ts
+// =====================================
+
 import { readSheet, writeSheet } from "./googleSheetsStorage";
 
 type Filter<T> = Partial<{ [K in keyof T]: T[K] }>;
@@ -13,10 +16,13 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 📥 LOAD RAW
   // =============================
-  private async load() {
+  private async load(): Promise<{
+    headers: string[];
+    dataRows: unknown[][];
+  }> {
     const rows = await readSheet(this.tab);
-    const headers: string[] = rows[0] || [];
-    const dataRows = rows.slice(1);
+    const headers: string[] = (rows[0] as string[]) || [];
+    const dataRows = rows.slice(1) as unknown[][];
 
     return { headers, dataRows };
   }
@@ -24,13 +30,12 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 🔄 MAP ROW → OBJECT
   // =============================
-  private mapRow(headers: string[], row: any[]): T {
-    const obj: any = {};
+  private mapRow(headers: string[], row: unknown[]): T {
+    const obj: Record<string, unknown> = {};
 
     headers.forEach((h, i) => {
       let val = row[i];
 
-      // ✅ FIX: poprawiony warunek JSON.parse
       if (
         typeof val === "string" &&
         (val.startsWith("[") || val.startsWith("{"))
@@ -45,15 +50,15 @@ export class SheetRepository<T extends { id?: string }> {
       obj[h] = val ?? null;
     });
 
-    return obj;
+    return obj as T;
   }
 
   // =============================
   // 🔄 MAP OBJECT → ROW
   // =============================
-  private mapObject(headers: string[], data: Partial<T>): any[] {
+  private mapObject(headers: string[], data: Partial<T>): unknown[] {
     return headers.map((h) => {
-      let val = (data as any)[h];
+      const val = (data as Record<string, unknown>)[h];
 
       if (Array.isArray(val) || typeof val === "object") {
         return JSON.stringify(val);
@@ -66,7 +71,7 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 🧠 ENSURE COLUMNS
   // =============================
-  private ensureColumns(headers: string[], data: Partial<T>) {
+  private ensureColumns(headers: string[], data: Partial<T>): void {
     for (const key of Object.keys(data)) {
       if (!headers.includes(key)) {
         headers.push(key);
@@ -77,7 +82,7 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 📤 SAVE ALL
   // =============================
-  private async save(headers: string[], rows: any[][]) {
+  private async save(headers: string[], rows: unknown[][]): Promise<void> {
     await writeSheet(this.tab, [headers, ...rows]);
   }
 
@@ -92,7 +97,7 @@ export class SheetRepository<T extends { id?: string }> {
     if (filter) {
       data = data.filter((item) =>
         Object.entries(filter).every(([key, val]) =>
-          (item as any)[key] === val
+          (item as Record<string, unknown>)[key] === val
         )
       );
     }
@@ -131,7 +136,6 @@ export class SheetRepository<T extends { id?: string }> {
 
     const { headers, dataRows } = await this.load();
 
-    // ensure all columns
     dataArray.forEach((data) => this.ensureColumns(headers, data));
 
     const newRows = dataArray.map((data) =>
