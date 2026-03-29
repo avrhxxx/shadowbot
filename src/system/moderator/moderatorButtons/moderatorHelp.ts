@@ -1,22 +1,20 @@
 // src/system/moderator/moderatorButtons/moderatorHelp.ts
 
 import { Interaction, EmbedBuilder } from "discord.js";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 export async function handleModeratorHelp(
   interaction: Interaction,
-  traceId: string
+  ctx: TraceContext
 ) {
   if (!interaction.isButton()) return;
 
-  logger.emit({
-    scope: "moderator.buttons",
-    event: "moderator_help_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      id: interaction.customId,
-    },
+  const l = log.ctx(ctx);
+
+  l.event("moderator_help_open", {
+    guildId: interaction.guildId,
+    id: interaction.customId,
   });
 
   const embed = new EmbedBuilder()
