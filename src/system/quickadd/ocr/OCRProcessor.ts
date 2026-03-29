@@ -3,7 +3,7 @@
 // =====================================
 
 import fetch from "node-fetch";
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 import { OCREngine } from "./OCREngine";
 import { OCRResult, OCRToken } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
@@ -18,17 +18,17 @@ export async function runOCR(
 ): Promise<OCRResult> {
   const startedAt = Date.now();
 
-  log.emit({
+  logger.emit({
     event: "ocr_input",
     traceId,
-    data: {
+    context: {
       imageUrl,
       flags: { USE_PREPROCESS, ENABLE_HOCR },
     },
   });
 
   try {
-    log.emit({
+    logger.emit({
       event: "fetch_start",
       traceId,
     });
@@ -36,11 +36,11 @@ export async function runOCR(
     const res = await fetch(imageUrl);
 
     if (!res.ok) {
-      log.emit({
+      logger.emit({
         event: "fetch_failed",
         traceId,
         level: "warn",
-        data: { status: res.status },
+        context: { status: res.status },
       });
 
       throw new Error(`fetch_failed: ${res.status}`);
@@ -48,10 +48,10 @@ export async function runOCR(
 
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    log.emit({
+    logger.emit({
       event: "image_loaded",
       traceId,
-      data: {
+      context: {
         size: buffer.length,
       },
     });
@@ -76,7 +76,6 @@ export async function runOCR(
     try {
       const visionResult = await runVisionOCR(inputBuffer);
 
-      // ✅ FIX: strict null guard + safe cast
       if (visionResult?.fullTextAnnotation?.text) {
         visionTokens = mapVisionToTokens(
           visionResult as any,
@@ -84,11 +83,11 @@ export async function runOCR(
         );
       }
     } catch (error) {
-      log.emit({
+      logger.emit({
         event: "vision_ocr_failed",
         traceId,
         level: "warn",
-        data: { error },
+        error,
       });
     }
 
@@ -110,11 +109,11 @@ export async function runOCR(
       try {
         hocrResult = await OCREngine.hocr(inputBuffer, traceId);
       } catch (error) {
-        log.emit({
+        logger.emit({
           event: "hocr_failed",
           traceId,
           level: "warn",
-          data: { error },
+          error,
         });
       }
     }
@@ -137,10 +136,10 @@ export async function runOCR(
       });
     }
 
-    log.emit({
+    logger.emit({
       event: "ocr_done",
       traceId,
-      data: {
+      context: {
         durationMs: Date.now() - startedAt,
         sources: sources.length,
       },
@@ -149,12 +148,12 @@ export async function runOCR(
     return { sources };
 
   } catch (error) {
-    log.emit({
+    logger.emit({
       event: "ocr_failed",
       traceId,
       level: "error",
-      data: {
-        error,
+      error,
+      context: {
         durationMs: Date.now() - startedAt,
       },
     });
