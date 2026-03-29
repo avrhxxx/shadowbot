@@ -5,8 +5,8 @@
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import { getEvents, getConfig, EventObject } from "../eventService";
 import { formatEventUTC } from "../../../shared/utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // -----------------------------
 // HELPERS
@@ -56,17 +56,13 @@ async function getEventById(
 // -----------------------------
 export async function handleDownload(
   interaction: ButtonInteraction,
+  ctx: TraceContext,
   singleEventId?: string
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   if (!interaction.guild || !interaction.guildId) {
-    logger.emit({
-      scope: "events.download",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
+    l.error("missing_guild", null);
     return;
   }
 
@@ -78,17 +74,12 @@ export async function handleDownload(
       getConfig(guildId)
     ]);
 
-    if (!config || !config.downloadChannel) {
+    if (!config?.downloadChannel) {
+      l.warn("missing_channel_config", { guildId });
+
       await interaction.reply({
         content: "❌ Download channel is not set in event settings.",
         ephemeral: true
-      });
-
-      logger.emit({
-        scope: "events.download",
-        event: "missing_channel_config",
-        traceId,
-        context: { guildId }
       });
 
       return;
@@ -97,16 +88,14 @@ export async function handleDownload(
     const channel = interaction.guild.channels.cache.get(config.downloadChannel);
 
     if (!channel || !channel.isTextBased()) {
+      l.warn("invalid_channel", {
+        guildId,
+        channelId: config.downloadChannel
+      });
+
       await interaction.reply({
         content: "❌ Download channel not found or not a text channel.",
         ephemeral: true
-      });
-
-      logger.emit({
-        scope: "events.download",
-        event: "invalid_channel",
-        traceId,
-        context: { guildId, channelId: config.downloadChannel }
       });
 
       return;
@@ -121,32 +110,22 @@ export async function handleDownload(
       const event = await getEventById(guildId, singleEventId);
 
       if (!event) {
+        l.warn("event_not_found", { guildId, eventId: singleEventId });
+
         await interaction.reply({
           content: "Event not found.",
           ephemeral: true
-        });
-
-        logger.emit({
-          scope: "events.download",
-          event: "event_not_found",
-          traceId,
-          context: { guildId, eventId: singleEventId }
         });
 
         return;
       }
 
       if (!["custom", "reservoir_raid"].includes(event.eventType)) {
+        l.warn("invalid_event_type", { eventType: event.eventType });
+
         await interaction.reply({
           content: "❌ This event type cannot be downloaded.",
           ephemeral: true
-        });
-
-        logger.emit({
-          scope: "events.download",
-          event: "invalid_event_type",
-          traceId,
-          context: { eventType: event.eventType }
         });
 
         return;
@@ -169,11 +148,9 @@ export async function handleDownload(
         ephemeral: true
       });
 
-      logger.emit({
-        scope: "events.download",
-        event: "single_download_success",
-        traceId,
-        context: { guildId, eventId: event.id }
+      l.event("single_download_success", {
+        guildId,
+        eventId: event.id
       });
 
       return;
@@ -189,23 +166,17 @@ export async function handleDownload(
     );
 
     if (!relevantEvents.length) {
+      l.warn("no_events", { guildId });
+
       await interaction.editReply({
         content: "No events with participants to download.",
         components: []
-      });
-
-      logger.emit({
-        scope: "events.download",
-        event: "no_events",
-        traceId,
-        context: { guildId }
       });
 
       return;
     }
 
     const blocks = relevantEvents.map(buildEventContent);
-
     const fullText = blocks.join("\n\n====================\n\n");
 
     const chunks = fullText.match(/[\s\S]{1,1900000}/g) || [];
@@ -227,25 +198,14 @@ export async function handleDownload(
       components: []
     });
 
-    logger.emit({
-      scope: "events.download",
-      event: "bulk_download_success",
-      traceId,
-      context: {
-        guildId,
-        eventsCount: relevantEvents.length,
-        chunks: chunks.length
-      }
+    l.event("bulk_download_success", {
+      guildId,
+      eventsCount: relevantEvents.length,
+      chunks: chunks.length
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.download",
-      event: "download_failed",
-      traceId,
-      level: "error",
-      error
-    });
+    l.error("download_failed", error);
 
     try {
       if (interaction.deferred || interaction.replied) {
