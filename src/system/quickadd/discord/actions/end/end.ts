@@ -12,7 +12,8 @@ import {
   validateSessionOwner,
 } from "../../../rules/QuickAddGuards";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -39,9 +40,10 @@ async function safeReply(
 
 export async function handleEnd(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
-  const startTime = Date.now();
+  const startedAt = Date.now();
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -50,14 +52,9 @@ export async function handleEnd(
     await interaction.deferReply({ flags: 64 });
   }
 
-  logger.emit({
-    scope: "quickadd.end",
-    event: "end_requested",
-    traceId,
-    context: {
-      guildId,
-      userId,
-    },
+  l.event("end_requested", {
+    guildId,
+    userId,
   });
 
   if (!guildId) {
@@ -67,50 +64,36 @@ export async function handleEnd(
 
   const session = QuickAddSession.get(guildId, userId);
 
-  logger.emit({
-    scope: "quickadd.end",
-    event: "end_session_loaded",
-    traceId,
-    context: {
-      sessionId: session?.sessionId,
-      guildId,
-      userId,
-    },
+  l.event("end_session_loaded", {
+    sessionId: session?.sessionId,
+    guildId,
+    userId,
   });
 
   const contextError = validateQuickAddContext(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   const ownerError = validateSessionOwner(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   if (contextError || ownerError || !session) {
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_guard_failed",
-      traceId,
-      level: "warn",
-      context: {
-        sessionId: session?.sessionId,
-        guildId,
-        userId,
-        hasSession: !!session,
-        contextError,
-        ownerError,
-        reason:
-          contextError ??
-          ownerError ??
-          (!session ? "no_session" : "unknown"),
-      },
-      stats: {
-        end_blocked: 1,
-      },
+    l.warn("end_guard_failed", {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+      hasSession: !!session,
+      contextError,
+      ownerError,
+      reason:
+        contextError ??
+        ownerError ??
+        (!session ? "no_session" : "unknown"),
     });
 
     await safeReply(
@@ -123,50 +106,34 @@ export async function handleEnd(
   const { sessionId, threadId, stage } = session;
 
   try {
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_start",
-      traceId,
-      context: {
-        sessionId,
-        guildId,
-        threadId,
-        stage,
-      },
-      stats: {
-        end_started: 1,
-      },
+    l.event("end_start", {
+      sessionId,
+      guildId,
+      threadId,
+      stage,
     });
 
-    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+    const entries = QuickAddBuffer.getEntries(sessionId, ctx.traceId);
 
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_buffer_state",
-      traceId,
-      context: {
-        sessionId,
-        count: entries.length,
-      },
+    l.event("end_buffer_state", {
+      sessionId,
+      count: entries.length,
     });
 
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_cleanup_start",
-      traceId,
-      context: {
-        sessionId,
-      },
+    l.event("end_cleanup_start", {
+      sessionId,
     });
 
-    QuickAddBuffer.clear(sessionId, traceId);
-    QuickAddSession.end(guildId, userId, traceId);
+    // 🧹 cleanup
+    QuickAddBuffer.clear(sessionId, ctx.traceId);
+    QuickAddSession.end(guildId, userId, ctx.traceId);
 
     await safeReply(
       interaction,
       "🛑 QuickAdd session ended"
     );
 
+    // 🧵 delete thread (if possible)
     try {
       const channel = interaction.channel;
 
@@ -178,67 +145,32 @@ export async function handleEnd(
       ) {
         await channel.delete();
 
-        logger.emit({
-          scope: "quickadd.end",
-          event: "thread_deleted",
-          traceId,
-          context: {
-            sessionId,
-            guildId,
-            threadId,
-          },
+        l.event("thread_deleted", {
+          sessionId,
+          guildId,
+          threadId,
         });
       }
     } catch (err) {
-      logger.emit({
-        scope: "quickadd.end",
-        event: "thread_delete_failed",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-        },
-        stats: {
-          end_thread_delete_failed: 1,
-        },
+      l.warn("thread_delete_failed", {
+        sessionId,
         error: err,
       });
     }
 
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_done",
-      traceId,
-      context: {
-        sessionId,
-      },
-      stats: {
-        end_success: 1,
-      },
-      meta: {
-        durationMs: duration,
-      },
+    l.event("end_done", {
+      sessionId,
+      durationMs: duration,
     });
 
   } catch (err) {
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.end",
-      event: "end_failed",
-      traceId,
-      level: "error",
-      context: {
-        sessionId,
-      },
-      stats: {
-        end_error: 1,
-      },
-      meta: {
-        durationMs: duration,
-      },
+    l.error("end_failed", {
+      sessionId,
+      durationMs: duration,
       error: err,
     });
 
