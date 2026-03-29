@@ -17,7 +17,8 @@ import {
 } from "../eventService";
 
 import { parseEventId } from "./utils";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // ======================================================
 // HELPERS
@@ -27,8 +28,7 @@ async function getEventById(
   eventId: string
 ): Promise<EventObject | null> {
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id.toString() === eventId.toString());
-  return event || null;
+  return events.find(e => e.id.toString() === eventId.toString()) || null;
 }
 
 // ======================================================
@@ -37,9 +37,15 @@ async function getEventById(
 export async function handleClearEventButton(
   interaction: ButtonInteraction,
   eventId: string,
-  traceId: string
+  ctx: TraceContext
 ) {
-  const guildId = interaction.guildId!;
+  const l = log.ctx(ctx);
+  const guildId = interaction.guildId;
+
+  if (!guildId) {
+    l.error("missing_guild", null);
+    return;
+  }
 
   try {
     const event = await getEventById(guildId, eventId);
@@ -50,10 +56,7 @@ export async function handleClearEventButton(
         ephemeral: true
       });
 
-      logger.emit({
-        scope: "events.clear",
-        event: "event_not_found",
-        traceId,
+      l.warn("event_not_found", {
         context: { guildId, eventId },
       });
 
@@ -87,21 +90,13 @@ export async function handleClearEventButton(
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.clear",
-      event: "confirm_ui_shown",
-      traceId,
+    l.event("confirm_ui_shown", {
       context: { guildId, eventId },
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.clear",
-      event: "button_failed",
-      traceId,
-      level: "error",
+    l.error("button_failed", error, {
       context: { guildId, eventId },
-      error,
     });
   }
 }
@@ -111,9 +106,16 @@ export async function handleClearEventButton(
 // ======================================================
 export async function handleClearEventConfirm(
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ) {
-  const guildId = interaction.guildId!;
+  const l = log.ctx(ctx);
+  const guildId = interaction.guildId;
+
+  if (!guildId) {
+    l.error("missing_guild", null);
+    return;
+  }
+
   const eventId = parseEventId(interaction.customId);
 
   try {
@@ -126,10 +128,7 @@ export async function handleClearEventConfirm(
         content: "Event not found."
       });
 
-      logger.emit({
-        scope: "events.clear",
-        event: "confirm_event_not_found",
-        traceId,
+      l.warn("confirm_event_not_found", {
         context: { guildId, eventId },
       });
 
@@ -149,21 +148,13 @@ export async function handleClearEventConfirm(
       embeds: [embed]
     });
 
-    logger.emit({
-      scope: "events.clear",
-      event: "confirmed",
-      traceId,
+    l.event("confirmed", {
       context: { guildId, eventId },
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.clear",
-      event: "confirm_failed",
-      traceId,
-      level: "error",
+    l.error("confirm_failed", error, {
       context: { guildId, eventId },
-      error,
     });
   }
 }
@@ -173,16 +164,19 @@ export async function handleClearEventConfirm(
 // ======================================================
 export async function handleClearEventAbort(
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ) {
+  const l = log.ctx(ctx);
+
   await interaction.reply({
     content: "Clear action aborted.",
     ephemeral: true
   });
 
-  logger.emit({
-    scope: "events.clear",
-    event: "aborted",
-    traceId,
+  l.event("aborted", {
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+    },
   });
 }
