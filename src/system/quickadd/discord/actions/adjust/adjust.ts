@@ -2,22 +2,6 @@
 // 📁 src/system/quickadd/discord/actions/adjust/adjust.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Adjusts a single entry in buffer by ID.
- *
- * Responsible for:
- * - updating nickname/value
- * - revalidating ALL entries
- * - saving learning (adjusted nicknames)
- *
- * ❗ RULES:
- * - id-based modification ONLY
- * - revalidation REQUIRED
- * - owner-only
- * - logger.emit ONLY
- */
-
 import { ChatInputCommandInteraction } from "discord.js";
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
@@ -31,7 +15,8 @@ import {
 
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // 🔐 SAFE REPLY (EDIT ONLY)
@@ -58,9 +43,10 @@ async function safeReply(
 
 export async function handleAdjust(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
   const startedAt = Date.now();
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -79,31 +65,22 @@ export async function handleAdjust(
   const contextError = validateQuickAddContext(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   const ownerError = validateSessionOwner(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   if (contextError || ownerError || !session) {
-    logger.emit({
-      scope: "quickadd.adjust",
-      event: "adjust_blocked",
-      traceId,
-      level: "warn",
-      context: {
-        sessionId: session?.sessionId,
-        guildId,
-        userId,
-        hasSession: !!session,
-        reason: contextError ?? ownerError ?? "no_session",
-      },
-      stats: {
-        adjust_blocked: 1,
-      },
+    l.warn("adjust_blocked", {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+      hasSession: !!session,
+      reason: contextError ?? ownerError ?? "no_session",
     });
 
     await safeReply(
@@ -125,36 +102,22 @@ export async function handleAdjust(
   }
 
   try {
-    logger.emit({
-      scope: "quickadd.adjust",
-      event: "adjust_start",
-      traceId,
-      context: {
-        sessionId,
-        guildId,
-        id,
-        newNickname,
-        newValue,
-      },
-      stats: {
-        adjust_started: 1,
-      },
+    l.event("adjust_start", {
+      sessionId,
+      guildId,
+      id,
+      newNickname,
+      newValue,
     });
 
-    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+    const entries = QuickAddBuffer.getEntries(sessionId, ctx.traceId);
 
     const index = entries.findIndex((e) => e.id === id);
 
     if (index === -1) {
-      logger.emit({
-        scope: "quickadd.adjust",
-        event: "entry_not_found",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-          id,
-        },
+      l.warn("entry_not_found", {
+        sessionId,
+        id,
       });
 
       await safeReply(
@@ -180,23 +143,14 @@ export async function handleAdjust(
         nickname: e.nickname,
         value: e.value,
       })),
-      traceId
+      ctx.traceId
     );
 
     if (revalidated.length !== newEntries.length) {
-      logger.emit({
-        scope: "quickadd.adjust",
-        event: "revalidation_length_mismatch",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-          before: newEntries.length,
-          after: revalidated.length,
-        },
-        stats: {
-          adjust_revalidation_mismatch: 1,
-        },
+      l.warn("revalidation_length_mismatch", {
+        sessionId,
+        before: newEntries.length,
+        after: revalidated.length,
       });
 
       await safeReply(
@@ -213,20 +167,13 @@ export async function handleAdjust(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
+    QuickAddBuffer.replaceEntries(sessionId, merged, ctx.traceId);
 
-    logger.emit({
-      scope: "quickadd.adjust",
-      event: "adjust_applied",
-      traceId,
-      context: {
-        sessionId,
-        id,
-      },
-      meta: {
-        before: target,
-        after: updated,
-      },
+    l.event("adjust_applied", {
+      sessionId,
+      id,
+      before: target,
+      after: updated,
     });
 
     try {
@@ -238,29 +185,18 @@ export async function handleAdjust(
               adjusted: newNickname,
             },
           ],
-          traceId
+          ctx.traceId
         );
 
-        logger.emit({
-          scope: "quickadd.adjust",
-          event: "learning_saved_adjust",
-          traceId,
-          context: {
-            sessionId,
-            from: target.nickname,
-            to: newNickname,
-          },
+        l.event("learning_saved_adjust", {
+          sessionId,
+          from: target.nickname,
+          to: newNickname,
         });
       }
     } catch (err) {
-      logger.emit({
-        scope: "quickadd.adjust",
-        event: "learning_failed_adjust",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-        },
+      l.warn("learning_failed_adjust", {
+        sessionId,
         error: err,
       });
     }
@@ -272,38 +208,17 @@ export async function handleAdjust(
 
     const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.adjust",
-      event: "adjust_done",
-      traceId,
-      context: {
-        sessionId,
-      },
-      meta: {
-        durationMs: duration,
-      },
-      stats: {
-        adjust_success: 1,
-      },
+    l.event("adjust_done", {
+      sessionId,
+      durationMs: duration,
     });
 
   } catch (err) {
     const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.adjust",
-      event: "adjust_failed",
-      traceId,
-      level: "error",
-      context: {
-        sessionId,
-      },
-      meta: {
-        durationMs: duration,
-      },
-      stats: {
-        adjust_error: 1,
-      },
+    l.error("adjust_failed", {
+      sessionId,
+      durationMs: duration,
       error: err,
     });
 
