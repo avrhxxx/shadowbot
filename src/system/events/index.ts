@@ -22,16 +22,26 @@ export { initEventReminders } from "./eventsButtons/eventsReminder";
 // 🔹 PANEL
 // =============================
 
-export * from "./eventPanel";
+export { renderEventPanel } from "./eventPanel";
 
 // =============================
-// 🔹 SERVICE
+// 🔹 DOMAIN SERVICE (CONTROLLED API)
 // =============================
 
-export * from "./eventService";
-
-// =============================
-// 🔹 BUTTONS
-// =============================
-
-export * from "./eventsButtons";
+export {
+  getEvents,
+  getEventById,
+  createEvent,
+  deleteEvent,
+  updateEvent,
+  cancelEvent,
+  addParticipants,
+  removeParticipants,
+  markAbsent,
+  addResults,
+  saveEvents,
+  checkAndSetReminder,
+  getConfig,
+  setNotificationChannel,
+  setDownloadChannel,
+} from "./eventService";
