@@ -3,6 +3,19 @@ import { ButtonInteraction, CacheType } from "discord.js";
 import * as pointsService from "../pointsService";
 import { logger } from "../../../core/logger/log";
 
+// -----------------------------
+// Helper (spójny z resztą systemu)
+// -----------------------------
+function safeReply(
+  interaction: ButtonInteraction<CacheType>,
+  payload: any
+) {
+  if (interaction.replied || interaction.deferred) {
+    return interaction.followUp(payload);
+  }
+  return interaction.reply(payload);
+}
+
 /**
  * Placeholder: Wyświetla listę wszystkich stworzonych tygodni
  */
@@ -13,16 +26,10 @@ export async function handleListWeeks(
   const guildId = interaction.guildId;
 
   if (!guildId) {
-    const payload = {
+    await safeReply(interaction, {
       content: "❌ Guild context is required.",
       ephemeral: true,
-    };
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(payload);
-    } else {
-      await interaction.reply(payload);
-    }
+    });
     return;
   }
 
@@ -37,20 +44,13 @@ export async function handleListWeeks(
       },
     });
 
-    // 🔥 FIX: wymagany guildId
     const weeks: string[] = await pointsService.getAllWeeks(guildId);
 
     if (!weeks.length) {
-      const payload = {
+      await safeReply(interaction, {
         content: "⚠️ No weeks created yet.",
         ephemeral: true,
-      };
-
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(payload);
-      } else {
-        await interaction.reply(payload);
-      }
+      });
       return;
     }
 
@@ -58,16 +58,10 @@ export async function handleListWeeks(
       .map((week: string, index: number) => `${index + 1}. ${week}`)
       .join("\n");
 
-    const payload = {
+    await safeReply(interaction, {
       content: `📋 **Created Weeks:**\n${weekList}`,
       ephemeral: true,
-    };
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(payload);
-    } else {
-      await interaction.reply(payload);
-    }
+    });
 
   } catch (error) {
     logger.emit({
@@ -83,16 +77,10 @@ export async function handleListWeeks(
     });
 
     if (interaction.isRepliable()) {
-      const payload = {
+      await safeReply(interaction, {
         content: "❌ Failed to fetch weeks.",
         ephemeral: true,
-      };
-
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(payload);
-      } else {
-        await interaction.reply(payload);
-      }
+      });
     }
   }
 }
