@@ -72,8 +72,10 @@ export async function createAbsence(
 
   if (existing) {
     l?.warn("create_duplicate", {
-      guildId: data.guildId,
-      player: data.player,
+      context: {
+        guildId: data.guildId,
+        player: data.player,
+      },
     });
 
     throw new Error(
@@ -91,9 +93,11 @@ export async function createAbsence(
   await absenceRepo.create(newAbsence);
 
   l?.event("created", {
-    guildId: data.guildId,
-    player: data.player,
-    absenceId: newAbsence.id,
+    result: {
+      guildId: data.guildId,
+      player: data.player,
+      absenceId: newAbsence.id,
+    },
   });
 
   return newAbsence;
@@ -116,16 +120,20 @@ export async function removeAbsence(
   );
 
   if (!target) {
-    l?.warn("remove_not_found", { guildId, player });
+    l?.warn("remove_not_found", {
+      context: { guildId, player },
+    });
     return null;
   }
 
   await absenceRepo.deleteById(target.id);
 
   l?.event("removed", {
-    guildId,
-    player,
-    absenceId: target.id,
+    result: {
+      guildId,
+      player,
+      absenceId: target.id,
+    },
   });
 
   return target;
@@ -150,7 +158,9 @@ export async function setNotificationChannel(
 
   await setConfig(guildId, "notificationChannel", channelId, ctx);
 
-  l?.event("set_notification_channel", { guildId, channelId });
+  l?.event("set_notification_channel", {
+    context: { guildId, channelId },
+  });
 }
 
 export async function setAbsenceEmbedId(
@@ -162,7 +172,9 @@ export async function setAbsenceEmbedId(
 
   await setConfig(guildId, "absenceEmbedId", messageId, ctx);
 
-  l?.event("set_embed_id", { guildId, messageId });
+  l?.event("set_embed_id", {
+    context: { guildId, messageId },
+  });
 }
 
 export async function setConfig(
@@ -182,7 +194,10 @@ export async function setConfig(
       [key]: value,
     });
 
-    l?.event("config_created", { guildId, key });
+    l?.event("config_created", {
+      context: { guildId, key },
+    });
+
     return;
   }
 
@@ -190,5 +205,7 @@ export async function setConfig(
     [key]: value,
   });
 
-  l?.event("config_updated", { guildId, key });
+  l?.event("config_updated", {
+    context: { guildId, key },
+  });
 }
