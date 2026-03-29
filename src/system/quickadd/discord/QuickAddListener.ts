@@ -6,7 +6,8 @@ import { Client, Interaction } from "discord.js";
 import { handleQuickAddCommand } from "./CommandRouter";
 import { createTraceId } from "../../../core/ids/IdGenerator";
 import { handleConfirmAutocomplete } from "./actions/confirm/confirmAutocomplete";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // =====================================
 // 🚀 REGISTER
@@ -15,6 +16,14 @@ import { logger } from "../../../core/logger/log";
 export function registerQuickAddListener(client: Client) {
   client.on("interactionCreate", async (interaction: Interaction) => {
     const traceId = createTraceId();
+
+    // 🔥 TEMP ctx creation (entrypoint)
+    const ctx = {
+      traceId,
+      system: "quickadd",
+    } as TraceContext;
+
+    const l = log.ctx(ctx);
 
     const userId = interaction.user?.id;
     const guildId = interaction.guildId;
@@ -32,43 +41,31 @@ export function registerQuickAddListener(client: Client) {
         try {
           subcommand = interaction.options.getSubcommand();
         } catch {
-          logger.emit({
-            scope: "quickadd.listener",
-            event: "autocomplete_subcommand_missing",
-            traceId,
-            level: "warn",
-            context: { userId, guildId, channelId },
+          l.warn("autocomplete_subcommand_missing", {
+            userId,
+            guildId,
+            channelId,
           });
 
           await interaction.respond([]);
           return;
         }
 
-        logger.emit({
-          scope: "quickadd.listener",
-          event: "autocomplete_received",
-          traceId,
-          context: {
-            userId,
-            guildId,
-            channelId,
-            subcommand,
-          },
+        l.event("autocomplete_received", {
+          userId,
+          guildId,
+          channelId,
+          subcommand,
         });
 
         if (subcommand === "confirm") {
-          await handleConfirmAutocomplete(interaction, traceId);
+          await handleConfirmAutocomplete(interaction, ctx);
         } else {
           await interaction.respond([]);
         }
 
-        logger.emit({
-          scope: "quickadd.listener",
-          event: "autocomplete_handled",
-          traceId,
-          context: {
-            subcommand,
-          },
+        l.event("autocomplete_handled", {
+          subcommand,
         });
 
         return;
@@ -80,40 +77,24 @@ export function registerQuickAddListener(client: Client) {
       if (!interaction.isChatInputCommand()) return;
       if (interaction.commandName !== "q") return;
 
-      logger.emit({
-        scope: "quickadd.listener",
-        event: "interaction_received",
-        traceId,
-        context: {
-          userId,
-          guildId,
-          channelId,
-        },
+      l.event("interaction_received", {
+        userId,
+        guildId,
+        channelId,
       });
 
-      await handleQuickAddCommand(interaction, traceId);
+      await handleQuickAddCommand(interaction, ctx);
 
-      logger.emit({
-        scope: "quickadd.listener",
-        event: "interaction_routed",
-        traceId,
-        context: {
-          userId,
-          guildId,
-        },
+      l.event("interaction_routed", {
+        userId,
+        guildId,
       });
 
     } catch (error) {
-      logger.emit({
-        scope: "quickadd.listener",
-        event: "listener_error",
-        traceId,
-        level: "error",
-        context: {
-          userId,
-          guildId,
-          channelId,
-        },
+      l.error("listener_error", {
+        userId,
+        guildId,
+        channelId,
         error,
       });
 
