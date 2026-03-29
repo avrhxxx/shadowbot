@@ -83,7 +83,7 @@ export async function createEvent(
 
   logger.emit({
     scope: "events.service",
-    event: "event_created",
+    event: "event_create",
     traceId,
     context: {
       eventId: newEvent.id,
@@ -102,13 +102,29 @@ export async function deleteEvent(
   eventId: string,
   traceId?: string
 ) {
+  const existing = await eventRepo.findById(eventId);
+
+  if (!existing) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId },
+    });
+    return;
+  }
+
   await eventRepo.deleteById(eventId);
 
   logger.emit({
     scope: "events.service",
-    event: "event_deleted",
+    event: "event_delete",
     traceId,
-    context: { eventId },
+    context: {
+      eventId,
+      guildId: existing.guildId,
+    },
   });
 }
 
@@ -124,7 +140,7 @@ export async function updateEvent(
 
   logger.emit({
     scope: "events.service",
-    event: "event_updated",
+    event: "event_update",
     traceId,
     context: { eventId },
   });
@@ -139,16 +155,29 @@ export async function checkAndSetReminder(
   traceId?: string
 ): Promise<boolean> {
   const event = await eventRepo.findById(eventId);
-  if (!event) return false;
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId },
+    });
+    return false;
+  }
 
   if (!event.reminderSent && reminderValue) {
     await eventRepo.updateById(eventId, { reminderSent: true });
 
     logger.emit({
       scope: "events.service",
-      event: "reminder_set",
+      event: "event_reminder_set",
       traceId,
-      context: { eventId },
+      context: {
+        eventId,
+        guildId: event.guildId,
+      },
     });
 
     return true;
@@ -191,9 +220,14 @@ export async function addParticipants(
 
   logger.emit({
     scope: "events.service",
-    event: "participants_added",
+    event: "event_participants_add",
     traceId,
-    context: { eventId, count: nicknames.length },
+    context: {
+      eventId,
+      guildId,
+      added: nicknames.length,
+      total: participants.length,
+    },
   });
 
   return participants;
@@ -230,9 +264,14 @@ export async function removeParticipants(
 
   logger.emit({
     scope: "events.service",
-    event: "participants_removed",
+    event: "event_participants_remove",
     traceId,
-    context: { eventId, count: nicknames.length },
+    context: {
+      eventId,
+      guildId,
+      removed: nicknames.length,
+      total: participants.length,
+    },
   });
 
   return participants;
@@ -274,9 +313,14 @@ export async function markAbsent(
 
   logger.emit({
     scope: "events.service",
-    event: "participants_marked_absent",
+    event: "event_participants_absent",
     traceId,
-    context: { eventId, count: nicknames.length },
+    context: {
+      eventId,
+      guildId,
+      affected: nicknames.length,
+      absentTotal: absent.length,
+    },
   });
 
   return absent;
@@ -329,11 +373,13 @@ export async function addResults(
 
   logger.emit({
     scope: "events.service",
-    event: "results_added",
+    event: "event_results_add",
     traceId,
     context: {
       eventId,
+      guildId,
       resultsCount: results.length,
+      absentCount: absent.length,
     },
   });
 
@@ -349,15 +395,28 @@ export async function cancelEvent(
   traceId?: string
 ): Promise<EventObject | null> {
   const event = await getEventById(guildId, eventId);
-  if (!event) return null;
+
+  if (!event) {
+    logger.emit({
+      scope: "events.service",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { eventId, guildId },
+    });
+    return null;
+  }
 
   await updateEvent(eventId, { status: "CANCELED" }, traceId);
 
   logger.emit({
     scope: "events.service",
-    event: "event_canceled",
+    event: "event_cancel",
     traceId,
-    context: { eventId },
+    context: {
+      eventId,
+      guildId,
+    },
   });
 
   return { ...event, status: "CANCELED" };
@@ -392,9 +451,12 @@ export async function saveEvents(
 
   logger.emit({
     scope: "events.service",
-    event: "events_bulk_saved",
+    event: "event_bulk_save",
     traceId,
-    context: { count: events.length },
+    context: {
+      guildId,
+      count: events.length,
+    },
   });
 }
 
