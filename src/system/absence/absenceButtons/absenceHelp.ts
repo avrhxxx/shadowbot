@@ -14,7 +14,12 @@ export async function handleAbsenceHelp(
 
   const l = log.ctx(ctx);
 
-  l.event("help_open");
+  l.event("help_open", {
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+    },
+  });
 
   const embed = new EmbedBuilder()
     .setTitle("Absence Panel Guide")
