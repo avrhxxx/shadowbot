@@ -1,12 +1,19 @@
-// src/moderatorPanel/moderatorButtons/absenceHelp.ts
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceHelp.ts
+// =====================================
+
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 export async function handleAbsenceHelp(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
+  const traceId = createTraceId();
+
   const embed = new EmbedBuilder()
     .setTitle("Absence Panel Guide")
-    .setColor(0x1E90FF) // niebieski, pasujący do panelu
+    .setColor(0x1E90FF)
     .addFields(
       { 
         name: "👋 Welcome", 
@@ -39,5 +46,15 @@ export async function handleAbsenceHelp(interaction: ButtonInteraction) {
       }
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  try {
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+  } catch (err) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "absence_help_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
