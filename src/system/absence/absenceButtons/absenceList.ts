@@ -11,8 +11,8 @@ import {
 } from "discord.js";
 import { getAbsences, AbsenceObject } from "../absenceService";
 import { getEventDateUTC } from "../../../shared/utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // -----------------------------
 // Formatowanie daty: DD.MM.YYYY – DD.MM.YYYY + unix return
@@ -41,28 +41,18 @@ function formatAbsenceDate(absence: AbsenceObject): string {
 // -----------------------------
 // MAIN HANDLER
 // -----------------------------
-export async function handleAbsenceList(interaction: ButtonInteraction) {
-  const traceId = createTraceId();
+export async function handleAbsenceList(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "list_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-    },
-  });
+  l.event("list_open");
 
   const guildId = interaction.guildId;
 
   if (!guildId) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
+    l.error("missing_guild", new Error("Missing guildId"));
 
     await interaction.reply({
       content: "❌ Cannot fetch absences: no guild.",
@@ -74,10 +64,7 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
   try {
     const absences: AbsenceObject[] = await getAbsences(guildId);
 
-    logger.emit({
-      scope: "absence.buttons",
-      event: "list_loaded",
-      traceId,
+    l.event("list_loaded", {
       result: {
         count: absences.length,
       },
@@ -127,13 +114,7 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "list_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("list_failed", err);
 
     await interaction.reply({
       content: "❌ Failed to load absences.",
