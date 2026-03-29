@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceAdd.ts
+// =====================================
+
 import { 
   ButtonInteraction, 
   ModalBuilder, 
@@ -9,6 +13,8 @@ import {
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
 import { notifyAbsenceAdded } from "./absenceNotification";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // ----------------------------
 // HELPERS TO CREATE INPUTS
@@ -39,7 +45,6 @@ function parseDayMonth(input: string): { day: number; month: number; year: numbe
   let day: number, month: number;
 
   if (cleaned.length === 4) {
-    // format DDMM
     day = parseInt(cleaned.slice(0, 2), 10);
     month = parseInt(cleaned.slice(2), 10);
   } else {
@@ -85,10 +90,23 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
+  const traceId = createTraceId();
+
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
   const guild = interaction.guild as Guild;
+
+  if (!guild) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "missing_guild",
+      traceId,
+      level: "error",
+    });
+    return;
+  }
+
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
   const fromRaw = interaction.fields.getTextInputValue("absence_from").trim();
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
@@ -101,14 +119,15 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
 
   const fromDate = parseDayMonth(fromRaw);
   const toDate = parseDayMonth(toRaw);
+
   if (!fromDate || !toDate) {
     await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
     return;
   }
 
-  // WALIDACJA: from <= to
   const fromTs = new Date(fromDate.year, fromDate.month - 1, fromDate.day).getTime();
   const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
+
   if (fromTs > toTs) {
     await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
@@ -139,7 +158,14 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     );
 
   } catch (err) {
-    console.error("Error saving absence:", err);
+    logger.emit({
+      scope: "absence.buttons",
+      event: "create_absence_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+
     await interaction.followUp({ content: "❌ Failed to save absence." });
   }
 }
