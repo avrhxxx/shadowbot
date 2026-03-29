@@ -10,7 +10,8 @@ import { QuickAddBuffer } from "../../../storage/QuickAddBuffer";
 import { validateQuickAddContext } from "../../../rules/QuickAddGuards";
 import { validateEntries } from "../../../validation/QuickAddValidator";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -37,9 +38,10 @@ async function safeReply(
 
 export async function handleFix(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
   const startTime = Date.now();
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -48,14 +50,9 @@ export async function handleFix(
     await interaction.deferReply({ flags: 64 });
   }
 
-  logger.emit({
-    scope: "quickadd.fix",
-    event: "fix_requested",
-    traceId,
-    context: {
-      guildId,
-      userId,
-    },
+  l.event("fix_requested", {
+    guildId,
+    userId,
   });
 
   if (!guildId) {
@@ -68,28 +65,19 @@ export async function handleFix(
   const contextError = validateQuickAddContext(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   if (contextError || !session) {
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_guard_failed",
-      traceId,
-      level: "warn",
-      context: {
-        sessionId: session?.sessionId,
-        guildId,
-        userId,
-        hasSession: !!session,
-        contextError,
-        reason:
-          contextError ??
-          (!session ? "no_session" : "unknown"),
-      },
-      stats: {
-        fix_blocked: 1,
-      },
+    l.warn("fix_guard_failed", {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+      hasSession: !!session,
+      contextError,
+      reason:
+        contextError ??
+        (!session ? "no_session" : "unknown"),
     });
 
     await safeReply(
@@ -102,41 +90,22 @@ export async function handleFix(
   const sessionId = session.sessionId;
 
   try {
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_start",
-      traceId,
-      context: {
-        sessionId,
-        guildId,
-        stage: session.stage,
-      },
-      stats: {
-        fix_started: 1,
-      },
+    l.event("fix_start", {
+      sessionId,
+      guildId,
+      stage: session.stage,
     });
 
-    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+    const entries = QuickAddBuffer.getEntries(sessionId, ctx.traceId);
 
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_buffer_loaded",
-      traceId,
-      context: {
-        sessionId,
-        count: entries.length,
-      },
+    l.event("fix_buffer_loaded", {
+      sessionId,
+      count: entries.length,
     });
 
     if (!entries.length) {
-      logger.emit({
-        scope: "quickadd.fix",
-        event: "fix_empty",
-        traceId,
-        context: { sessionId },
-        stats: {
-          fix_empty: 1,
-        },
+      l.event("fix_empty", {
+        sessionId,
       });
 
       await safeReply(interaction, "⚠️ Nothing to fix");
@@ -165,17 +134,9 @@ export async function handleFix(
       return entry;
     });
 
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_revalidation_start",
-      traceId,
-      context: {
-        sessionId,
-        count: updatedRaw.length,
-      },
-      stats: {
-        fix_revalidation_start: 1,
-      },
+    l.event("fix_revalidation_start", {
+      sessionId,
+      count: updatedRaw.length,
     });
 
     const revalidated = await validateEntries(
@@ -183,36 +144,19 @@ export async function handleFix(
         nickname: e.nickname,
         value: e.value,
       })),
-      traceId
+      ctx.traceId
     );
 
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_revalidation_done",
-      traceId,
-      context: {
-        sessionId,
-        count: revalidated.length,
-      },
-      stats: {
-        fix_revalidation_done: 1,
-      },
+    l.event("fix_revalidation_done", {
+      sessionId,
+      count: revalidated.length,
     });
 
     if (revalidated.length !== updatedRaw.length) {
-      logger.emit({
-        scope: "quickadd.fix",
-        event: "revalidation_length_mismatch",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-          before: updatedRaw.length,
-          after: revalidated.length,
-        },
-        stats: {
-          fix_revalidation_mismatch: 1,
-        },
+      l.warn("revalidation_length_mismatch", {
+        sessionId,
+        before: updatedRaw.length,
+        after: revalidated.length,
       });
 
       await safeReply(
@@ -229,19 +173,11 @@ export async function handleFix(
       suggestion: v.suggestion,
     }));
 
-    QuickAddBuffer.replaceEntries(sessionId, merged, traceId);
+    QuickAddBuffer.replaceEntries(sessionId, merged, ctx.traceId);
 
     if (applied === 0) {
-      logger.emit({
-        scope: "quickadd.fix",
-        event: "fix_no_changes",
-        traceId,
-        context: {
-          sessionId,
-        },
-        stats: {
-          fix_no_changes: 1,
-        },
+      l.event("fix_no_changes", {
+        sessionId,
       });
     }
 
@@ -254,40 +190,19 @@ export async function handleFix(
 
     const duration = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_done",
-      traceId,
-      context: {
-        sessionId,
-        applied,
-      },
-      meta: {
-        durationMs: duration,
-        preview: changes.slice(0, 5),
-      },
-      stats: {
-        fix_success: 1,
-      },
+    l.event("fix_done", {
+      sessionId,
+      applied,
+      durationMs: duration,
+      preview: changes.slice(0, 5),
     });
 
   } catch (err) {
     const duration = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.fix",
-      event: "fix_failed",
-      traceId,
-      level: "error",
-      context: {
-        sessionId,
-      },
-      meta: {
-        durationMs: duration,
-      },
-      stats: {
-        fix_error: 1,
-      },
+    l.error("fix_failed", {
+      sessionId,
+      durationMs: duration,
       error: err,
     });
 
