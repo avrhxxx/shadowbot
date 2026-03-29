@@ -27,7 +27,7 @@ export type LogPayload = {
     increment?: string;
     value?: number;
 
-    // ✅ FIX: allow legacy / accidental fields
+    // ✅ allow flexible fields
     [key: string]: unknown;
   };
 
@@ -59,11 +59,17 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
-// 🔥 LOGGER
+// 🔥 LOGGER (IMMUTABLE API)
 // =====================================
 
 export const logger = {
   emit(payload: LogPayload | string): void {
+    // 🔒 GUARD
+    if (!payload) {
+      console.log("LOGGER_ERROR: empty payload");
+      return;
+    }
+
     // 🔹 SHORT VERSION → NORMALIZE
     if (typeof payload === "string") {
       payload = { event: payload };
@@ -84,12 +90,17 @@ export const logger = {
       error,
     } = payload;
 
+    // ❗ HARD REQUIREMENT
+    if (!event) {
+      console.log("LOGGER_ERROR: missing event", payload);
+      return;
+    }
+
     const time = new Date().toISOString();
     const normalizedError = normalizeError(error);
-    const finalEvent = event || "unknown_event";
 
     console.log(
-      `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${finalEvent}`,
+      `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${event}`,
       {
         ...(context && { context }),
         ...(input && { input }),
@@ -97,25 +108,11 @@ export const logger = {
         ...(stats && { stats }),
         ...(meta && { meta }),
 
-        // 🔥 OBSERVABILITY
         ...(metrics && { metrics }),
         ...(timing && { timing }),
 
         ...(normalizedError && { error: normalizedError }),
       }
     );
-  },
-
-  // 🔹 SHORTCUTS
-  info(event: string, data?: Partial<LogPayload>) {
-    this.emit({ ...data, event, level: "info" });
-  },
-
-  warn(event: string, data?: Partial<LogPayload>) {
-    this.emit({ ...data, event, level: "warn" });
-  },
-
-  error(event: string, data?: Partial<LogPayload>) {
-    this.emit({ ...data, event, level: "error" });
   },
 };
