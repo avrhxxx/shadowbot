@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsButtons/eventsCreate.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsCreate.ts
+// =====================================
+
 import { 
     ButtonInteraction, 
     ModalBuilder, 
@@ -8,7 +11,8 @@ import {
     StringSelectMenuInteraction, 
     StringSelectMenuBuilder 
 } from "discord.js";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 const EVENT_TYPES = [
     { label: "Arcadian Conquest", value: "arcadian_conquest", prefillName: "Arcadian Conquest" },
@@ -46,9 +50,17 @@ function createTextInput(customId: string, labelText: string, placeholder: strin
 // ----------------------------
 export async function handleCreate(
     interaction: ButtonInteraction,
-    traceId: string
+    ctx: TraceContext
 ) {
+    const l = log.ctx(ctx);
+    const guildId = interaction.guildId;
+
     if (!interaction.isButton()) return;
+
+    if (!guildId) {
+        l.error("missing_guild", null);
+        return;
+    }
 
     try {
         const selectMenu = new StringSelectMenuBuilder()
@@ -62,24 +74,13 @@ export async function handleCreate(
             ephemeral: true
         });
 
-        logger.emit({
-            scope: "events.create",
-            event: "open_type_select",
-            traceId,
-            context: {
-                userId: interaction.user.id,
-                guildId: interaction.guildId,
-            },
+        l.event("open_type_select", {
+            guildId,
+            userId: interaction.user.id,
         });
 
     } catch (err) {
-        logger.emit({
-            scope: "events.create",
-            event: "open_type_select_failed",
-            traceId,
-            level: "error",
-            error: err,
-        });
+        l.error("open_type_select_failed", err);
     }
 }
 
@@ -88,21 +89,25 @@ export async function handleCreate(
 // ----------------------------
 export async function handleTypeSelect(
     interaction: StringSelectMenuInteraction,
-    traceId: string
+    ctx: TraceContext
 ) {
+    const l = log.ctx(ctx);
+    const guildId = interaction.guildId;
+
     if (!interaction.isStringSelectMenu()) return;
+
+    if (!guildId) {
+        l.error("missing_guild", null);
+        return;
+    }
 
     const typeValue = interaction.values[0];
     const typeConfig = EVENT_TYPES.find(t => t.value === typeValue);
 
     if (!typeConfig) {
-        logger.emit({
-            scope: "events.create",
-            event: "invalid_type",
-            traceId,
-            input: {
-                typeValue,
-            },
+        l.warn("invalid_type", {
+            guildId,
+            typeValue,
         });
         return;
     }
@@ -150,27 +155,13 @@ export async function handleTypeSelect(
 
         await interaction.showModal(modal);
 
-        logger.emit({
-            scope: "events.create",
-            event: "modal_opened",
-            traceId,
-            context: {
-                type: typeValue,
-                userId: interaction.user.id,
-                guildId: interaction.guildId,
-            },
+        l.event("modal_opened", {
+            guildId,
+            userId: interaction.user.id,
+            type: typeValue,
         });
 
     } catch (err) {
-        logger.emit({
-            scope: "events.create",
-            event: "modal_open_failed",
-            traceId,
-            level: "error",
-            context: {
-                type: typeValue,
-            },
-            error: err,
-        });
+        l.error("modal_open_failed", err);
     }
 }
