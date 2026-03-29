@@ -4,51 +4,36 @@
 
 import { sheetsClient } from "./googleSheetsClient";
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
+// =====================================
+// 🔐 ENV
+// =====================================
+
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+if (!SHEET_ID || !SHEET_ID.trim()) {
+  throw new Error("GOOGLE_SHEET_ID env variable is missing");
+}
 
 // --------------------------
 // TABS
 // --------------------------
-const MODERATOR_CONFIG_TAB = "moderator_config";
-
-const EVENTS_TAB = "events";
-const EVENTS_CONFIG_TAB = "events_config";
-
-const POINTS_WEEKS_TAB = "points_weeks";
-const POINTS_DONATIONS_TAB = "points_donations";
-const POINTS_DUEL_TAB = "points_duel";
-const POINTS_CONFIG_TAB = "points_config";
-
-const ABSENCE_TAB = "absence";
-const ABSENCE_CONFIG_TAB = "absence_config";
-
-const TRANSLATE_TAB = "translate";
-const TRANSLATE_CONFIG_TAB = "translate_config";
-
-// 🔥 QUICKADD (UPDATED)
 const QUICKADD_NICKNAMES_TAB = "quickadd_nicknames";
-
-// 🔥 QUEUES
 const QUICKADD_EVENTS_QUEUE_TAB = "quickadd_events_queue";
 const QUICKADD_POINTS_QUEUE_TAB = "quickadd_points_queue";
 
 // --------------------------
-// ENV VALIDATION
-// --------------------------
-if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
-
-// --------------------------
 // BASIC READ / WRITE
 // --------------------------
-async function readSheet(tab: string): Promise<any[][]> {
+async function readSheet(tab: string): Promise<unknown[][]> {
   const res = await sheetsClient.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: tab,
   });
-  return res.data.values || [];
+
+  return res.data?.values ?? [];
 }
 
-async function writeSheet(tab: string, values: any[][]) {
+async function writeSheet(tab: string, values: unknown[][]): Promise<void> {
   await sheetsClient.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: tab,
@@ -65,10 +50,10 @@ async function getAllSheets() {
     spreadsheetId: SHEET_ID,
   });
 
-  return res.data.sheets || [];
+  return res.data?.sheets ?? [];
 }
 
-async function ensureSheetExists(tab: string, headers: any[][]) {
+async function ensureSheetExists(tab: string, headers: unknown[][]) {
   const allSheets = await getAllSheets();
   const exists = allSheets.some((s) => s.properties?.title === tab);
 
@@ -80,9 +65,7 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
         requests: [
           {
             addSheet: {
-              properties: {
-                title: tab,
-              },
+              properties: { title: tab },
             },
           },
         ],
@@ -93,18 +76,15 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
   // ENSURE HEADERS
   const rows = await readSheet(tab);
 
-  if (!rows || rows.length === 0 || rows[0].length === 0) {
+  if (!rows.length || !(rows[0]?.length > 0)) {
     await writeSheet(`${tab}!A1`, headers);
   }
 }
 
 // 🔥 INIT
 export async function ensureAllSheets() {
-  // 🔥 QUICKADD — NO SCHEMA (only create tabs)
   await ensureSheetExists(QUICKADD_EVENTS_QUEUE_TAB, [[]]);
-
   await ensureSheetExists(QUICKADD_POINTS_QUEUE_TAB, [[]]);
-
   await ensureSheetExists(QUICKADD_NICKNAMES_TAB, [[]]);
 }
 
@@ -112,15 +92,35 @@ export async function ensureAllSheets() {
 // HELPERS
 // --------------------------
 async function getSheetId(tab: string): Promise<number> {
-  const res = await sheetsClient.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const sheet = res.data.sheets?.find((s) => s.properties?.title === tab);
-  if (!sheet?.properties?.sheetId)
+  const res = await sheetsClient.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+  });
+
+  const sheet = res.data?.sheets?.find(
+    (s) => s.properties?.title === tab
+  );
+
+  const id = sheet?.properties?.sheetId;
+
+  if (typeof id !== "number") {
     throw new Error(`Sheet "${tab}" not found`);
-  return sheet.properties.sheetId;
+  }
+
+  return id;
 }
 
-async function updateCell(tab: string, row: number, col: number, value: any) {
+async function updateCell(
+  tab: string,
+  row: number,
+  col: number,
+  value: unknown
+): Promise<void> {
+  if (row <= 0 || col <= 0) {
+    throw new Error("Invalid row/col index");
+  }
+
   const range = `${tab}!${toA1(col, row)}`;
+
   await sheetsClient.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range,
@@ -129,8 +129,13 @@ async function updateCell(tab: string, row: number, col: number, value: any) {
   });
 }
 
-async function deleteRow(tab: string, row: number) {
+async function deleteRow(tab: string, row: number): Promise<void> {
+  if (row <= 0) {
+    throw new Error("Invalid row index");
+  }
+
   const sheetId = await getSheetId(tab);
+
   await sheetsClient.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: {
@@ -153,7 +158,7 @@ async function deleteRow(tab: string, row: number) {
 // --------------------------
 // 🔥 APPEND (LEARNING)
 // --------------------------
-export async function appendLearningRows(values: any[][]) {
+export async function appendLearningRows(values: unknown[][]) {
   if (!values.length) return;
 
   await sheetsClient.spreadsheets.values.append({
