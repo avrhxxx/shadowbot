@@ -19,7 +19,7 @@
  * - traceId REQUIRED (STRICT)
  */
 
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 import { resolveNickname } from "../mapping/NicknameResolver";
 
 import {
@@ -80,17 +80,19 @@ export async function validateEntries(
 
   let idCounter = 1;
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.validator",
     event: "validation_start",
     traceId,
-    data: { entries: entries.length },
+    context: { entries: entries.length },
   });
 
   for (const entry of entries) {
-    log.emit({
+    logger.emit({
+      scope: "quickadd.validator",
       event: "validation_entry_start",
       traceId,
-      data: {
+      context: {
         nickname: entry.nickname,
         value: entry.value,
       },
@@ -112,10 +114,11 @@ export async function validateEntries(
       confidence = 0;
       isInvalidValue = true;
 
-      log.emit({
+      logger.emit({
+        scope: "quickadd.validator",
         event: "decision_invalid_value",
         traceId,
-        data: { value: entry.value },
+        context: { value: entry.value },
       });
     }
 
@@ -127,23 +130,25 @@ export async function validateEntries(
     try {
       resolved = await resolveNickname(entry.nickname, traceId);
 
-      log.emit({
+      logger.emit({
+        scope: "quickadd.validator",
         event: "resolve_result",
         traceId,
-        data: {
+        context: {
           input: entry.nickname,
           resolved,
         },
       });
     } catch (err) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.validator",
         event: "resolve_failed",
         traceId,
-        data: {
-          input: entry.nickname,
-          error: String(err),
-        },
         level: "warn",
+        error: err,
+        context: {
+          input: entry.nickname,
+        },
       });
     }
 
@@ -158,10 +163,11 @@ export async function validateEntries(
         status = pickHigherStatus(status, "UNRESOLVED");
         confidence = 0.3;
 
-        log.emit({
+        logger.emit({
+          scope: "quickadd.validator",
           event: "decision_unresolved",
           traceId,
-          data: { nickname: entry.nickname },
+          context: { nickname: entry.nickname },
         });
 
         if (
@@ -170,20 +176,22 @@ export async function validateEntries(
         ) {
           confidence = 0.1;
 
-          log.emit({
+          logger.emit({
+            scope: "quickadd.validator",
             event: "decision_low_quality_ocr",
             traceId,
-            data: { nickname: entry.nickname },
+            context: { nickname: entry.nickname },
           });
         }
       } else {
         const similarity = stringSimilarity(entry.nickname, resolved);
         confidence = similarity;
 
-        log.emit({
+        logger.emit({
+          scope: "quickadd.validator",
           event: "similarity_computed",
           traceId,
-          data: {
+          context: {
             input: entry.nickname,
             resolved,
             similarity,
@@ -211,10 +219,11 @@ export async function validateEntries(
       status = pickHigherStatus(status, "DUPLICATE");
       confidence = Math.min(confidence, 0.5);
 
-      log.emit({
+      logger.emit({
+        scope: "quickadd.validator",
         event: "decision_duplicate",
         traceId,
-        data: { key },
+        context: { key },
       });
     } else {
       seen.add(key);
@@ -232,10 +241,11 @@ export async function validateEntries(
 
     results.push(validated);
 
-    log.emit({
+    logger.emit({
+      scope: "quickadd.validator",
       event: "validation_entry_done",
       traceId,
-      data: {
+      context: {
         id: validated.id,
         nickname: validated.nickname,
         status: validated.status,
@@ -245,10 +255,11 @@ export async function validateEntries(
     });
   }
 
-  log.emit({
+  logger.emit({
+    scope: "quickadd.validator",
     event: "validation_done",
     traceId,
-    data: {
+    stats: {
       total: results.length,
       durationMs: Date.now() - startedAt,
     },
