@@ -2,19 +2,6 @@
 // 📁 src/google/googleSheetsClient.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Shared Google Cloud authentication + Sheets client.
- *
- * Responsibilities:
- * - provide single GoogleAuth instance
- * - configure scopes for all Google services (Sheets + Vision)
- *
- * ❗ RULES:
- * - single source of truth for auth
- * - reusable across Google integrations
- */
-
 import { google } from "googleapis";
 
 // =====================================
@@ -26,10 +13,27 @@ if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
 }
 
 // =====================================
-// 🔑 PARSE CREDENTIALS
+// 🔑 PARSE CREDENTIALS (SAFE)
 // =====================================
 
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+let credentials: any;
+
+try {
+  credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT as string);
+} catch (error) {
+  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT ma niepoprawny JSON format");
+}
+
+// =====================================
+// 🔍 VALIDATION
+// =====================================
+
+if (!credentials.client_email || !credentials.private_key) {
+  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT brakuje wymaganych pól");
+}
+
+// Fix multiline private key
+credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
 // =====================================
 // 🔥 SHARED AUTH (Sheets + Vision)
@@ -39,7 +43,7 @@ export const googleAuth = new google.auth.GoogleAuth({
   credentials,
   scopes: [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/cloud-platform", // 🔥 wymagane dla Vision
+    "https://www.googleapis.com/auth/cloud-vision",
   ],
 });
 
