@@ -28,8 +28,10 @@ export async function handleRemoveAbsence(
   const l = log.ctx(ctx);
 
   l.event("remove_modal_open", {
-    guildId: interaction.guildId,
-    userId: interaction.user?.id,
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+    },
   });
 
   const modal = new ModalBuilder()
@@ -66,17 +68,21 @@ export async function handleRemoveAbsenceSubmit(
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
   l.event("remove_submit", {
-    guildId,
-    nick,
+    input: {
+      guildId,
+      nick,
+    },
   });
 
   try {
-    const removed = await removeAbsence(guildId, nick);
+    const removed = await removeAbsence(guildId, nick, ctx);
 
     if (!removed) {
       l.warn("remove_not_found", {
-        guildId,
-        nick,
+        input: {
+          guildId,
+          nick,
+        },
       });
 
       await interaction.followUp({
@@ -86,9 +92,13 @@ export async function handleRemoveAbsenceSubmit(
     }
 
     l.event("remove_success", {
-      guildId,
-      nick,
-      absenceId: removed.id,
+      input: {
+        guildId,
+        nick,
+      },
+      result: {
+        absenceId: removed.id,
+      },
     });
 
     await interaction.followUp({
@@ -99,8 +109,10 @@ export async function handleRemoveAbsenceSubmit(
 
   } catch (err) {
     l.error("remove_failed", err, {
-      guildId,
-      nick,
+      input: {
+        guildId,
+        nick,
+      },
     });
 
     await interaction.followUp({
