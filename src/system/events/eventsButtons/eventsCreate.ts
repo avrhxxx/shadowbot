@@ -8,7 +8,6 @@ import {
     StringSelectMenuInteraction, 
     StringSelectMenuBuilder 
 } from "discord.js";
-import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
 const EVENT_TYPES = [
@@ -22,7 +21,7 @@ const EVENT_TYPES = [
 ];
 
 // ----------------------------
-// HELPERS TO CREATE INPUTS
+// HELPERS
 // ----------------------------
 function createDateInput(customId: string, labelText: string) {
     return new TextInputBuilder()
@@ -43,12 +42,13 @@ function createTextInput(customId: string, labelText: string, placeholder: strin
 }
 
 // ----------------------------
-// Step 1: show type select
+// Step 1
 // ----------------------------
-export async function handleCreate(interaction: ButtonInteraction) {
+export async function handleCreate(
+    interaction: ButtonInteraction,
+    traceId: string
+) {
     if (!interaction.isButton()) return;
-
-    const traceId = createTraceId();
 
     try {
         const selectMenu = new StringSelectMenuBuilder()
@@ -84,12 +84,13 @@ export async function handleCreate(interaction: ButtonInteraction) {
 }
 
 // ----------------------------
-// Step 2: show modal based on type
+// Step 2
 // ----------------------------
-export async function handleTypeSelect(interaction: StringSelectMenuInteraction) {
+export async function handleTypeSelect(
+    interaction: StringSelectMenuInteraction,
+    traceId: string
+) {
     if (!interaction.isStringSelectMenu()) return;
-
-    const traceId = createTraceId();
 
     const typeValue = interaction.values[0];
     const typeConfig = EVENT_TYPES.find(t => t.value === typeValue);
