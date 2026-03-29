@@ -1,14 +1,17 @@
 // =====================================
-// 📁 src/eventsPanel/eventsButtons/eventHelp.ts
+// 📁 src/system/events/eventsButtons/eventsHelp.ts
 // =====================================
 
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 export async function handleHelp(
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ) {
+  const l = log.ctx(ctx);
+
   if (!interaction.isButton()) return;
 
   const embed = new EmbedBuilder()
@@ -73,10 +76,7 @@ Bot is still in beta! If something acts up, or you have ideas, just give me a sh
   try {
     await interaction.reply({ embeds: [embed], ephemeral: true });
 
-    logger.emit({
-      scope: "events.help",
-      event: "shown",
-      traceId,
+    l.event("shown", {
       context: {
         guildId: interaction.guildId,
         userId: interaction.user.id,
@@ -84,13 +84,7 @@ Bot is still in beta! If something acts up, or you have ideas, just give me a sh
     });
 
   } catch (error) {
-    logger.emit({
-      scope: "events.help",
-      event: "show_failed",
-      traceId,
-      level: "error",
-      error,
-    });
+    l.error("show_failed", error);
 
     try {
       if (interaction.deferred || interaction.replied) {
