@@ -2,8 +2,9 @@
 // 📁 src/system/quickadd/storage/QuickAddBuffer.ts
 // =====================================
 
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
 import { EntryStatus } from "../core/QuickAddTypes";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 type ParsedEntry = {
   nickname: string;
@@ -38,12 +39,6 @@ const TIMEOUT_MS = 5 * 60 * 1000;
 // 🧠 HELPERS
 // =====================================
 
-function assertTrace(traceId: string, scope: string) {
-  if (!traceId) {
-    throw new Error(`[BUFFER ERROR] Missing traceId in ${scope}`);
-  }
-}
-
 function cloneEntry(entry: BufferedEntry): BufferedEntry {
   return { ...entry };
 }
@@ -52,17 +47,16 @@ function cloneEntries(entries: BufferedEntry[]): BufferedEntry[] {
   return entries.map(cloneEntry);
 }
 
-function checkTimeout(sessionId: string, traceId: string) {
+function checkTimeout(sessionId: string, ctx: TraceContext) {
+  const l = log.ctx(ctx);
+
   const last = lastAccess.get(sessionId);
   const now = Date.now();
 
   if (last && now - last > TIMEOUT_MS) {
     const before = buffer.get(sessionId)?.length || 0;
 
-    logger.emit({
-      event: "buffer_timeout",
-      traceId,
-      level: "warn",
+    l.warn("buffer_timeout", {
       context: { sessionId },
       stats: { before },
     });
@@ -83,14 +77,13 @@ export const QuickAddBuffer = {
   addEntries(
     sessionId: string,
     entries: ParsedEntry[],
-    traceId: string
+    ctx: TraceContext
   ) {
-    assertTrace(traceId, "addEntries");
-    checkTimeout(sessionId, traceId);
+    const l = log.ctx(ctx);
 
-    logger.emit({
-      event: "buffer_add_start",
-      traceId,
+    checkTimeout(sessionId, ctx);
+
+    l.event("buffer_add_start", {
       context: { sessionId },
       stats: { incoming: entries.length },
     });
@@ -108,9 +101,7 @@ export const QuickAddBuffer = {
     buffer.set(sessionId, updated);
     idCounters.set(sessionId, nextId);
 
-    logger.emit({
-      event: "buffer_add_done",
-      traceId,
+    l.event("buffer_add_done", {
       context: { sessionId },
       stats: { after: updated.length },
     });
@@ -119,14 +110,13 @@ export const QuickAddBuffer = {
   replaceEntries(
     sessionId: string,
     entries: BufferedEntry[],
-    traceId: string
+    ctx: TraceContext
   ) {
-    assertTrace(traceId, "replaceEntries");
-    checkTimeout(sessionId, traceId);
+    const l = log.ctx(ctx);
 
-    logger.emit({
-      event: "buffer_replace_start",
-      traceId,
+    checkTimeout(sessionId, ctx);
+
+    l.event("buffer_replace_start", {
       context: { sessionId },
       stats: {
         count: entries.length,
@@ -141,9 +131,7 @@ export const QuickAddBuffer = {
     buffer.set(sessionId, entries);
     idCounters.set(sessionId, maxId + 1);
 
-    logger.emit({
-      event: "buffer_replace_done",
-      traceId,
+    l.event("buffer_replace_done", {
       context: { sessionId },
       stats: {
         nextId: maxId + 1,
@@ -153,16 +141,15 @@ export const QuickAddBuffer = {
 
   getEntries(
     sessionId: string,
-    traceId: string
+    ctx: TraceContext
   ): BufferedEntry[] {
-    assertTrace(traceId, "getEntries");
-    checkTimeout(sessionId, traceId);
+    const l = log.ctx(ctx);
+
+    checkTimeout(sessionId, ctx);
 
     const entries = buffer.get(sessionId) || [];
 
-    logger.emit({
-      event: "buffer_get",
-      traceId,
+    l.event("buffer_get", {
       context: { sessionId },
       stats: { count: entries.length },
     });
@@ -170,12 +157,10 @@ export const QuickAddBuffer = {
     return cloneEntries(entries);
   },
 
-  clear(sessionId: string, traceId: string) {
-    assertTrace(traceId, "clear");
+  clear(sessionId: string, ctx: TraceContext) {
+    const l = log.ctx(ctx);
 
-    logger.emit({
-      event: "buffer_clear",
-      traceId,
+    l.event("buffer_clear", {
       context: { sessionId },
     });
 
