@@ -2,7 +2,7 @@
 // 📁 src/system/absence/absenceService.ts
 // =====================================
 
-import { SheetRepository } from "../google/SheetRepository";
+import { SheetRepository } from "../../integrations/google/SheetRepository";
 import crypto from "crypto";
 import { logger } from "../../core/logger/log";
 
