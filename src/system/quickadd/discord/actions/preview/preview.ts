@@ -7,7 +7,8 @@ import { Message } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { processImageInput } from "../../../core/QuickAddPipeline";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 /**
  * 🧠 ROLE:
@@ -26,31 +27,22 @@ import { logger } from "../../../../core/logger/log";
 
 export async function handlePreview(
   message: Message,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
+  const l = log.ctx(ctx);
+
   const guildId = message.guild?.id;
   const userId = message.author?.id;
 
-  logger.emit({
-    scope: "quickadd.preview",
-    event: "preview_received",
-    traceId,
-    context: {
-      guildId,
-      userId,
-    },
+  l.event("preview_received", {
+    guildId,
+    userId,
   });
 
   if (!guildId || !userId) {
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_invalid_context",
-      traceId,
-      level: "warn",
-      context: {
-        guildId,
-        userId,
-      },
+    l.warn("preview_invalid_context", {
+      guildId,
+      userId,
     });
     return;
   }
@@ -58,15 +50,9 @@ export async function handlePreview(
   const session = QuickAddSession.get(guildId, userId);
 
   if (!session) {
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_no_session",
-      traceId,
-      level: "warn",
-      context: {
-        guildId,
-        userId,
-      },
+    l.warn("preview_no_session", {
+      guildId,
+      userId,
     });
     return;
   }
@@ -74,54 +60,32 @@ export async function handlePreview(
   const attachment = message.attachments.first();
 
   if (!attachment?.url) {
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_no_image",
-      traceId,
-      level: "warn",
-      context: {
-        sessionId: session.sessionId,
-      },
+    l.warn("preview_no_image", {
+      sessionId: session.sessionId,
     });
     return;
   }
 
   try {
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_pipeline_start",
-      traceId,
-      context: {
-        sessionId: session.sessionId,
-        imageUrl: attachment.url,
-      },
+    l.event("preview_pipeline_start", {
+      sessionId: session.sessionId,
+      imageUrl: attachment.url,
     });
 
     await processImageInput(
       message,
       session,
       attachment.url,
-      traceId
+      ctx.traceId
     );
 
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_pipeline_done",
-      traceId,
-      context: {
-        sessionId: session.sessionId,
-      },
+    l.event("preview_pipeline_done", {
+      sessionId: session.sessionId,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "quickadd.preview",
-      event: "preview_failed",
-      traceId,
-      level: "error",
-      context: {
-        sessionId: session.sessionId,
-      },
+    l.error("preview_failed", {
+      sessionId: session.sessionId,
       error: err,
     });
   }
