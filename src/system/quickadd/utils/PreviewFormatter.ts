@@ -17,7 +17,7 @@
  * - pure function
  */
 
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 
 type PreviewEntry = {
   id: number;
@@ -37,16 +37,16 @@ export function formatPreview(
     throw new Error("traceId is required in formatPreview");
   }
 
-  log.emit({
+  logger.emit({
     event: "format_preview_start",
     traceId,
-    data: {
+    context: {
       entries: entries.length,
     },
   });
 
   if (!entries.length) {
-    log.emit({
+    logger.emit({
       event: "format_preview_empty",
       traceId,
     });
@@ -146,14 +146,14 @@ ${suggestions}
 ━━━━━━━━━━━━━━━━━━
 `;
 
-  log.emit({
+  logger.emit({
     event: "format_preview_done",
     traceId,
-    data: {
+    stats: {
       entries: entries.length,
-      hasConfidence: !!confidenceList,
-      hasSuggestions: !!suggestions,
-      length: output.length,
+      hasConfidence: confidenceList ? 1 : 0,
+      hasSuggestions: suggestions ? 1 : 0,
+      outputLength: output.length,
     },
   });
 
