@@ -18,7 +18,7 @@
  * - NO transformation
  */
 
-import vision from "@google-cloud/vision";
+import * as vision from "@google-cloud/vision";
 import { googleAuth } from "./googleSheetsClient";
 
 // 🔥 używamy WSPÓLNEGO AUTH
