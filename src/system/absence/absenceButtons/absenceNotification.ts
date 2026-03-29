@@ -4,8 +4,9 @@
 
 import { Guild, TextChannel, EmbedBuilder } from "discord.js";
 import * as AS from "../absenceService";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // HELPERS
@@ -31,7 +32,7 @@ function parseAbsenceDate(dateStr: string, year: number): Date | null {
 }
 
 // -----------------------------
-// GET CHANNEL (NO TRACE HERE)
+// GET CHANNEL (NO LOG HERE)
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await AS.getAbsenceConfig(guild.id);
@@ -50,15 +51,13 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 // -----------------------------
 // EMBED UPDATE
 // -----------------------------
-export async function updateAbsenceEmbed(guild: Guild, traceId?: string) {
-  const localTraceId = traceId ?? createTraceId();
+export async function updateAbsenceEmbed(
+  guild: Guild,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.notification",
-    event: "embed_update_start",
-    traceId: localTraceId,
-    context: { guildId: guild.id },
-  });
+  l.event("embed_update_start");
 
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
@@ -134,21 +133,12 @@ export async function updateAbsenceEmbed(guild: Guild, traceId?: string) {
       await message.pin().catch(() => {});
     }
 
-    logger.emit({
-      scope: "absence.notification",
-      event: "embed_update_done",
-      traceId: localTraceId,
+    l.event("embed_update_done", {
       result: { count: absences.length },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.notification",
-      event: "embed_update_failed",
-      traceId: localTraceId,
-      level: "error",
-      error: err,
-    });
+    l.error("embed_update_failed", err);
   }
 }
 
@@ -159,16 +149,12 @@ export async function notifyAbsenceAdded(
   guild: Guild,
   player: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  ctx: TraceContext
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.notification",
-    event: "notify_added_start",
-    traceId,
-    context: { guildId: guild.id, player },
-  });
+  l.event("notify_added_start", { player });
 
   try {
     const absences = await AS.getAbsences(guild.id);
@@ -185,72 +171,74 @@ export async function notifyAbsenceAdded(
       `📌 Player **${player}** is now absent from ${formatAbsenceDate(startDate, year)} to ${formatAbsenceDate(endDate, year)} (returns <t:${unixBack}:R>).`
     );
 
-    await updateAbsenceEmbed(guild, traceId);
+    await updateAbsenceEmbed(guild, ctx);
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.notification",
-      event: "notify_added_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("notify_added_failed", err);
   }
 }
 
-export async function notifyAbsenceRemoved(guild: Guild, player: string) {
-  const traceId = createTraceId();
+export async function notifyAbsenceRemoved(
+  guild: Guild,
+  player: string,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   try {
     const channel = await getNotificationChannel(guild);
     if (!channel) return;
 
     await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-    await updateAbsenceEmbed(guild, traceId);
+    await updateAbsenceEmbed(guild, ctx);
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.notification",
-      event: "notify_removed_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("notify_removed_failed", err);
   }
 }
 
-export async function notifyAbsenceAutoClean(guild: Guild, player: string) {
-  const traceId = createTraceId();
+export async function notifyAbsenceAutoClean(
+  guild: Guild,
+  player: string,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   try {
     const channel = await getNotificationChannel(guild);
     if (!channel) return;
 
     await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-    await updateAbsenceEmbed(guild, traceId);
+    await updateAbsenceEmbed(guild, ctx);
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.notification",
-      event: "notify_autoclean_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("notify_autoclean_failed", err);
   }
 }
 
 // -----------------------------
-// AUTO CLEANER
+// AUTO CLEANER (WORKER)
 // -----------------------------
 export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
 
   setInterval(async () => {
-    await updateAbsenceEmbed(guild);
+    const ctx: TraceContext = {
+      traceId: createTraceId(),
+      source: "worker",
+      system: "absence",
+    };
+
+    await updateAbsenceEmbed(guild, ctx);
   }, 60_000);
 
   setInterval(async () => {
-    const traceId = createTraceId();
+    const ctx: TraceContext = {
+      traceId: createTraceId(),
+      source: "worker",
+      system: "absence",
+    };
+
+    const l = log.ctx(ctx);
 
     const absences = await AS.getAbsences(guild.id);
     const now = new Date();
@@ -264,14 +252,9 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
       if (endDate && endDate < now) {
         await AS.removeAbsence(guild.id, a.player);
 
-        logger.emit({
-          scope: "absence.notification",
-          event: "autoclean_removed",
-          traceId,
-          context: { player: a.player },
-        });
+        l.event("autoclean_removed", { player: a.player });
 
-        await notifyAbsenceAutoClean(guild, a.player);
+        await notifyAbsenceAutoClean(guild, a.player, ctx);
       }
     }
 
@@ -281,15 +264,13 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
 // -----------------------------
 // INIT
 // -----------------------------
-export async function initAbsenceNotifications(guild: Guild) {
-  const traceId = createTraceId();
+export async function initAbsenceNotifications(
+  guild: Guild,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.notification",
-    event: "init",
-    traceId,
-    context: { guildId: guild.id },
-  });
+  l.event("init");
 
-  await updateAbsenceEmbed(guild, traceId);
+  await updateAbsenceEmbed(guild, ctx);
 }
