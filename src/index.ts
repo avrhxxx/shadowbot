@@ -16,6 +16,7 @@ import {
 // =============================
 
 import { handleSystemInteraction } from "./core/router/systemRouter";
+import { logger } from "./core/logger/log";
 
 // =============================
 // 🧩 SYSTEMS (INIT ONLY)
@@ -70,7 +71,13 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 // =============================
 
 client.once("clientReady", async () => {
-  console.log(`✅ Logged in as ${client.user?.tag}`);
+  logger.emit({
+    scope: "app",
+    event: "client_ready",
+    context: {
+      user: client.user?.tag,
+    },
+  });
 
   // =============================
   // 🌍 INTEGRATIONS INIT
@@ -78,9 +85,18 @@ client.once("clientReady", async () => {
 
   try {
     await ensureAllSheets();
-    console.log("✅ Sheets structure verified");
+
+    logger.emit({
+      scope: "app",
+      event: "sheets_initialized",
+    });
   } catch (err) {
-    console.error("❌ Sheets init failed:", err);
+    logger.emit({
+      scope: "app",
+      event: "sheets_init_failed",
+      level: "error",
+      error: err,
+    });
   }
 
   // =============================
@@ -89,9 +105,18 @@ client.once("clientReady", async () => {
 
   try {
     startQuickAddWorker();
-    console.log("✅ QuickAdd worker started");
+
+    logger.emit({
+      scope: "app",
+      event: "quickadd_worker_started",
+    });
   } catch (err) {
-    console.error("❌ QuickAdd worker failed:", err);
+    logger.emit({
+      scope: "app",
+      event: "quickadd_worker_failed",
+      level: "error",
+      error: err,
+    });
   }
 
   // =============================
@@ -105,9 +130,17 @@ client.once("clientReady", async () => {
       qCommand.toJSON(),
     ]);
 
-    console.log("✅ Slash commands registered");
+    logger.emit({
+      scope: "app",
+      event: "slash_commands_registered",
+    });
   } catch (err) {
-    console.error("❌ Slash command registration failed:", err);
+    logger.emit({
+      scope: "app",
+      event: "slash_commands_failed",
+      level: "error",
+      error: err,
+    });
   }
 
   // =============================
@@ -126,30 +159,52 @@ client.once("clientReady", async () => {
     Array.from(client.guilds.cache.values()).map(async (guild) => {
       try {
         await ensureQuickAddChannel(guild);
-        console.log(`✅ QuickAdd channel ready in ${guild.name}`);
+
+        logger.emit({
+          scope: "app.guild",
+          event: "quickadd_channel_ready",
+          context: {
+            guild: guild.name,
+          },
+        });
       } catch (err) {
-        console.error(
-          `❌ QuickAdd channel error in ${guild.name}:`,
-          err
-        );
+        logger.emit({
+          scope: "app.guild",
+          event: "quickadd_channel_failed",
+          level: "error",
+          context: {
+            guild: guild.name,
+          },
+          error: err,
+        });
       }
 
       try {
         initEventReminders(guild);
       } catch (err) {
-        console.error(
-          `❌ Event reminders error in ${guild.name}:`,
-          err
-        );
+        logger.emit({
+          scope: "app.guild",
+          event: "event_reminders_failed",
+          level: "error",
+          context: {
+            guild: guild.name,
+          },
+          error: err,
+        });
       }
 
       try {
         await initAbsenceNotifications(guild);
       } catch (err) {
-        console.error(
-          `❌ Absence notifications error in ${guild.id}:`,
-          err
-        );
+        logger.emit({
+          scope: "app.guild",
+          event: "absence_notifications_failed",
+          level: "error",
+          context: {
+            guild: guild.id,
+          },
+          error: err,
+        });
       }
     })
   );
@@ -179,9 +234,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
     if (!interaction.isRepliable()) return;
 
     await handleSystemInteraction(interaction);
-
   } catch (err) {
-    console.error("❌ interactionCreate error:", err);
+    logger.emit({
+      scope: "app",
+      event: "interaction_error",
+      level: "error",
+      error: err,
+    });
 
     if (interaction.isRepliable()) {
       await interaction
