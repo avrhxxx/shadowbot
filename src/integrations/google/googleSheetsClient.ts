@@ -31,7 +31,7 @@ if (!rawEnv || !rawEnv.trim()) {
 let credentials: GoogleServiceAccount;
 
 try {
-  credentials = JSON.parse(rawEnv);
+  credentials = JSON.parse(rawEnv) as GoogleServiceAccount;
 } catch {
   throw new Error("❌ GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
 }
@@ -45,7 +45,9 @@ if (!credentials.client_email || !credentials.private_key) {
 }
 
 // Fix multiline private key (important for GCP)
-credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+if (typeof credentials.private_key === "string") {
+  credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+}
 
 // =====================================
 // 🔥 SHARED AUTH (Sheets + Vision)
