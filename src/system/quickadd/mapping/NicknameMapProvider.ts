@@ -3,33 +3,25 @@
 // =====================================
 
 import { getLearningData } from "../storage/QuickAddRepository";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 export async function loadNicknameMap(
-  traceId: string
+  ctx: TraceContext
 ): Promise<Record<string, string>> {
+  const l = log.ctx(ctx);
+
   try {
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "map_load_start",
-      traceId,
-    });
+    l.event("map_load_start");
 
-    const rows = await getLearningData(traceId);
+    const rows = await getLearningData(ctx);
 
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "sheet_loaded",
-      traceId,
+    l.event("sheet_loaded", {
       context: { rowsCount: rows?.length || 0 },
     });
 
     if (!rows || rows.length < 2) {
-      logger.emit({
-        scope: "quickadd.mapping",
-        event: "empty_sheet",
-        traceId,
-        level: "warn",
+      l.warn("empty_sheet", {
         context: { rowsCount: rows?.length || 0 },
       });
       return {};
@@ -38,12 +30,7 @@ export async function loadNicknameMap(
     const headersRaw = rows[0];
 
     if (!Array.isArray(headersRaw)) {
-      logger.emit({
-        scope: "quickadd.mapping",
-        event: "invalid_headers",
-        traceId,
-        level: "warn",
-      });
+      l.warn("invalid_headers");
       return {};
     }
 
@@ -58,10 +45,7 @@ export async function loadNicknameMap(
     const adjustedIndex = headers.indexOf("adjusted");
     const overrideIndex = headers.indexOf("override");
 
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "columns_detected",
-      traceId,
+    l.event("columns_detected", {
       context: {
         ocrIndex,
         parserIndex,
@@ -71,12 +55,7 @@ export async function loadNicknameMap(
     });
 
     if (ocrIndex === -1) {
-      logger.emit({
-        scope: "quickadd.mapping",
-        event: "missing_ocr_column",
-        traceId,
-        level: "warn",
-      });
+      l.warn("missing_ocr_column");
       return {};
     }
 
@@ -105,21 +84,14 @@ export async function loadNicknameMap(
       map[cleaned] = finalValue;
     }
 
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "map_built",
-      traceId,
+    l.event("map_built", {
       context: { mapSize: Object.keys(map).length },
     });
 
     return map;
 
   } catch (err) {
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "map_load_failed",
-      traceId,
-      level: "error",
+    l.error("map_load_failed", {
       error: err,
     });
 
