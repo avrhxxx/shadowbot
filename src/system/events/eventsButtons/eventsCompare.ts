@@ -16,8 +16,12 @@ import {
 } from "discord.js";
 import { EventObject, getEvents, getConfig } from "../eventService";
 import { formatEventUTC } from "../../../shared/utils/timeUtils";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
+// ======================================================
+// HELPERS
+// ======================================================
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
 }
@@ -32,40 +36,44 @@ async function sendComparisonFile(channel: TextChannel, name: string, content: s
   await channel.send({ content: `📥 ${name}`, files: [file] });
 }
 
-// -----------------------------
-// HELPER
-// -----------------------------
 async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
   const events = await getEvents(guildId);
   return events.find(e => e.id.toString().trim() === eventId.toString().trim()) || null;
 }
 
-// -----------------------------
-// BUTTON HANDLERS
-// -----------------------------
+// ======================================================
+// BUTTON → SELECT
+// ======================================================
 export const handleCompareButton = async (
   interaction: ButtonInteraction,
   eventId: string,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> => {
+  const l = log.ctx(ctx);
+
   try {
     const guild = interaction.guild as Guild;
     const current = await getEventById(interaction.guildId!, eventId);
 
     if (!current) {
-      logger.emit({ scope: "events.compare", event: "event_not_found", traceId, context: { eventId } });
+      l.warn("event_not_found", { eventId });
+
       await interaction.reply({ content: "Event not found.", ephemeral: true });
       return;
     }
 
     if (current.status !== "PAST") {
-      await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
+      l.warn("not_past_event", { eventId });
 
-      logger.emit({ scope: "events.compare", event: "not_past_event", traceId, context: { eventId } });
+      await interaction.reply({
+        content: "You can only compare past events.",
+        ephemeral: true
+      });
       return;
     }
 
     const events = await getEvents(interaction.guildId!);
+
     const pastEvents = events
       .filter(e =>
         e.status === "PAST" &&
@@ -75,9 +83,12 @@ export const handleCompareButton = async (
       .sort((a, b) => b.createdAt - a.createdAt);
 
     if (!pastEvents.length) {
-      await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
+      l.warn("no_compare_candidates", { eventId });
 
-      logger.emit({ scope: "events.compare", event: "no_compare_candidates", traceId, context: { eventId } });
+      await interaction.reply({
+        content: "No other past events available to compare.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -101,24 +112,28 @@ export const handleCompareButton = async (
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.compare",
-      event: "open_select",
-      traceId,
-      context: { baseEventId: current.id, candidates: pastEvents.length },
+    l.event("open_select", {
+      baseEventId: current.id,
+      candidates: pastEvents.length,
     });
 
   } catch (err) {
-    logger.emit({ scope: "events.compare", event: "compare_button_failed", traceId, level: "error", error: err });
+    l.error("compare_button_failed", err);
   }
 };
 
+// ======================================================
+// SELECT → RESULT
+// ======================================================
 export const handleCompareSelect = async (
   interaction: StringSelectMenuInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> => {
+  const l = log.ctx(ctx);
+
   try {
     const guild = interaction.guild as Guild;
+
     const selectedId = interaction.values[0];
     const currentId = interaction.customId.replace("compare_select_", "");
 
@@ -126,13 +141,11 @@ export const handleCompareSelect = async (
     const eventB = await getEventById(guild.id, selectedId);
 
     if (!eventA || !eventB) {
-      await interaction.update({ content: "One of the events no longer exists.", components: [] });
+      l.warn("select_event_missing", { currentId, selectedId });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "select_event_missing",
-        traceId,
-        context: { currentId, selectedId },
+      await interaction.update({
+        content: "One of the events no longer exists.",
+        components: []
       });
       return;
     }
@@ -146,24 +159,30 @@ export const handleCompareSelect = async (
         .setStyle(ButtonStyle.Primary)
     );
 
-    await interaction.update({ content: embedText, components: [row] });
+    await interaction.update({
+      content: embedText,
+      components: [row]
+    });
 
-    logger.emit({
-      scope: "events.compare",
-      event: "comparison_ready",
-      traceId,
-      context: { eventA: eventA.id, eventB: eventB.id },
+    l.event("comparison_ready", {
+      eventA: eventA.id,
+      eventB: eventB.id,
     });
 
   } catch (err) {
-    logger.emit({ scope: "events.compare", event: "compare_select_failed", traceId, level: "error", error: err });
+    l.error("compare_select_failed", err);
   }
 };
 
+// ======================================================
+// DOWNLOAD SINGLE
+// ======================================================
 export const handleCompareDownload = async (
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> => {
+  const l = log.ctx(ctx);
+
   try {
     const guild = interaction.guild as Guild;
     const [, , idA, idB] = interaction.customId.split("_");
@@ -172,79 +191,84 @@ export const handleCompareDownload = async (
     const eventB = await getEventById(guild.id, idB);
 
     if (!eventA || !eventB) {
-      await interaction.reply({ content: "Events not found.", ephemeral: true });
+      l.warn("download_events_missing", { idA, idB });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "download_events_missing",
-        traceId,
-        context: { idA, idB },
-      });
+      await interaction.reply({ content: "Events not found.", ephemeral: true });
       return;
     }
 
     const { txtText } = buildComparisonAB(eventA, eventB, guild);
     const config = await getConfig(guild.id);
 
-    const channelId = config?.downloadChannel;
-    if (!channelId) {
-      await interaction.reply({ content: "Download channel not set.", ephemeral: true });
+    if (!config?.downloadChannel) {
+      l.warn("missing_download_channel", { guildId: guild.id });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "missing_download_channel",
-        traceId,
-        context: { guildId: guild.id },
+      await interaction.reply({
+        content: "Download channel not set.",
+        ephemeral: true
       });
       return;
     }
 
-    const channel = guild.channels.cache.get(channelId) as TextChannel;
+    const channel = guild.channels.cache.get(config.downloadChannel) as TextChannel;
+
     if (!channel || !channel.isTextBased()) {
-      await interaction.reply({ content: "Download channel invalid.", ephemeral: true });
+      l.warn("invalid_download_channel", { channelId: config.downloadChannel });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "invalid_download_channel",
-        traceId,
-        context: { channelId },
+      await interaction.reply({
+        content: "Download channel invalid.",
+        ephemeral: true
       });
       return;
     }
 
-    await sendComparisonFile(channel, `compare_${eventA.name}_vs_${eventB.name}.txt`, txtText);
+    await sendComparisonFile(
+      channel,
+      `compare_${eventA.name}_vs_${eventB.name}.txt`,
+      txtText
+    );
 
-    await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
+    await interaction.reply({
+      content: "Comparison sent to download channel.",
+      ephemeral: true
+    });
 
-    logger.emit({
-      scope: "events.compare",
-      event: "download_sent",
-      traceId,
-      context: { eventA: eventA.id, eventB: eventB.id, channelId },
+    l.event("download_sent", {
+      eventA: eventA.id,
+      eventB: eventB.id,
+      channelId: config.downloadChannel,
     });
 
   } catch (err) {
-    logger.emit({ scope: "events.compare", event: "download_failed", traceId, level: "error", error: err });
+    l.error("download_failed", err);
   }
 };
 
-// -----------------------------
-// Compare All
-// -----------------------------
+// ======================================================
+// COMPARE ALL
+// ======================================================
 export const handleCompareAll = async (
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> => {
+  const l = log.ctx(ctx);
+
   await interaction.deferReply({ ephemeral: true });
 
   try {
     const events = await getEvents(interaction.guildId!);
-    const relevantEvents = events.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+
+    const relevantEvents = events.filter(e =>
+      ["custom", "reservoir_raid"].includes(e.eventType)
+    );
 
     if (!relevantEvents.length) {
-      await interaction.editReply({ content: "No events with participants to compare.", components: [] });
+      l.warn("compare_all_empty");
 
-      logger.emit({ scope: "events.compare", event: "compare_all_empty", traceId });
+      await interaction.editReply({
+        content: "No events with participants to compare.",
+        components: []
+      });
       return;
     }
 
@@ -260,51 +284,72 @@ export const handleCompareAll = async (
       components: [row]
     });
 
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_all_ready",
-      traceId,
-      context: { eventsCount: relevantEvents.length },
+    l.event("compare_all_ready", {
+      eventsCount: relevantEvents.length,
     });
 
   } catch (err) {
-    logger.emit({ scope: "events.compare", event: "compare_all_failed", traceId, level: "error", error: err });
+    l.error("compare_all_failed", err);
   }
 };
 
+// ======================================================
+// COMPARE ALL DOWNLOAD
+// ======================================================
 export const handleCompareAllDownload = async (
   interaction: ButtonInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> => {
+  const l = log.ctx(ctx);
+
   await interaction.deferReply({ ephemeral: true });
 
   try {
     const events = await getEvents(interaction.guildId!);
-    const relevantEvents = events.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+
+    const relevantEvents = events.filter(e =>
+      ["custom", "reservoir_raid"].includes(e.eventType)
+    );
 
     if (!relevantEvents.length) {
-      await interaction.editReply({ content: "No events to download.", components: [] });
+      l.warn("compare_all_download_empty");
 
-      logger.emit({ scope: "events.compare", event: "compare_all_download_empty", traceId });
+      await interaction.editReply({
+        content: "No events to download.",
+        components: []
+      });
       return;
     }
 
-    const { txtText } = buildComparisonAll(relevantEvents, interaction.guild as Guild);
+    const { txtText } = buildComparisonAll(
+      relevantEvents,
+      interaction.guild as Guild
+    );
+
     const config = await getConfig(interaction.guildId!);
 
     if (!config?.downloadChannel) {
-      await interaction.editReply({ content: "Download channel not set.", components: [] });
+      l.warn("compare_all_missing_channel");
 
-      logger.emit({ scope: "events.compare", event: "compare_all_missing_channel", traceId });
+      await interaction.editReply({
+        content: "Download channel not set.",
+        components: []
+      });
       return;
     }
 
-    const channel = interaction.guild!.channels.cache.get(config.downloadChannel) as TextChannel;
+    const channel = interaction.guild!.channels.cache.get(
+      config.downloadChannel
+    ) as TextChannel;
 
     const chunks = txtText.match(/[\s\S]{1,1900}/g) || [];
 
     for (const [i, chunk] of chunks.entries()) {
-      await sendComparisonFile(channel, `compare_all_part_${i + 1}.txt`, chunk);
+      await sendComparisonFile(
+        channel,
+        `compare_all_part_${i + 1}.txt`,
+        chunk
+      );
     }
 
     await interaction.editReply({
@@ -312,14 +357,11 @@ export const handleCompareAllDownload = async (
       components: []
     });
 
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_all_sent",
-      traceId,
-      context: { parts: chunks.length },
+    l.event("compare_all_sent", {
+      parts: chunks.length,
     });
 
   } catch (err) {
-    logger.emit({ scope: "events.compare", event: "compare_all_download_failed", traceId, level: "error", error: err });
+    l.error("compare_all_download_failed", err);
   }
 };
