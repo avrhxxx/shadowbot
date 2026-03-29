@@ -12,7 +12,8 @@ import {
 
 import * as EB from "./eventsButtons";
 import { parseEventId } from "./eventsButtons/utils";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 // =====================================
 // 🔹 IDS (CENTRALIZED)
@@ -63,12 +64,12 @@ export const IDS = {
 };
 
 // =====================================
-// HANDLERS MAP
+// HANDLERS MAP (CTX)
 // =====================================
 
 const BUTTON_HANDLERS: Record<
   string,
-  (i: ButtonInteraction<CacheType>, traceId: string) => Promise<any>
+  (i: ButtonInteraction<CacheType>, ctx: TraceContext) => Promise<any>
 > = {
   [IDS.BUTTONS.CREATE]: EB.handleCreate,
   [IDS.BUTTONS.LIST]: EB.handleCategoryClick,
@@ -85,7 +86,7 @@ const BUTTON_HANDLERS: Record<
 
 const SELECT_HANDLERS: Record<
   string,
-  (i: StringSelectMenuInteraction<CacheType>, traceId: string) => Promise<any>
+  (i: StringSelectMenuInteraction<CacheType>, ctx: TraceContext) => Promise<any>
 > = {
   [IDS.SELECTS.MANUAL_REMINDER]: EB.handleManualReminderSelect,
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: EB.handleSettingsSelect,
@@ -100,19 +101,17 @@ const SELECT_HANDLERS: Record<
 
 async function handleModal(
   interaction: ModalSubmitInteraction<CacheType>,
-  traceId: string
+  ctx: TraceContext
 ): Promise<boolean> {
   const { customId } = interaction;
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "events.handler",
-    event: "modal_received",
-    traceId,
-    context: { customId },
+  l.event("modal_received", {
+    input: { customId },
   });
 
   if (customId === IDS.MODALS.CREATE || customId.startsWith(`${IDS.MODALS.CREATE}_`)) {
-    await EB.handleCreateSubmit(interaction, traceId);
+    await EB.handleCreateSubmit(interaction, ctx);
     return true;
   }
 
@@ -120,7 +119,7 @@ async function handleModal(
     await EB.handleAddParticipantSubmit(
       interaction,
       parseEventId(customId, IDS.MODALS.ADD_PREFIX),
-      traceId
+      ctx
     );
     return true;
   }
@@ -129,7 +128,7 @@ async function handleModal(
     await EB.handleRemoveParticipantSubmit(
       interaction,
       parseEventId(customId, IDS.MODALS.REMOVE_PREFIX),
-      traceId
+      ctx
     );
     return true;
   }
@@ -138,7 +137,7 @@ async function handleModal(
     await EB.handleAbsentParticipantSubmit(
       interaction,
       parseEventId(customId, IDS.MODALS.ABSENT_PREFIX),
-      traceId
+      ctx
     );
     return true;
   }
@@ -147,27 +146,28 @@ async function handleModal(
 }
 
 // =====================================
-// MAIN HANDLER
+// MAIN HANDLER (CTX READY)
 // =====================================
 
 export async function handleEventInteraction(
   interaction: Interaction<CacheType>,
-  traceId: string
+  ctx: TraceContext
 ): Promise<boolean> {
+  const l = log.ctx(ctx);
+
   try {
+    // =============================
+    // 🔘 BUTTONS
+    // =============================
+
     if (interaction.isButton()) {
       const id = interaction.customId;
 
       const handler = BUTTON_HANDLERS[id];
       if (handler) {
-        logger.emit({
-          scope: "events.handler",
-          event: "button",
-          traceId,
-          context: { id },
-        });
+        l.event("button", { input: { id } });
 
-        await handler(interaction, traceId);
+        await handler(interaction, ctx);
         return true;
       }
 
@@ -175,7 +175,7 @@ export async function handleEventInteraction(
         await EB.handleCancelConfirm(
           interaction,
           id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, ""),
-          traceId
+          ctx
         );
         return true;
       }
@@ -184,7 +184,7 @@ export async function handleEventInteraction(
         await EB.handleAddParticipant(
           interaction,
           parseEventId(id, IDS.BUTTONS.ADD_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
@@ -193,7 +193,7 @@ export async function handleEventInteraction(
         await EB.handleRemoveParticipant(
           interaction,
           parseEventId(id, IDS.BUTTONS.REMOVE_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
@@ -202,7 +202,7 @@ export async function handleEventInteraction(
         await EB.handleAbsentParticipant(
           interaction,
           parseEventId(id, IDS.BUTTONS.ABSENT_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
@@ -211,7 +211,7 @@ export async function handleEventInteraction(
         await EB.handleShowList(
           interaction,
           parseEventId(id, IDS.BUTTONS.SHOW_LIST_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
@@ -220,7 +220,7 @@ export async function handleEventInteraction(
         await EB.handleCategoryClick(
           interaction,
           id.replace(IDS.BUTTONS.CATEGORY_PREFIX, ""),
-          traceId
+          ctx
         );
         return true;
       }
@@ -229,7 +229,7 @@ export async function handleEventInteraction(
         await EB.handleDownload(
           interaction,
           parseEventId(id, IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
@@ -238,18 +238,18 @@ export async function handleEventInteraction(
         await EB.handleCompareButton(
           interaction,
           parseEventId(id, IDS.BUTTONS.COMPARE_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_CONFIRM_PREFIX)) {
-        await EB.handleClearEventConfirm(interaction, traceId);
+        await EB.handleClearEventConfirm(interaction, ctx);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_ABORT_PREFIX)) {
-        await EB.handleClearEventAbort(interaction, traceId);
+        await EB.handleClearEventAbort(interaction, ctx);
         return true;
       }
 
@@ -257,11 +257,15 @@ export async function handleEventInteraction(
         await EB.handleClearEventButton(
           interaction,
           parseEventId(id, IDS.BUTTONS.CLEAR_PREFIX),
-          traceId
+          ctx
         );
         return true;
       }
     }
+
+    // =============================
+    // 📋 SELECTS
+    // =============================
 
     if (interaction.isStringSelectMenu()) {
       const id = interaction.customId;
@@ -269,36 +273,29 @@ export async function handleEventInteraction(
       const handler = SELECT_HANDLERS[id];
 
       if (handler) {
-        logger.emit({
-          scope: "events.handler",
-          event: "select",
-          traceId,
-          context: { id },
-        });
+        l.event("select", { input: { id } });
 
-        await handler(interaction, traceId);
+        await handler(interaction, ctx);
         return true;
       }
 
       if (id.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
-        await EB.handleCompareSelect(interaction, traceId);
+        await EB.handleCompareSelect(interaction, ctx);
         return true;
       }
     }
 
+    // =============================
+    // 🧾 MODALS
+    // =============================
+
     if (interaction.isModalSubmit()) {
-      return await handleModal(interaction, traceId);
+      return await handleModal(interaction, ctx);
     }
 
     return false;
   } catch (error) {
-    logger.emit({
-      scope: "events.handler",
-      event: "error",
-      traceId,
-      level: "error",
-      error,
-    });
+    l.error("handler_error", error);
 
     if (interaction.isRepliable()) {
       const payload = {
