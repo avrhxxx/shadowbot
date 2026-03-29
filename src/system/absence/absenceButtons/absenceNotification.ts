@@ -31,11 +31,9 @@ function parseAbsenceDate(dateStr: string, year: number): Date | null {
 }
 
 // -----------------------------
-// GET CHANNEL
+// GET CHANNEL (NO TRACE HERE)
 // -----------------------------
 export async function getNotificationChannel(guild: Guild): Promise<TextChannel | null> {
-  const traceId = createTraceId();
-
   const config = await AS.getAbsenceConfig(guild.id);
   if (!config.notificationChannel) return null;
 
@@ -44,14 +42,7 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
     if (!channel || !channel.isTextBased()) return null;
 
     return channel as TextChannel;
-  } catch (err) {
-    logger.emit({
-      scope: "absence.notification",
-      event: "fetch_channel_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+  } catch {
     return null;
   }
 }
@@ -59,63 +50,70 @@ export async function getNotificationChannel(guild: Guild): Promise<TextChannel 
 // -----------------------------
 // EMBED UPDATE
 // -----------------------------
-export async function updateAbsenceEmbed(guild: Guild) {
-  const traceId = createTraceId();
+export async function updateAbsenceEmbed(guild: Guild, traceId?: string) {
+  const localTraceId = traceId ?? createTraceId();
+
+  logger.emit({
+    scope: "absence.notification",
+    event: "embed_update_start",
+    traceId: localTraceId,
+    context: { guildId: guild.id },
+  });
 
   const channel = await getNotificationChannel(guild);
   if (!channel) return;
 
-  const absences = await AS.getAbsences(guild.id);
-  const now = new Date();
-  const unixNow = Math.floor(now.getTime() / 1000);
+  try {
+    const absences = await AS.getAbsences(guild.id);
+    const now = new Date();
+    const unixNow = Math.floor(now.getTime() / 1000);
 
-  const embed = new EmbedBuilder()
-    .setTitle("📋 Absence List")
-    .setColor("Blue");
+    const embed = new EmbedBuilder()
+      .setTitle("📋 Absence List")
+      .setColor("Blue");
 
-  if (!absences.length) {
-    embed.setDescription("No active absences.");
-  } else {
-    const byBackDate: Record<string, string[]> = {};
+    if (!absences.length) {
+      embed.setDescription("No active absences.");
+    } else {
+      const byBackDate: Record<string, string[]> = {};
 
-    absences.forEach(a => {
-      const endDate = parseAbsenceDate(a.endDate, a.year ?? now.getFullYear());
+      absences.forEach(a => {
+        const endDate = parseAbsenceDate(a.endDate, a.year ?? now.getFullYear());
 
-      const backStr = endDate
-        ? formatAbsenceDate(a.endDate, a.year ?? now.getFullYear())
-        : "Unknown";
+        const backStr = endDate
+          ? formatAbsenceDate(a.endDate, a.year ?? now.getFullYear())
+          : "Unknown";
 
-      const unixBack = endDate
-        ? Math.floor(endDate.getTime() / 1000)
-        : 0;
+        const unixBack = endDate
+          ? Math.floor(endDate.getTime() / 1000)
+          : 0;
 
-      if (!byBackDate[backStr]) byBackDate[backStr] = [];
+        if (!byBackDate[backStr]) byBackDate[backStr] = [];
 
-      byBackDate[backStr].push(
-        `• 👤 ${a.player} — returns <t:${unixBack}:R>`
+        byBackDate[backStr].push(
+          `• 👤 ${a.player} — returns <t:${unixBack}:R>`
+        );
+      });
+
+      embed.setDescription(
+        Object.keys(byBackDate)
+          .sort((a, b) => {
+            const da = a.split(".").reverse().join("");
+            const db = b.split(".").reverse().join("");
+            return Number(da) - Number(db);
+          })
+          .map(date =>
+            `📅 Back on ${date}\n${byBackDate[date].join("\n")}`
+          )
+          .join("\n\n")
       );
+    }
+
+    embed.addFields({
+      name: "Last Update",
+      value: `<t:${unixNow}:F>`
     });
 
-    embed.setDescription(
-      Object.keys(byBackDate)
-        .sort((a, b) => {
-          const da = a.split(".").reverse().join("");
-          const db = b.split(".").reverse().join("");
-          return Number(da) - Number(db);
-        })
-        .map(date =>
-          `📅 Back on ${date}\n${byBackDate[date].join("\n")}`
-        )
-        .join("\n\n")
-    );
-  }
-
-  embed.addFields({
-    name: "Last Update",
-    value: `<t:${unixNow}:F>`
-  });
-
-  try {
     const config = await AS.getAbsenceConfig(guild.id);
     let message;
 
@@ -132,14 +130,22 @@ export async function updateAbsenceEmbed(guild: Guild) {
       await AS.setAbsenceEmbedId(guild.id, message.id);
     }
 
-    if (!message.pinned)
+    if (!message.pinned) {
       await message.pin().catch(() => {});
+    }
+
+    logger.emit({
+      scope: "absence.notification",
+      event: "embed_update_done",
+      traceId: localTraceId,
+      result: { count: absences.length },
+    });
 
   } catch (err) {
     logger.emit({
       scope: "absence.notification",
-      event: "update_embed_failed",
-      traceId,
+      event: "embed_update_failed",
+      traceId: localTraceId,
       level: "error",
       error: err,
     });
@@ -157,22 +163,29 @@ export async function notifyAbsenceAdded(
 ) {
   const traceId = createTraceId();
 
-  const absences = await AS.getAbsences(guild.id);
-  const absence = absences.find(a => a.player === player);
-  const year = absence?.year ?? new Date().getFullYear();
-
-  const end = parseAbsenceDate(endDate, year);
-  const unixBack = end ? Math.floor(end.getTime() / 1000) : 0;
-
-  const channel = await getNotificationChannel(guild);
-  if (!channel) return;
+  logger.emit({
+    scope: "absence.notification",
+    event: "notify_added_start",
+    traceId,
+    context: { guildId: guild.id, player },
+  });
 
   try {
+    const absences = await AS.getAbsences(guild.id);
+    const absence = absences.find(a => a.player === player);
+    const year = absence?.year ?? new Date().getFullYear();
+
+    const end = parseAbsenceDate(endDate, year);
+    const unixBack = end ? Math.floor(end.getTime() / 1000) : 0;
+
+    const channel = await getNotificationChannel(guild);
+    if (!channel) return;
+
     await channel.send(
       `📌 Player **${player}** is now absent from ${formatAbsenceDate(startDate, year)} to ${formatAbsenceDate(endDate, year)} (returns <t:${unixBack}:R>).`
     );
 
-    await updateAbsenceEmbed(guild);
+    await updateAbsenceEmbed(guild, traceId);
 
   } catch (err) {
     logger.emit({
@@ -188,12 +201,13 @@ export async function notifyAbsenceAdded(
 export async function notifyAbsenceRemoved(guild: Guild, player: string) {
   const traceId = createTraceId();
 
-  const channel = await getNotificationChannel(guild);
-  if (!channel) return;
-
   try {
+    const channel = await getNotificationChannel(guild);
+    if (!channel) return;
+
     await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-    await updateAbsenceEmbed(guild);
+    await updateAbsenceEmbed(guild, traceId);
+
   } catch (err) {
     logger.emit({
       scope: "absence.notification",
@@ -208,12 +222,13 @@ export async function notifyAbsenceRemoved(guild: Guild, player: string) {
 export async function notifyAbsenceAutoClean(guild: Guild, player: string) {
   const traceId = createTraceId();
 
-  const channel = await getNotificationChannel(guild);
-  if (!channel) return;
-
   try {
+    const channel = await getNotificationChannel(guild);
+    if (!channel) return;
+
     await channel.send(`🚀 **${player}** has returned, absence cleared!`);
-    await updateAbsenceEmbed(guild);
+    await updateAbsenceEmbed(guild, traceId);
+
   } catch (err) {
     logger.emit({
       scope: "absence.notification",
@@ -235,12 +250,12 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
   }, 60_000);
 
   setInterval(async () => {
+    const traceId = createTraceId();
 
     const absences = await AS.getAbsences(guild.id);
     const now = new Date();
 
     for (const a of absences) {
-
       const endDate = parseAbsenceDate(
         a.endDate,
         a.year ?? now.getFullYear()
@@ -248,6 +263,14 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
 
       if (endDate && endDate < now) {
         await AS.removeAbsence(guild.id, a.player);
+
+        logger.emit({
+          scope: "absence.notification",
+          event: "autoclean_removed",
+          traceId,
+          context: { player: a.player },
+        });
+
         await notifyAbsenceAutoClean(guild, a.player);
       }
     }
@@ -259,5 +282,14 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
 // INIT
 // -----------------------------
 export async function initAbsenceNotifications(guild: Guild) {
-  await updateAbsenceEmbed(guild);
+  const traceId = createTraceId();
+
+  logger.emit({
+    scope: "absence.notification",
+    event: "init",
+    traceId,
+    context: { guildId: guild.id },
+  });
+
+  await updateAbsenceEmbed(guild, traceId);
 }
