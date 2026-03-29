@@ -117,17 +117,17 @@ async function handleModal(
   }
 
   if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
-    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId), traceId);
+    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId, IDS.MODALS.ADD_PREFIX), traceId);
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
-    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId), traceId);
+    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId, IDS.MODALS.REMOVE_PREFIX), traceId);
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
-    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId), traceId);
+    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId, IDS.MODALS.ABSENT_PREFIX), traceId);
     return true;
   }
 
@@ -165,22 +165,22 @@ export async function handleEventInteraction(
       }
 
       if (id.startsWith(IDS.BUTTONS.ADD_PREFIX)) {
-        await EB.handleAddParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleAddParticipant(interaction, parseEventId(id, IDS.BUTTONS.ADD_PREFIX), traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.REMOVE_PREFIX)) {
-        await EB.handleRemoveParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleRemoveParticipant(interaction, parseEventId(id, IDS.BUTTONS.REMOVE_PREFIX), traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.ABSENT_PREFIX)) {
-        await EB.handleAbsentParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleAbsentParticipant(interaction, parseEventId(id, IDS.BUTTONS.ABSENT_PREFIX), traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.SHOW_LIST_PREFIX)) {
-        await EB.handleShowList(interaction, parseEventId(id), traceId);
+        await EB.handleShowList(interaction, parseEventId(id, IDS.BUTTONS.SHOW_LIST_PREFIX), traceId);
         return true;
       }
 
@@ -190,12 +190,12 @@ export async function handleEventInteraction(
       }
 
       if (id.startsWith(IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX)) {
-        await EB.handleDownload(interaction, parseEventId(id), traceId);
+        await EB.handleDownload(interaction, parseEventId(id, IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX), traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.COMPARE_PREFIX)) {
-        await EB.handleCompareButton(interaction, parseEventId(id), traceId);
+        await EB.handleCompareButton(interaction, parseEventId(id, IDS.BUTTONS.COMPARE_PREFIX), traceId);
         return true;
       }
 
@@ -210,7 +210,7 @@ export async function handleEventInteraction(
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_PREFIX)) {
-        await EB.handleClearEventButton(interaction, parseEventId(id), traceId);
+        await EB.handleClearEventButton(interaction, parseEventId(id, IDS.BUTTONS.CLEAR_PREFIX), traceId);
         return true;
       }
     }
