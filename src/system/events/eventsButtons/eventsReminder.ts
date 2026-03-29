@@ -1,26 +1,65 @@
 // src/eventsPanel/eventsButtons/eventsReminder.ts
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
-import { getEventById, updateEvent, getConfig, EventObject, getEvents } from "../eventService"; // 🔥 FIX
+import { getEventById, updateEvent, getConfig, EventObject, getEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
-const CHECK_INTERVAL = 60_000; // 60s
+const CHECK_INTERVAL = 60_000;
 const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 
 // ======================================================
 // INIT / STOP REMINDERS
 // ======================================================
 export async function initEventReminders(guild: Guild) {
-  if (intervalHandles.has(guild.id)) return;
+  const traceId = createTraceId();
 
-  const handle = setInterval(() => checkEvents(guild).catch(console.error), CHECK_INTERVAL);
+  if (intervalHandles.has(guild.id)) {
+    logger.emit({
+      scope: "events.reminder",
+      event: "already_initialized",
+      traceId,
+      context: { guildId: guild.id },
+    });
+    return;
+  }
+
+  const handle = setInterval(() => {
+    checkEvents(guild).catch((err) => {
+      logger.emit({
+        scope: "events.reminder",
+        event: "interval_failed",
+        traceId,
+        level: "error",
+        error: err,
+      });
+    });
+  }, CHECK_INTERVAL);
+
   intervalHandles.set(guild.id, handle);
+
+  logger.emit({
+    scope: "events.reminder",
+    event: "initialized",
+    traceId,
+    context: { guildId: guild.id },
+  });
 }
 
 export function stopEventReminders(guildId: string) {
+  const traceId = createTraceId();
+
   const handle = intervalHandles.get(guildId);
   if (handle) {
     clearInterval(handle);
     intervalHandles.delete(guildId);
+
+    logger.emit({
+      scope: "events.reminder",
+      event: "stopped",
+      traceId,
+      context: { guildId },
+    });
   }
 }
 
@@ -28,92 +67,134 @@ export function stopEventReminders(guildId: string) {
 // CHECK EVENTS
 // ======================================================
 async function checkEvents(guild: Guild) {
-  const now = new Date();
-  const config = await getConfig(guild.id);
-  const channel = getTextChannel(guild, config?.notificationChannel);
-  if (!channel) return;
+  const traceId = createTraceId();
 
-  const events = await getEvents(guild.id);
+  try {
+    const now = new Date();
+    const config = await getConfig(guild.id);
+    const channel = getTextChannel(guild, config?.notificationChannel);
 
-  for (const event of events) {
-    if (!event || event.status !== "ACTIVE") continue;
+    if (!channel) {
+      logger.emit({
+        scope: "events.reminder",
+        event: "missing_channel",
+        traceId,
+        context: { guildId: guild.id },
+      });
+      return;
+    }
 
-    // ----------------------
-    // Birthday
-    // ----------------------
-    if (event.eventType === "birthdays") {
-      const thisYear = now.getUTCFullYear();
+    const events = await getEvents(guild.id);
 
-      if (
-        event.day === now.getUTCDate() &&
-        event.month === now.getUTCMonth() + 1 &&
-        (event.lastBirthdayYear ?? 0) < thisYear
-      ) {
-        await sendBirthdayNotification(channel, event);
+    for (const event of events) {
+      if (!event || event.status !== "ACTIVE") continue;
 
-        event.lastBirthdayYear = thisYear;
+      // ----------------------
+      // Birthday
+      // ----------------------
+      if (event.eventType === "birthdays") {
+        const thisYear = now.getUTCFullYear();
 
-        // 🔥 FIX
+        if (
+          event.day === now.getUTCDate() &&
+          event.month === now.getUTCMonth() + 1 &&
+          (event.lastBirthdayYear ?? 0) < thisYear
+        ) {
+          await sendBirthdayNotification(channel, event);
+
+          await updateEvent(event.id, {
+            lastBirthdayYear: thisYear,
+          });
+
+          logger.emit({
+            scope: "events.reminder",
+            event: "birthday_sent",
+            traceId,
+            context: {
+              guildId: guild.id,
+              eventId: event.id,
+            },
+          });
+        }
+
+        continue;
+      }
+
+      const eventTime = getEventDateUTC(
+        event.day,
+        event.month,
+        event.hour,
+        event.minute,
+        event.year
+      ).getTime();
+
+      const reminderTime =
+        eventTime - (event.reminderBefore ?? 60) * 60_000;
+
+      // ----------------------
+      // Upcoming
+      // ----------------------
+      if (!event.reminderSent && now.getTime() >= reminderTime) {
+        await sendEventNotification(
+          channel,
+          event,
+          "⏰ Upcoming Event",
+          "upcoming",
+          "Orange"
+        );
+
         await updateEvent(event.id, {
-          lastBirthdayYear: thisYear,
+          reminderSent: true,
+        });
+
+        logger.emit({
+          scope: "events.reminder",
+          event: "reminder_sent",
+          traceId,
+          context: {
+            guildId: guild.id,
+            eventId: event.id,
+          },
         });
       }
 
-      continue;
+      // ----------------------
+      // Started
+      // ----------------------
+      if (!event.started && now.getTime() >= eventTime) {
+        await sendEventNotification(
+          channel,
+          event,
+          "✅ Event Started",
+          "started",
+          "Blue"
+        );
+
+        await updateEvent(event.id, {
+          started: true,
+          status: "PAST",
+        });
+
+        logger.emit({
+          scope: "events.reminder",
+          event: "event_started",
+          traceId,
+          context: {
+            guildId: guild.id,
+            eventId: event.id,
+          },
+        });
+      }
     }
 
-    const eventTime = getEventDateUTC(
-      event.day,
-      event.month,
-      event.hour,
-      event.minute,
-      event.year
-    ).getTime();
-
-    const reminderTime =
-      eventTime - (event.reminderBefore ?? 60) * 60_000;
-
-    // ----------------------
-    // Upcoming
-    // ----------------------
-    if (!event.reminderSent && now.getTime() >= reminderTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        "⏰ Upcoming Event",
-        "upcoming",
-        "Orange"
-      );
-
-      event.reminderSent = true;
-
-      // 🔥 FIX
-      await updateEvent(event.id, {
-        reminderSent: true,
-      });
-    }
-
-    // ----------------------
-    // Started
-    // ----------------------
-    if (!event.started && now.getTime() >= eventTime) {
-      await sendEventNotification(
-        channel,
-        event,
-        "✅ Event Started",
-        "started",
-        "Blue"
-      );
-
-      event.started = true;
-      event.status = "PAST";
-
-      // 🔥 FIX
-      await updateEvent(event.id, {
-        started: true,
-        status: "PAST",
-      });
-    }
+  } catch (err) {
+    logger.emit({
+      scope: "events.reminder",
+      event: "check_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
   }
 }
 
@@ -124,17 +205,30 @@ async function sendBirthdayNotification(
   channel: TextChannel,
   event: EventObject
 ) {
-  const embed = new EmbedBuilder()
-    .setTitle("🎂 Birthday Celebration!")
-    .setDescription(
-      `Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`
-    )
-    .setColor(0xffc107);
+  const traceId = createTraceId();
 
-  await channel.send({
-    content: "@everyone",
-    embeds: [embed],
-  });
+  try {
+    const embed = new EmbedBuilder()
+      .setTitle("🎂 Birthday Celebration!")
+      .setDescription(
+        `Today is **${event.name}**'s birthday! Let's celebrate together 🎉🍻`
+      )
+      .setColor(0xffc107);
+
+    await channel.send({
+      content: "@everyone",
+      embeds: [embed],
+    });
+
+  } catch (err) {
+    logger.emit({
+      scope: "events.reminder",
+      event: "birthday_send_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 // ======================================================
@@ -144,30 +238,56 @@ export async function sendEventCreatedNotification(
   event: EventObject,
   guild: Guild
 ) {
-  const config = await getConfig(guild.id);
-  const channel = getTextChannel(guild, config?.notificationChannel);
-  if (!channel) return;
+  const traceId = createTraceId();
 
-  await sendEventNotification(
-    channel,
-    event,
-    "🎉 Event Created",
-    "created",
-    "Green"
-  );
+  try {
+    const config = await getConfig(guild.id);
+    const channel = getTextChannel(guild, config?.notificationChannel);
+    if (!channel) return;
+
+    await sendEventNotification(
+      channel,
+      event,
+      "🎉 Event Created",
+      "created",
+      "Green"
+    );
+
+  } catch (err) {
+    logger.emit({
+      scope: "events.reminder",
+      event: "created_notification_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 export async function sendReminderMessage(
   channel: TextChannel,
   event: EventObject
 ) {
-  await sendEventNotification(
-    channel,
-    event,
-    "⏰ Upcoming Event",
-    "upcoming",
-    "Orange"
-  );
+  const traceId = createTraceId();
+
+  try {
+    await sendEventNotification(
+      channel,
+      event,
+      "⏰ Upcoming Event",
+      "upcoming",
+      "Orange"
+    );
+
+  } catch (err) {
+    logger.emit({
+      scope: "events.reminder",
+      event: "manual_reminder_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+  }
 }
 
 // ======================================================
