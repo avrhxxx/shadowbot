@@ -10,7 +10,8 @@ import {
 
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // 🔐 SAFE REPLY
@@ -50,8 +51,10 @@ function isQuickAddType(value: string): value is QuickAddType {
 
 export async function handleStart(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
+  const l = log.ctx(ctx);
+
   const startTime = Date.now();
 
   if (!interaction.deferred && !interaction.replied) {
@@ -61,14 +64,9 @@ export async function handleStart(
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  logger.emit({
-    scope: "quickadd.start",
-    event: "start_requested",
-    traceId,
-    context: {
-      guildId,
-      userId,
-    },
+  l.event("start_requested", {
+    guildId,
+    userId,
   });
 
   if (!guildId) {
@@ -79,16 +77,10 @@ export async function handleStart(
   const rawType = interaction.options.getString("type", true);
 
   if (!isQuickAddType(rawType)) {
-    logger.emit({
-      scope: "quickadd.start",
-      event: "start_invalid_type",
-      traceId,
-      level: "warn",
-      context: {
-        guildId,
-        userId,
-        rawType,
-      },
+    l.warn("start_invalid_type", {
+      guildId,
+      userId,
+      rawType,
     });
 
     await safeReply(interaction, "❌ Invalid QuickAdd type");
@@ -100,18 +92,12 @@ export async function handleStart(
   let threadId: string | null = null;
 
   try {
-    logger.emit({
-      scope: "quickadd.start",
-      event: "start_start",
-      traceId,
-      context: {
-        guildId,
-        userId,
-        type,
-      },
-      stats: {
-        start_started: 1,
-      },
+    l.event("start_start", {
+      guildId,
+      userId,
+      type,
+    }, {
+      start_started: 1,
     });
 
     const session = QuickAddSession.start(
@@ -122,19 +108,13 @@ export async function handleStart(
         threadId: null,
         type,
       },
-      traceId
+      ctx.traceId
     );
 
     if (!session) {
-      logger.emit({
-        scope: "quickadd.start",
-        event: "start_blocked_existing_session",
-        traceId,
-        level: "warn",
-        context: {
-          guildId,
-          userId,
-        },
+      l.warn("start_blocked_existing_session", {
+        guildId,
+        userId,
       });
 
       await safeReply(
@@ -166,7 +146,7 @@ export async function handleStart(
       guildId,
       userId,
       thread.id,
-      traceId
+      ctx.traceId
     );
 
     await thread.send({
@@ -180,40 +160,26 @@ export async function handleStart(
 
     const duration = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.start",
-      event: "start_done",
-      traceId,
-      context: {
-        sessionId: session.sessionId,
-        threadId,
-      },
-      stats: {
-        durationMs: duration,
-        start_success: 1,
-      },
+    l.event("start_done", {
+      sessionId: session.sessionId,
+      threadId,
+    }, {
+      durationMs: duration,
+      start_success: 1,
     });
 
   } catch (err) {
     const duration = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.start",
-      event: "start_failed",
-      traceId,
-      level: "error",
+    l.error("start_failed", {
+      guildId,
+      userId,
       error: err,
-      context: {
-        guildId,
-        userId,
-      },
-      stats: {
-        durationMs: duration,
-        start_error: 1,
-      },
+      durationMs: duration,
+      start_error: 1,
     });
 
-    QuickAddSession.end(guildId, userId, traceId);
+    QuickAddSession.end(guildId, userId, ctx.traceId);
 
     if (threadId) {
       try {
