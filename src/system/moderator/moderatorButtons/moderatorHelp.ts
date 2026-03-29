@@ -1,12 +1,27 @@
-// src/moderatorPanel/moderatorButtons/moderatorHelp.ts
-import { Interaction, EmbedBuilder } from "discord.js";
+// src/system/moderator/moderatorButtons/moderatorHelp.ts
 
-export async function handleModeratorHelp(interaction: Interaction) {
+import { Interaction, EmbedBuilder } from "discord.js";
+import { logger } from "../../../core/logger/log";
+
+export async function handleModeratorHelp(
+  interaction: Interaction,
+  traceId: string
+) {
   if (!interaction.isButton()) return;
+
+  logger.emit({
+    scope: "moderator.buttons",
+    event: "moderator_help_open",
+    traceId,
+    context: {
+      guildId: interaction.guildId,
+      id: interaction.customId,
+    },
+  });
 
   const embed = new EmbedBuilder()
     .setTitle("Moderator Panel Guide")
-    .setColor(0x1E90FF) // niebieski, pasujący do panelu
+    .setColor(0x1E90FF)
     .addFields(
       {
         name: "🟢 Event Menu",
