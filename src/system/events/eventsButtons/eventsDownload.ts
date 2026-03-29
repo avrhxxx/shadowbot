@@ -1,131 +1,268 @@
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsDownload.ts
+// =====================================
+
 import { ButtonInteraction, AttachmentBuilder, TextChannel } from "discord.js";
 import { getEvents, getConfig, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
-async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
-  const events = await getEvents(guildId);
-  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
-  return event || null;
+// -----------------------------
+// HELPERS
+// -----------------------------
+function formatStatus(event: EventObject): string {
+  if (event.status === "PAST") return "[PAST]";
+  if (event.status === "CANCELED") return "[CANCELED]";
+  return "[ACTIVE]";
 }
 
-export async function handleDownload(interaction: ButtonInteraction, singleEventId?: string) {
-  if (!interaction.guild || !interaction.guildId) return;
+function buildEventContent(event: EventObject): string {
+  const participants = event.participants.length
+    ? event.participants.join("\n")
+    : "None";
+
+  const absent = event.absent?.length
+    ? event.absent.join("\n")
+    : "None";
+
+  const date = formatEventUTC(
+    event.day,
+    event.month,
+    event.hour,
+    event.minute,
+    event.year
+  );
+
+  return [
+    `Event: ${event.name}`,
+    `Status: ${formatStatus(event)}`,
+    `Date: ${date}`,
+    `Participants:\n${participants}`,
+    `Absent:\n${absent}`
+  ].join("\n\n");
+}
+
+async function getEventById(
+  guildId: string,
+  eventId: string
+): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  return events.find(e => e.id.toString().trim() === eventId.toString().trim()) || null;
+}
+
+// -----------------------------
+// MAIN HANDLER
+// -----------------------------
+export async function handleDownload(
+  interaction: ButtonInteraction,
+  singleEventId?: string
+) {
+  const traceId = createTraceId();
+
+  if (!interaction.guild || !interaction.guildId) {
+    logger.emit({
+      scope: "events.download",
+      event: "missing_guild",
+      traceId,
+      level: "error",
+    });
+    return;
+  }
 
   const guildId = interaction.guildId;
-  const allEvents: EventObject[] = await getEvents(guildId);
-  const config = await getConfig(guildId);
 
-  if (!config || !config.downloadChannel) {
-    await interaction.reply({
-      content: "❌ Download channel is not set in event settings.",
-      ephemeral: true
-    });
-    return;
-  }
+  try {
+    const [allEvents, config] = await Promise.all([
+      getEvents(guildId),
+      getConfig(guildId)
+    ]);
 
-  const channel = interaction.guild.channels.cache.get(config.downloadChannel);
-  if (!channel || !(channel instanceof TextChannel)) {
-    await interaction.reply({
-      content: "❌ Download channel not found or not a text channel.",
-      ephemeral: true
-    });
-    return;
-  }
+    if (!config || !config.downloadChannel) {
+      await interaction.reply({
+        content: "❌ Download channel is not set in event settings.",
+        ephemeral: true
+      });
 
-  // -------------------------
-  // SINGLE EVENT
-  // -------------------------
-  if (singleEventId) {
-    const event = await getEventById(guildId, singleEventId);
+      logger.emit({
+        scope: "events.download",
+        event: "missing_channel_config",
+        traceId,
+        context: { guildId }
+      });
 
-    if (!event) {
-      await interaction.reply({ content: "Event not found.", ephemeral: true });
       return;
     }
 
-    const status =
-      event.status === "PAST" ? "[PAST]" :
-      event.status === "CANCELED" ? "[CANCELED]" :
-      "[ACTIVE]";
+    const channel = interaction.guild.channels.cache.get(config.downloadChannel);
 
-    const participants = event.participants.length ? event.participants.join("\n") : "None";
-    const absent = event.absent?.length ? event.absent.join("\n") : "None";
+    if (!channel || !channel.isTextBased()) {
+      await interaction.reply({
+        content: "❌ Download channel not found or not a text channel.",
+        ephemeral: true
+      });
 
-    const date = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
+      logger.emit({
+        scope: "events.download",
+        event: "invalid_channel",
+        traceId,
+        context: { guildId, channelId: config.downloadChannel }
+      });
 
-    const content = [
-      `Event: ${event.name}`,
-      `Status: ${status}`,
-      `Date: ${date}`,
-      `Participants:\n${participants}`,
-      `Absent:\n${absent}`
-    ].join("\n\n");
+      return;
+    }
 
-    const file = new AttachmentBuilder(
-      Buffer.from(content, "utf8"),
-      { name: `${event.id}.txt` }
+    const textChannel = channel as TextChannel;
+
+    // -------------------------
+    // SINGLE EVENT
+    // -------------------------
+    if (singleEventId) {
+      const event = await getEventById(guildId, singleEventId);
+
+      if (!event) {
+        await interaction.reply({
+          content: "Event not found.",
+          ephemeral: true
+        });
+
+        logger.emit({
+          scope: "events.download",
+          event: "event_not_found",
+          traceId,
+          context: { guildId, eventId: singleEventId }
+        });
+
+        return;
+      }
+
+      // optional: ograniczenie typów
+      if (!["custom", "reservoir_raid"].includes(event.eventType)) {
+        await interaction.reply({
+          content: "❌ This event type cannot be downloaded.",
+          ephemeral: true
+        });
+
+        logger.emit({
+          scope: "events.download",
+          event: "invalid_event_type",
+          traceId,
+          context: { eventType: event.eventType }
+        });
+
+        return;
+      }
+
+      const content = buildEventContent(event);
+
+      const file = new AttachmentBuilder(
+        Buffer.from(content, "utf8"),
+        { name: `${event.id}.txt` }
+      );
+
+      await textChannel.send({
+        content: `Participant list for **${event.name}**`,
+        files: [file]
+      });
+
+      await interaction.reply({
+        content: `Participant file sent to <#${config.downloadChannel}>.`,
+        ephemeral: true
+      });
+
+      logger.emit({
+        scope: "events.download",
+        event: "single_download_success",
+        traceId,
+        context: { guildId, eventId: event.id }
+      });
+
+      return;
+    }
+
+    // -------------------------
+    // ALL EVENTS
+    // -------------------------
+    await interaction.deferReply({ ephemeral: true });
+
+    const relevantEvents = allEvents.filter(e =>
+      ["custom", "reservoir_raid"].includes(e.eventType)
     );
 
-    await channel.send({
-      content: `Participant list for **${event.name}**`,
-      files: [file]
-    });
+    if (!relevantEvents.length) {
+      await interaction.editReply({
+        content: "No events with participants to download.",
+        components: []
+      });
 
-    await interaction.reply({
-      content: `Participant file sent to <#${config.downloadChannel}>.`,
-      ephemeral: true
-    });
+      logger.emit({
+        scope: "events.download",
+        event: "no_events",
+        traceId,
+        context: { guildId }
+      });
 
-    return;
-  }
+      return;
+    }
 
-  // -------------------------
-  // ALL EVENTS (tylko custom + reservoir)
-  // -------------------------
-  await interaction.deferReply({ ephemeral: true });
+    const blocks = relevantEvents.map(buildEventContent);
 
-  const relevantEvents = allEvents.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
+    const fullText = blocks.join("\n\n====================\n\n");
 
-  if (!relevantEvents.length) {
+    // chunking (bezpieczne dla Discord limit)
+    const chunks = fullText.match(/[\s\S]{1,1900000}/g) || [];
+
+    for (const [i, chunk] of chunks.entries()) {
+      const file = new AttachmentBuilder(
+        Buffer.from(chunk, "utf8"),
+        { name: `all_events_part_${i + 1}.txt` }
+      );
+
+      await textChannel.send({
+        content: `All participant lists (part ${i + 1})`,
+        files: [file]
+      });
+    }
+
     await interaction.editReply({
-      content: "No events with participants to download.",
+      content: `Participant lists sent to <#${config.downloadChannel}>.`,
       components: []
     });
-    return;
+
+    logger.emit({
+      scope: "events.download",
+      event: "bulk_download_success",
+      traceId,
+      context: {
+        guildId,
+        eventsCount: relevantEvents.length,
+        chunks: chunks.length
+      }
+    });
+
+  } catch (error) {
+    logger.emit({
+      scope: "events.download",
+      event: "download_failed",
+      traceId,
+      level: "error",
+      error
+    });
+
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: "❌ Failed to download events.",
+          components: []
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ Failed to download events.",
+          ephemeral: true
+        });
+      }
+    } catch {
+      // silent fail
+    }
   }
-
-  const blocks = relevantEvents.map(event => {
-    const status =
-      event.status === "PAST" ? "[PAST]" :
-      event.status === "CANCELED" ? "[CANCELED]" :
-      "[ACTIVE]";
-
-    const participants = event.participants.length ? event.participants.join("\n") : "None";
-    const absent = event.absent?.length ? event.absent.join("\n") : "None";
-
-    const date = formatEventUTC(event.day, event.month, event.hour, event.minute, event.year);
-
-    return [
-      `Event: ${event.name}`,
-      `Status: ${status}`,
-      `Date: ${date}`,
-      `Participants:\n${participants}`,
-      `Absent:\n${absent}`
-    ].join("\n\n");
-  });
-
-  const file = new AttachmentBuilder(
-    Buffer.from(blocks.join("\n\n====================\n\n"), "utf8"),
-    { name: `all_events_${Date.now()}.txt` }
-  );
-
-  await channel.send({
-    content: "All participant lists",
-    files: [file]
-  });
-
-  await interaction.editReply({
-    content: `Participant lists sent to <#${config.downloadChannel}>.`,
-    components: []
-  });
 }
