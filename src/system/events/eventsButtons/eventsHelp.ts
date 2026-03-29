@@ -1,10 +1,19 @@
-// src/eventsPanel/eventsButtons/eventHelp.ts
+// =====================================
+// 📁 src/eventsPanel/eventsButtons/eventHelp.ts
+// =====================================
+
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 export async function handleHelp(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
+  if (!interaction.isButton()) return;
+
   const embed = new EmbedBuilder()
     .setTitle("Event Panel Guide")
-    .setColor(0x1E90FF) // pasujący kolor do panelu
+    .setColor(0x1E90FF)
     .addFields(
       { 
         name: "👋 Welcome", 
@@ -61,5 +70,42 @@ Bot is still in beta! If something acts up, or you have ideas, just give me a sh
       }
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  try {
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+
+    logger.emit({
+      scope: "events.help",
+      event: "shown",
+      traceId,
+      context: {
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+      },
+    });
+
+  } catch (error) {
+    logger.emit({
+      scope: "events.help",
+      event: "show_failed",
+      traceId,
+      level: "error",
+      error,
+    });
+
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: "❌ Failed to show help.",
+          components: []
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ Failed to show help.",
+          ephemeral: true
+        });
+      }
+    } catch {
+      // silent fail
+    }
+  }
 }
