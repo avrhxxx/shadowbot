@@ -1,9 +1,12 @@
-// src/eventsPanel/eventsButtons/eventsReminder.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsReminder.ts
+// =====================================
+
 import { TextChannel, Guild, EmbedBuilder, ColorResolvable } from "discord.js";
 import { getEventById, updateEvent, getConfig, EventObject, getEvents } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 const CHECK_INTERVAL = 60_000;
 const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
@@ -11,63 +14,42 @@ const intervalHandles = new Map<string, ReturnType<typeof setInterval>>();
 // ======================================================
 // INIT / STOP REMINDERS
 // ======================================================
-export async function initEventReminders(guild: Guild) {
-  const traceId = createTraceId();
+export async function initEventReminders(guild: Guild, ctx: TraceContext) {
+  const l = log.ctx(ctx);
 
   if (intervalHandles.has(guild.id)) {
-    logger.emit({
-      scope: "events.reminder",
-      event: "already_initialized",
-      traceId,
-      context: { guildId: guild.id },
-    });
+    l.warn("already_initialized", { guildId: guild.id });
     return;
   }
 
   const handle = setInterval(() => {
-    checkEvents(guild).catch((err) => {
-      logger.emit({
-        scope: "events.reminder",
-        event: "interval_failed",
-        traceId,
-        level: "error",
-        error: err,
-      });
+    checkEvents(guild, ctx).catch((err) => {
+      l.error("interval_failed", err);
     });
   }, CHECK_INTERVAL);
 
   intervalHandles.set(guild.id, handle);
 
-  logger.emit({
-    scope: "events.reminder",
-    event: "initialized",
-    traceId,
-    context: { guildId: guild.id },
-  });
+  l.event("initialized", { guildId: guild.id });
 }
 
-export function stopEventReminders(guildId: string) {
-  const traceId = createTraceId();
+export function stopEventReminders(guildId: string, ctx: TraceContext) {
+  const l = log.ctx(ctx);
 
   const handle = intervalHandles.get(guildId);
   if (handle) {
     clearInterval(handle);
     intervalHandles.delete(guildId);
 
-    logger.emit({
-      scope: "events.reminder",
-      event: "stopped",
-      traceId,
-      context: { guildId },
-    });
+    l.event("stopped", { guildId });
   }
 }
 
 // ======================================================
 // CHECK EVENTS
 // ======================================================
-async function checkEvents(guild: Guild) {
-  const traceId = createTraceId();
+async function checkEvents(guild: Guild, ctx: TraceContext) {
+  const l = log.ctx(ctx);
 
   try {
     const now = new Date();
@@ -75,12 +57,7 @@ async function checkEvents(guild: Guild) {
     const channel = getTextChannel(guild, config?.notificationChannel);
 
     if (!channel) {
-      logger.emit({
-        scope: "events.reminder",
-        event: "missing_channel",
-        traceId,
-        context: { guildId: guild.id },
-      });
+      l.warn("missing_channel", { guildId: guild.id });
       return;
     }
 
@@ -100,20 +77,14 @@ async function checkEvents(guild: Guild) {
           event.month === now.getUTCMonth() + 1 &&
           (event.lastBirthdayYear ?? 0) < thisYear
         ) {
-          await sendBirthdayNotification(channel, event);
+          await sendBirthdayNotification(channel, event, ctx);
 
           await updateEvent(event.id, {
             lastBirthdayYear: thisYear,
           });
 
-          logger.emit({
-            scope: "events.reminder",
-            event: "birthday_sent",
-            traceId,
-            context: {
-              guildId: guild.id,
-              eventId: event.id,
-            },
+          l.event("birthday_sent", {
+            eventId: event.id,
           });
         }
 
@@ -147,14 +118,8 @@ async function checkEvents(guild: Guild) {
           reminderSent: true,
         });
 
-        logger.emit({
-          scope: "events.reminder",
-          event: "reminder_sent",
-          traceId,
-          context: {
-            guildId: guild.id,
-            eventId: event.id,
-          },
+        l.event("reminder_sent", {
+          eventId: event.id,
         });
       }
 
@@ -175,26 +140,14 @@ async function checkEvents(guild: Guild) {
           status: "PAST",
         });
 
-        logger.emit({
-          scope: "events.reminder",
-          event: "event_started",
-          traceId,
-          context: {
-            guildId: guild.id,
-            eventId: event.id,
-          },
+        l.event("event_started", {
+          eventId: event.id,
         });
       }
     }
 
   } catch (err) {
-    logger.emit({
-      scope: "events.reminder",
-      event: "check_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("check_failed", err);
   }
 }
 
@@ -203,9 +156,10 @@ async function checkEvents(guild: Guild) {
 // ======================================================
 async function sendBirthdayNotification(
   channel: TextChannel,
-  event: EventObject
+  event: EventObject,
+  ctx: TraceContext
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   try {
     const embed = new EmbedBuilder()
@@ -221,13 +175,7 @@ async function sendBirthdayNotification(
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.reminder",
-      event: "birthday_send_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("birthday_send_failed", err);
   }
 }
 
@@ -236,9 +184,10 @@ async function sendBirthdayNotification(
 // ======================================================
 export async function sendEventCreatedNotification(
   event: EventObject,
-  guild: Guild
+  guild: Guild,
+  ctx: TraceContext
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   try {
     const config = await getConfig(guild.id);
@@ -254,21 +203,16 @@ export async function sendEventCreatedNotification(
     );
 
   } catch (err) {
-    logger.emit({
-      scope: "events.reminder",
-      event: "created_notification_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("created_notification_failed", err);
   }
 }
 
 export async function sendReminderMessage(
   channel: TextChannel,
-  event: EventObject
+  event: EventObject,
+  ctx: TraceContext
 ) {
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   try {
     await sendEventNotification(
@@ -280,13 +224,7 @@ export async function sendReminderMessage(
     );
 
   } catch (err) {
-    logger.emit({
-      scope: "events.reminder",
-      event: "manual_reminder_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("manual_reminder_failed", err);
   }
 }
 
