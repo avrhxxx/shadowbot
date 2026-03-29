@@ -17,14 +17,12 @@ export type LogPayload = {
 
   level?: LogLevel;
 
-  // 🔹 STANDARD FIELDS
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
   stats?: Record<string, number>;
   meta?: Record<string, unknown>;
 
-  // 🔥 OBSERVABILITY
   metrics?: {
     increment?: string;
     value?: number;
@@ -63,13 +61,11 @@ function normalizeError(err: unknown) {
 // =====================================
 
 function emit(payload: LogPayload | string): void {
-  // 🔒 GUARD
   if (!payload) {
     console.log("LOGGER_ERROR: empty payload");
     return;
   }
 
-  // 🔹 SHORT VERSION → NORMALIZE
   if (typeof payload === "string") {
     payload = { event: payload };
   }
@@ -89,7 +85,6 @@ function emit(payload: LogPayload | string): void {
     error,
   } = payload;
 
-  // ❗ HARD REQUIREMENT
   if (!event) {
     console.log("LOGGER_ERROR: missing event", payload);
     return;
@@ -99,7 +94,7 @@ function emit(payload: LogPayload | string): void {
   const normalizedError = normalizeError(error);
 
   console.log(
-    `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "-"} | ${event}`,
+    `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "unknown"} | ${event}`,
     {
       ...(context && { context }),
       ...(input && { input }),
@@ -126,9 +121,12 @@ export function log(
     ...payload,
     event,
     traceId: ctx.traceId,
-    scope: payload.scope ?? ctx.system,
+    scope: payload.scope ?? ctx.system ?? "unknown",
+
     context: {
-      ...ctx,
+      userId: ctx.userId,
+      source: ctx.source,
+      system: ctx.system,
       ...(payload.context || {}),
     },
   });
@@ -160,23 +158,23 @@ log.error = function (
 // =====================================
 
 type CtxLogger = {
-  event: (event: string, context?: Record<string, unknown>) => void;
-  warn: (event: string, context?: Record<string, unknown>) => void;
-  error: (event: string, error: unknown, context?: Record<string, unknown>) => void;
+  event: (event: string, payload?: Omit<LogPayload, "event" | "traceId">) => void;
+  warn: (event: string, payload?: Omit<LogPayload, "event" | "traceId" | "level">) => void;
+  error: (event: string, error: unknown, payload?: Omit<LogPayload, "event" | "traceId" | "error" | "level">) => void;
 };
 
 log.ctx = function (ctx: TraceContext): CtxLogger {
   return {
-    event(event, context = {}) {
-      log(ctx, event, { context });
+    event(event, payload = {}) {
+      log(ctx, event, payload);
     },
 
-    warn(event, context = {}) {
-      log(ctx, event, { level: "warn", context });
+    warn(event, payload = {}) {
+      log(ctx, event, { ...payload, level: "warn" });
     },
 
-    error(event, error, context = {}) {
-      log(ctx, event, { level: "error", error, context });
+    error(event, error, payload = {}) {
+      log(ctx, event, { ...payload, level: "error", error });
     },
   };
 };
