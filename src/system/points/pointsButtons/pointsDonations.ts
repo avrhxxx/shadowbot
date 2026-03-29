@@ -6,10 +6,12 @@ import { logger } from "../../../core/logger/log";
 // -----------------------------
 // Render wszystkich tygodni dla kategorii Donations
 // -----------------------------
-export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
-  const weeks = await pointsService.getAllWeeks("Donations");
+export async function renderWeeks(
+  guildId: string
+): Promise<ActionRowBuilder<ButtonBuilder>[]> {
+  const weeks = await pointsService.getAllWeeks(guildId, "Donations");
 
-  return weeks.map(week => {
+  return weeks.map((week: string) => {
     const safeWeek = encodeURIComponent(week);
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -29,13 +31,23 @@ export async function handleWeekClick(
   traceId: string
 ) {
   try {
+    const guildId = interaction.guildId;
+
+    if (!guildId) {
+      await interaction.reply({
+        content: "❌ Guild not found.",
+        ephemeral: true
+      });
+      return;
+    }
+
     logger.emit({
       scope: "points.button",
       event: "points_week_click",
       traceId,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
         week,
       },
     });
@@ -46,9 +58,14 @@ export async function handleWeekClick(
     }
 
     // Pobranie aktualnych punktów
-    const points = await pointsService.getPoints("Donations", week);
+    const points = await pointsService.getPoints(
+      guildId,
+      "Donations",
+      week
+    );
+
     const pointsText = points.length > 0 
-      ? points.map(p => `${p.nick}: ${p.points}`).join("\n")
+      ? points.map((p) => `${p.nick}: ${p.points}`).join("\n")
       : "_No points recorded yet_";
 
     // Przyciski akcji
