@@ -1,9 +1,10 @@
 // =====================================
-// 📁 src/quickadd/mapping/NicknameResolver.ts
+// 📁 src/system/quickadd/mapping/NicknameResolver.ts
 // =====================================
 
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
 import { loadNicknameMap } from "./NicknameMapProvider";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 const localFallbackMap: Record<string, string> = {};
 
@@ -19,18 +20,18 @@ const CACHE_TTL = 60_000;
 
 export async function resolveNickname(
   nick: string,
-  traceId: string
+  ctx: TraceContext
 ): Promise<string> {
+  const l = log.ctx(ctx);
+
   if (!nick) return "";
 
   const cleaned = clean(nick);
   const now = Date.now();
 
-  logger.emit({
-    scope: "quickadd.mapping",
-    event: "resolve_start",
-    traceId,
-    context: { input: nick, cleaned },
+  l.event("resolve_start", {
+    input: nick,
+    cleaned,
   });
 
   try {
@@ -42,24 +43,15 @@ export async function resolveNickname(
     // =====================================
     if (!cachedMap || cacheExpired) {
       if (!loadingPromise) {
-        logger.emit({
-          scope: "quickadd.mapping",
-          event: "cache_refresh_start",
-          traceId,
-        });
+        l.event("cache_refresh_start");
 
-        loadingPromise = loadNicknameMap(traceId)
+        loadingPromise = loadNicknameMap(ctx)
           .then((map) => {
             cachedMap = map;
             lastLoad = Date.now();
 
-            logger.emit({
-              scope: "quickadd.mapping",
-              event: "cache_loaded",
-              traceId,
-              context: {
-                cacheSize: Object.keys(map).length,
-              },
+            l.event("cache_loaded", {
+              cacheSize: Object.keys(map).length,
             });
 
             return map;
@@ -71,35 +63,24 @@ export async function resolveNickname(
 
       await loadingPromise;
     } else {
-      logger.emit({
-        scope: "quickadd.mapping",
-        event: "cache_hit",
-        traceId,
-        context: {
-          ageMs: cacheAge,
-        },
+      l.event("cache_hit", {
+        ageMs: cacheAge,
       });
     }
 
     const mapped = cachedMap?.[cleaned];
 
     if (mapped) {
-      logger.emit({
-        scope: "quickadd.mapping",
-        event: "resolved_sheet",
-        traceId,
-        context: { input: nick, result: mapped },
+      l.event("resolved_sheet", {
+        input: nick,
+        result: mapped,
       });
 
       return mapped;
     }
 
   } catch (err) {
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "map_failed",
-      traceId,
-      level: "warn",
+    l.warn("map_failed", {
       error: err,
     });
   }
@@ -110,22 +91,16 @@ export async function resolveNickname(
 
   const local = localFallbackMap[cleaned];
   if (local) {
-    logger.emit({
-      scope: "quickadd.mapping",
-      event: "resolved_local",
-      traceId,
-      context: { input: nick, result: local },
+    l.event("resolved_local", {
+      input: nick,
+      result: local,
     });
 
     return local;
   }
 
-  logger.emit({
-    scope: "quickadd.mapping",
-    event: "unmapped",
-    traceId,
-    level: "warn",
-    context: { input: nick },
+  l.warn("unmapped", {
+    input: nick,
   });
 
   return nick;
