@@ -2,8 +2,9 @@
 // 📁 src/quickadd/ocr/VisionOCRExtractor.ts
 // =====================================
 
-import { log } from "../logger";
+import { log } from "../../core/logger/log";
 import { OCRToken } from "./OCRTypes";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 type VisionSymbol = { text: string };
 
@@ -25,22 +26,15 @@ type VisionResponse = {
 
 export function mapVisionToTokens(
   result: VisionResponse | null,
-  traceId: string
+  ctx: TraceContext
 ): OCRToken[] {
-  if (!traceId) {
-    throw new Error("traceId is required in VisionOCRExtractor");
-  }
-
+  const l = log.ctx(ctx);
   const startedAt = Date.now();
 
   const fullText = result?.fullTextAnnotation;
 
   if (!fullText) {
-    log.emit({
-      event: "vision_no_fulltext",
-      traceId,
-      type: "system",
-    });
+    l.warn("vision_no_fulltext");
     return [];
   }
 
@@ -76,14 +70,10 @@ export function mapVisionToTokens(
     }
   }
 
-  log.emit({
-    event: "vision_tokens_extracted",
-    traceId,
-    type: "system",
-    data: {
-      tokens: tokens.length,
-      durationMs: Date.now() - startedAt,
-    },
+  l.event("vision_tokens_extracted", {
+    tokens: tokens.length,
+  }, {
+    durationMs: Date.now() - startedAt,
   });
 
   return tokens;
