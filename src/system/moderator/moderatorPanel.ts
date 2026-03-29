@@ -283,6 +283,13 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
+    logger.emit({
+      scope: "moderator.panel",
+      event: "moderator_init_success",
+      traceId,
+      context: { guildId },
+    });
+
     setInterval(async () => {
       const traceId = crypto.randomUUID();
 
@@ -298,6 +305,14 @@ export async function initModeratorPanel(client: Client) {
         if (hubMsg) map.set("hubMessage", hubMsg);
 
         await syncModeratorPanel(guildId, modChannel!, map, traceId);
+
+        logger.emit({
+          scope: "moderator.panel",
+          event: "moderator_interval_sync",
+          traceId,
+          context: { guildId },
+        });
+
       } catch (err) {
         logger.emit({
           scope: "moderator.panel",
