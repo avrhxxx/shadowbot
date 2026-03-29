@@ -25,10 +25,16 @@ export async function handleListWeeks(
     const weeks: string[] = await pointsService.getAllWeeks();
 
     if (!weeks.length) {
-      await interaction.reply({
+      const payload = {
         content: "⚠️ No weeks created yet (placeholder).",
         ephemeral: true
-      });
+      };
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(payload);
+      } else {
+        await interaction.reply(payload);
+      }
       return;
     }
 
@@ -36,10 +42,16 @@ export async function handleListWeeks(
       .map((week: string, index: number) => `${index + 1}. ${week}`)
       .join("\n");
 
-    await interaction.reply({
+    const payload = {
       content: `📋 **Created Weeks (placeholder):**\n${weekList}`,
       ephemeral: true
-    });
+    };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else {
+      await interaction.reply(payload);
+    }
 
   } catch (error) {
     logger.emit({
