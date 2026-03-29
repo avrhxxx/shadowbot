@@ -101,15 +101,8 @@ async function handleModal(
 
 export async function handleAbsenceInteraction(
   interaction: Interaction<CacheType>,
-  traceId: string
+  ctx: TraceContext
 ): Promise<boolean> {
-  const ctx: TraceContext = {
-    traceId,
-    source: "discord",
-    system: "absence",
-    userId: interaction.user?.id,
-  };
-
   const l = log.ctx(ctx);
 
   try {
