@@ -2,11 +2,13 @@
 // 📁 src/core/trace/TraceContext.ts
 // =====================================
 
-export type TraceContext = {
-  traceId: string;
+import type { TraceId } from "../ids/IdGenerator";
+
+export type TraceContext = Readonly<{
+  traceId: TraceId;
   userId?: string;
   source: "discord" | "system" | "worker";
 
-  // 🔥 NEW (CRUCIAL)
+  // 🔥 SYSTEM DOMAIN (keep in sync with system modules)
   system?: "events" | "absence" | "points" | "quickadd";
-};
+}>;
