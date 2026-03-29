@@ -4,7 +4,8 @@
 
 import { SheetRepository } from "../../integrations/google/SheetRepository";
 import crypto from "crypto";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 // =============================
 // TYPES
@@ -59,22 +60,20 @@ export async function getAbsenceByPlayer(
 // ➕ CREATE
 // =============================
 export async function createAbsence(
-  data: AbsenceObject
+  data: AbsenceObject,
+  ctx?: TraceContext
 ): Promise<AbsenceObject> {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const existing = await getAbsenceByPlayer(
     data.guildId,
     data.player
   );
 
   if (existing) {
-    logger.emit({
-      scope: "absence.service",
-      event: "create_duplicate",
-      level: "warn",
-      context: {
-        guildId: data.guildId,
-        player: data.player,
-      },
+    l?.warn("create_duplicate", {
+      guildId: data.guildId,
+      player: data.player,
     });
 
     throw new Error(
@@ -91,14 +90,10 @@ export async function createAbsence(
 
   await absenceRepo.create(newAbsence);
 
-  logger.emit({
-    scope: "absence.service",
-    event: "created",
-    context: {
-      guildId: data.guildId,
-      player: data.player,
-      absenceId: newAbsence.id,
-    },
+  l?.event("created", {
+    guildId: data.guildId,
+    player: data.player,
+    absenceId: newAbsence.id,
   });
 
   return newAbsence;
@@ -109,8 +104,11 @@ export async function createAbsence(
 // =============================
 export async function removeAbsence(
   guildId: string,
-  player: string
+  player: string,
+  ctx?: TraceContext
 ): Promise<AbsenceObject | null> {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const absences = await getAbsences(guildId);
 
   const target = absences.find(
@@ -118,26 +116,16 @@ export async function removeAbsence(
   );
 
   if (!target) {
-    logger.emit({
-      scope: "absence.service",
-      event: "remove_not_found",
-      level: "warn",
-      context: { guildId, player },
-    });
-
+    l?.warn("remove_not_found", { guildId, player });
     return null;
   }
 
   await absenceRepo.deleteById(target.id);
 
-  logger.emit({
-    scope: "absence.service",
-    event: "removed",
-    context: {
-      guildId,
-      player,
-      absenceId: target.id,
-    },
+  l?.event("removed", {
+    guildId,
+    player,
+    absenceId: target.id,
   });
 
   return target;
@@ -150,41 +138,41 @@ export async function getAbsenceConfig(
   guildId: string
 ): Promise<AbsenceConfig> {
   const rows = await configRepo.findAll({ guildId });
-
   return rows[0] || { guildId };
 }
 
 export async function setNotificationChannel(
   guildId: string,
-  channelId: string
+  channelId: string,
+  ctx?: TraceContext
 ) {
-  await setConfig(guildId, "notificationChannel", channelId);
+  const l = ctx ? log.ctx(ctx) : null;
 
-  logger.emit({
-    scope: "absence.service",
-    event: "set_notification_channel",
-    context: { guildId, channelId },
-  });
+  await setConfig(guildId, "notificationChannel", channelId, ctx);
+
+  l?.event("set_notification_channel", { guildId, channelId });
 }
 
 export async function setAbsenceEmbedId(
   guildId: string,
-  messageId: string
+  messageId: string,
+  ctx?: TraceContext
 ) {
-  await setConfig(guildId, "absenceEmbedId", messageId);
+  const l = ctx ? log.ctx(ctx) : null;
 
-  logger.emit({
-    scope: "absence.service",
-    event: "set_embed_id",
-    context: { guildId, messageId },
-  });
+  await setConfig(guildId, "absenceEmbedId", messageId, ctx);
+
+  l?.event("set_embed_id", { guildId, messageId });
 }
 
 export async function setConfig(
   guildId: string,
   key: string,
-  value: any
+  value: any,
+  ctx?: TraceContext
 ) {
+  const l = ctx ? log.ctx(ctx) : null;
+
   const existing = await configRepo.findAll({ guildId });
 
   if (!existing.length) {
@@ -194,12 +182,7 @@ export async function setConfig(
       [key]: value,
     });
 
-    logger.emit({
-      scope: "absence.service",
-      event: "config_created",
-      context: { guildId, key },
-    });
-
+    l?.event("config_created", { guildId, key });
     return;
   }
 
@@ -207,9 +190,5 @@ export async function setConfig(
     [key]: value,
   });
 
-  logger.emit({
-    scope: "absence.service",
-    event: "config_updated",
-    context: { guildId, key },
-  });
+  l?.event("config_updated", { guildId, key });
 }
