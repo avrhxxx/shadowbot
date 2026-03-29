@@ -1,4 +1,3 @@
-
 // src/system/points/pointsButtons/pointsRemove.ts
 import { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
 import { logger } from "../../../core/logger/log";
