@@ -16,7 +16,6 @@ import {
 } from "discord.js";
 import { EventObject, getEvents, getConfig } from "../eventService";
 import { formatEventUTC } from "../../../shared/utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
 function formatEventUTCObj(e: EventObject) {
@@ -34,12 +33,11 @@ async function sendComparisonFile(channel: TextChannel, name: string, content: s
 }
 
 // -----------------------------
-// HELPER: GET EVENT BY ID
+// HELPER
 // -----------------------------
 async function getEventById(guildId: string, eventId: string): Promise<EventObject | null> {
   const events = await getEvents(guildId);
-  const event = events.find(e => e.id.toString().trim() === eventId.toString().trim());
-  return event || null;
+  return events.find(e => e.id.toString().trim() === eventId.toString().trim()) || null;
 }
 
 // -----------------------------
@@ -47,22 +45,15 @@ async function getEventById(guildId: string, eventId: string): Promise<EventObje
 // -----------------------------
 export const handleCompareButton = async (
   interaction: ButtonInteraction,
-  eventId: string
+  eventId: string,
+  traceId: string
 ): Promise<void> => {
-  const traceId = createTraceId();
-
   try {
     const guild = interaction.guild as Guild;
     const current = await getEventById(interaction.guildId!, eventId);
 
     if (!current) {
-      logger.emit({
-        scope: "events.compare",
-        event: "event_not_found",
-        traceId,
-        context: { eventId },
-      });
-
+      logger.emit({ scope: "events.compare", event: "event_not_found", traceId, context: { eventId } });
       await interaction.reply({ content: "Event not found.", ephemeral: true });
       return;
     }
@@ -70,36 +61,23 @@ export const handleCompareButton = async (
     if (current.status !== "PAST") {
       await interaction.reply({ content: "You can only compare past events.", ephemeral: true });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "not_past_event",
-        traceId,
-        context: { eventId },
-      });
-
+      logger.emit({ scope: "events.compare", event: "not_past_event", traceId, context: { eventId } });
       return;
     }
 
     const events = await getEvents(interaction.guildId!);
     const pastEvents = events
-      .filter(
-        e =>
-          e.status === "PAST" &&
-          e.id !== current.id &&
-          ["custom", "reservoir_raid"].includes(e.eventType)
+      .filter(e =>
+        e.status === "PAST" &&
+        e.id !== current.id &&
+        ["custom", "reservoir_raid"].includes(e.eventType)
       )
       .sort((a, b) => b.createdAt - a.createdAt);
 
     if (!pastEvents.length) {
       await interaction.reply({ content: "No other past events available to compare.", ephemeral: true });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "no_compare_candidates",
-        traceId,
-        context: { eventId },
-      });
-
+      logger.emit({ scope: "events.compare", event: "no_compare_candidates", traceId, context: { eventId } });
       return;
     }
 
@@ -127,28 +105,18 @@ export const handleCompareButton = async (
       scope: "events.compare",
       event: "open_select",
       traceId,
-      context: {
-        baseEventId: current.id,
-        candidates: pastEvents.length,
-      },
+      context: { baseEventId: current.id, candidates: pastEvents.length },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_button_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    logger.emit({ scope: "events.compare", event: "compare_button_failed", traceId, level: "error", error: err });
   }
 };
 
 export const handleCompareSelect = async (
-  interaction: StringSelectMenuInteraction
+  interaction: StringSelectMenuInteraction,
+  traceId: string
 ): Promise<void> => {
-  const traceId = createTraceId();
-
   try {
     const guild = interaction.guild as Guild;
     const selectedId = interaction.values[0];
@@ -166,7 +134,6 @@ export const handleCompareSelect = async (
         traceId,
         context: { currentId, selectedId },
       });
-
       return;
     }
 
@@ -185,33 +152,21 @@ export const handleCompareSelect = async (
       scope: "events.compare",
       event: "comparison_ready",
       traceId,
-      context: {
-        eventA: eventA.id,
-        eventB: eventB.id,
-      },
+      context: { eventA: eventA.id, eventB: eventB.id },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_select_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    logger.emit({ scope: "events.compare", event: "compare_select_failed", traceId, level: "error", error: err });
   }
 };
 
 export const handleCompareDownload = async (
-  interaction: ButtonInteraction
+  interaction: ButtonInteraction,
+  traceId: string
 ): Promise<void> => {
-  const traceId = createTraceId();
-
   try {
     const guild = interaction.guild as Guild;
-    const parts = interaction.customId.split("_");
-    const idA = parts[2];
-    const idB = parts[3];
+    const [, , idA, idB] = interaction.customId.split("_");
 
     const eventA = await getEventById(guild.id, idA);
     const eventB = await getEventById(guild.id, idB);
@@ -225,7 +180,6 @@ export const handleCompareDownload = async (
         traceId,
         context: { idA, idB },
       });
-
       return;
     }
 
@@ -242,7 +196,6 @@ export const handleCompareDownload = async (
         traceId,
         context: { guildId: guild.id },
       });
-
       return;
     }
 
@@ -256,15 +209,10 @@ export const handleCompareDownload = async (
         traceId,
         context: { channelId },
       });
-
       return;
     }
 
-    await sendComparisonFile(
-      channel,
-      `compare_${eventA.name}_vs_${eventB.name}.txt`,
-      txtText
-    );
+    await sendComparisonFile(channel, `compare_${eventA.name}_vs_${eventB.name}.txt`, txtText);
 
     await interaction.reply({ content: "Comparison sent to download channel.", ephemeral: true });
 
@@ -272,30 +220,21 @@ export const handleCompareDownload = async (
       scope: "events.compare",
       event: "download_sent",
       traceId,
-      context: {
-        eventA: eventA.id,
-        eventB: eventB.id,
-        channelId,
-      },
+      context: { eventA: eventA.id, eventB: eventB.id, channelId },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.compare",
-      event: "download_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    logger.emit({ scope: "events.compare", event: "download_failed", traceId, level: "error", error: err });
   }
 };
 
 // -----------------------------
 // Compare All
 // -----------------------------
-export const handleCompareAll = async (interaction: ButtonInteraction): Promise<void> => {
-  const traceId = createTraceId();
-
+export const handleCompareAll = async (
+  interaction: ButtonInteraction,
+  traceId: string
+): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
 
   try {
@@ -305,12 +244,7 @@ export const handleCompareAll = async (interaction: ButtonInteraction): Promise<
     if (!relevantEvents.length) {
       await interaction.editReply({ content: "No events with participants to compare.", components: [] });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "compare_all_empty",
-        traceId,
-      });
-
+      logger.emit({ scope: "events.compare", event: "compare_all_empty", traceId });
       return;
     }
 
@@ -322,7 +256,7 @@ export const handleCompareAll = async (interaction: ButtonInteraction): Promise<
     );
 
     await interaction.editReply({
-      content: `📥 Comparison for all events ready. Click Download All (TXT) to get the file.`,
+      content: `📥 Comparison ready.`,
       components: [row]
     });
 
@@ -330,25 +264,18 @@ export const handleCompareAll = async (interaction: ButtonInteraction): Promise<
       scope: "events.compare",
       event: "compare_all_ready",
       traceId,
-      context: {
-        eventsCount: relevantEvents.length,
-      },
+      context: { eventsCount: relevantEvents.length },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_all_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    logger.emit({ scope: "events.compare", event: "compare_all_failed", traceId, level: "error", error: err });
   }
 };
 
-export const handleCompareAllDownload = async (interaction: ButtonInteraction): Promise<void> => {
-  const traceId = createTraceId();
-
+export const handleCompareAllDownload = async (
+  interaction: ButtonInteraction,
+  traceId: string
+): Promise<void> => {
   await interaction.deferReply({ ephemeral: true });
 
   try {
@@ -356,14 +283,9 @@ export const handleCompareAllDownload = async (interaction: ButtonInteraction): 
     const relevantEvents = events.filter(e => ["custom", "reservoir_raid"].includes(e.eventType));
 
     if (!relevantEvents.length) {
-      await interaction.editReply({ content: "No events with participants to download.", components: [] });
+      await interaction.editReply({ content: "No events to download.", components: [] });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "compare_all_download_empty",
-        traceId,
-      });
-
+      logger.emit({ scope: "events.compare", event: "compare_all_download_empty", traceId });
       return;
     }
 
@@ -373,27 +295,11 @@ export const handleCompareAllDownload = async (interaction: ButtonInteraction): 
     if (!config?.downloadChannel) {
       await interaction.editReply({ content: "Download channel not set.", components: [] });
 
-      logger.emit({
-        scope: "events.compare",
-        event: "compare_all_missing_channel",
-        traceId,
-      });
-
+      logger.emit({ scope: "events.compare", event: "compare_all_missing_channel", traceId });
       return;
     }
 
     const channel = interaction.guild!.channels.cache.get(config.downloadChannel) as TextChannel;
-    if (!channel || !channel.isTextBased()) {
-      await interaction.editReply({ content: "Download channel invalid.", components: [] });
-
-      logger.emit({
-        scope: "events.compare",
-        event: "compare_all_invalid_channel",
-        traceId,
-      });
-
-      return;
-    }
 
     const chunks = txtText.match(/[\s\S]{1,1900}/g) || [];
 
@@ -402,7 +308,7 @@ export const handleCompareAllDownload = async (interaction: ButtonInteraction): 
     }
 
     await interaction.editReply({
-      content: `Comparison for all events sent to <#${config.downloadChannel}>`,
+      content: `Comparison sent to <#${config.downloadChannel}>`,
       components: []
     });
 
@@ -410,86 +316,10 @@ export const handleCompareAllDownload = async (interaction: ButtonInteraction): 
       scope: "events.compare",
       event: "compare_all_sent",
       traceId,
-      context: {
-        parts: chunks.length,
-        channelId: config.downloadChannel,
-      },
+      context: { parts: chunks.length },
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.compare",
-      event: "compare_all_download_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    logger.emit({ scope: "events.compare", event: "compare_all_download_failed", traceId, level: "error", error: err });
   }
 };
-
-// -----------------------------
-// HELPERS
-// -----------------------------
-function buildComparisonAB(eventA: EventObject, eventB: EventObject, guild: Guild) {
-  const participantsA = new Set(eventA.participants);
-  const participantsB = new Set(eventB.participants);
-  const absentA = new Set(eventA.absent || []);
-  const absentB = new Set(eventB.absent || []);
-
-  const reliable = [...participantsA].filter(id => participantsB.has(id));
-  const missedOnce = [...participantsA].filter(id => absentB.has(id));
-  const missedTwice = [...absentA].filter(id => absentB.has(id));
-
-  const embedText =
-    `Comparing:\nEvent A: ${eventA.name} (${formatEventUTCObj(eventA)})\nEvent B: ${eventB.name} (${formatEventUTCObj(eventB)})\n\n` +
-    `🟢 Reliable (${reliable.length})\n${reliable.length ? reliable.map(id => getMemberName(guild, id)).join("\n") : "None"}\n\n` +
-    `🟡 Missed Once (${missedOnce.length})\n${missedOnce.length ? missedOnce.map(id => getMemberName(guild, id)).join("\n") : "None"}\n\n` +
-    `🔴 Missed Twice (${missedTwice.length})\n${missedTwice.length ? missedTwice.map(id => getMemberName(guild, id)).join("\n") : "None"}`;
-
-  const txtText =
-    `Attendance Comparison\n=====================\n\nEvent A: ${eventA.name} (${formatEventUTCObj(eventA)})\nEvent B: ${eventB.name} (${formatEventUTCObj(eventB)})\n\n` +
-    `Reliable (${reliable.length})\n${reliable.length ? reliable.map(id => getMemberName(guild, id)).join("\n") : ""}\n\n` +
-    `Missed Once (${missedOnce.length})\n${missedOnce.length ? missedOnce.map(id => getMemberName(guild, id)).join("\n") : ""}\n\n` +
-    `Missed Twice (${missedTwice.length})\n${missedTwice.length ? missedTwice.map(id => getMemberName(guild, id)).join("\n") : ""}`;
-
-  return { embedText, txtText };
-}
-
-function buildComparisonAll(events: EventObject[], guild: Guild) {
-  const allParticipants = new Set<string>();
-  events.forEach(ev => {
-    ev.participants.forEach(p => allParticipants.add(p));
-    (ev.absent || []).forEach(a => allParticipants.add(a));
-  });
-
-  const participants = [...allParticipants];
-  const txtLines: string[] = [];
-
-  participants.forEach(memberId => {
-    const name = getMemberName(guild, memberId);
-    let attended = 0;
-    const block: string[] = [];
-
-    events.forEach(ev => {
-      let status = "-";
-
-      if (ev.participants.includes(memberId)) {
-        status = "✓";
-        attended++;
-      } else if (ev.absent?.includes(memberId)) {
-        status = "✗";
-      }
-
-      block.push(`${ev.name}  ${status}`);
-    });
-
-    txtLines.push(
-      `${name}\n${block.join("\n")}\nAttendance: ${attended}/${events.length} (${Math.round((attended/events.length)*100)}%)\n`
-    );
-  });
-
-  return {
-    embedText: `All Events Comparison\n\`\`\`\n${txtLines.join("\n----------------------\n\n")}\n\`\`\``,
-    txtText: `All Events Comparison\n\n${txtLines.join("\n----------------------\n\n")}`
-  };
-}
