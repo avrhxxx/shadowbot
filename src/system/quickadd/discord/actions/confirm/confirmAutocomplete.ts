@@ -7,7 +7,8 @@ import { AutocompleteInteraction } from "discord.js";
 import { QuickAddSession } from "../../../core/QuickAddSession";
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // MOCK DATA
@@ -36,18 +37,16 @@ function resolveMode(type: QuickAddType): "points" | "events" {
 
 export async function handleConfirmAutocomplete(
   interaction: AutocompleteInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
+  const l = log.ctx(ctx);
+
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
   if (!guildId) {
-    logger.emit({
-      scope: "quickadd.confirm_autocomplete",
-      event: "confirm_autocomplete_no_guild",
-      traceId,
-      level: "warn",
-      context: { userId },
+    l.warn("confirm_autocomplete_no_guild", {
+      userId,
     });
 
     try {
@@ -61,21 +60,13 @@ export async function handleConfirmAutocomplete(
     const session = QuickAddSession.get(guildId, userId);
 
     if (!session || session.stage !== "CONFIRM_PENDING") {
-      logger.emit({
-        scope: "quickadd.confirm_autocomplete",
-        event: "confirm_autocomplete_blocked",
-        traceId,
-        context: {
-          sessionId: session?.sessionId,
-          guildId,
-          userId,
-          hasSession: !!session,
-          stage: session?.stage,
-          reason: !session ? "no_session" : "invalid_stage",
-        },
-        stats: {
-          confirm_autocomplete_blocked: 1,
-        },
+      l.event("confirm_autocomplete_blocked", {
+        sessionId: session?.sessionId,
+        guildId,
+        userId,
+        hasSession: !!session,
+        stage: session?.stage,
+        reason: !session ? "no_session" : "invalid_stage",
       });
 
       await interaction.respond([]);
@@ -94,25 +85,14 @@ export async function handleConfirmAutocomplete(
       opt.name.toLowerCase().includes(focused)
     );
 
-    logger.emit({
-      scope: "quickadd.confirm_autocomplete",
-      event: "confirm_autocomplete",
-      traceId,
-      context: {
-        sessionId: session.sessionId,
-        guildId,
-        userId,
-        inputRaw: focusedRaw,
-        input: focused,
-        results: filtered.length,
-        mode,
-      },
-      meta: {
-        preview: filtered.slice(0, 3).map((o) => o.value),
-      },
-      stats: {
-        confirm_autocomplete_used: 1,
-      },
+    l.event("confirm_autocomplete", {
+      sessionId: session.sessionId,
+      guildId,
+      userId,
+      inputRaw: focusedRaw,
+      input: focused,
+      results: filtered.length,
+      mode,
     });
 
     await interaction.respond(
@@ -123,15 +103,9 @@ export async function handleConfirmAutocomplete(
     );
 
   } catch (err) {
-    logger.emit({
-      scope: "quickadd.confirm_autocomplete",
-      event: "confirm_autocomplete_failed",
-      traceId,
-      level: "warn",
-      context: {
-        guildId,
-        userId,
-      },
+    l.warn("confirm_autocomplete_failed", {
+      guildId,
+      userId,
       error: err,
     });
 
