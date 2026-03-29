@@ -15,7 +15,7 @@ import {
 // 🧠 CORE
 // =============================
 
-import { handleSystemInteraction } from "./core/systemRouter";
+import { handleSystemInteraction } from "./core/router/systemRouter";
 
 // =============================
 // 🧩 SYSTEMS (INIT ONLY)
@@ -175,8 +175,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
     // =============================
     // 🧠 SYSTEM ROUTER
     // =============================
-    // 🔮 FUTURE:
-    // prefix-based routing (customId: "absence_*", etc.)
 
     if (!interaction.isRepliable()) return;
 
