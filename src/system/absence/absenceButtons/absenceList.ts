@@ -1,7 +1,18 @@
-// src/absencePanel/absenceButtons/absenceList.ts
-import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceList.ts
+// =====================================
+
+import { 
+  ButtonInteraction, 
+  EmbedBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle 
+} from "discord.js";
 import { getAbsences, AbsenceObject } from "../absenceService";
-import { getEventDateUTC } from "../../utils/timeUtils";
+import { getEventDateUTC } from "../../../shared/utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // Formatowanie daty: DD.MM.YYYY – DD.MM.YYYY + unix return
@@ -31,9 +42,18 @@ function formatAbsenceDate(absence: AbsenceObject): string {
 // MAIN HANDLER
 // -----------------------------
 export async function handleAbsenceList(interaction: ButtonInteraction) {
+  const traceId = createTraceId();
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "missing_guild",
+      traceId,
+      level: "error",
+    });
+
     await interaction.reply({
       content: "❌ Cannot fetch absences: no guild.",
       ephemeral: true
@@ -41,50 +61,64 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
     return;
   }
 
-  const absences: AbsenceObject[] = await getAbsences(guildId);
+  try {
+    const absences: AbsenceObject[] = await getAbsences(guildId);
 
-  const embed = new EmbedBuilder()
-    .setTitle("📌 Current Absences")
-    .setColor(0x1E90FF);
+    const embed = new EmbedBuilder()
+      .setTitle("📌 Current Absences")
+      .setColor(0x1E90FF);
 
-  if (absences.length === 0) {
-    embed.setDescription("✅ No absences recorded.");
-  } else {
-    for (const absence of absences) {
-      embed.addFields({
-        name: absence.player,
-        value: formatAbsenceDate(absence),
-        inline: false
-      });
+    if (absences.length === 0) {
+      embed.setDescription("✅ No absences recorded.");
+    } else {
+      for (const absence of absences) {
+        embed.addFields({
+          name: absence.player,
+          value: formatAbsenceDate(absence),
+          inline: false
+        });
+      }
     }
-  }
 
-  // -----------------------------
-  // ACTION ROW: dynamic buttons
-  // -----------------------------
-  const actionRow = new ActionRowBuilder<ButtonBuilder>();
+    // -----------------------------
+    // ACTION ROW: dynamic buttons
+    // -----------------------------
+    const actionRow = new ActionRowBuilder<ButtonBuilder>();
 
-  // Add Absence – zawsze dostępny
-  actionRow.addComponents(
-    new ButtonBuilder()
-      .setCustomId("absence_add")
-      .setLabel("Add Absence")
-      .setStyle(ButtonStyle.Success)
-  );
-
-  // Remove Absence – tylko jeśli są osoby na liście
-  if (absences.length > 0) {
     actionRow.addComponents(
       new ButtonBuilder()
-        .setCustomId("absence_remove")
-        .setLabel("Remove Absence")
-        .setStyle(ButtonStyle.Danger)
+        .setCustomId("absence_add")
+        .setLabel("Add Absence")
+        .setStyle(ButtonStyle.Success)
     );
-  }
 
-  await interaction.reply({
-    embeds: [embed],
-    components: [actionRow],
-    ephemeral: true
-  });
+    if (absences.length > 0) {
+      actionRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId("absence_remove")
+          .setLabel("Remove Absence")
+          .setStyle(ButtonStyle.Danger)
+      );
+    }
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [actionRow],
+      ephemeral: true
+    });
+
+  } catch (err) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "absence_list_failed",
+      traceId,
+      level: "error",
+      error: err,
+    });
+
+    await interaction.reply({
+      content: "❌ Failed to load absences.",
+      ephemeral: true
+    }).catch(() => null);
+  }
 }
