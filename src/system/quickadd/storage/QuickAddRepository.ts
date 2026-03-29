@@ -8,7 +8,7 @@ import {
   updateCell,
 } from "../../google/googleSheetsStorage";
 
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 
 // =====================================
 // 📌 CONFIG
@@ -47,22 +47,21 @@ async function withRetry<T>(
     } catch (err) {
       attempt++;
 
-      log.emit({
+      logger.emit({
         event: "retry_attempt",
         traceId,
-        data: {
-          label,
-          attempt,
-        },
         level: "warn",
+        context: { label },
+        stats: { attempt },
       });
 
       if (attempt >= RETRY_LIMIT) {
-        log.emit({
+        logger.emit({
           event: "retry_failed",
           traceId,
-          data: { error: err, label },
           level: "error",
+          context: { label },
+          error: err,
         });
 
         throw err;
@@ -93,11 +92,11 @@ export async function getQueue(
       await withRetry(() => readSheet(tab), traceId, "read_queue")
     );
 
-    log.emit({
+    logger.emit({
       event: "queue_loaded",
       traceId,
-      data: {
-        type,
+      context: { type },
+      stats: {
         rows: data.length,
         durationMs: Date.now() - startedAt,
       },
@@ -105,11 +104,12 @@ export async function getQueue(
 
     return data;
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "queue_load_failed",
       traceId,
-      data: { error: err, type },
       level: "error",
+      context: { type },
+      error: err,
     });
 
     return [];
@@ -131,10 +131,10 @@ export async function saveAdjusted(
   const startedAt = Date.now();
 
   try {
-    log.emit({
+    logger.emit({
       event: "adjusted_save_start",
       traceId,
-      data: { count: entries.length },
+      stats: { count: entries.length },
     });
 
     let sheet = safeSheet(
@@ -159,11 +159,10 @@ export async function saveAdjusted(
     const adjustedIndex = headers.indexOf("adjusted");
 
     if (ocrIndex === -1 || adjustedIndex === -1) {
-      log.emit({
+      logger.emit({
         event: "adjusted_missing_columns",
         traceId,
         level: "warn",
-        data: {},
       });
       return;
     }
@@ -185,10 +184,10 @@ export async function saveAdjusted(
             "update_cell_adjusted"
           );
 
-          log.emit({
+          logger.emit({
             event: "adjusted_updated",
             traceId,
-            data: {
+            context: {
               from: ocrRaw,
               to: entry.adjusted,
             },
@@ -210,10 +209,10 @@ export async function saveAdjusted(
           Date.now(),
         ]);
 
-        log.emit({
+        logger.emit({
           event: "adjusted_added",
           traceId,
-          data: {
+          context: {
             ocr: entry.ocr_raw,
             adjusted: entry.adjusted,
           },
@@ -227,21 +226,21 @@ export async function saveAdjusted(
       "write_nicknames"
     );
 
-    log.emit({
+    logger.emit({
       event: "adjusted_save_done",
       traceId,
-      data: {
+      stats: {
         count: entries.length,
         durationMs: Date.now() - startedAt,
       },
     });
 
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "adjusted_failed",
       traceId,
-      data: { error: err },
       level: "error",
+      error: err,
     });
   }
 }
@@ -267,10 +266,10 @@ export async function enqueuePoints(
   const startedAt = Date.now();
 
   try {
-    log.emit({
+    logger.emit({
       event: "points_queue_start",
       traceId,
-      data: { count: entries.length },
+      stats: { count: entries.length },
     });
 
     const existing = safeSheet(
@@ -293,21 +292,21 @@ export async function enqueuePoints(
       "write_points"
     );
 
-    log.emit({
+    logger.emit({
       event: "points_queue_done",
       traceId,
-      data: {
+      stats: {
         count: rows.length,
         durationMs: Date.now() - startedAt,
       },
     });
 
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "points_queue_failed",
       traceId,
-      data: { error: err },
       level: "error",
+      error: err,
     });
 
     throw err;
@@ -334,10 +333,10 @@ export async function enqueueEvents(
   const startedAt = Date.now();
 
   try {
-    log.emit({
+    logger.emit({
       event: "events_queue_start",
       traceId,
-      data: { count: entries.length },
+      stats: { count: entries.length },
     });
 
     const existing = safeSheet(
@@ -359,21 +358,21 @@ export async function enqueueEvents(
       "write_events"
     );
 
-    log.emit({
+    logger.emit({
       event: "events_queue_done",
       traceId,
-      data: {
+      stats: {
         count: rows.length,
         durationMs: Date.now() - startedAt,
       },
     });
 
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "events_queue_failed",
       traceId,
-      data: { error: err },
       level: "error",
+      error: err,
     });
 
     throw err;
@@ -394,10 +393,10 @@ export async function getLearningData(traceId: string): Promise<any[][]> {
       await withRetry(() => readSheet(NICKNAME_TAB), traceId, "read_learning")
     );
 
-    log.emit({
+    logger.emit({
       event: "learning_loaded",
       traceId,
-      data: {
+      stats: {
         rows: data.length,
         durationMs: Date.now() - startedAt,
       },
@@ -405,11 +404,11 @@ export async function getLearningData(traceId: string): Promise<any[][]> {
 
     return data;
   } catch (err) {
-    log.emit({
+    logger.emit({
       event: "learning_load_failed",
       traceId,
-      data: { error: err },
       level: "error",
+      error: err,
     });
 
     return [];
