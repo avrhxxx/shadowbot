@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } from "discord.js";
+import { IDS } from "../eventsHandlers";
 
 /**
  * Renderuje Event Panel
@@ -9,41 +10,41 @@ export function renderEventPanel(): MessageCreateOptions {
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("event_create")
+      .setCustomId(IDS.BUTTONS.CREATE)
       .setLabel("Create Event")
-      .setStyle(ButtonStyle.Primary), // niebieski
+      .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("event_list")
+      .setCustomId(IDS.BUTTONS.LIST)
       .setLabel("Events List")
-      .setStyle(ButtonStyle.Primary), // niebieski
+      .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("event_manual_reminder")
+      .setCustomId(IDS.BUTTONS.MANUAL_REMINDER)
       .setLabel("Manual Reminder")
-      .setStyle(ButtonStyle.Primary), // niebieski
+      .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("event_show_all")
+      .setCustomId(IDS.BUTTONS.SHOW_ALL)
       .setLabel("Show All")
-      .setStyle(ButtonStyle.Primary), // niebieski
+      .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
-      .setCustomId("event_cancel")
+      .setCustomId(IDS.BUTTONS.CANCEL)
       .setLabel("Cancel Event")
-      .setStyle(ButtonStyle.Danger) // czerwony
+      .setStyle(ButtonStyle.Danger)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("event_help")
+      .setCustomId(IDS.BUTTONS.HELP)
       .setLabel("Guide")
-      .setStyle(ButtonStyle.Success), // zielony
+      .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
-      .setCustomId("event_settings")
+      .setCustomId(IDS.BUTTONS.SETTINGS)
       .setLabel("Settings")
-      .setStyle(ButtonStyle.Secondary) // szary, na końcu
+      .setStyle(ButtonStyle.Secondary)
   );
 
   return {
