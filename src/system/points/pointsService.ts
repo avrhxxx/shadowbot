@@ -2,7 +2,7 @@
 // 📁 src/system/points/pointsService.ts
 // =====================================
 
-import { SheetRepository } from "../google/SheetRepository";
+import { SheetRepository } from "../../integrations/google/SheetRepository";
 import crypto from "crypto";
 import { logger } from "../../core/logger/log";
 
@@ -66,10 +66,10 @@ export async function getAllWeeks(
   const rows = await weeksRepo.findAll({ guildId });
 
   const filtered = category
-    ? rows.filter((r) => r.category === category)
+    ? rows.filter((r: PointsEntry) => r.category === category)
     : rows;
 
-  return [...new Set(filtered.map((r) => r.week))];
+  return [...new Set(filtered.map((r: PointsEntry) => r.week))];
 }
 
 // ----------------------------
@@ -92,7 +92,7 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
     logger.emit({
       scope: "points.service",
       event: "points_updated",
-      context: entry,
+      context: { ...entry },
     });
 
   } else {
@@ -104,7 +104,7 @@ export async function addPoints(entry: PointsEntry): Promise<void> {
     logger.emit({
       scope: "points.service",
       event: "points_created",
-      context: entry,
+      context: { ...entry },
     });
   }
 }
@@ -121,7 +121,7 @@ export async function getPoints(
 
   const rows = await repo.findAll({ guildId });
 
-  return rows.filter((r) => !week || r.week === week);
+  return rows.filter((r: PointsEntry) => !week || r.week === week);
 }
 
 // ----------------------------
@@ -132,18 +132,24 @@ export async function compareWeeks(
   category: PointsCategory,
   week1: string,
   week2: string
-) {
+): Promise<
+  {
+    nick: string;
+    week1Points: number;
+    week2Points: number;
+  }[]
+> {
   const repo = getRepo(category);
 
   const all = await repo.findAll({ guildId });
 
-  const w1 = all.filter((r) => r.week === week1);
-  const w2 = all.filter((r) => r.week === week2);
+  const w1 = all.filter((r: PointsEntry) => r.week === week1);
+  const w2 = all.filter((r: PointsEntry) => r.week === week2);
 
   const map2 = new Map<string, number>();
-  w2.forEach((r) => map2.set(r.nick, r.points));
+  w2.forEach((r: PointsEntry) => map2.set(r.nick, r.points));
 
-  return w1.map((r) => ({
+  return w1.map((r: PointsEntry) => ({
     nick: r.nick,
     week1Points: r.points,
     week2Points: map2.get(r.nick) || 0,
