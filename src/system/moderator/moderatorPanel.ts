@@ -21,6 +21,7 @@ import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 import { SheetRepository } from "../../google/SheetRepository";
 import { log } from "../../../core/logger/log";
 import { TraceContext } from "../../../core/trace/TraceContext";
+import crypto from "crypto"; // ✅ FIX
 
 // =============================
 // TYPES
@@ -57,7 +58,7 @@ async function updateConfig(
 
   if (!existing.id) {
     await repo.create({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // ✅ OK (DB id, not traceId)
       guildId,
       ...partial
     });
