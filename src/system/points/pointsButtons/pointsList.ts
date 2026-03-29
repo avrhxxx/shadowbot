@@ -21,10 +21,16 @@ export async function handlePointsList(
       },
     });
 
-    await interaction.reply({
+    const payload = {
       content: "📋 Points List – placeholder functionality. To be implemented.",
       ephemeral: true
-    });
+    };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else {
+      await interaction.reply(payload);
+    }
 
   } catch (error) {
     logger.emit({
