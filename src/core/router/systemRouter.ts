@@ -51,7 +51,7 @@ export async function handleSystemInteraction(
     scope: "system.router",
     event: "received",
     traceId,
-    context: {
+    input: {
       interactionId: interaction.id,
       type: interaction.type,
     },
@@ -71,14 +71,17 @@ export async function handleSystemInteraction(
           context: {
             handler: name,
           },
-          stats: {
+          result: {
+            handled: true,
+          },
+          timing: {
+            label: name,
             durationMs: Date.now() - startTime,
           },
         });
 
         return;
       }
-
     } catch (err) {
       logger.emit({
         scope: "system.router",
@@ -88,7 +91,8 @@ export async function handleSystemInteraction(
         context: {
           handler: name,
         },
-        stats: {
+        timing: {
+          label: name,
           durationMs: Date.now() - startTime,
         },
         error: err,
@@ -101,7 +105,7 @@ export async function handleSystemInteraction(
     event: "unhandled",
     traceId,
     level: "warn",
-    context: {
+    input: {
       interactionId: interaction.id,
     },
   });
