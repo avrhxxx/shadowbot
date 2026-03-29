@@ -2,7 +2,7 @@
 // 📁 src/core/ids/IdGenerator.ts
 // =====================================
 
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 
 // =====================================
 // 🔹 TYPES
@@ -17,7 +17,7 @@ export type QueueId = string;
 // =====================================
 
 function generate(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${randomUUID()}`;
 }
 
 // =====================================
