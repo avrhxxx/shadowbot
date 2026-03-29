@@ -9,6 +9,17 @@ import { TraceContext } from "../../../core/trace/TraceContext";
 import { createTraceId } from "../../../core/ids/IdGenerator";
 
 // -----------------------------
+// WORKER CTX FACTORY
+// -----------------------------
+function createWorkerCtx(): TraceContext {
+  return {
+    traceId: createTraceId(),
+    source: "worker",
+    system: "absence",
+  };
+}
+
+// -----------------------------
 // HELPERS
 // -----------------------------
 function formatAbsenceDate(dateStr: string, year: number): string {
@@ -223,25 +234,17 @@ export async function notifyAbsenceAutoClean(
 // -----------------------------
 // AUTO CLEANER (WORKER)
 // -----------------------------
-export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 1000) {
-
+export function startAbsenceAutoCleaner(
+  guild: Guild,
+  intervalMs = 15 * 60 * 1000
+) {
   setInterval(async () => {
-    const ctx: TraceContext = {
-      traceId: createTraceId(),
-      source: "worker",
-      system: "absence",
-    };
-
+    const ctx = createWorkerCtx();
     await updateAbsenceEmbed(guild, ctx);
   }, 60_000);
 
   setInterval(async () => {
-    const ctx: TraceContext = {
-      traceId: createTraceId(),
-      source: "worker",
-      system: "absence",
-    };
-
+    const ctx = createWorkerCtx();
     const l = log.ctx(ctx);
 
     const absences = await AS.getAbsences(guild.id);
@@ -263,7 +266,6 @@ export function startAbsenceAutoCleaner(guild: Guild, intervalMs = 15 * 60 * 100
         await notifyAbsenceAutoClean(guild, a.player, ctx);
       }
     }
-
   }, intervalMs);
 }
 
