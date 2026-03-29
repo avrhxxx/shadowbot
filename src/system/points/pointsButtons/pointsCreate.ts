@@ -1,3 +1,4 @@
+// src/system/points/pointsButtons/pointsCreate.ts
 import {
   ButtonInteraction,
   CacheType,
@@ -10,6 +11,7 @@ import {
 } from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
+import { logger } from "../../../core/logger/log";
 
 // ✅ Helper do bezpiecznego reply/edit
 export async function safeReply(
@@ -45,62 +47,109 @@ function formatWeekName(from: { day: number; month: number }, to: { day: number;
 }
 
 // Otwieranie modala tworzenia tygodnia
-export async function handleCreateWeek(interaction: ButtonInteraction<CacheType>) {
-  const category = interaction.customId.replace("points_create_week_", "");
+export async function handleCreateWeek(
+  interaction: ButtonInteraction<CacheType>,
+  traceId: string
+) {
+  try {
+    const category = interaction.customId.replace("points_create_week_", "");
 
-  const modal = new ModalBuilder()
-    .setCustomId(`points_create_modal_${category}`)
-    .setTitle(`Create Week – ${category}`)
-    .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("week_from")
-          .setLabel("From (DD/MM, DD/MM HH:mm or DDMM)")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("1003")
-          .setRequired(true)
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("week_to")
-          .setLabel("To (DD/MM, DD/MM HH:mm or DDMM)")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("1703")
-          .setRequired(true)
-      )
-    );
+    logger.emit({
+      scope: "points.button",
+      event: "points_create_week_open_modal",
+      traceId,
+      context: {
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        category,
+      },
+    });
 
-  await interaction.showModal(modal);
+    const modal = new ModalBuilder()
+      .setCustomId(`points_create_modal_${category}`)
+      .setTitle(`Create Week – ${category}`)
+      .addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("week_from")
+            .setLabel("From (DD/MM, DD/MM HH:mm or DDMM)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("1003")
+            .setRequired(true)
+        ),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("week_to")
+            .setLabel("To (DD/MM, DD/MM HH:mm or DDMM)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("1703")
+            .setRequired(true)
+        )
+      );
+
+    await interaction.showModal(modal);
+
+  } catch (error) {
+    logger.emit({
+      scope: "points.button",
+      event: "points_create_week_modal_error",
+      traceId,
+      level: "error",
+      error,
+      context: {
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+      },
+    });
+  }
 }
 
 // Obsługa submitu modala
-export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction<CacheType>) {
-  const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
-  const category = categoryMatch ? categoryMatch[1] : null;
-
-  if (!category) {
-    await safeReply(interaction, { content: "⚠️ Unknown category.", ephemeral: true });
-    return;
-  }
-
-  const fromRaw = interaction.fields.getTextInputValue("week_from");
-  const toRaw = interaction.fields.getTextInputValue("week_to");
-
-  const fromParsed = parseWeekDate(fromRaw);
-  const toParsed = parseWeekDate(toRaw);
-
-  if (!fromParsed || !toParsed) {
-    await safeReply(interaction, {
-      content: "❌ Invalid date format. Use DD/MM, DD/MM HH:mm or DDMM.",
-      ephemeral: true
-    });
-    return;
-  }
-
-  const weekName = formatWeekName(fromParsed, toParsed);
-
+export async function handleCreateWeekSubmit(
+  interaction: ModalSubmitInteraction<CacheType>,
+  traceId: string
+) {
   try {
-    await pointsService.createWeek(category === "donations" ? "Donations" : "Duel", weekName);
+    const categoryMatch = interaction.customId.match(/^points_create_modal_(.+)$/);
+    const category = categoryMatch ? categoryMatch[1] : null;
+
+    if (!category) {
+      await safeReply(interaction, { content: "⚠️ Unknown category.", ephemeral: true });
+      return;
+    }
+
+    const fromRaw = interaction.fields.getTextInputValue("week_from");
+    const toRaw = interaction.fields.getTextInputValue("week_to");
+
+    const fromParsed = parseWeekDate(fromRaw);
+    const toParsed = parseWeekDate(toRaw);
+
+    if (!fromParsed || !toParsed) {
+      await safeReply(interaction, {
+        content: "❌ Invalid date format. Use DD/MM, DD/MM HH:mm or DDMM.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const weekName = formatWeekName(fromParsed, toParsed);
+
+    logger.emit({
+      scope: "points.button",
+      event: "points_create_week_submit",
+      traceId,
+      context: {
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        category,
+        weekName,
+      },
+    });
+
+    await pointsService.createWeek(
+      category === "donations" ? "Donations" : "Duel",
+      weekName
+    );
 
     await safeReply(interaction, {
       content: `🟢 Created new week: **${weekName}** for category **${category}**`,
@@ -110,14 +159,34 @@ export async function handleCreateWeekSubmit(interaction: ModalSubmitInteraction
     // Po stworzeniu tygodnia renderujemy nowe przyciski
     if (category === "donations") {
       const weekRows = await pointsDonations.renderWeeks();
+
       await interaction.editReply({
         content: `📅 Donations – Select a week or create a new one:`,
-        components: [...weekRows, new ActionRowBuilder<ButtonBuilder>().addComponents(pointsDonations.createWeekButton("donations"))]
+        components: [
+          ...weekRows,
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            pointsDonations.createWeekButton("donations")
+          )
+        ]
       });
     }
 
   } catch (error) {
-    console.error("Create Week error:", error);
-    await safeReply(interaction, { content: "❌ Failed to create week.", ephemeral: true });
+    logger.emit({
+      scope: "points.button",
+      event: "points_create_week_error",
+      traceId,
+      level: "error",
+      error,
+      context: {
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+      },
+    });
+
+    await safeReply(interaction, {
+      content: "❌ Failed to create week.",
+      ephemeral: true
+    });
   }
 }
