@@ -52,7 +52,8 @@ export async function handleSystemInteraction(
   const baseCtx: TraceContext = {
     traceId,
     source: "discord",
-    userId: interaction.user?.id,
+    userId: interaction.isRepliable() ? interaction.user.id : undefined,
+    guildId: interaction.guildId ?? undefined,
   };
 
   const l = log.ctx(baseCtx);
