@@ -13,11 +13,15 @@ export type SessionId = string;
 export type QueueId = string;
 
 // =====================================
-// 🔹 GENERATORS
+// 🔹 INTERNAL
 // =====================================
 
+// ❗ ID FORMAT: <prefix>-<8char uuid>
+// - NEVER parse
+// - for logging / tracing only
+
 function generate(prefix: string): string {
-  return `${prefix}-${randomUUID()}`;
+  return `${prefix}-${randomUUID().slice(0, 8)}`;
 }
 
 // =====================================
