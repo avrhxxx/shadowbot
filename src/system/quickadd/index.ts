@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/quickadd/index.ts
+// 📁 src/system/quickadd/index.ts
 // =====================================
 
 /**
@@ -54,6 +54,12 @@ export * from "./mapping/NicknameResolver";
 
 // ✅ FIX — avoid export collision with QuickAddTypes
 export { validateEntries } from "./validation/QuickAddValidator";
+
+// =====================================
+// 🔹 WORKER (🔥 BRAKOWAŁO TEGO)
+// =====================================
+
+export { startQuickAddWorker } from "./integrations/QuickAddQueueWorker";
 
 // =====================================
 // 🔹 STORAGE (INTERNAL — NOT EXPORTED)
