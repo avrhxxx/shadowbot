@@ -1,4 +1,6 @@
-// src/system/events/eventsButtons/eventsManualReminder.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsManualReminder.ts
+// =====================================
 
 import {
   ButtonInteraction,
@@ -11,8 +13,8 @@ import {
 import { getEvents, EventObject, getConfig } from "../eventService";
 import { sendReminderMessage } from "./eventsReminder";
 import { formatEventUTC } from "../../utils/timeUtils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 /* ======================================================
    HELPERS
@@ -38,17 +40,16 @@ function createEventSelectMenu(events: EventObject[], customId: string, placehol
 /* ======================================================
    HANDLE MANUAL REMINDER BUTTON
 ====================================================== */
-export async function handleManualReminder(interaction: ButtonInteraction) {
-  const traceId = createTraceId();
+export async function handleManualReminder(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
+
   if (!guildId) {
-    logger.emit({
-      scope: "events.manualReminder",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
+    l.error("missing_guild");
 
     await interaction.reply({
       content: "❌ Cannot load events: no guild.",
@@ -60,12 +61,13 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
   try {
     const events = await getEvents(guildId);
 
-    // ❗ filtr: usuwamy birthday events
     const upcomingEvents = events.filter(
       e => e.status !== "PAST" && e.eventType !== "birthdays"
     );
 
     if (!upcomingEvents.length) {
+      l.warn("no_upcoming_events", { guildId });
+
       await interaction.reply({
         content: "No upcoming events available for manual reminder.",
         ephemeral: true
@@ -85,24 +87,13 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.manualReminder",
-      event: "open_select",
-      traceId,
-      context: {
-        guildId,
-        eventsCount: upcomingEvents.length,
-      },
+    l.event("open_select", {
+      guildId,
+      eventsCount: upcomingEvents.length,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.manualReminder",
-      event: "load_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("load_failed", err);
 
     await interaction.reply({
       content: "❌ Failed to load events.",
@@ -114,13 +105,18 @@ export async function handleManualReminder(interaction: ButtonInteraction) {
 /* ======================================================
    HANDLE MANUAL REMINDER SELECT
 ====================================================== */
-export async function handleManualReminderSelect(interaction: StringSelectMenuInteraction) {
-  const traceId = createTraceId();
+export async function handleManualReminderSelect(
+  interaction: StringSelectMenuInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   const selectedEventId = interaction.values?.[0];
 
   if (!guildId || !selectedEventId) {
+    l.warn("missing_selection", { guildId });
+
     await interaction.reply({
       content: "No event selected.",
       ephemeral: true
@@ -133,6 +129,8 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     const event = events.find(e => e.id === selectedEventId);
 
     if (!event) {
+      l.warn("event_not_found", { guildId, eventId: selectedEventId });
+
       await interaction.reply({
         content: "Event not found.",
         ephemeral: true
@@ -144,6 +142,8 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     const channelId = config.notificationChannel;
 
     if (!channelId) {
+      l.warn("missing_notification_channel", { guildId });
+
       await interaction.reply({
         content: "Notification channel not set.",
         ephemeral: true
@@ -154,6 +154,8 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
     const rawChannel = interaction.guild?.channels.cache.get(channelId);
 
     if (!rawChannel || !rawChannel.isTextBased()) {
+      l.warn("invalid_notification_channel", { channelId });
+
       await interaction.reply({
         content: "Notification channel invalid.",
         ephemeral: true
@@ -170,29 +172,14 @@ export async function handleManualReminderSelect(interaction: StringSelectMenuIn
       components: []
     });
 
-    logger.emit({
-      scope: "events.manualReminder",
-      event: "reminder_sent",
-      traceId,
-      context: {
-        guildId,
-        eventId: selectedEventId,
-        channelId,
-      },
+    l.event("reminder_sent", {
+      guildId,
+      eventId: selectedEventId,
+      channelId,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.manualReminder",
-      event: "reminder_failed",
-      traceId,
-      level: "error",
-      context: {
-        guildId,
-        eventId: selectedEventId,
-      },
-      error: err,
-    });
+    l.error("reminder_failed", err);
 
     await interaction.reply({
       content: "❌ Failed to send reminder.",
