@@ -5,10 +5,22 @@
 import { google } from "googleapis";
 
 // =====================================
+// 🔹 TYPES
+// =====================================
+
+type GoogleServiceAccount = {
+  client_email: string;
+  private_key: string;
+  [key: string]: unknown;
+};
+
+// =====================================
 // 🔐 ENV CHECK
 // =====================================
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+const rawEnv = process.env.GOOGLE_SERVICE_ACCOUNT;
+
+if (!rawEnv || !rawEnv.trim()) {
   throw new Error("❌ Missing GOOGLE_SERVICE_ACCOUNT environment variable!");
 }
 
@@ -16,11 +28,11 @@ if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
 // 🔑 PARSE CREDENTIALS (SAFE)
 // =====================================
 
-let credentials: any;
+let credentials: GoogleServiceAccount;
 
 try {
-  credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT as string);
-} catch (error) {
+  credentials = JSON.parse(rawEnv);
+} catch {
   throw new Error("❌ GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
 }
 
@@ -32,7 +44,7 @@ if (!credentials.client_email || !credentials.private_key) {
   throw new Error("❌ GOOGLE_SERVICE_ACCOUNT is missing required fields");
 }
 
-// Fix multiline private key
+// Fix multiline private key (important for GCP)
 credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
 // =====================================
@@ -55,3 +67,9 @@ export const sheetsClient = google.sheets({
   version: "v4",
   auth: googleAuth,
 });
+
+// =====================================
+// 🔄 EXPORT RAW CREDS (dla Vision)
+// =====================================
+
+export const googleCredentials = credentials;
