@@ -33,12 +33,12 @@ import { initAbsenceNotifications } from "./system/absence";
 // =============================
 
 import {
-  qCommand,
-  handleQuickAddCommand,
-  ensureQuickAddChannel,
   registerQuickAddListener,
   startQuickAddWorker,
 } from "./system/quickadd";
+
+// ❗ tymczasowo bez qCommand / handleQuickAddCommand / ensureQuickAddChannel
+// (bo nie są eksportowane — dodamy później jak poprawimy quickadd/index)
 
 // =============================
 // 🌍 INTEGRATIONS
@@ -120,19 +120,15 @@ client.once("clientReady", async () => {
   }
 
   // =============================
-  // ⚙️ SLASH COMMANDS
+  // ⚙️ SLASH COMMANDS (TEMP OFF)
   // =============================
 
   try {
     await client.application?.commands.set([]);
 
-    await client.application?.commands.set([
-      qCommand.toJSON(),
-    ]);
-
     logger.emit({
       scope: "app",
-      event: "slash_commands_registered",
+      event: "slash_commands_skipped",
     });
   } catch (err) {
     logger.emit({
@@ -158,11 +154,9 @@ client.once("clientReady", async () => {
   await Promise.all(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
       try {
-        await ensureQuickAddChannel(guild);
-
         logger.emit({
           scope: "app.guild",
-          event: "quickadd_channel_ready",
+          event: "guild_init",
           context: {
             guild: guild.name,
           },
@@ -170,7 +164,7 @@ client.once("clientReady", async () => {
       } catch (err) {
         logger.emit({
           scope: "app.guild",
-          event: "quickadd_channel_failed",
+          event: "guild_init_failed",
           level: "error",
           context: {
             guild: guild.name,
@@ -216,17 +210,6 @@ client.once("clientReady", async () => {
 
 client.on("interactionCreate", async (interaction: Interaction) => {
   try {
-    // =============================
-    // 🔥 QUICKADD COMMAND (SPECIAL CASE)
-    // =============================
-
-    if (interaction.isChatInputCommand()) {
-      if (interaction.commandName === "q") {
-        await handleQuickAddCommand(interaction);
-        return;
-      }
-    }
-
     // =============================
     // 🧠 SYSTEM ROUTER
     // =============================
