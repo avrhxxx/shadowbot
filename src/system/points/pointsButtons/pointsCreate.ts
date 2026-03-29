@@ -134,20 +134,33 @@ export async function handleCreateWeekSubmit(
 
     const weekName = formatWeekName(fromParsed, toParsed);
 
+    const guildId = interaction.guildId;
+
+    if (!guildId) {
+      await safeReply(interaction, {
+        content: "❌ Guild not found.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const categoryEnum = category === "donations" ? "Donations" : "Duel";
+
     logger.emit({
       scope: "points.button",
       event: "points_create_week_submit",
       traceId,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
-        category,
+        guildId,
+        category: categoryEnum,
         weekName,
       },
     });
 
     await pointsService.createWeek(
-      category === "donations" ? "Donations" : "Duel",
+      guildId,
+      categoryEnum,
       weekName
     );
 
