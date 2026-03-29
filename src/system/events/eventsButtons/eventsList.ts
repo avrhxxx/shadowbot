@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsButtons/eventsList.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsList.ts
+// =====================================
+
 import { 
   ButtonInteraction, 
   EmbedBuilder, 
@@ -9,6 +12,8 @@ import {
 } from "discord.js";
 import { getEvents, EventObject } from "../eventService";
 import { formatEventUTC } from "../../utils/timeUtils";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // STATUS COLORS
@@ -89,16 +94,13 @@ Participants: ${event.participants.length}`;
     .setLabel("Clear Event Data")
     .setStyle(ButtonStyle.Danger);
 
-  // EVENTS WITHOUT PARTICIPANTS
   if (!showParticipants) {
-
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(clearButton);
 
     return { embed, rows: [row] };
   }
 
-  // FULL EVENT BUTTONS
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 
     new ButtonBuilder()
@@ -145,43 +147,68 @@ Participants: ${event.participants.length}`;
 // -----------------------------
 export async function handleCategoryClick(interaction: ButtonInteraction, category?: string) {
 
+  const traceId = createTraceId();
+
   if (category) return await handleListByCategory(interaction, category);
 
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
+  try {
+    const events = await getEvents(guildId);
 
-  if (!events.length) {
-    await interaction.reply({ content: "No events found.", ephemeral: true });
-    return;
-  }
-
-  const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
-
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  let currentRow = new ActionRowBuilder<ButtonBuilder>();
-
-  categories.forEach((cat, idx) => {
-
-    currentRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`event_category_${cat}`)
-        .setLabel(formatCategoryLabel(cat))
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    if ((idx + 1) % 5 === 0) {
-      rows.push(currentRow);
-      currentRow = new ActionRowBuilder<ButtonBuilder>();
+    if (!events.length) {
+      await interaction.reply({ content: "No events found.", ephemeral: true });
+      return;
     }
-  });
 
-  if (currentRow.components.length > 0) rows.push(currentRow);
+    const categories = Array.from(new Set(events.map(e => e.eventType || "custom")));
 
-  await interaction.reply({
-    content: "Select a category to view events:",
-    components: rows,
-    ephemeral: true
-  });
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+    categories.forEach((cat, idx) => {
+
+      currentRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`event_category_${cat}`)
+          .setLabel(formatCategoryLabel(cat))
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      if ((idx + 1) % 5 === 0) {
+        rows.push(currentRow);
+        currentRow = new ActionRowBuilder<ButtonBuilder>();
+      }
+    });
+
+    if (currentRow.components.length > 0) rows.push(currentRow);
+
+    await interaction.reply({
+      content: "Select a category to view events:",
+      components: rows,
+      ephemeral: true
+    });
+
+    logger.emit({
+      scope: "events.list",
+      event: "categories_shown",
+      traceId,
+      context: { guildId, categories: categories.length }
+    });
+
+  } catch (error) {
+    logger.emit({
+      scope: "events.list",
+      event: "category_click_failed",
+      traceId,
+      level: "error",
+      error
+    });
+
+    await interaction.reply({
+      content: "❌ Failed to load categories.",
+      ephemeral: true
+    }).catch(() => null);
+  }
 }
 
 // -----------------------------
@@ -189,35 +216,60 @@ export async function handleCategoryClick(interaction: ButtonInteraction, catego
 // -----------------------------
 export async function handleListByCategory(interaction: ButtonInteraction, category?: string) {
 
+  const traceId = createTraceId();
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
 
-  if (!events.length) {
-    await interaction.reply({ content: "No events found.", ephemeral: true });
-    return;
-  }
+  try {
+    const events = await getEvents(guildId);
 
-  const filteredEvents = category
-    ? events.filter(e => e.eventType === category)
-    : events;
+    if (!events.length) {
+      await interaction.reply({ content: "No events found.", ephemeral: true });
+      return;
+    }
 
-  if (!filteredEvents.length) {
-    await interaction.reply({
-      content: `No events found for category "${category}".`,
-      ephemeral: true
+    const filteredEvents = category
+      ? events.filter(e => e.eventType === category)
+      : events;
+
+    if (!filteredEvents.length) {
+      await interaction.reply({
+        content: `No events found for category "${category}".`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    for (let i = 0; i < filteredEvents.length; i++) {
+
+      const event = filteredEvents[i];
+      const { embed, rows } = createEventEmbedAndRows(event);
+
+      const payload = { embeds: [embed], components: rows, ephemeral: true };
+
+      if (i === 0) await interaction.reply(payload);
+      else await interaction.followUp(payload);
+    }
+
+    logger.emit({
+      scope: "events.list",
+      event: "category_list_shown",
+      traceId,
+      context: { guildId, category, count: filteredEvents.length }
     });
-    return;
-  }
 
-  for (let i = 0; i < filteredEvents.length; i++) {
+  } catch (error) {
+    logger.emit({
+      scope: "events.list",
+      event: "list_by_category_failed",
+      traceId,
+      level: "error",
+      error
+    });
 
-    const event = filteredEvents[i];
-    const { embed, rows } = createEventEmbedAndRows(event);
-
-    const payload = { embeds: [embed], components: rows, ephemeral: true };
-
-    if (i === 0) await interaction.reply(payload);
-    else await interaction.followUp(payload);
+    await interaction.reply({
+      content: "❌ Failed to load events.",
+      ephemeral: true
+    }).catch(() => null);
   }
 }
 
@@ -226,34 +278,58 @@ export async function handleListByCategory(interaction: ButtonInteraction, categ
 // -----------------------------
 export async function handleShowList(interaction: ButtonInteraction, eventId: string) {
 
+  const traceId = createTraceId();
   const guildId = interaction.guildId!;
-  const events = await getEvents(guildId);
 
-  const event = events.find(e => e.id.toString() === eventId);
+  try {
+    const events = await getEvents(guildId);
+    const event = events.find(e => e.id.toString() === eventId);
 
-  if (!event) {
-    await interaction.reply({ content: "Event not found.", ephemeral: true });
-    return;
-  }
+    if (!event) {
+      await interaction.reply({ content: "Event not found.", ephemeral: true });
+      return;
+    }
 
-  const participants = event.participants.map(cleanNickname);
-  const absent = event.absent?.map(cleanNickname) || [];
+    const participants = event.participants.map(cleanNickname);
+    const absent = event.absent?.map(cleanNickname) || [];
 
-  const embed = new EmbedBuilder()
-    .setTitle(`List for ${event.name}`)
-    .setDescription(
-      `Date: ${formatEventUTCObj(event)}
+    const embed = new EmbedBuilder()
+      .setTitle(`List for ${event.name}`)
+      .setDescription(
+        `Date: ${formatEventUTCObj(event)}
 
 Participants (${participants.length}):
 ${participants.join("\n")}` +
-      (absent.length ? `
+        (absent.length ? `
 
 Absent (${absent.length}):
 ${absent.join("\n")}` : "")
-    )
-    .setColor(STATUS_COLORS[event.status] ?? 0xffffff);
+      )
+      .setColor(STATUS_COLORS[event.status] ?? 0xffffff);
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+
+    logger.emit({
+      scope: "events.list",
+      event: "show_list",
+      traceId,
+      context: { guildId, eventId }
+    });
+
+  } catch (error) {
+    logger.emit({
+      scope: "events.list",
+      event: "show_list_failed",
+      traceId,
+      level: "error",
+      error
+    });
+
+    await interaction.reply({
+      content: "❌ Failed to load list.",
+      ephemeral: true
+    }).catch(() => null);
+  }
 }
 
 // -----------------------------
@@ -261,15 +337,34 @@ ${absent.join("\n")}` : "")
 // -----------------------------
 export async function updateEventEmbed(message: Message, eventId: string) {
 
+  const traceId = createTraceId();
   const guildId = message.guildId;
   if (!guildId) return;
 
-  const events = await getEvents(guildId);
-  const event = events.find(ev => ev.id.toString() === eventId);
+  try {
+    const events = await getEvents(guildId);
+    const event = events.find(ev => ev.id.toString() === eventId);
 
-  if (!event) return;
+    if (!event) return;
 
-  const { embed, rows } = createEventEmbedAndRows(event);
+    const { embed, rows } = createEventEmbedAndRows(event);
 
-  await message.edit({ embeds: [embed], components: rows });
+    await message.edit({ embeds: [embed], components: rows });
+
+    logger.emit({
+      scope: "events.list",
+      event: "embed_updated",
+      traceId,
+      context: { guildId, eventId }
+    });
+
+  } catch (error) {
+    logger.emit({
+      scope: "events.list",
+      event: "embed_update_failed",
+      traceId,
+      level: "error",
+      error
+    });
+  }
 }
