@@ -10,6 +10,22 @@ export async function handleListWeeks(
   interaction: ButtonInteraction<CacheType>,
   traceId: string
 ): Promise<void> {
+  const guildId = interaction.guildId;
+
+  if (!guildId) {
+    const payload = {
+      content: "❌ Guild context is required.",
+      ephemeral: true,
+    };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else {
+      await interaction.reply(payload);
+    }
+    return;
+  }
+
   try {
     logger.emit({
       scope: "points.button",
@@ -17,17 +33,17 @@ export async function handleListWeeks(
       traceId,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
       },
     });
 
-    // Pobieramy wszystkie tygodnie
-    const weeks: string[] = await pointsService.getAllWeeks();
+    // 🔥 FIX: wymagany guildId
+    const weeks: string[] = await pointsService.getAllWeeks(guildId);
 
     if (!weeks.length) {
       const payload = {
-        content: "⚠️ No weeks created yet (placeholder).",
-        ephemeral: true
+        content: "⚠️ No weeks created yet.",
+        ephemeral: true,
       };
 
       if (interaction.replied || interaction.deferred) {
@@ -43,8 +59,8 @@ export async function handleListWeeks(
       .join("\n");
 
     const payload = {
-      content: `📋 **Created Weeks (placeholder):**\n${weekList}`,
-      ephemeral: true
+      content: `📋 **Created Weeks:**\n${weekList}`,
+      ephemeral: true,
     };
 
     if (interaction.replied || interaction.deferred) {
@@ -62,7 +78,7 @@ export async function handleListWeeks(
       error,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
       },
     });
 
