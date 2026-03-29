@@ -19,11 +19,11 @@
  */
 
 import * as vision from "@google-cloud/vision";
-import { googleAuth } from "./googleSheetsClient";
+import { googleCredentials } from "./googleSheetsClient";
 
-// 🔥 używamy WSPÓLNEGO AUTH
+// 🔥 używamy WSPÓLNYCH credentials (bez hacków typu "as any")
 const client = new vision.ImageAnnotatorClient({
-  auth: googleAuth as any, // 🔥 FIX: type mismatch workaround
+  credentials: googleCredentials,
 });
 
 export async function runVisionOCR(buffer: Buffer) {
