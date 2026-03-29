@@ -1,4 +1,6 @@
-// src/absencePanel/absenceButtons/index.ts
+// =====================================
+// 📁 src/system/absence/absenceButtons/index.ts
+// =====================================
 
 // Add / Remove
 export { handleAddAbsence, handleAddAbsenceSubmit } from "./absenceAdd";
@@ -11,12 +13,12 @@ export { handleAbsenceList } from "./absenceList";
 export { handleSettings, handleSettingsSelect } from "./absenceSettings";
 
 // Notifications & Embed
-export { 
-  notifyAbsenceAdded, 
-  notifyAbsenceRemoved, 
-  notifyAbsenceAutoClean, 
-  initAbsenceNotifications, 
-  startAbsenceAutoCleaner 
+export {
+  notifyAbsenceAdded,
+  notifyAbsenceRemoved,
+  notifyAbsenceAutoClean,
+  initAbsenceNotifications,
+  startAbsenceAutoCleaner
 } from "./absenceNotification";
 
 // Help / Guide
