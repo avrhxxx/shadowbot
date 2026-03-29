@@ -3,7 +3,7 @@
 // =====================================
 
 import sharp from "sharp";
-import { log } from "../logger";
+import { logger } from "../../core/logger/log";
 
 export const OCRPreprocessor = {
   async base(buffer: Buffer, traceId: string): Promise<Buffer> {
@@ -13,12 +13,12 @@ export const OCRPreprocessor = {
         .resize({ width: 1500, withoutEnlargement: true })
         .toBuffer();
     } catch (error) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.ocr.preprocessor",
         event: "pre_base_failed",
         traceId,
-        type: "system",
         level: "error",
-        data: { error },
+        error,
       });
       return buffer;
     }
@@ -32,12 +32,12 @@ export const OCRPreprocessor = {
         .sharpen()
         .toBuffer();
     } catch (error) {
-      log.emit({
+      logger.emit({
+        scope: "quickadd.ocr.preprocessor",
         event: "pre_enhance_failed",
         traceId,
-        type: "system",
         level: "error",
-        data: { error },
+        error,
       });
       return buffer;
     }
