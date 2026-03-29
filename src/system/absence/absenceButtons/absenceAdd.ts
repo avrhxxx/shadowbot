@@ -107,7 +107,9 @@ export async function handleAddAbsenceSubmit(
   const guildId = interaction.guildId!;
   const guild = interaction.guild as Guild;
 
-  l.event("add_submit_received");
+  l.event("add_submit_received", {
+    context: { guildId },
+  });
 
   if (!guild) {
     l.error("missing_guild", new Error("Guild not found"));
@@ -121,7 +123,9 @@ export async function handleAddAbsenceSubmit(
   const absences = await getAbsences(guildId);
 
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    l.warn("duplicate_player", { player: nick });
+    l.warn("duplicate_player", {
+      context: { player: nick },
+    });
 
     await interaction.followUp({ content: `❌ Player ${nick} is already on the absence list.` });
     return;
@@ -131,7 +135,9 @@ export async function handleAddAbsenceSubmit(
   const toDate = parseDayMonth(toRaw);
 
   if (!fromDate || !toDate) {
-    l.warn("invalid_date_format", { fromRaw, toRaw });
+    l.warn("invalid_date_format", {
+      input: { fromRaw, toRaw },
+    });
 
     await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
     return;
@@ -141,7 +147,9 @@ export async function handleAddAbsenceSubmit(
   const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
 
   if (fromTs > toTs) {
-    l.warn("invalid_date_range", { fromRaw, toRaw });
+    l.warn("invalid_date_range", {
+      input: { fromRaw, toRaw },
+    });
 
     await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
@@ -158,7 +166,7 @@ export async function handleAddAbsenceSubmit(
       endDate: `${toDate.day}/${toDate.month}`,
       year: fromDate.year,
       createdAt: Date.now()
-    });
+    }, ctx);
 
     l.event("absence_created", {
       result: {
