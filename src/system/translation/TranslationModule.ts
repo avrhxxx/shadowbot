@@ -195,15 +195,21 @@ export function initTranslationModule(client: Client) {
             traceId
           });
 
+          // 🔥 FIX: clone zamiast mutacji
           const disabledRows = rows.map((row) => {
-            row.components.forEach((c) => c.setDisabled(true));
-            return row;
+            const newRow = new ActionRowBuilder<ButtonBuilder>();
+
+            row.components.forEach((btn) => {
+              newRow.addComponents(ButtonBuilder.from(btn).setDisabled(true));
+            });
+
+            return newRow;
           });
 
           await panel.edit({
             components: disabledRows,
             embeds: [
-              embed.setFooter({
+              EmbedBuilder.from(embed).setFooter({
                 text: "Translation panel expired."
               })
             ]
