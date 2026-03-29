@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceRemove.ts
+// =====================================
+
 import {
   ButtonInteraction,
   ModalSubmitInteraction,
@@ -9,11 +13,15 @@ import {
 } from "discord.js";
 import { removeAbsence } from "../absenceService";
 import { notifyAbsenceRemoved } from "./absenceNotification";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // ----------------------------
 // SHOW REMOVE MODAL
 // ----------------------------
 export async function handleRemoveAbsence(interaction: ButtonInteraction) {
+  if (!interaction.isButton()) return;
+
   const modal = new ModalBuilder()
     .setTitle("Remove Absence")
     .setCustomId("absence_remove_modal");
@@ -25,7 +33,10 @@ export async function handleRemoveAbsence(interaction: ButtonInteraction) {
     .setPlaceholder("Enter nickname to remove")
     .setRequired(true);
 
-  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput));
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(nickInput)
+  );
+
   await interaction.showModal(modal);
 }
 
@@ -33,6 +44,8 @@ export async function handleRemoveAbsence(interaction: ButtonInteraction) {
 // HANDLE MODAL SUBMIT
 // ----------------------------
 export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteraction) {
+  const traceId = createTraceId();
+
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
@@ -43,16 +56,33 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
-      await interaction.followUp({ content: `❌ No absence found for ${nick}.` });
+      await interaction.followUp({
+        content: `❌ No absence found for ${nick}.`
+      });
       return;
     }
 
-    await interaction.followUp({ content: `📌 Absence for ${nick} removed from the list.` });
+    await interaction.followUp({
+      content: `📌 Absence for ${nick} removed from the list.`
+    });
 
     await notifyAbsenceRemoved(guild, nick);
 
   } catch (err) {
-    console.error("Error removing absence:", err);
-    await interaction.followUp({ content: "❌ An error occurred while trying to remove absence." });
+    logger.emit({
+      scope: "absence.remove",
+      event: "remove_failed",
+      traceId,
+      level: "error",
+      context: {
+        guildId,
+        nick,
+      },
+      error: err,
+    });
+
+    await interaction.followUp({
+      content: "❌ An error occurred while trying to remove absence."
+    });
   }
 }
