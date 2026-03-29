@@ -30,27 +30,47 @@ type ActionType = typeof IDS.ACTIONS[number];
 // -----------------------------
 const BUTTON_HANDLERS: Record<
   string,
-  (i: ButtonInteraction<CacheType>) => Promise<void>
+  (i: ButtonInteraction<CacheType>, traceId: string) => Promise<void>
 > = {
-  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i) =>
-    PB.pointsManagement.handlePointsManagementMain(i),
+  [IDS.BUTTONS.POINTS_MANAGEMENT]: (i, traceId) =>
+    PB.pointsManagement.handlePointsManagementMain(i, traceId),
 
-  [IDS.BUTTONS.GUIDE]: async (i) => {
+  [IDS.BUTTONS.GUIDE]: async (i, traceId) => {
+    logger.emit({
+      scope: "points.handler",
+      event: "guide_open",
+      traceId,
+      context: {
+        userId: i.user.id,
+        guildId: i.guildId,
+      },
+    });
+
     await safeReply(i, {
       content: "📖 Guide not implemented yet.",
       ephemeral: true
     });
   },
 
-  [IDS.BUTTONS.SETTINGS]: async (i) => {
+  [IDS.BUTTONS.SETTINGS]: async (i, traceId) => {
+    logger.emit({
+      scope: "points.handler",
+      event: "settings_open",
+      traceId,
+      context: {
+        userId: i.user.id,
+        guildId: i.guildId,
+      },
+    });
+
     await safeReply(i, {
       content: "⚙️ Settings not implemented yet.",
       ephemeral: true
     });
   },
 
-  [IDS.BUTTONS.LIST_WEEKS]: (i) =>
-    PB.pointsListWeeks.handleListWeeks(i)
+  [IDS.BUTTONS.LIST_WEEKS]: (i, traceId) =>
+    PB.pointsListWeeks.handleListWeeks(i, traceId)
 };
 
 // -----------------------------
@@ -71,17 +91,21 @@ export async function handlePointsInteraction(
         scope: "points.handler",
         event: "button",
         traceId,
-        context: { id: customId },
+        context: {
+          id: customId,
+          userId: interaction.user.id,
+          guildId: interaction.guildId,
+        },
       });
 
       const handler = BUTTON_HANDLERS[customId];
       if (handler) {
-        await handler(interaction);
+        await handler(interaction, traceId);
         return true;
       }
 
       if (customId.startsWith("points_management_category_")) {
-        await PB.pointsManagement.handlePointsManagement(interaction);
+        await PB.pointsManagement.handlePointsManagement(interaction, traceId);
         return true;
       }
 
@@ -110,7 +134,7 @@ export async function handlePointsInteraction(
           return true;
         }
 
-        await module.handleWeekClick(interaction, week);
+        await module.handleWeekClick(interaction, week, traceId);
         return true;
       }
 
@@ -157,19 +181,19 @@ export async function handlePointsInteraction(
           return true;
         }
 
-        // 🔥 IMPORTANT: delegate to buttons layer
+        // 🔥 REAL HANDLERS (Twoje pliki)
         switch (action) {
           case "add":
-            await module.handleAdd(interaction);
+            await PB.pointsAdd.handleAddPoints(interaction, traceId);
             break;
           case "remove":
-            await module.handleRemove(interaction);
+            await PB.pointsRemove.handleRemovePoints(interaction, traceId);
             break;
           case "list":
-            await module.handleList(interaction);
+            await PB.pointsList.handlePointsList(interaction, traceId);
             break;
           case "compare":
-            await module.handleCompare(interaction);
+            await PB.pointsCompare.handleCompareWeeks(interaction, traceId);
             break;
         }
 
@@ -189,7 +213,11 @@ export async function handlePointsInteraction(
         scope: "points.handler",
         event: "modal",
         traceId,
-        context: { id: customId },
+        context: {
+          id: customId,
+          userId: interaction.user.id,
+          guildId: interaction.guildId,
+        },
       });
 
       if (customId.startsWith("points_create_modal_")) {
