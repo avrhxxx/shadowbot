@@ -7,7 +7,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { QuickAddSession } from "../core/QuickAddSession";
-import { log } from "../logger";
+import { logger } from "../core/logger/log";
 
 // =====================================
 // 🧠 CORE GUARDS (PURE)
@@ -19,10 +19,10 @@ export function isSessionActive(
 ): boolean {
   const result = !!session;
 
-  log.emit({
+  logger.emit({
     event: "guard_session_active",
     traceId,
-    data: { result },
+    result: { isActive: result },
   });
 
   return result;
@@ -35,14 +35,14 @@ export function isSessionOwner(
 ): boolean {
   const result = session?.ownerId === userId;
 
-  log.emit({
+  logger.emit({
     event: "guard_session_owner",
     traceId,
-    data: {
+    context: {
       userId,
       ownerId: session?.ownerId,
-      result,
     },
+    result: { isOwner: result },
   });
 
   return result;
@@ -54,52 +54,56 @@ export function isInQuickAddThread(
   traceId: string
 ): boolean {
   if (!channel || !session) {
-    log.emit({
+    logger.emit({
       event: "guard_thread_missing_context",
       traceId,
-      data: {
+      context: {
         hasChannel: !!channel,
         hasSession: !!session,
       },
+      result: { match: false },
     });
 
     return false;
   }
 
   if (channel.id === session.threadId) {
-    log.emit({
+    logger.emit({
       event: "guard_thread_match_main",
       traceId,
-      data: {
+      context: {
         channelId: channel.id,
         threadId: session.threadId,
       },
+      result: { match: true },
     });
 
     return true;
   }
 
   if ("parentId" in channel && channel.parentId === session.threadId) {
-    log.emit({
+    logger.emit({
       event: "guard_thread_match_child",
       traceId,
-      data: {
+      context: {
         channelId: channel.id,
         parentId: channel.parentId,
         threadId: session.threadId,
       },
+      result: { match: true },
     });
 
     return true;
   }
 
-  log.emit({
+  logger.emit({
     event: "guard_thread_mismatch",
     traceId,
-    data: {
+    context: {
       channelId: channel.id,
       threadId: session.threadId,
     },
+    result: { match: false },
   });
 
   return false;
@@ -119,23 +123,23 @@ export function validateQuickAddContext(
   const channelId = interaction.channel?.id;
 
   if (!session) {
-    log.emit({
+    logger.emit({
       event: "guard_fail_no_session",
       traceId,
-      data: { guildId, userId, channelId },
       level: "warn",
+      context: { guildId, userId, channelId },
     });
 
     return "❌ No active session";
   }
 
-  // 🔥 NOWY KLUCZOWY GUARD (multi-session isolation)
+  // 🔥 multi-session isolation
   if (session.userId !== userId) {
-    log.emit({
+    logger.emit({
       event: "guard_fail_wrong_user",
       traceId,
       level: "warn",
-      data: {
+      context: {
         guildId,
         userId,
         sessionUserId: session.userId,
@@ -146,25 +150,25 @@ export function validateQuickAddContext(
   }
 
   if (!isInQuickAddThread(interaction.channel, session, traceId)) {
-    log.emit({
+    logger.emit({
       event: "guard_fail_wrong_thread",
       traceId,
-      data: {
+      level: "warn",
+      context: {
         guildId,
         userId,
         channelId,
         expectedThread: session.threadId,
       },
-      level: "warn",
     });
 
     return "❌ Use this command inside QuickAdd thread";
   }
 
-  log.emit({
+  logger.emit({
     event: "guard_context_ok",
     traceId,
-    data: { guildId, userId, channelId },
+    context: { guildId, userId, channelId },
   });
 
   return null;
@@ -179,35 +183,35 @@ export function validateSessionOwner(
   const userId = interaction.user.id;
 
   if (!session) {
-    log.emit({
+    logger.emit({
       event: "guard_owner_no_session",
       traceId,
-      data: { guildId, userId },
       level: "warn",
+      context: { guildId, userId },
     });
 
     return "❌ No active session";
   }
 
   if (session.ownerId !== userId) {
-    log.emit({
+    logger.emit({
       event: "guard_owner_mismatch",
       traceId,
-      data: {
+      level: "warn",
+      context: {
         guildId,
         userId,
         ownerId: session.ownerId,
       },
-      level: "warn",
     });
 
     return "❌ Only session owner can use this command";
   }
 
-  log.emit({
+  logger.emit({
     event: "guard_owner_ok",
     traceId,
-    data: { guildId, userId },
+    context: { guildId, userId },
   });
 
   return null;
