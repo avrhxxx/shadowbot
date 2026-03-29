@@ -1,4 +1,6 @@
-// src/utils/timeZones.ts
+// =====================================
+// 📁 src/shared/utils/timeZones.ts
+// =====================================
 
 /**
  * Mapa krajów / regionów na prawdziwe strefy czasowe IANA
