@@ -24,8 +24,10 @@ export async function handleSettings(
   const l = log.ctx(ctx);
 
   l.event("settings_open", {
-    guildId: interaction.guild.id,
-    userId: interaction.user?.id,
+    context: {
+      guildId: interaction.guild.id,
+      userId: interaction.user?.id,
+    },
   });
 
   const textChannels = interaction.guild.channels.cache
@@ -34,7 +36,9 @@ export async function handleSettings(
 
   if (!textChannels.length) {
     l.warn("settings_no_channels", {
-      guildId: interaction.guild.id,
+      context: {
+        guildId: interaction.guild.id,
+      },
     });
 
     await interaction.reply({
@@ -58,8 +62,9 @@ export async function handleSettings(
   });
 
   l.event("settings_rendered", {
-    guildId: interaction.guild.id,
-    channelsCount: textChannels.length,
+    result: {
+      channelsCount: textChannels.length,
+    },
   });
 }
 
@@ -75,12 +80,19 @@ export async function handleSettingsSelect(
   const guildId = interaction.guildId;
 
   l.event("settings_select", {
-    guildId,
-    values: interaction.values,
+    input: {
+      guildId,
+      values: interaction.values,
+    },
   });
 
   if (!guildId || !interaction.values.length) {
-    l.warn("settings_invalid_selection");
+    l.warn("settings_invalid_selection", {
+      input: {
+        guildId,
+        values: interaction.values,
+      },
+    });
 
     await interaction.reply({
       content: "No channel selected.",
@@ -96,8 +108,10 @@ export async function handleSettingsSelect(
 
     if (config.notificationChannel === channelId) {
       l.event("settings_already_set", {
-        guildId,
-        channelId,
+        input: {
+          guildId,
+          channelId,
+        },
       });
 
       await interaction.reply({
@@ -107,11 +121,13 @@ export async function handleSettingsSelect(
       return;
     }
 
-    await setNotificationChannel(guildId, channelId);
+    await setNotificationChannel(guildId, channelId, ctx);
 
     l.event("settings_updated", {
-      guildId,
-      channelId,
+      input: {
+        guildId,
+        channelId,
+      },
     });
 
     await interaction.reply({
@@ -121,8 +137,10 @@ export async function handleSettingsSelect(
 
   } catch (err) {
     l.error("settings_update_failed", err, {
-      guildId,
-      channelId,
+      input: {
+        guildId,
+        channelId,
+      },
     });
 
     await interaction.reply({
