@@ -17,7 +17,8 @@
  */
 
 import { ChatInputCommandInteraction } from "discord.js";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // =====================================
 // 🧱 TYPES
@@ -25,7 +26,7 @@ import { logger } from "../../../core/logger/log";
 
 export type CommandHandler = (
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ) => Promise<void>;
 
 export type QuickAddSubcommand =
@@ -69,31 +70,22 @@ const registry: Record<QuickAddSubcommand, CommandHandler> = {
 
 export function getCommandHandler(
   subcommand: string,
-  traceId: string
+  ctx: TraceContext
 ): CommandHandler | null {
+  const l = log.ctx(ctx);
+
   const handler = registry[subcommand as QuickAddSubcommand];
 
   if (!handler) {
-    logger.emit({
-      scope: "quickadd.registry",
-      event: "handler_not_found",
-      traceId,
-      level: "warn",
-      context: {
-        subcommand,
-      },
+    l.warn("handler_not_found", {
+      subcommand,
     });
 
     return null;
   }
 
-  logger.emit({
-    scope: "quickadd.registry",
-    event: "handler_resolved",
-    traceId,
-    context: {
-      subcommand,
-    },
+  l.event("handler_resolved", {
+    subcommand,
   });
 
   return handler;
