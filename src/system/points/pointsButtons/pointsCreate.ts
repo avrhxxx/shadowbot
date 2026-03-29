@@ -11,6 +11,7 @@ import {
 } from "discord.js";
 import * as pointsService from "../pointsService";
 import * as pointsDonations from "./pointsDonations";
+import * as pointsDuel from "./pointsDuel";
 import { logger } from "../../../core/logger/log";
 
 // ✅ Helper do bezpiecznego reply/edit
@@ -18,7 +19,7 @@ export async function safeReply(
   interaction: ButtonInteraction<CacheType> | ModalSubmitInteraction<CacheType>,
   payload: any
 ) {
-  if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
+  if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
 
@@ -169,9 +170,11 @@ export async function handleCreateWeekSubmit(
       ephemeral: true
     });
 
-    // Po stworzeniu tygodnia renderujemy nowe przyciski
+    // 🔥 FIX: obsługa obu kategorii + guildId
+    let weekRows: ActionRowBuilder<ButtonBuilder>[];
+
     if (category === "donations") {
-      const weekRows = await pointsDonations.renderWeeks();
+      weekRows = await pointsDonations.renderWeeks(guildId);
 
       await interaction.editReply({
         content: `📅 Donations – Select a week or create a new one:`,
@@ -179,6 +182,18 @@ export async function handleCreateWeekSubmit(
           ...weekRows,
           new ActionRowBuilder<ButtonBuilder>().addComponents(
             pointsDonations.createWeekButton("donations")
+          )
+        ]
+      });
+    } else if (category === "duel") {
+      weekRows = await pointsDuel.renderWeeks(guildId);
+
+      await interaction.editReply({
+        content: `📅 Duel – Select a week or create a new one:`,
+        components: [
+          ...weekRows,
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            pointsDuel.createWeekButton("duel")
           )
         ]
       });
