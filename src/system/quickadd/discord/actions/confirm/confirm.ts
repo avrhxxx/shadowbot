@@ -18,7 +18,8 @@ import {
 
 import { QuickAddType } from "../../../core/QuickAddTypes";
 
-import { logger } from "../../../../core/logger/log";
+import { log } from "../../../../core/logger/log";
+import { TraceContext } from "../../../../core/trace/TraceContext";
 
 // =====================================
 // 🧠 MODE RESOLVER
@@ -56,9 +57,10 @@ async function safeReply(
 
 export async function handleConfirm(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<void> {
-  const startTime = Date.now();
+  const startedAt = Date.now();
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -77,32 +79,23 @@ export async function handleConfirm(
   const contextError = validateQuickAddContext(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   const ownerError = validateSessionOwner(
     interaction,
     session,
-    traceId
+    ctx.traceId
   );
 
   if (contextError || ownerError || !session) {
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_guard_failed",
-      traceId,
-      level: "warn",
-      context: {
-        sessionId: session?.sessionId,
-        guildId,
-        userId,
-        hasSession: !!session,
-        contextError,
-        ownerError,
-      },
-      stats: {
-        confirm_blocked: 1,
-      },
+    l.warn("confirm_guard_failed", {
+      sessionId: session?.sessionId,
+      guildId,
+      userId,
+      hasSession: !!session,
+      contextError,
+      ownerError,
     });
 
     await safeReply(
@@ -115,42 +108,21 @@ export async function handleConfirm(
   const sessionId = session.sessionId;
 
   try {
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_start",
-      traceId,
-      context: {
-        sessionId,
-        stage: session.stage,
-        type: session.type,
-      },
-      stats: {
-        confirm_started: 1,
-      },
+    l.event("confirm_start", {
+      sessionId,
+      stage: session.stage,
+      type: session.type,
     });
 
-    const entries = QuickAddBuffer.getEntries(sessionId, traceId);
+    const entries = QuickAddBuffer.getEntries(sessionId, ctx.traceId);
 
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_buffer_loaded",
-      traceId,
-      context: {
-        sessionId,
-        count: entries.length,
-      },
+    l.event("confirm_buffer_loaded", {
+      sessionId,
+      count: entries.length,
     });
 
     if (!entries.length) {
-      logger.emit({
-        scope: "quickadd.confirm",
-        event: "confirm_empty",
-        traceId,
-        context: { sessionId },
-        stats: {
-          confirm_empty: 1,
-        },
-      });
+      l.event("confirm_empty", { sessionId });
 
       await safeReply(interaction, "⚠️ Nothing to confirm");
       return;
@@ -159,17 +131,9 @@ export async function handleConfirm(
     const invalid = entries.filter((e) => e.status !== "OK");
 
     if (invalid.length > 0) {
-      logger.emit({
-        scope: "quickadd.confirm",
-        event: "confirm_blocked_invalid",
-        traceId,
-        context: {
-          sessionId,
-          invalidCount: invalid.length,
-        },
-        stats: {
-          confirm_blocked_invalid: 1,
-        },
+      l.warn("confirm_blocked_invalid", {
+        sessionId,
+        invalidCount: invalid.length,
       });
 
       await safeReply(
@@ -179,22 +143,20 @@ export async function handleConfirm(
       return;
     }
 
+    // =============================
+    // STEP 1 → ENTER CONFIRM MODE
+    // =============================
     if (session.stage === "COLLECTING") {
       QuickAddSession.setStage(
         guildId,
         userId,
         "CONFIRM_PENDING",
-        traceId
+        ctx.traceId
       );
 
-      logger.emit({
-        scope: "quickadd.confirm",
-        event: "confirm_stage_entered",
-        traceId,
-        context: {
-          sessionId,
-          count: entries.length,
-        },
+      l.event("confirm_stage_entered", {
+        sessionId,
+        count: entries.length,
       });
 
       await safeReply(
@@ -208,39 +170,27 @@ export async function handleConfirm(
       return;
     }
 
+    // =============================
+    // INVALID STAGE
+    // =============================
     if (session.stage !== "CONFIRM_PENDING") {
-      logger.emit({
-        scope: "quickadd.confirm",
-        event: "confirm_blocked_stage",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-          stage: session.stage,
-        },
-        stats: {
-          confirm_blocked_stage: 1,
-        },
+      l.warn("confirm_blocked_stage", {
+        sessionId,
+        stage: session.stage,
       });
 
       await safeReply(interaction, "❌ Invalid session stage");
       return;
     }
 
+    // =============================
+    // STEP 2 → SUBMIT
+    // =============================
     const target = interaction.options.getString("target");
 
     if (!target) {
-      logger.emit({
-        scope: "quickadd.confirm",
-        event: "confirm_blocked_missing_target",
-        traceId,
-        level: "warn",
-        context: {
-          sessionId,
-        },
-        stats: {
-          confirm_blocked_missing_target: 1,
-        },
+      l.warn("confirm_blocked_missing_target", {
+        sessionId,
       });
 
       await safeReply(
@@ -255,16 +205,11 @@ export async function handleConfirm(
 
     const mode = resolveMode(session.type);
 
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_submit",
-      traceId,
-      context: {
-        sessionId,
-        mode,
-        count: entries.length,
-        target,
-      },
+    l.event("confirm_submit", {
+      sessionId,
+      mode,
+      count: entries.length,
+      target,
     });
 
     if (mode === "points") {
@@ -276,7 +221,7 @@ export async function handleConfirm(
           nickname: e.nickname,
           points: e.value,
         })),
-        traceId
+        ctx.traceId
       );
     } else {
       await enqueueEvents(
@@ -286,63 +231,35 @@ export async function handleConfirm(
           type: session.type,
           nickname: e.nickname,
         })),
-        traceId
+        ctx.traceId
       );
     }
 
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_cleanup",
-      traceId,
-      context: {
-        sessionId,
-      },
-    });
+    l.event("confirm_cleanup", { sessionId });
 
-    QuickAddBuffer.clear(sessionId, traceId);
-    QuickAddSession.end(guildId, userId, traceId);
+    QuickAddBuffer.clear(sessionId, ctx.traceId);
+    QuickAddSession.end(guildId, userId, ctx.traceId);
 
     await safeReply(
       interaction,
       `✅ Submitted ${entries.length} entries`
     );
 
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_done",
-      traceId,
-      context: {
-        sessionId,
-        mode,
-        count: entries.length,
-      },
-      meta: {
-        durationMs: duration,
-      },
-      stats: {
-        confirm_success: 1,
-      },
+    l.event("confirm_done", {
+      sessionId,
+      mode,
+      count: entries.length,
+      durationMs: duration,
     });
 
   } catch (err) {
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startedAt;
 
-    logger.emit({
-      scope: "quickadd.confirm",
-      event: "confirm_failed",
-      traceId,
-      level: "error",
-      context: {
-        sessionId,
-      },
-      meta: {
-        durationMs: duration,
-      },
-      stats: {
-        confirm_error: 1,
-      },
+    l.error("confirm_failed", {
+      sessionId,
+      durationMs: duration,
       error: err,
     });
 
