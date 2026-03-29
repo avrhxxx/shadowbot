@@ -117,29 +117,17 @@ async function handleModal(
   }
 
   if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
-    await EB.handleAddParticipantSubmit(
-      interaction,
-      parseEventId(customId),
-      traceId
-    );
+    await EB.handleAddParticipantSubmit(interaction, parseEventId(customId), traceId);
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
-    await EB.handleRemoveParticipantSubmit(
-      interaction,
-      parseEventId(customId),
-      traceId
-    );
+    await EB.handleRemoveParticipantSubmit(interaction, parseEventId(customId), traceId);
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
-    await EB.handleAbsentParticipantSubmit(
-      interaction,
-      parseEventId(customId),
-      traceId
-    );
+    await EB.handleAbsentParticipantSubmit(interaction, parseEventId(customId), traceId);
     return true;
   }
 
@@ -155,9 +143,6 @@ export async function handleEventInteraction(
   traceId: string
 ): Promise<boolean> {
   try {
-    // =============================
-    // 🔘 BUTTONS
-    // =============================
     if (interaction.isButton()) {
       const id = interaction.customId;
 
@@ -174,60 +159,62 @@ export async function handleEventInteraction(
         return true;
       }
 
-      // PREFIX FLOW
-
       if (id.startsWith(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX)) {
-        logger.emit({ scope: "events.handler", event: "cancel_confirm", traceId, context: { id } });
-        return await EB.handleCancelConfirm(interaction, id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, ""), traceId);
+        await EB.handleCancelConfirm(interaction, id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, ""), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.ADD_PREFIX)) {
-        logger.emit({ scope: "events.handler", event: "add_click", traceId, context: { id } });
-        return await EB.handleAddParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleAddParticipant(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.REMOVE_PREFIX)) {
-        logger.emit({ scope: "events.handler", event: "remove_click", traceId, context: { id } });
-        return await EB.handleRemoveParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleRemoveParticipant(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.ABSENT_PREFIX)) {
-        logger.emit({ scope: "events.handler", event: "absent_click", traceId, context: { id } });
-        return await EB.handleAbsentParticipant(interaction, parseEventId(id), traceId);
+        await EB.handleAbsentParticipant(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.SHOW_LIST_PREFIX)) {
-        return await EB.handleShowList(interaction, parseEventId(id), traceId);
+        await EB.handleShowList(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CATEGORY_PREFIX)) {
-        return await EB.handleCategoryClick(interaction, id.replace(IDS.BUTTONS.CATEGORY_PREFIX, ""), traceId);
+        await EB.handleCategoryClick(interaction, id.replace(IDS.BUTTONS.CATEGORY_PREFIX, ""), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX)) {
-        return await EB.handleDownload(interaction, parseEventId(id), traceId);
+        await EB.handleDownload(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.COMPARE_PREFIX)) {
-        return await EB.handleCompareButton(interaction, parseEventId(id), traceId);
+        await EB.handleCompareButton(interaction, parseEventId(id), traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_CONFIRM_PREFIX)) {
-        return await EB.handleClearEventConfirm(interaction, traceId);
+        await EB.handleClearEventConfirm(interaction, traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_ABORT_PREFIX)) {
-        return await EB.handleClearEventAbort(interaction, traceId);
+        await EB.handleClearEventAbort(interaction, traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_PREFIX)) {
-        return await EB.handleClearEventButton(interaction, parseEventId(id), traceId);
+        await EB.handleClearEventButton(interaction, parseEventId(id), traceId);
+        return true;
       }
     }
 
-    // =============================
-    // 📋 SELECTS
-    // =============================
     if (interaction.isStringSelectMenu()) {
       const id = interaction.customId;
 
@@ -241,17 +228,16 @@ export async function handleEventInteraction(
           context: { id },
         });
 
-        return await handler(interaction, traceId);
+        await handler(interaction, traceId);
+        return true;
       }
 
       if (id.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
-        return await EB.handleCompareSelect(interaction, traceId);
+        await EB.handleCompareSelect(interaction, traceId);
+        return true;
       }
     }
 
-    // =============================
-    // 🧾 MODALS
-    // =============================
     if (interaction.isModalSubmit()) {
       return await handleModal(interaction, traceId);
     }
