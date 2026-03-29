@@ -3,44 +3,36 @@
 // =====================================
 
 import fetch from "node-fetch";
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
 import { OCREngine } from "./OCREngine";
 import { OCRResult, OCRToken } from "./OCRTypes";
 import { runVisionOCR } from "../../google/GoogleVisionService";
 import { mapVisionToTokens } from "./VisionOCRExtractor";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 const USE_PREPROCESS = false;
 const ENABLE_HOCR = true;
 
 export async function runOCR(
   imageUrl: string,
-  traceId: string
+  ctx: TraceContext
 ): Promise<OCRResult> {
+  const l = log.ctx(ctx);
   const startedAt = Date.now();
 
-  logger.emit({
-    event: "ocr_input",
-    traceId,
-    context: {
-      imageUrl,
-      flags: { USE_PREPROCESS, ENABLE_HOCR },
-    },
+  l.event("ocr_input", {
+    imageUrl,
+    flags: { USE_PREPROCESS, ENABLE_HOCR },
   });
 
   try {
-    logger.emit({
-      event: "fetch_start",
-      traceId,
-    });
+    l.event("fetch_start");
 
     const res = await fetch(imageUrl);
 
     if (!res.ok) {
-      logger.emit({
-        event: "fetch_failed",
-        traceId,
-        level: "warn",
-        context: { status: res.status },
+      l.warn("fetch_failed", {
+        status: res.status,
       });
 
       throw new Error(`fetch_failed: ${res.status}`);
@@ -48,12 +40,8 @@ export async function runOCR(
 
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    logger.emit({
-      event: "image_loaded",
-      traceId,
-      context: {
-        size: buffer.length,
-      },
+    l.event("image_loaded", {
+      size: buffer.length,
     });
 
     let inputBuffer = buffer;
@@ -64,8 +52,8 @@ export async function runOCR(
     if (USE_PREPROCESS) {
       const { OCRPreprocessor } = await import("./OCRPreprocessor.js");
 
-      const base = await OCRPreprocessor.base(buffer, traceId);
-      inputBuffer = await OCRPreprocessor.enhance(base, traceId);
+      const base = await OCRPreprocessor.base(buffer, ctx);
+      inputBuffer = await OCRPreprocessor.enhance(base, ctx);
     }
 
     // =====================================
@@ -79,14 +67,11 @@ export async function runOCR(
       if (visionResult?.fullTextAnnotation?.text) {
         visionTokens = mapVisionToTokens(
           visionResult as any,
-          traceId
+          ctx
         );
       }
     } catch (error) {
-      logger.emit({
-        event: "vision_ocr_failed",
-        traceId,
-        level: "warn",
+      l.warn("vision_ocr_failed", {
         error,
       });
     }
@@ -95,9 +80,9 @@ export async function runOCR(
     // 🤖 TESSERACT
     // =====================================
     const [full, line, box] = await Promise.all([
-      OCREngine.full(inputBuffer, traceId),
-      OCREngine.line(inputBuffer, traceId),
-      OCREngine.box(inputBuffer, traceId),
+      OCREngine.full(inputBuffer, ctx),
+      OCREngine.line(inputBuffer, ctx),
+      OCREngine.box(inputBuffer, ctx),
     ]);
 
     // =====================================
@@ -107,12 +92,9 @@ export async function runOCR(
 
     if (ENABLE_HOCR) {
       try {
-        hocrResult = await OCREngine.hocr(inputBuffer, traceId);
+        hocrResult = await OCREngine.hocr(inputBuffer, ctx);
       } catch (error) {
-        logger.emit({
-          event: "hocr_failed",
-          traceId,
-          level: "warn",
+        l.warn("hocr_failed", {
           error,
         });
       }
@@ -136,26 +118,19 @@ export async function runOCR(
       });
     }
 
-    logger.emit({
-      event: "ocr_done",
-      traceId,
-      context: {
-        durationMs: Date.now() - startedAt,
-        sources: sources.length,
-      },
+    l.event("ocr_done", {
+      sources: sources.length,
+    }, {
+      durationMs: Date.now() - startedAt,
     });
 
     return { sources };
 
   } catch (error) {
-    logger.emit({
-      event: "ocr_failed",
-      traceId,
-      level: "error",
+    l.error("ocr_failed", {
       error,
-      context: {
-        durationMs: Date.now() - startedAt,
-      },
+    }, {
+      durationMs: Date.now() - startedAt,
     });
 
     return { sources: [] };
