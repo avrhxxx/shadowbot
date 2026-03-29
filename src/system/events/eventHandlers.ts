@@ -119,18 +119,27 @@ async function handleModal(
   if (customId.startsWith(IDS.MODALS.ADD_PREFIX)) {
     await EB.handleAddParticipantSubmit(
       interaction,
-      parseEventId(customId, IDS.MODALS.ADD_PREFIX)
+      parseEventId(customId, IDS.MODALS.ADD_PREFIX),
+      traceId
     );
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.REMOVE_PREFIX)) {
-    await EB.handleRemoveParticipantSubmit(interaction);
+    await EB.handleRemoveParticipantSubmit(
+      interaction,
+      parseEventId(customId, IDS.MODALS.REMOVE_PREFIX),
+      traceId
+    );
     return true;
   }
 
   if (customId.startsWith(IDS.MODALS.ABSENT_PREFIX)) {
-    await EB.handleAbsentParticipantSubmit(interaction);
+    await EB.handleAbsentParticipantSubmit(
+      interaction,
+      parseEventId(customId, IDS.MODALS.ABSENT_PREFIX),
+      traceId
+    );
     return true;
   }
 
@@ -165,7 +174,8 @@ export async function handleEventInteraction(
       if (id.startsWith(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX)) {
         await EB.handleCancelConfirm(
           interaction,
-          id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, "")
+          id.replace(IDS.BUTTONS.CANCEL_CONFIRM_PREFIX, ""),
+          traceId
         );
         return true;
       }
@@ -173,56 +183,82 @@ export async function handleEventInteraction(
       if (id.startsWith(IDS.BUTTONS.ADD_PREFIX)) {
         await EB.handleAddParticipant(
           interaction,
-          parseEventId(id, IDS.BUTTONS.ADD_PREFIX)
+          parseEventId(id, IDS.BUTTONS.ADD_PREFIX),
+          traceId
         );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.REMOVE_PREFIX)) {
-        await EB.handleRemoveParticipant(interaction);
+        await EB.handleRemoveParticipant(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.REMOVE_PREFIX),
+          traceId
+        );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.ABSENT_PREFIX)) {
-        await EB.handleAbsentParticipant(interaction);
+        await EB.handleAbsentParticipant(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.ABSENT_PREFIX),
+          traceId
+        );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.SHOW_LIST_PREFIX)) {
-        await EB.handleShowList(interaction);
+        await EB.handleShowList(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.SHOW_LIST_PREFIX),
+          traceId
+        );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CATEGORY_PREFIX)) {
         await EB.handleCategoryClick(
           interaction,
-          id.replace(IDS.BUTTONS.CATEGORY_PREFIX, "")
+          id.replace(IDS.BUTTONS.CATEGORY_PREFIX, ""),
+          traceId
         );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX)) {
-        await EB.handleDownload(interaction);
+        await EB.handleDownload(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.DOWNLOAD_SINGLE_PREFIX),
+          traceId
+        );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.COMPARE_PREFIX)) {
-        await EB.handleCompareButton(interaction);
+        await EB.handleCompareButton(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.COMPARE_PREFIX),
+          traceId
+        );
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_CONFIRM_PREFIX)) {
-        await EB.handleClearEventConfirm(interaction);
+        await EB.handleClearEventConfirm(interaction, traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_ABORT_PREFIX)) {
-        await EB.handleClearEventAbort(interaction);
+        await EB.handleClearEventAbort(interaction, traceId);
         return true;
       }
 
       if (id.startsWith(IDS.BUTTONS.CLEAR_PREFIX)) {
-        await EB.handleClearEventButton(interaction);
+        await EB.handleClearEventButton(
+          interaction,
+          parseEventId(id, IDS.BUTTONS.CLEAR_PREFIX),
+          traceId
+        );
         return true;
       }
     }
@@ -245,7 +281,7 @@ export async function handleEventInteraction(
       }
 
       if (id.startsWith(IDS.SELECTS.COMPARE_SELECT_PREFIX)) {
-        await EB.handleCompareSelect(interaction);
+        await EB.handleCompareSelect(interaction, traceId);
         return true;
       }
     }
