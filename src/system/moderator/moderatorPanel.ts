@@ -1,4 +1,4 @@
-// src/moderatorPanel/moderatorPanel.ts
+// src/system/moderator/moderatorPanel.ts
 
 import {
   Client,
@@ -18,9 +18,9 @@ import { handlePointsMenu } from "./moderatorButtons/pointsMenu";
 import { handleTranslateMenu } from "./moderatorButtons/translateMenu";
 import { handleAbsenceMenu } from "./moderatorButtons/absenceMenu";
 
-import { SheetRepository } from "../google/SheetRepository";
-import crypto from "crypto";
-import { logger } from "../core/logger/log";
+import { SheetRepository } from "../../google/SheetRepository";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // =============================
 // TYPES
@@ -111,25 +111,22 @@ function formatVersion(num: number): string {
 
 // ---- SYNC ----
 async function syncModeratorPanel(
+  ctx: TraceContext,
   guildId: string,
   modChannel: TextChannel,
-  messages: Map<string, Message>,
-  traceId: string
+  messages: Map<string, Message>
 ) {
+  const l = log.ctx(ctx);
+
   if (!messages.get("dateEmbed")) {
     const msg = await modChannel.send({ embeds: [renderDateFormatsEmbed()] });
 
     await updateConfig(guildId, { dateEmbedId: msg.id });
 
-    logger.emit({
-      scope: "moderator.panel",
-      event: "moderator_date_embed_create",
-      traceId,
-      context: {
-        guildId,
-        channelId: modChannel.id,
-        messageId: msg.id,
-      },
+    l.event("moderator_date_embed_create", {
+      guildId,
+      channelId: modChannel.id,
+      messageId: msg.id,
     });
   }
 
@@ -141,15 +138,10 @@ async function syncModeratorPanel(
 
     await updateConfig(guildId, { hubMessageId: msg.id });
 
-    logger.emit({
-      scope: "moderator.panel",
-      event: "moderator_hub_create",
-      traceId,
-      context: {
-        guildId,
-        channelId: modChannel.id,
-        messageId: msg.id,
-      },
+    l.event("moderator_hub_create", {
+      guildId,
+      channelId: modChannel.id,
+      messageId: msg.id,
     });
   }
 }
@@ -157,22 +149,18 @@ async function syncModeratorPanel(
 // ---- INIT ----
 const startedGuilds = new Set<string>();
 
-export async function initModeratorPanel(client: Client) {
+export async function initModeratorPanel(client: Client, ctx: TraceContext) {
   if (!client.user) return;
+
+  const l = log.ctx(ctx);
 
   for (const guild of client.guilds.cache.values()) {
     if (startedGuilds.has(guild.id)) continue;
     startedGuilds.add(guild.id);
 
-    const traceId = crypto.randomUUID();
     const guildId = guild.id;
 
-    logger.emit({
-      scope: "moderator.panel",
-      event: "moderator_init_start",
-      traceId,
-      context: { guildId },
-    });
+    l.event("moderator_init_start", { guildId });
 
     let config = await getConfig(guildId);
 
@@ -190,15 +178,10 @@ export async function initModeratorPanel(client: Client) {
         type: ChannelType.GuildText
       });
 
-      logger.emit({
-        scope: "moderator.panel",
-        event: "moderator_channel_create",
-        traceId,
-        context: {
-          guildId,
-          channelId: modChannel.id,
-          name: "moderator-panel",
-        },
+      l.event("moderator_channel_create", {
+        guildId,
+        channelId: modChannel.id,
+        name: "moderator-panel",
       });
 
       await updateConfig(guildId, { modChannelId: modChannel.id });
@@ -210,15 +193,10 @@ export async function initModeratorPanel(client: Client) {
         type: ChannelType.GuildText
       });
 
-      logger.emit({
-        scope: "moderator.panel",
-        event: "moderator_channel_create",
-        traceId,
-        context: {
-          guildId,
-          channelId: updatesChannel.id,
-          name: "bot-updates",
-        },
+      l.event("moderator_channel_create", {
+        guildId,
+        channelId: updatesChannel.id,
+        name: "bot-updates",
       });
 
       await updateConfig(guildId, { updateChannelId: updatesChannel.id });
@@ -251,7 +229,7 @@ export async function initModeratorPanel(client: Client) {
       updated = true;
     }
 
-    await syncModeratorPanel(guildId, modChannel, map, traceId);
+    await syncModeratorPanel(ctx, guildId, modChannel, map);
 
     config = await getConfig(guildId);
 
@@ -267,14 +245,9 @@ export async function initModeratorPanel(client: Client) {
         content: `Shadow Bot updated → v${formatVersion(versionNum)}\n<t:${unix}:F>`
       });
 
-      logger.emit({
-        scope: "moderator.panel",
-        event: "moderator_version_update",
-        traceId,
-        context: {
-          guildId,
-          version: formatVersion(versionNum),
-        },
+      l.event("moderator_version_update", {
+        guildId,
+        version: formatVersion(versionNum),
       });
 
       await updateConfig(guildId, {
@@ -283,16 +256,9 @@ export async function initModeratorPanel(client: Client) {
       });
     }
 
-    logger.emit({
-      scope: "moderator.panel",
-      event: "moderator_init_success",
-      traceId,
-      context: { guildId },
-    });
+    l.event("moderator_init_success", { guildId });
 
     setInterval(async () => {
-      const traceId = crypto.randomUUID();
-
       try {
         const fetched = await modChannel!.messages.fetch({ limit: 50 });
 
@@ -304,23 +270,14 @@ export async function initModeratorPanel(client: Client) {
         if (dateMsg) map.set("dateEmbed", dateMsg);
         if (hubMsg) map.set("hubMessage", hubMsg);
 
-        await syncModeratorPanel(guildId, modChannel!, map, traceId);
+        await syncModeratorPanel(ctx, guildId, modChannel!, map);
 
-        logger.emit({
-          scope: "moderator.panel",
-          event: "moderator_interval_sync",
-          traceId,
-          context: { guildId },
-        });
+        l.event("moderator_interval_sync", { guildId });
 
       } catch (err) {
-        logger.emit({
-          scope: "moderator.panel",
-          event: "moderator_interval_error",
-          traceId,
-          level: "error",
+        l.error("moderator_interval_error", {
           error: err,
-          context: { guildId },
+          guildId
         });
       }
     }, 60000);
@@ -333,57 +290,48 @@ export async function initModeratorPanel(client: Client) {
 
 export async function handleModeratorInteraction(
   interaction: Interaction,
-  traceId: string
+  ctx: TraceContext
 ): Promise<boolean> {
   if (!interaction.isButton()) return false;
+
+  const l = log.ctx(ctx);
 
   try {
     const id = interaction.customId;
 
-    logger.emit({
-      scope: "moderator.handler",
-      event: "moderator_button",
-      traceId,
-      context: {
-        id,
-        guildId: interaction.guildId,
-      },
+    l.event("moderator_button", {
+      id,
+      guildId: interaction.guildId,
     });
 
     switch (id) {
       case "moderator_event_menu":
-        await handleEventMenu(interaction);
+        await handleEventMenu(interaction, ctx);
         return true;
 
       case "moderator_points_menu":
-        await handlePointsMenu(interaction);
+        await handlePointsMenu(interaction, ctx);
         return true;
 
       case "moderator_translate_menu":
-        await handleTranslateMenu(interaction);
+        await handleTranslateMenu(interaction, ctx);
         return true;
 
       case "moderator_absence_menu":
-        await handleAbsenceMenu(interaction);
+        await handleAbsenceMenu(interaction, ctx);
         return true;
 
       case "moderator_help":
-        await handleModeratorHelp(interaction);
+        await handleModeratorHelp(interaction, ctx);
         return true;
     }
 
     return false;
   } catch (error) {
-    logger.emit({
-      scope: "moderator.handler",
-      event: "moderator_error",
-      traceId,
-      level: "error",
+    l.error("moderator_error", {
       error,
-      context: {
-        guildId: interaction.guildId,
-        id: interaction.isButton() ? interaction.customId : undefined,
-      },
+      guildId: interaction.guildId,
+      id: interaction.isButton() ? interaction.customId : undefined,
     });
 
     if (interaction.isRepliable()) {
