@@ -1,15 +1,56 @@
+// src/system/events/eventsButtons/utils.ts
+
 /**
  * Wyciąga ID eventu z customId przycisku lub modala.
- * Działa dla wszystkich formatów:
+ * BEZPIECZNE – nie używa lastIndexOf("_"), tylko znane prefixy.
+ *
+ * Obsługiwane formaty:
  * event_add_ID
  * event_remove_ID
  * event_show_list_ID
  * event_download_single_ID
- * itd.
+ * event_compare_ID
+ * event_clear_ID
  */
 export function parseEventId(customId: string): string {
-  const index = customId.lastIndexOf("_");
-  return customId.substring(index + 1);
+  const prefixes = [
+    "event_add_",
+    "event_remove_",
+    "event_absent_",
+    "event_show_list_",
+    "event_download_single_",
+    "event_compare_",
+    "event_clear_"
+  ];
+
+  for (const prefix of prefixes) {
+    if (customId.startsWith(prefix)) {
+      return customId.slice(prefix.length);
+    }
+  }
+
+  throw new Error(`Unable to parse eventId from customId: ${customId}`);
+}
+
+/**
+ * Specjalny parser dla:
+ * compare_download_ID1_ID2
+ */
+export function parseCompareIds(customId: string): { idA: string; idB: string } {
+  const prefix = "compare_download_";
+
+  if (!customId.startsWith(prefix)) {
+    throw new Error(`Invalid compare customId: ${customId}`);
+  }
+
+  const rest = customId.slice(prefix.length);
+  const [idA, idB] = rest.split("_");
+
+  if (!idA || !idB) {
+    throw new Error(`Invalid compare IDs in customId: ${customId}`);
+  }
+
+  return { idA, idB };
 }
 
 /* ===========================
