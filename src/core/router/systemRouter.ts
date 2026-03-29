@@ -4,7 +4,8 @@
 
 import { Interaction } from "discord.js";
 import { createTraceId } from "../ids/IdGenerator";
-import { logger } from "../logger/log";
+import { log } from "../logger/log";
+import { TraceContext } from "../trace/TraceContext";
 
 // =============================
 // 🧩 SYSTEM IMPORTS
@@ -20,11 +21,11 @@ import { handlePointsInteraction } from "../../system/points";
 
 type SystemHandler = (
   interaction: Interaction,
-  traceId: string
+  ctx: TraceContext
 ) => Promise<boolean>;
 
 type SystemHandlerEntry = {
-  name: string;
+  name: TraceContext["system"];
   handler: SystemHandler;
 };
 
@@ -47,10 +48,16 @@ export async function handleSystemInteraction(
 ) {
   const traceId = createTraceId();
 
-  logger.emit({
-    scope: "system.router",
-    event: "received",
+  // 🔥 BASE CTX
+  const baseCtx: TraceContext = {
     traceId,
+    source: "discord",
+    userId: interaction.user?.id,
+  };
+
+  const l = log.ctx(baseCtx);
+
+  l.event("received", {
     input: {
       interactionId: interaction.id,
       type: interaction.type,
@@ -60,30 +67,24 @@ export async function handleSystemInteraction(
   for (const { name, handler } of SYSTEM_HANDLERS) {
     const startTime = Date.now();
 
-    try {
-      // 🔍 ATTEMPT LOG (NEW)
-      logger.emit({
-        scope: "system.router",
-        event: "handler_attempt",
-        traceId,
-        context: { handler: name },
-      });
+    // 🔁 CHILD CTX (per system)
+    const ctx: TraceContext = {
+      ...baseCtx,
+      system: name,
+    };
 
-      const handled = await handler(interaction, traceId);
+    const l = log.ctx(ctx);
+
+    try {
+      l.event("handler_attempt");
+
+      const handled = await handler(interaction, ctx);
 
       if (handled) {
-        logger.emit({
-          scope: "system.router",
-          event: "handled",
-          traceId,
-          context: {
-            handler: name,
-          },
-          result: {
-            handled: true,
-          },
+        l.event("handled", {
+          result: { handled: true },
           timing: {
-            label: name,
+            label: name!,
             durationMs: Date.now() - startTime,
           },
         });
@@ -91,28 +92,18 @@ export async function handleSystemInteraction(
         return;
       }
     } catch (err) {
-      logger.emit({
-        scope: "system.router",
-        event: "handler_error",
-        traceId,
-        level: "error",
-        context: {
-          handler: name,
-        },
+      l.error("handler_error", err, {
         timing: {
-          label: name,
+          label: name!,
           durationMs: Date.now() - startTime,
         },
-        error: err,
       });
     }
   }
 
-  logger.emit({
-    scope: "system.router",
-    event: "unhandled",
-    traceId,
-    level: "warn",
+  const lFinal = log.ctx(baseCtx);
+
+  lFinal.warn("unhandled", {
     input: {
       interactionId: interaction.id,
       type: interaction.type,
