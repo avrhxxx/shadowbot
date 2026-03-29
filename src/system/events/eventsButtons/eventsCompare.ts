@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsCompare.ts
+// =====================================
+
 import {
   ButtonInteraction,
   StringSelectMenuInteraction,
@@ -11,7 +15,7 @@ import {
   AttachmentBuilder
 } from "discord.js";
 import { EventObject, getEvents, getConfig } from "../eventService";
-import { formatEventUTC } from "../../utils/timeUtils";
+import { formatEventUTC } from "../../../shared/utils/timeUtils";
 
 function formatEventUTCObj(e: EventObject) {
   return formatEventUTC(e.day, e.month, e.hour, e.minute, e.year);
