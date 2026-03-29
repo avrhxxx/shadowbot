@@ -21,10 +21,16 @@ export async function handleCompareWeeks(
       },
     });
 
-    await interaction.reply({
+    const payload = {
       content: "📊 Compare Weeks – placeholder functionality. To be implemented.",
       ephemeral: true
-    });
+    };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else {
+      await interaction.reply(payload);
+    }
 
   } catch (error) {
     logger.emit({
