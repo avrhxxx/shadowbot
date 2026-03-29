@@ -1,4 +1,4 @@
-l// src/system/points/pointsButtons/pointsManagement.ts
+// src/system/points/pointsButtons/pointsManagement.ts
 
 import { MessageCreateOptions, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, CacheType } from "discord.js";
 import * as pointsDonations from "./pointsDonations";
@@ -105,6 +105,15 @@ export async function handlePointsManagement(
   if (!interaction.customId.startsWith("points_management_category_")) return;
 
   const categoryId = interaction.customId.replace("points_management_category_", "");
+  const guildId = interaction.guildId;
+
+  if (!guildId) {
+    await safeReply(interaction, {
+      content: "❌ Guild context is required.",
+      ephemeral: true
+    });
+    return;
+  }
 
   try {
     logger.emit({
@@ -113,7 +122,7 @@ export async function handlePointsManagement(
       traceId,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
         categoryId,
       },
     });
@@ -122,10 +131,10 @@ export async function handlePointsManagement(
     let createButton: ButtonBuilder;
 
     if (categoryId === "donations") {
-      weekRows = await pointsDonations.renderWeeks();
+      weekRows = await pointsDonations.renderWeeks(guildId);
       createButton = pointsDonations.createWeekButton("donations");
     } else if (categoryId === "duel") {
-      weekRows = await pointsDuel.renderWeeks();
+      weekRows = await pointsDuel.renderWeeks(guildId);
       createButton = pointsDuel.createWeekButton("duel");
     } else {
       await safeReply(interaction, {
@@ -155,7 +164,7 @@ export async function handlePointsManagement(
       error,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
         categoryId,
       },
     });
