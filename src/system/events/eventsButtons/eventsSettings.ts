@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsButtons/eventsSettings.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsSettings.ts
+// =====================================
+
 import { 
   Interaction, 
   StringSelectMenuBuilder, 
@@ -7,16 +10,16 @@ import {
 } from "discord.js";
 
 import { setConfig, getConfig } from "../eventService";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // ======================================================
 // HANDLER SETTINGS BUTTON
 // ======================================================
-export async function handleSettings(interaction: Interaction) {
+export async function handleSettings(interaction: Interaction, ctx: TraceContext) {
   if (!interaction.isButton() || !interaction.guild) return;
 
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
   const textChannels = interaction.guild.channels.cache
     .filter(c => c.isTextBased())
@@ -25,13 +28,8 @@ export async function handleSettings(interaction: Interaction) {
   if (!textChannels.length) {
     await interaction.reply({ content: "No text channels available.", ephemeral: true });
 
-    logger.emit({
-      scope: "events.settings",
-      event: "no_channels",
-      traceId,
-      context: {
-        guildId: interaction.guild.id,
-      },
+    l.warn("no_channels", {
+      guildId: interaction.guild.id,
     });
 
     return;
@@ -55,33 +53,23 @@ export async function handleSettings(interaction: Interaction) {
     ephemeral: true
   });
 
-  logger.emit({
-    scope: "events.settings",
-    event: "open_settings",
-    traceId,
-    context: {
-      guildId: interaction.guild.id,
-      channelsCount: textChannels.length,
-    },
+  l.event("open_settings", {
+    guildId: interaction.guild.id,
+    channelsCount: textChannels.length,
   });
 }
 
 // ======================================================
 // HANDLER SELECT MENU
 // ======================================================
-export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
-  const traceId = createTraceId();
+export async function handleSettingsSelect(interaction: StringSelectMenuInteraction, ctx: TraceContext) {
+  const l = log.ctx(ctx);
 
   const guildId = interaction.guildId;
   if (!guildId || !interaction.values.length) {
     await interaction.reply({ content: "No channel selected.", ephemeral: true });
 
-    logger.emit({
-      scope: "events.settings",
-      event: "no_selection",
-      traceId,
-      context: { guildId },
-    });
+    l.warn("no_selection", { guildId });
 
     return;
   }
@@ -98,15 +86,9 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
   if (!key) {
     await interaction.reply({ content: "Unknown selection.", ephemeral: true });
 
-    logger.emit({
-      scope: "events.settings",
-      event: "unknown_selection",
-      traceId,
-      context: {
-        guildId,
-        customId: interaction.customId,
-      },
-      level: "warn",
+    l.warn("unknown_selection", {
+      guildId,
+      customId: interaction.customId,
     });
 
     return;
@@ -121,15 +103,10 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
         ephemeral: true
       });
 
-      logger.emit({
-        scope: "events.settings",
-        event: "channel_unchanged",
-        traceId,
-        context: {
-          guildId,
-          channelId,
-          key,
-        },
+      l.event("channel_unchanged", {
+        guildId,
+        channelId,
+        key,
       });
 
       return;
@@ -142,29 +119,17 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.settings",
-      event: "channel_updated",
-      traceId,
-      context: {
-        guildId,
-        channelId,
-        key,
-      },
+    l.event("channel_updated", {
+      guildId,
+      channelId,
+      key,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.settings",
-      event: "channel_update_failed",
-      traceId,
-      level: "error",
-      context: {
-        guildId,
-        channelId,
-        key,
-      },
-      error: err,
+    l.error("channel_update_failed", err, {
+      guildId,
+      channelId,
+      key,
     });
 
     await interaction.reply({
