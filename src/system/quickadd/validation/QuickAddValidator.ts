@@ -1,25 +1,8 @@
 // =====================================
-// 📁 src/quickadd/validation/QuickAddValidator.ts
+// 📁 src/system/quickadd/validation/QuickAddValidator.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Validates parsed entries (BATCH, evaluate-only).
- *
- * Responsible for:
- * - nickname resolution
- * - confidence scoring
- * - duplicate detection
- * - suggestions
- *
- * ❗ RULES:
- * - NO blocking (evaluate_only)
- * - BATCH processing
- * - FULL trace logging
- * - traceId REQUIRED (STRICT)
- */
-
-import { logger } from "../../core/logger/log";
+import { log } from "../../core/logger/log";
 import { resolveNickname } from "../mapping/NicknameResolver";
 
 import {
@@ -27,16 +10,11 @@ import {
   ValidatedEntry,
   EntryStatus,
 } from "../core/QuickAddTypes";
+import { TraceContext } from "../../core/trace/TraceContext";
 
 // =====================================
 // 🧠 HELPERS
 // =====================================
-
-function assertTrace(traceId: string) {
-  if (!traceId) {
-    throw new Error("[VALIDATOR ERROR] Missing traceId");
-  }
-}
 
 function normalize(str: string): string {
   return str.trim().toLowerCase();
@@ -69,10 +47,9 @@ function pickHigherStatus(
 
 export async function validateEntries(
   entries: ParsedEntry[],
-  traceId: string
+  ctx: TraceContext
 ): Promise<ValidatedEntry[]> {
-  assertTrace(traceId);
-
+  const l = log.ctx(ctx);
   const startedAt = Date.now();
 
   const results: ValidatedEntry[] = [];
@@ -80,22 +57,14 @@ export async function validateEntries(
 
   let idCounter = 1;
 
-  logger.emit({
-    scope: "quickadd.validator",
-    event: "validation_start",
-    traceId,
-    context: { entries: entries.length },
+  l.event("validation_start", {
+    entries: entries.length,
   });
 
   for (const entry of entries) {
-    logger.emit({
-      scope: "quickadd.validator",
-      event: "validation_entry_start",
-      traceId,
-      context: {
-        nickname: entry.nickname,
-        value: entry.value,
-      },
+    l.event("validation_entry_start", {
+      nickname: entry.nickname,
+      value: entry.value,
     });
 
     const originalNickname = entry.nickname;
@@ -114,11 +83,8 @@ export async function validateEntries(
       confidence = 0;
       isInvalidValue = true;
 
-      logger.emit({
-        scope: "quickadd.validator",
-        event: "decision_invalid_value",
-        traceId,
-        context: { value: entry.value },
+      l.event("decision_invalid_value", {
+        value: entry.value,
       });
     }
 
@@ -128,27 +94,16 @@ export async function validateEntries(
     let resolved = "";
 
     try {
-      resolved = await resolveNickname(entry.nickname, traceId);
+      resolved = await resolveNickname(entry.nickname, ctx);
 
-      logger.emit({
-        scope: "quickadd.validator",
-        event: "resolve_result",
-        traceId,
-        context: {
-          input: entry.nickname,
-          resolved,
-        },
+      l.event("resolve_result", {
+        input: entry.nickname,
+        resolved,
       });
     } catch (err) {
-      logger.emit({
-        scope: "quickadd.validator",
-        event: "resolve_failed",
-        traceId,
-        level: "warn",
+      l.warn("resolve_failed", {
+        input: entry.nickname,
         error: err,
-        context: {
-          input: entry.nickname,
-        },
       });
     }
 
@@ -163,11 +118,8 @@ export async function validateEntries(
         status = pickHigherStatus(status, "UNRESOLVED");
         confidence = 0.3;
 
-        logger.emit({
-          scope: "quickadd.validator",
-          event: "decision_unresolved",
-          traceId,
-          context: { nickname: entry.nickname },
+        l.event("decision_unresolved", {
+          nickname: entry.nickname,
         });
 
         if (
@@ -176,26 +128,18 @@ export async function validateEntries(
         ) {
           confidence = 0.1;
 
-          logger.emit({
-            scope: "quickadd.validator",
-            event: "decision_low_quality_ocr",
-            traceId,
-            context: { nickname: entry.nickname },
+          l.event("decision_low_quality_ocr", {
+            nickname: entry.nickname,
           });
         }
       } else {
         const similarity = stringSimilarity(entry.nickname, resolved);
         confidence = similarity;
 
-        logger.emit({
-          scope: "quickadd.validator",
-          event: "similarity_computed",
-          traceId,
-          context: {
-            input: entry.nickname,
-            resolved,
-            similarity,
-          },
+        l.event("similarity_computed", {
+          input: entry.nickname,
+          resolved,
+          similarity,
         });
 
         if (similarity >= 0.9) {
@@ -219,11 +163,8 @@ export async function validateEntries(
       status = pickHigherStatus(status, "DUPLICATE");
       confidence = Math.min(confidence, 0.5);
 
-      logger.emit({
-        scope: "quickadd.validator",
-        event: "decision_duplicate",
-        traceId,
-        context: { key },
+      l.event("decision_duplicate", {
+        key,
       });
     } else {
       seen.add(key);
@@ -241,28 +182,18 @@ export async function validateEntries(
 
     results.push(validated);
 
-    logger.emit({
-      scope: "quickadd.validator",
-      event: "validation_entry_done",
-      traceId,
-      context: {
-        id: validated.id,
-        nickname: validated.nickname,
-        status: validated.status,
-        confidence: validated.confidence,
-        suggestion: validated.suggestion,
-      },
+    l.event("validation_entry_done", {
+      id: validated.id,
+      nickname: validated.nickname,
+      status: validated.status,
+      confidence: validated.confidence,
+      suggestion: validated.suggestion,
     });
   }
 
-  logger.emit({
-    scope: "quickadd.validator",
-    event: "validation_done",
-    traceId,
-    stats: {
-      total: results.length,
-      durationMs: Date.now() - startedAt,
-    },
+  l.event("validation_done", {}, {
+    total: results.length,
+    durationMs: Date.now() - startedAt,
   });
 
   return results;
