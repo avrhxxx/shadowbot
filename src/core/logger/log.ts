@@ -22,10 +22,13 @@ export type LogPayload = {
   stats?: Record<string, number>;
   meta?: Record<string, unknown>;
 
-  // 🔥 NEW: OBSERVABILITY
+  // 🔥 OBSERVABILITY
   metrics?: {
     increment?: string;
     value?: number;
+
+    // ✅ FIX: allow legacy / accidental fields
+    [key: string]: unknown;
   };
 
   timing?: {
