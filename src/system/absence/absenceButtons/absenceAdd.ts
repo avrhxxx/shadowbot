@@ -13,8 +13,8 @@ import {
 } from "discord.js";
 import { createAbsence, getAbsences } from "../absenceService";
 import { notifyAbsenceAdded } from "./absenceNotification";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // ----------------------------
 // HELPERS TO CREATE INPUTS
@@ -66,20 +66,15 @@ function formatDateDisplay({ day, month, year }: { day: number; month: number; y
 // ----------------------------
 // SHOW MODAL
 // ----------------------------
-export async function handleAddAbsence(interaction: ButtonInteraction) {
+export async function handleAddAbsence(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
   if (!interaction.isButton()) return;
 
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "add_modal_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-    },
-  });
+  l.event("add_modal_open");
 
   const modal = new ModalBuilder()
     .setTitle("Add Absence")
@@ -101,31 +96,21 @@ export async function handleAddAbsence(interaction: ButtonInteraction) {
 // ----------------------------
 // HANDLE MODAL SUBMIT
 // ----------------------------
-export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction) {
-  const traceId = createTraceId();
+export async function handleAddAbsenceSubmit(
+  interaction: ModalSubmitInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guildId!;
   const guild = interaction.guild as Guild;
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "add_submit_received",
-    traceId,
-    input: {
-      guildId,
-      userId: interaction.user.id,
-    },
-  });
+  l.event("add_submit_received");
 
   if (!guild) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
+    l.error("missing_guild", new Error("Guild not found"));
     return;
   }
 
@@ -136,13 +121,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const absences = await getAbsences(guildId);
 
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "duplicate_player",
-      traceId,
-      level: "warn",
-      context: { player: nick },
-    });
+    l.warn("duplicate_player", { player: nick });
 
     await interaction.followUp({ content: `❌ Player ${nick} is already on the absence list.` });
     return;
@@ -152,13 +131,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toDate = parseDayMonth(toRaw);
 
   if (!fromDate || !toDate) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "invalid_date_format",
-      traceId,
-      level: "warn",
-      input: { fromRaw, toRaw },
-    });
+    l.warn("invalid_date_format", { fromRaw, toRaw });
 
     await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
     return;
@@ -168,13 +141,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
 
   if (fromTs > toTs) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "invalid_date_range",
-      traceId,
-      level: "warn",
-      input: { fromRaw, toRaw },
-    });
+    l.warn("invalid_date_range", { fromRaw, toRaw });
 
     await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
@@ -193,10 +160,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       createdAt: Date.now()
     });
 
-    logger.emit({
-      scope: "absence.buttons",
-      event: "absence_created",
-      traceId,
+    l.event("absence_created", {
       result: {
         player: nick,
         id,
@@ -215,13 +179,7 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
     );
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "create_absence_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
+    l.error("create_absence_failed", err);
 
     await interaction.followUp({ content: "❌ Failed to save absence." });
   }
