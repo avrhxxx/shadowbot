@@ -21,6 +21,11 @@ export class SheetRepository<T extends { id?: string }> {
     dataRows: unknown[][];
   }> {
     const rows = await readSheet(this.tab);
+
+    if (!rows || !rows.length) {
+      return { headers: [], dataRows: [] };
+    }
+
     const headers: string[] = (rows[0] as string[]) || [];
     const dataRows = rows.slice(1) as unknown[][];
 
@@ -38,12 +43,13 @@ export class SheetRepository<T extends { id?: string }> {
 
       if (
         typeof val === "string" &&
+        val.length > 1 &&
         (val.startsWith("[") || val.startsWith("{"))
       ) {
         try {
           val = JSON.parse(val);
         } catch {
-          // ignore parse error
+          // ignore invalid JSON
         }
       }
 
@@ -60,11 +66,17 @@ export class SheetRepository<T extends { id?: string }> {
     return headers.map((h) => {
       const val = (data as Record<string, unknown>)[h];
 
+      if (val === null || val === undefined) return "";
+
       if (Array.isArray(val) || typeof val === "object") {
-        return JSON.stringify(val);
+        try {
+          return JSON.stringify(val);
+        } catch {
+          return "";
+        }
       }
 
-      return val ?? "";
+      return val;
     });
   }
 
