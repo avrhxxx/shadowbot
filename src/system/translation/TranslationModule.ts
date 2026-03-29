@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/translation/TranslationModule.ts
+// 📁 src/system/translation/TranslationModule.ts
 // =====================================
 
 import {
@@ -12,8 +12,8 @@ import {
   MessageFlags
 } from "discord.js";
 import fetch from "node-fetch";
-import { logger } from "../core/logger/log";
-import { createTraceId } from "../core/ids/IdGenerator";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // =====================================
 // 🔹 CONFIG
@@ -56,10 +56,10 @@ const LANGUAGES = [
 // 🚀 MODULE INIT
 // =====================================
 
-export function initTranslationModule(client: Client) {
-  client.on("messageReactionAdd", async (reaction, user) => {
-    const traceId = createTraceId();
+export function initTranslationModule(client: Client, ctx: TraceContext) {
+  const l = log.ctx(ctx);
 
+  client.on("messageReactionAdd", async (reaction, user) => {
     try {
       if (user.bot) return;
 
@@ -73,14 +73,9 @@ export function initTranslationModule(client: Client) {
 
       if (!message.content) return;
 
-      logger.emit({
-        scope: "translation.module",
-        event: "reaction_trigger",
-        traceId,
-        context: {
-          messageId: message.id,
-          userId: user.id
-        }
+      l.event("reaction_trigger", {
+        messageId: message.id,
+        userId: user.id
       });
 
       const embed = new EmbedBuilder()
@@ -136,12 +131,7 @@ export function initTranslationModule(client: Client) {
 
           const langCode = parts[2];
 
-          logger.emit({
-            scope: "translation.module",
-            event: "language_selected",
-            traceId,
-            context: { langCode }
-          });
+          l.event("language_selected", { langCode });
 
           if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -150,7 +140,7 @@ export function initTranslationModule(client: Client) {
           const translated = await translateText(
             message.content,
             langCode,
-            traceId
+            l
           );
 
           await interaction.editReply({
@@ -164,13 +154,7 @@ export function initTranslationModule(client: Client) {
           });
 
         } catch (error) {
-          logger.emit({
-            scope: "translation.module",
-            event: "interaction_error",
-            traceId,
-            level: "error",
-            error
-          });
+          l.error("interaction_error", { error });
 
           if (interaction.isRepliable()) {
             const payload = {
@@ -189,13 +173,8 @@ export function initTranslationModule(client: Client) {
 
       collector.on("end", async () => {
         try {
-          logger.emit({
-            scope: "translation.module",
-            event: "collector_end",
-            traceId
-          });
+          l.event("collector_end");
 
-          // 🔥 FIX: clone zamiast mutacji
           const disabledRows = rows.map((row) => {
             const newRow = new ActionRowBuilder<ButtonBuilder>();
 
@@ -222,24 +201,12 @@ export function initTranslationModule(client: Client) {
           }, 1000);
 
         } catch (error) {
-          logger.emit({
-            scope: "translation.module",
-            event: "cleanup_error",
-            traceId,
-            level: "error",
-            error
-          });
+          l.error("cleanup_error", { error });
         }
       });
 
     } catch (error) {
-      logger.emit({
-        scope: "translation.module",
-        event: "module_error",
-        traceId,
-        level: "error",
-        error
-      });
+      l.error("module_error", { error });
     }
   });
 
@@ -250,7 +217,7 @@ export function initTranslationModule(client: Client) {
   async function translateText(
     text: string,
     target: string,
-    traceId: string
+    l: ReturnType<typeof log.ctx>
   ): Promise<string> {
     // =============================
     // LIBRE
@@ -275,13 +242,7 @@ export function initTranslationModule(client: Client) {
         }
       }
     } catch (error) {
-      logger.emit({
-        scope: "translation.module",
-        event: "libre_failed",
-        traceId,
-        level: "warn",
-        error
-      });
+      l.warn("libre_failed", { error });
     }
 
     // =============================
@@ -308,13 +269,7 @@ export function initTranslationModule(client: Client) {
         return data[0][0][0];
       }
     } catch (error) {
-      logger.emit({
-        scope: "translation.module",
-        event: "google_failed",
-        traceId,
-        level: "error",
-        error
-      });
+      l.error("google_failed", { error });
     }
 
     return "Translation failed.";
