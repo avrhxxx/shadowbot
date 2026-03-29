@@ -6,10 +6,12 @@ import { logger } from "../../../core/logger/log";
 // -----------------------------
 // Render wszystkich tygodni dla kategorii Duel
 // -----------------------------
-export async function renderWeeks(): Promise<ActionRowBuilder<ButtonBuilder>[]> {
-  const weeks = await pointsService.getAllWeeks("Duel");
+export async function renderWeeks(
+  guildId: string
+): Promise<ActionRowBuilder<ButtonBuilder>[]> {
+  const weeks = await pointsService.getAllWeeks(guildId, "Duel");
 
-  return weeks.map(week => {
+  return weeks.map((week: string) => {
     const safeWeek = encodeURIComponent(week);
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -29,16 +31,42 @@ export async function handleWeekClick(
   traceId: string
 ) {
   try {
+    const guildId = interaction.guildId;
+
+    if (!guildId) {
+      await interaction.reply({
+        content: "❌ Guild not found.",
+        ephemeral: true
+      });
+      return;
+    }
+
     logger.emit({
       scope: "points.button",
       event: "points_week_click_duel",
       traceId,
       context: {
         userId: interaction.user.id,
-        guildId: interaction.guildId,
+        guildId,
         week,
       },
     });
+
+    // ✅ Defer żeby uniknąć "interaction failed"
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferUpdate();
+    }
+
+    // 🔥 Pobranie punktów (spójne z Donations)
+    const points = await pointsService.getPoints(
+      guildId,
+      "Duel",
+      week
+    );
+
+    const pointsText = points.length > 0
+      ? points.map((p) => `${p.nick}: ${p.points}`).join("\n")
+      : "_No points recorded yet_";
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -61,12 +89,12 @@ export async function handleWeekClick(
 
     if (interaction.replied || interaction.deferred) {
       await interaction.editReply({
-        content: `📌 Duel – Week ${week}`,
+        content: `📌 Duel – Week ${week}\n\n${pointsText}`,
         components: [row]
       });
     } else {
       await interaction.reply({
-        content: `📌 Duel – Week ${week}`,
+        content: `📌 Duel – Week ${week}\n\n${pointsText}`,
         components: [row],
         ephemeral: true
       });
