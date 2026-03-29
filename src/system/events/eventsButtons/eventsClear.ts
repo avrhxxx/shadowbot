@@ -17,7 +17,6 @@ import {
 } from "../eventService";
 
 import { parseEventId } from "./utils";
-import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
 // ======================================================
@@ -37,9 +36,9 @@ async function getEventById(
 // ======================================================
 export async function handleClearEventButton(
   interaction: ButtonInteraction,
-  eventId: string
+  eventId: string,
+  traceId: string
 ) {
-  const traceId = createTraceId();
   const guildId = interaction.guildId!;
 
   try {
@@ -111,9 +110,9 @@ export async function handleClearEventButton(
 // HANDLE CONFIRM CLEAR
 // ======================================================
 export async function handleClearEventConfirm(
-  interaction: ButtonInteraction
+  interaction: ButtonInteraction,
+  traceId: string
 ) {
-  const traceId = createTraceId();
   const guildId = interaction.guildId!;
   const eventId = parseEventId(interaction.customId);
 
@@ -173,10 +172,9 @@ export async function handleClearEventConfirm(
 // HANDLE ABORT CLEAR
 // ======================================================
 export async function handleClearEventAbort(
-  interaction: ButtonInteraction
+  interaction: ButtonInteraction,
+  traceId: string
 ) {
-  const traceId = createTraceId();
-
   await interaction.reply({
     content: "Clear action aborted.",
     ephemeral: true
