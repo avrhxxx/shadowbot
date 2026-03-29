@@ -1,8 +1,8 @@
 // =====================================
-// 📁 src/google/googleSheetsStorage.ts
+// 📁 src/integrations/google/googleSheetsStorage.ts
 // =====================================
 
-import { google } from "googleapis";
+import { sheetsClient } from "./googleSheetsClient";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 
@@ -36,23 +36,12 @@ const QUICKADD_POINTS_QUEUE_TAB = "quickadd_points_queue";
 // ENV VALIDATION
 // --------------------------
 if (!SHEET_ID) throw new Error("GOOGLE_SHEET_ID env variable is missing");
-if (!process.env.GOOGLE_SERVICE_ACCOUNT)
-  throw new Error("GOOGLE_SERVICE_ACCOUNT env variable is missing");
-
-const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-
-const auth = new google.auth.GoogleAuth({
-  credentials: serviceAccount,
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
-
-const sheets = google.sheets({ version: "v4", auth });
 
 // --------------------------
 // BASIC READ / WRITE
 // --------------------------
 async function readSheet(tab: string): Promise<any[][]> {
-  const res = await sheets.spreadsheets.values.get({
+  const res = await sheetsClient.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: tab,
   });
@@ -60,7 +49,7 @@ async function readSheet(tab: string): Promise<any[][]> {
 }
 
 async function writeSheet(tab: string, values: any[][]) {
-  await sheets.spreadsheets.values.update({
+  await sheetsClient.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: tab,
     valueInputOption: "RAW",
@@ -72,7 +61,7 @@ async function writeSheet(tab: string, values: any[][]) {
 // 🔥 SELF HEALING
 // --------------------------
 async function getAllSheets() {
-  const res = await sheets.spreadsheets.get({
+  const res = await sheetsClient.spreadsheets.get({
     spreadsheetId: SHEET_ID,
   });
 
@@ -85,7 +74,7 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
 
   // CREATE TAB
   if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
+    await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SHEET_ID,
       requestBody: {
         requests: [
@@ -111,7 +100,7 @@ async function ensureSheetExists(tab: string, headers: any[][]) {
 
 // 🔥 INIT
 export async function ensureAllSheets() {
-  // 🔥 QUICKADD — BEZ SCHEMY (tylko tworzenie zakładek)
+  // 🔥 QUICKADD — NO SCHEMA (only create tabs)
   await ensureSheetExists(QUICKADD_EVENTS_QUEUE_TAB, [[]]);
 
   await ensureSheetExists(QUICKADD_POINTS_QUEUE_TAB, [[]]);
@@ -123,7 +112,7 @@ export async function ensureAllSheets() {
 // HELPERS
 // --------------------------
 async function getSheetId(tab: string): Promise<number> {
-  const res = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const res = await sheetsClient.spreadsheets.get({ spreadsheetId: SHEET_ID });
   const sheet = res.data.sheets?.find((s) => s.properties?.title === tab);
   if (!sheet?.properties?.sheetId)
     throw new Error(`Sheet "${tab}" not found`);
@@ -132,7 +121,7 @@ async function getSheetId(tab: string): Promise<number> {
 
 async function updateCell(tab: string, row: number, col: number, value: any) {
   const range = `${tab}!${toA1(col, row)}`;
-  await sheets.spreadsheets.values.update({
+  await sheetsClient.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range,
     valueInputOption: "RAW",
@@ -142,7 +131,7 @@ async function updateCell(tab: string, row: number, col: number, value: any) {
 
 async function deleteRow(tab: string, row: number) {
   const sheetId = await getSheetId(tab);
-  await sheets.spreadsheets.batchUpdate({
+  await sheetsClient.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: {
       requests: [
@@ -167,7 +156,7 @@ async function deleteRow(tab: string, row: number) {
 export async function appendLearningRows(values: any[][]) {
   if (!values.length) return;
 
-  await sheets.spreadsheets.values.append({
+  await sheetsClient.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
     range: QUICKADD_NICKNAMES_TAB,
     valueInputOption: "RAW",
