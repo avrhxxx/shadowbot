@@ -1,4 +1,6 @@
-// src/utils/timeUtils.ts
+// =====================================
+// 📁 src/shared/utils/timeUtils.ts
+// =====================================
 
 /**
  * Zwraca literalną datę eventu w UTC.
