@@ -1,4 +1,7 @@
-// src/eventsPanel/eventsButtons/eventsCreateSubmit.ts
+// =====================================
+// 📁 src/system/events/eventsButtons/eventsCreateSubmit.ts
+// =====================================
+
 import {
   ModalSubmitInteraction,
   ActionRowBuilder,
@@ -11,8 +14,8 @@ import { v4 as uuidv4 } from "uuid";
 import { createEvent, EventObject } from "../eventService";
 import { getEventDateUTC, formatEventUTC } from "../../utils/timeUtils";
 import { sendEventCreatedNotification } from "./eventsReminder";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import type { TraceContext } from "../../../core/trace/TraceContext";
 
 // -----------------------------------------------------------
 // TEMP DATA TYPE
@@ -45,47 +48,55 @@ function parseEventDateTime(input: string) {
     /^(\d{1,2})(?:[.\-/]?)(\d{1,2})\s*(\d{2})(?::?(\d{2}))?$/
   );
   if (!match) return null;
+
   const day = parseInt(match[1], 10);
   const month = parseInt(match[2], 10);
   const hour = parseInt(match[3], 10);
   const minute = match[4] ? parseInt(match[4], 10) : 0;
+
   if (hour > 23 || minute > 59) return null;
+
   return { day, month, hour, minute };
 }
 
 async function safeReply(interaction: any, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.editReply(payload);
   if ("update" in interaction && typeof interaction.update === "function") return interaction.update(payload);
+
   if (payload.ephemeral) {
     payload.flags = 64;
     delete payload.ephemeral;
   }
+
   return interaction.reply(payload);
 }
 
 // -----------------------------------------------------------
-// HANDLE CREATE SUBMIT (ENTRY → dostaje traceId z eventHandlers)
+// MAIN SUBMIT
 // -----------------------------------------------------------
 export async function handleCreateSubmit(
   interaction: ModalSubmitInteraction,
-  traceId: string
+  ctx: TraceContext
 ) {
-  const guildId = interaction.guildId!;
+  const l = log.ctx(ctx);
+  const guildId = interaction.guildId;
 
-  logger.emit({
-    scope: "events.create",
-    event: "submit_received",
-    traceId,
-    context: {
-      guildId,
-      userId: interaction.user.id,
-      customId: interaction.customId,
-    },
+  if (!guildId) {
+    l.error("missing_guild", null);
+    return;
+  }
+
+  l.event("submit_received", {
+    guildId,
+    userId: interaction.user.id,
+    customId: interaction.customId,
   });
 
   const typeMatch = interaction.customId.match(/^event_create_modal_(.+)$/);
   const rawType = typeMatch ? typeMatch[1] : "custom";
-  const eventType = rawType.startsWith("standard_") ? rawType.replace(/^standard_/, "") : rawType;
+  const eventType = rawType.startsWith("standard_")
+    ? rawType.replace(/^standard_/, "")
+    : rawType;
 
   let name = "";
   let datetimeRaw = "";
@@ -102,21 +113,23 @@ export async function handleCreateSubmit(
     ghoulion_pursuit: "Ghoulion Pursuit",
     kvk: "KvK"
   };
-  if (prefillMap[eventType]) name = prefillMap[eventType];
+
+  if (prefillMap[eventType]) {
+    name = prefillMap[eventType];
+  }
 
   let day: number, month: number, hour = 0, minute = 0, year: number | undefined;
 
   if (eventType === "birthdays") {
     const dateMatch = datetimeRaw.trim().match(/^(\d{1,2})[./-]?(\d{1,2})$/);
-    if (!dateMatch) {
-      logger.emit({
-        scope: "events.create",
-        event: "invalid_birthdate_format",
-        traceId,
-        input: { datetimeRaw },
-      });
 
-      await safeReply(interaction, { content: "Invalid date format. Use DD/MM.", ephemeral: true });
+    if (!dateMatch) {
+      l.warn("invalid_birthdate_format", { datetimeRaw });
+
+      await safeReply(interaction, {
+        content: "Invalid date format. Use DD/MM.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -129,14 +142,12 @@ export async function handleCreateSubmit(
     const parsed = parseEventDateTime(datetimeRaw);
 
     if (!parsed && eventType !== "custom") {
-      logger.emit({
-        scope: "events.create",
-        event: "invalid_datetime_format",
-        traceId,
-        input: { datetimeRaw },
-      });
+      l.warn("invalid_datetime_format", { datetimeRaw });
 
-      await safeReply(interaction, { content: "Invalid date/time format.", ephemeral: true });
+      await safeReply(interaction, {
+        content: "Invalid date/time format.",
+        ephemeral: true
+      });
       return;
     }
 
@@ -151,20 +162,25 @@ export async function handleCreateSubmit(
 
   const tempId = `E-${uuidv4()}`;
   const nowUTC = new Date();
+
   const eventDateUTC = year
     ? new Date(Date.UTC(year, month - 1, day, hour, minute))
     : getEventDateUTC(day, month, hour, minute);
 
-  if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC.getTime() < nowUTC.getTime()) {
+  if ((eventType === "birthdays" || eventType === "custom") && !year && eventDateUTC < nowUTC) {
+    l.event("past_date_detected", { tempId, eventType });
 
-    logger.emit({
-      scope: "events.create",
-      event: "past_date_detected",
-      traceId,
-      context: { tempId, eventType },
+    tempEventStore.set(tempId, {
+      id: tempId,
+      name,
+      day,
+      month,
+      hour,
+      minute,
+      guildId,
+      eventType,
+      notifyOnCreate: false
     });
-
-    tempEventStore.set(tempId, { id: tempId, name, day, month, hour, minute, guildId, eventType, notifyOnCreate: false });
 
     await safeReply(interaction, {
       content: `The date ${formatEventUTC(day, month, hour, minute)} has passed. Schedule for next year?`,
@@ -176,6 +192,7 @@ export async function handleCreateSubmit(
       ],
       ephemeral: true
     });
+
     return;
   }
 
@@ -193,28 +210,25 @@ export async function handleCreateSubmit(
     notifyOnCreate: eventType === "birthdays" ? false : undefined
   });
 
-  logger.emit({
-    scope: "events.create",
-    event: "temp_created",
-    traceId,
-    context: { tempId, eventType },
-  });
+  l.event("temp_created", { tempId, eventType });
 
   if (eventType !== "birthdays") {
-    await showCreateNotificationConfirm(interaction, tempId, traceId);
+    await showCreateNotificationConfirm(interaction, tempId, ctx);
   } else {
-    await finalizeEvent(interaction, tempId, traceId);
+    await finalizeEvent(interaction, tempId, ctx);
   }
 }
 
 // -----------------------------------------------------------
-// INTERNAL (NO NEW TRACE)
+// INTERNAL FLOW
 // -----------------------------------------------------------
 export async function showCreateNotificationConfirm(
   interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
   tempId: string,
-  traceId: string
+  ctx: TraceContext
 ) {
+  const l = log.ctx(ctx);
+
   const tempData = tempEventStore.get(tempId);
   if (!tempData) return;
 
@@ -229,30 +243,26 @@ export async function showCreateNotificationConfirm(
     ephemeral: true
   });
 
-  logger.emit({
-    scope: "events.create",
-    event: "ask_notification",
-    traceId,
-    context: { tempId },
-  });
+  l.event("ask_notification", { tempId });
 }
 
 export async function finalizeEvent(
   interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction,
   tempId: string,
-  traceId: string
+  ctx: TraceContext
 ) {
+  const l = log.ctx(ctx);
+
   const tempData = tempEventStore.get(tempId);
 
   if (!tempData) {
-    logger.emit({
-      scope: "events.create",
-      event: "temp_missing",
-      traceId,
-      context: { tempId },
-    });
+    l.warn("temp_missing", { tempId });
 
-    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+    await safeReply(interaction, {
+      content: "Temporary event data not found.",
+      components: [],
+      ephemeral: true
+    });
     return;
   }
 
@@ -290,26 +300,14 @@ export async function finalizeEvent(
       ephemeral: true
     });
 
-    logger.emit({
-      scope: "events.create",
-      event: "event_created",
-      traceId,
-      context: {
-        eventId: newEvent.id,
-        guildId: newEvent.guildId,
-        type: newEvent.eventType,
-      },
+    l.event("event_created", {
+      eventId: newEvent.id,
+      guildId: newEvent.guildId,
+      type: newEvent.eventType,
     });
 
   } catch (err) {
-    logger.emit({
-      scope: "events.create",
-      event: "create_failed",
-      traceId,
-      level: "error",
-      context: { tempId },
-      error: err,
-    });
+    l.error("create_failed", err);
 
     await safeReply(interaction, {
       content: "❌ Failed to create event.",
@@ -319,71 +317,65 @@ export async function finalizeEvent(
 }
 
 // -----------------------------------------------------------
-// ENTRY POINTS (NEW TRACE)
+// ENTRY POINTS (CTX FROM ROUTER)
 // -----------------------------------------------------------
-export async function handleNotificationResponse(interaction: ButtonInteraction) {
-  const traceId = createTraceId();
+export async function handleNotificationResponse(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   const [, tempId] = interaction.customId.split(/-(.+)/);
   const tempData = tempEventStore.get(tempId);
 
   if (!tempData) {
-    logger.emit({
-      scope: "events.create",
-      event: "notification_temp_missing",
-      traceId,
-      context: { tempId },
-    });
+    l.warn("notification_temp_missing", { tempId });
 
-    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+    await safeReply(interaction, {
+      content: "Temporary event data not found.",
+      components: [],
+      ephemeral: true
+    });
     return;
   }
 
   tempData.notifyOnCreate = interaction.customId.startsWith("notify_create_yes");
 
-  logger.emit({
-    scope: "events.create",
-    event: "notification_decision",
-    traceId,
-    context: {
-      tempId,
-      notify: tempData.notifyOnCreate,
-    },
+  l.event("notification_decision", {
+    tempId,
+    notify: tempData.notifyOnCreate,
   });
 
-  await finalizeEvent(interaction, tempId, traceId);
+  await finalizeEvent(interaction, tempId, ctx);
 }
 
-export async function finalizeNextYearEvent(interaction: ButtonInteraction | ModalSubmitInteraction) {
-  const traceId = createTraceId();
+export async function finalizeNextYearEvent(
+  interaction: ButtonInteraction | ModalSubmitInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   const [, tempId] = interaction.customId.split(/-(.+)/);
   const tempData = tempEventStore.get(tempId);
 
   if (!tempData) {
-    logger.emit({
-      scope: "events.create",
-      event: "next_year_temp_missing",
-      traceId,
-      context: { tempId },
-    });
+    l.warn("next_year_temp_missing", { tempId });
 
-    await safeReply(interaction, { content: "Temporary event data not found.", components: [], ephemeral: true });
+    await safeReply(interaction, {
+      content: "Temporary event data not found.",
+      components: [],
+      ephemeral: true
+    });
     return;
   }
 
   tempData.year = new Date().getUTCFullYear() + 1;
 
-  logger.emit({
-    scope: "events.create",
-    event: "next_year_selected",
-    traceId,
-    context: { tempId },
-  });
+  l.event("next_year_selected", { tempId });
 
   if (tempData.eventType !== "birthdays") {
-    await showCreateNotificationConfirm(interaction, tempId, traceId);
+    await showCreateNotificationConfirm(interaction, tempId, ctx);
   } else {
-    await finalizeEvent(interaction, tempId, traceId);
+    await finalizeEvent(interaction, tempId, ctx);
   }
 }
