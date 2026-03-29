@@ -1,5 +1,16 @@
-import { Interaction, StringSelectMenuBuilder, ActionRowBuilder, StringSelectMenuInteraction } from "discord.js";
+// =====================================
+// 📁 src/system/absence/absenceButtons/absenceSettings.ts
+// =====================================
+
+import {
+  Interaction,
+  StringSelectMenuBuilder,
+  ActionRowBuilder,
+  StringSelectMenuInteraction
+} from "discord.js";
 import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
+import { createTraceId } from "../../../core/ids/IdGenerator";
+import { logger } from "../../../core/logger/log";
 
 // -----------------------------
 // HANDLER SETTINGS BUTTON
@@ -7,12 +18,17 @@ import { setNotificationChannel, getAbsenceConfig } from "../absenceService";
 export async function handleSettings(interaction: Interaction) {
   if (!interaction.isButton() || !interaction.guild) return;
 
+  const traceId = createTraceId();
+
   const textChannels = interaction.guild.channels.cache
     .filter(c => c.isTextBased())
     .map(c => ({ label: c.name, value: c.id }));
 
   if (!textChannels.length) {
-    await interaction.reply({ content: "No text channels available.", ephemeral: true });
+    await interaction.reply({
+      content: "No text channels available.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -23,8 +39,20 @@ export async function handleSettings(interaction: Interaction) {
 
   await interaction.reply({
     content: "Select a channel for Absence notifications:",
-    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect)],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(channelSelect)
+    ],
     ephemeral: true
+  });
+
+  logger.emit({
+    scope: "absence.settings",
+    event: "open_settings",
+    traceId,
+    context: {
+      guildId: interaction.guild.id,
+      channelsCount: textChannels.length,
+    },
   });
 }
 
@@ -32,9 +60,14 @@ export async function handleSettings(interaction: Interaction) {
 // HANDLER SELECT MENU
 // -----------------------------
 export async function handleSettingsSelect(interaction: StringSelectMenuInteraction) {
+  const traceId = createTraceId();
+
   const guildId = interaction.guildId;
   if (!guildId || !interaction.values.length) {
-    await interaction.reply({ content: "No channel selected.", ephemeral: true });
+    await interaction.reply({
+      content: "No channel selected.",
+      ephemeral: true
+    });
     return;
   }
 
@@ -57,8 +90,33 @@ export async function handleSettingsSelect(interaction: StringSelectMenuInteract
       content: `Notification channel set to <#${channelId}>.`,
       ephemeral: true
     });
+
+    logger.emit({
+      scope: "absence.settings",
+      event: "channel_updated",
+      traceId,
+      context: {
+        guildId,
+        channelId,
+      },
+    });
+
   } catch (err) {
-    console.error("Error setting absence notification channel:", err);
-    await interaction.reply({ content: "Failed to set channel. Try again later.", ephemeral: true });
+    logger.emit({
+      scope: "absence.settings",
+      event: "channel_update_failed",
+      traceId,
+      level: "error",
+      context: {
+        guildId,
+        channelId,
+      },
+      error: err,
+    });
+
+    await interaction.reply({
+      content: "Failed to set channel. Try again later.",
+      ephemeral: true
+    });
   }
 }
