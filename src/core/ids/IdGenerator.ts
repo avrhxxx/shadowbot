@@ -18,7 +18,8 @@ export type QueueId = string;
 
 // ❗ ID FORMAT: <prefix>-<8char uuid>
 // - NEVER parse
-// - for logging / tracing only
+// - NEVER derive logic from prefix
+// - safe to use in logs / payloads / tracing
 
 function generate(prefix: string): string {
   return `${prefix}-${randomUUID().slice(0, 8)}`;
