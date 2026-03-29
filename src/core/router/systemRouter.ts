@@ -61,6 +61,14 @@ export async function handleSystemInteraction(
     const startTime = Date.now();
 
     try {
+      // 🔍 ATTEMPT LOG (NEW)
+      logger.emit({
+        scope: "system.router",
+        event: "handler_attempt",
+        traceId,
+        context: { handler: name },
+      });
+
       const handled = await handler(interaction, traceId);
 
       if (handled) {
@@ -107,6 +115,10 @@ export async function handleSystemInteraction(
     level: "warn",
     input: {
       interactionId: interaction.id,
+      type: interaction.type,
+      ...(interaction.isButton() && { customId: interaction.customId }),
+      ...(interaction.isStringSelectMenu() && { customId: interaction.customId }),
+      ...(interaction.isModalSubmit() && { customId: interaction.customId }),
     },
   });
 }
