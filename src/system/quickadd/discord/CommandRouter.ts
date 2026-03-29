@@ -7,7 +7,8 @@ import {
   getCommandHandler,
   QuickAddSubcommand,
 } from "./CommandRegistry";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // =====================================
 // 🚀 ROUTER
@@ -15,9 +16,11 @@ import { logger } from "../../../core/logger/log";
 
 export async function handleQuickAddCommand(
   interaction: ChatInputCommandInteraction,
-  traceId: string
+  ctx: TraceContext
 ) {
   if (!interaction.isChatInputCommand()) return;
+
+  const l = log.ctx(ctx);
 
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
@@ -32,38 +35,27 @@ export async function handleQuickAddCommand(
       subcommand =
         interaction.options.getSubcommand() as QuickAddSubcommand;
     } catch {
-      logger.emit({
-        scope: "quickadd.command_router",
-        event: "subcommand_missing",
-        traceId,
-        level: "error",
-        context: { userId, guildId, channelId },
+      l.error("subcommand_missing", {
+        userId,
+        guildId,
+        channelId,
       });
 
       return;
     }
 
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "received",
-      traceId,
-      context: {
-        userId,
-        guildId,
-        channelId,
-        subcommand,
-      },
+    l.event("received", {
+      userId,
+      guildId,
+      channelId,
+      subcommand,
     });
 
-    const handler = getCommandHandler(subcommand, traceId);
+    const handler = getCommandHandler(subcommand, ctx);
 
     if (!handler) {
-      logger.emit({
-        scope: "quickadd.command_router",
-        event: "handler_missing",
-        traceId,
-        level: "error",
-        context: { subcommand },
+      l.error("handler_missing", {
+        subcommand,
       });
 
       if (interaction.isRepliable()) {
@@ -89,41 +81,26 @@ export async function handleQuickAddCommand(
       await interaction.deferReply({ ephemeral: true });
     }
 
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "execution_start",
-      traceId,
-      context: { subcommand },
+    l.event("execution_start", {
+      subcommand,
     });
 
-    await handler(interaction, traceId);
+    await handler(interaction, ctx);
 
     const durationMs = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "execution_done",
-      traceId,
-      context: { subcommand },
-      metrics: {
-        durationMs,
-      },
+    l.event("execution_done", {
+      subcommand,
+    }, {
+      durationMs,
     });
 
   } catch (error) {
     const durationMs = Date.now() - startTime;
 
-    logger.emit({
-      scope: "quickadd.command_router",
-      event: "execution_failed",
-      traceId,
-      level: "error",
-      context: {
-        subcommand: subcommand ?? "unknown",
-      },
-      metrics: {
-        durationMs,
-      },
+    l.error("execution_failed", {
+      subcommand: subcommand ?? "unknown",
+      durationMs,
       error,
     });
 
