@@ -44,6 +44,16 @@ function formatAbsenceDate(absence: AbsenceObject): string {
 export async function handleAbsenceList(interaction: ButtonInteraction) {
   const traceId = createTraceId();
 
+  logger.emit({
+    scope: "absence.buttons",
+    event: "list_open",
+    traceId,
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+    },
+  });
+
   const guildId = interaction.guildId;
 
   if (!guildId) {
@@ -63,6 +73,15 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
 
   try {
     const absences: AbsenceObject[] = await getAbsences(guildId);
+
+    logger.emit({
+      scope: "absence.buttons",
+      event: "list_loaded",
+      traceId,
+      result: {
+        count: absences.length,
+      },
+    });
 
     const embed = new EmbedBuilder()
       .setTitle("📌 Current Absences")
@@ -110,7 +129,7 @@ export async function handleAbsenceList(interaction: ButtonInteraction) {
   } catch (err) {
     logger.emit({
       scope: "absence.buttons",
-      event: "absence_list_failed",
+      event: "list_failed",
       traceId,
       level: "error",
       error: err,
