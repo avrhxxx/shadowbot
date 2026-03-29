@@ -23,16 +23,42 @@ export async function handleCancel(interaction: ButtonInteraction) {
   const traceId = createTraceId();
 
   const guildId = interaction.guildId;
-  if (!guildId) return;
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "open",
+    traceId,
+    context: {
+      guildId,
+      userId: interaction.user?.id,
+    },
+  });
+
+  if (!guildId) {
+    logger.emit({
+      scope: "events.cancel",
+      event: "missing_guild",
+      traceId,
+      level: "error",
+    });
+    return;
+  }
 
   const events = await getEvents(guildId);
 
-  // ❌ Birthday events nie pojawią się w panelu
   const activeEvents = events.filter(
     e => e.status === "ACTIVE" && e.eventType !== "birthdays"
   );
 
   if (!activeEvents.length) {
+    logger.emit({
+      scope: "events.cancel",
+      event: "no_active_events",
+      traceId,
+      level: "warn",
+      context: { guildId },
+    });
+
     await interaction.reply({
       content: "No active events to cancel.",
       ephemeral: true
@@ -71,7 +97,7 @@ export async function handleCancel(interaction: ButtonInteraction) {
 
   logger.emit({
     scope: "events.cancel",
-    event: "open_select",
+    event: "select_rendered",
     traceId,
     context: {
       guildId,
@@ -86,15 +112,33 @@ export async function handleCancel(interaction: ButtonInteraction) {
 export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
   const traceId = createTraceId();
 
-  await interaction.deferUpdate();
-
   const guildId = interaction.guildId!;
   const eventId = interaction.values[0];
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "select",
+    traceId,
+    input: {
+      guildId,
+      eventId,
+    },
+  });
+
+  await interaction.deferUpdate();
 
   const events = await getEvents(guildId);
   const event = events.find(e => e.id === eventId);
 
   if (!event) {
+    logger.emit({
+      scope: "events.cancel",
+      event: "event_not_found",
+      traceId,
+      level: "warn",
+      context: { guildId, eventId },
+    });
+
     await interaction.followUp({
       content: "Event not found.",
       ephemeral: true
@@ -136,7 +180,7 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
 
   logger.emit({
     scope: "events.cancel",
-    event: "select_event",
+    event: "confirm_rendered",
     traceId,
     context: {
       guildId,
@@ -151,39 +195,78 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
 export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
   const traceId = createTraceId();
 
-  await interaction.deferUpdate();
-
   const guildId = interaction.guildId!;
-  const event = await cancelEvent(guildId, eventId);
-
-  if (!event) {
-    await interaction.followUp({
-      content: "Event not found.",
-      ephemeral: true
-    });
-    return;
-  }
-
-  const embed = new EmbedBuilder()
-    .setTitle("Event Canceled")
-    .setDescription(`**${event.name}** has been canceled.`)
-    .setColor("Red");
-
-  await interaction.editReply({
-    content: "",
-    embeds: [embed],
-    components: []
-  });
 
   logger.emit({
     scope: "events.cancel",
-    event: "confirmed",
+    event: "confirm_click",
     traceId,
-    context: {
+    input: {
       guildId,
       eventId,
     },
   });
+
+  await interaction.deferUpdate();
+
+  try {
+    const event = await cancelEvent(guildId, eventId);
+
+    if (!event) {
+      logger.emit({
+        scope: "events.cancel",
+        event: "event_not_found",
+        traceId,
+        level: "warn",
+        context: { guildId, eventId },
+      });
+
+      await interaction.followUp({
+        content: "Event not found.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle("Event Canceled")
+      .setDescription(`**${event.name}** has been canceled.`)
+      .setColor("Red");
+
+    await interaction.editReply({
+      content: "",
+      embeds: [embed],
+      components: []
+    });
+
+    logger.emit({
+      scope: "events.cancel",
+      event: "success",
+      traceId,
+      context: {
+        guildId,
+        eventId,
+      },
+    });
+
+  } catch (err) {
+    logger.emit({
+      scope: "events.cancel",
+      event: "cancel_failed",
+      traceId,
+      level: "error",
+      context: {
+        guildId,
+        eventId,
+      },
+      error: err,
+    });
+
+    await interaction.followUp({
+      content: "❌ Failed to cancel event.",
+      ephemeral: true
+    });
+  }
 }
 
 /* ======================================================
@@ -191,6 +274,16 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
 ====================================================== */
 export async function handleCancelAbort(interaction: ButtonInteraction) {
   const traceId = createTraceId();
+
+  logger.emit({
+    scope: "events.cancel",
+    event: "abort_click",
+    traceId,
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+    },
+  });
 
   await interaction.update({
     content: "Cancellation aborted.",
