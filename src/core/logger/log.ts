@@ -124,9 +124,7 @@ export function log(
     scope: payload.scope ?? ctx.system ?? "unknown",
 
     context: {
-      userId: ctx.userId,
-      source: ctx.source,
-      system: ctx.system,
+      ...ctx,
       ...(payload.context || {}),
     },
   });
