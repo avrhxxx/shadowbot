@@ -47,7 +47,12 @@ export async function handleAbsenceList(
 ) {
   const l = log.ctx(ctx);
 
-  l.event("list_open");
+  l.event("list_open", {
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user?.id,
+    },
+  });
 
   const guildId = interaction.guildId;
 
