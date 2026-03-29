@@ -3,12 +3,12 @@
 // =====================================
 
 import { ButtonInteraction, EmbedBuilder } from "discord.js";
-import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
-export async function handleHelp(interaction: ButtonInteraction) {
-  const traceId = createTraceId();
-
+export async function handleHelp(
+  interaction: ButtonInteraction,
+  traceId: string
+) {
   if (!interaction.isButton()) return;
 
   const embed = new EmbedBuilder()
