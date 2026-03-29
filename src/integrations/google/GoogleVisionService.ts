@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/google/GoogleVisionService.ts
+// 📁 src/integrations/google/GoogleVisionService.ts
 // =====================================
 
 /**
@@ -26,7 +26,13 @@ const client = new vision.ImageAnnotatorClient({
   credentials: googleCredentials,
 });
 
-export async function runVisionOCR(buffer: Buffer) {
+// =====================================
+// OCR
+// =====================================
+
+export async function runVisionOCR(
+  buffer: Buffer
+): Promise<vision.protos.google.cloud.vision.v1.IAnnotateImageResponse | null> {
   try {
     const [result] = await client.documentTextDetection({
       image: { content: buffer },
@@ -36,8 +42,8 @@ export async function runVisionOCR(buffer: Buffer) {
     });
 
     return result ?? null;
-
   } catch {
+    // intentional: transport layer stays silent
     return null;
   }
 }
