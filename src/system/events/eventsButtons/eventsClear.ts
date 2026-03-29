@@ -1,139 +1,58 @@
 // =====================================
-// 📁 src/system/events/eventsButtons/eventsCancel.ts
+// 📁 src/system/events/eventsButtons/eventsClear.ts
 // =====================================
 
 import {
   ButtonInteraction,
-  StringSelectMenuInteraction,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ActionRowBuilder,
   EmbedBuilder
 } from "discord.js";
-import { cancelEvent, getEvents } from "../eventService";
-import { formatEventUTC } from "../../../shared/utils/timeUtils";
+
+import {
+  getEvents,
+  deleteEvent as serviceDeleteEvent,
+  EventObject
+} from "../eventService";
+
+import { parseEventId } from "./utils";
 import { createTraceId } from "../../../core/ids/IdGenerator";
 import { logger } from "../../../core/logger/log";
 
-/* ======================================================
-   🔹 STEP 1 – BUTTON → SELECT
-====================================================== */
-export async function handleCancel(interaction: ButtonInteraction) {
-  const traceId = createTraceId();
-
-  const guildId = interaction.guildId;
-  if (!guildId) {
-    logger.emit({
-      scope: "events.cancel",
-      event: "missing_guild",
-      traceId,
-      level: "error",
-    });
-    return;
-  }
-
-  try {
-    const events = await getEvents(guildId);
-
-    const activeEvents = events.filter(
-      e => e.status === "ACTIVE" && e.eventType !== "birthdays"
-    );
-
-    if (!activeEvents.length) {
-      await interaction.reply({
-        content: "No active events to cancel.",
-        ephemeral: true
-      });
-
-      logger.emit({
-        scope: "events.cancel",
-        event: "no_active_events",
-        traceId,
-        context: { guildId },
-      });
-
-      return;
-    }
-
-    const uniqueActiveEvents = Array.from(
-      new Map(activeEvents.map(e => [e.id, e])).values()
-    );
-
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId("event_cancel_select")
-      .setPlaceholder("Select an event to cancel")
-      .addOptions(
-        uniqueActiveEvents.map(e => ({
-          label: e.name,
-          description: formatEventUTC(
-            e.day,
-            e.month,
-            e.hour,
-            e.minute,
-            e.year
-          ),
-          value: e.id
-        }))
-      );
-
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-
-    await interaction.reply({
-      content: "Select event to cancel:",
-      components: [row],
-      ephemeral: true
-    });
-
-    logger.emit({
-      scope: "events.cancel",
-      event: "open_select",
-      traceId,
-      context: {
-        guildId,
-        eventsCount: uniqueActiveEvents.length,
-      },
-    });
-
-  } catch (err) {
-    logger.emit({
-      scope: "events.cancel",
-      event: "handle_cancel_failed",
-      traceId,
-      level: "error",
-      error: err,
-    });
-
-    await interaction.reply({
-      content: "❌ Failed to load events.",
-      ephemeral: true
-    }).catch(() => null);
-  }
+// ======================================================
+// HELPERS
+// ======================================================
+async function getEventById(
+  guildId: string,
+  eventId: string
+): Promise<EventObject | null> {
+  const events = await getEvents(guildId);
+  const event = events.find(e => e.id.toString() === eventId.toString());
+  return event || null;
 }
 
-/* ======================================================
-   🔹 STEP 2 – SELECT → CONFIRMATION
-====================================================== */
-export async function handleCancelSelect(interaction: StringSelectMenuInteraction) {
+// ======================================================
+// HANDLE CLEAR BUTTON
+// ======================================================
+export async function handleClearEventButton(
+  interaction: ButtonInteraction,
+  eventId: string
+) {
   const traceId = createTraceId();
-
-  await interaction.deferUpdate();
-
   const guildId = interaction.guildId!;
-  const eventId = interaction.values[0];
 
   try {
-    const events = await getEvents(guildId);
-    const event = events.find(e => e.id === eventId);
+    const event = await getEventById(guildId, eventId);
 
     if (!event) {
-      await interaction.followUp({
+      await interaction.reply({
         content: "Event not found.",
         ephemeral: true
       });
 
       logger.emit({
-        scope: "events.cancel",
+        scope: "events.clear",
         event: "event_not_found",
         traceId,
         context: { guildId, eventId },
@@ -142,80 +61,74 @@ export async function handleCancelSelect(interaction: StringSelectMenuInteractio
       return;
     }
 
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`event_clear_confirm_${eventId}`)
+        .setLabel("Confirm")
+        .setStyle(ButtonStyle.Danger),
+
+      new ButtonBuilder()
+        .setCustomId(`event_clear_abort_${eventId}`)
+        .setLabel("Abort")
+        .setStyle(ButtonStyle.Secondary)
+    );
+
     const embed = new EmbedBuilder()
-      .setTitle("Confirm Cancellation")
+      .setTitle("⚠️ Confirm Clear Event Data")
       .setDescription(
-        `Are you sure you want to cancel **${event.name}**?\n\n` +
-        `📅 ${formatEventUTC(
-          event.day,
-          event.month,
-          event.hour,
-          event.minute,
-          event.year
-        )}`
+        `Are you sure you want to **clear all data** for event **${event.name}**?\n\n` +
+        `This will permanently delete **all participants, absences, and other event data**.\n` +
+        `This action **cannot be undone**.`
       )
-      .setColor("Orange");
+      .setColor("Red");
 
-    const confirmBtn = new ButtonBuilder()
-      .setCustomId(`event_cancel_confirm_${eventId}`)
-      .setLabel("Confirm")
-      .setStyle(ButtonStyle.Danger);
-
-    const abortBtn = new ButtonBuilder()
-      .setCustomId("event_cancel_abort")
-      .setLabel("Abort")
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, abortBtn);
-
-    await interaction.editReply({
-      content: "",
+    await interaction.reply({
       embeds: [embed],
-      components: [row]
+      components: [row],
+      ephemeral: true
     });
 
     logger.emit({
-      scope: "events.cancel",
-      event: "select_event",
+      scope: "events.clear",
+      event: "confirm_ui_shown",
       traceId,
-      context: {
-        guildId,
-        eventId,
-      },
+      context: { guildId, eventId },
     });
 
-  } catch (err) {
+  } catch (error) {
     logger.emit({
-      scope: "events.cancel",
-      event: "select_failed",
+      scope: "events.clear",
+      event: "button_failed",
       traceId,
       level: "error",
-      error: err,
+      context: { guildId, eventId },
+      error,
     });
   }
 }
 
-/* ======================================================
-   🔹 STEP 3 – CONFIRM BUTTON
-====================================================== */
-export async function handleCancelConfirm(interaction: ButtonInteraction, eventId: string) {
+// ======================================================
+// HANDLE CONFIRM CLEAR
+// ======================================================
+export async function handleClearEventConfirm(
+  interaction: ButtonInteraction
+) {
   const traceId = createTraceId();
-
-  await interaction.deferUpdate();
-
   const guildId = interaction.guildId!;
+  const eventId = parseEventId(interaction.customId);
 
   try {
-    const event = await cancelEvent(guildId, eventId);
+    await interaction.deferReply({ ephemeral: true });
+
+    const event = await getEventById(guildId, eventId);
 
     if (!event) {
-      await interaction.followUp({
-        content: "Event not found.",
-        ephemeral: true
+      await interaction.editReply({
+        content: "Event not found."
       });
 
       logger.emit({
-        scope: "events.cancel",
+        scope: "events.clear",
         event: "confirm_event_not_found",
         traceId,
         context: { guildId, eventId },
@@ -224,56 +137,53 @@ export async function handleCancelConfirm(interaction: ButtonInteraction, eventI
       return;
     }
 
+    await serviceDeleteEvent(eventId);
+
     const embed = new EmbedBuilder()
-      .setTitle("Event Canceled")
-      .setDescription(`**${event.name}** has been canceled.`)
+      .setTitle("Event Cleared")
+      .setDescription(
+        `✅ All data for **${event.name}** has been permanently cleared.`
+      )
       .setColor("Red");
 
     await interaction.editReply({
-      content: "",
-      embeds: [embed],
-      components: []
+      embeds: [embed]
     });
 
     logger.emit({
-      scope: "events.cancel",
+      scope: "events.clear",
       event: "confirmed",
       traceId,
-      context: {
-        guildId,
-        eventId,
-      },
+      context: { guildId, eventId },
     });
 
-  } catch (err) {
+  } catch (error) {
     logger.emit({
-      scope: "events.cancel",
+      scope: "events.clear",
       event: "confirm_failed",
       traceId,
       level: "error",
-      context: {
-        guildId,
-        eventId,
-      },
-      error: err,
+      context: { guildId, eventId },
+      error,
     });
   }
 }
 
-/* ======================================================
-   🔹 STEP 4 – ABORT BUTTON
-====================================================== */
-export async function handleCancelAbort(interaction: ButtonInteraction) {
+// ======================================================
+// HANDLE ABORT CLEAR
+// ======================================================
+export async function handleClearEventAbort(
+  interaction: ButtonInteraction
+) {
   const traceId = createTraceId();
 
-  await interaction.update({
-    content: "Cancellation aborted.",
-    embeds: [],
-    components: []
+  await interaction.reply({
+    content: "Clear action aborted.",
+    ephemeral: true
   });
 
   logger.emit({
-    scope: "events.cancel",
+    scope: "events.clear",
     event: "aborted",
     traceId,
   });
