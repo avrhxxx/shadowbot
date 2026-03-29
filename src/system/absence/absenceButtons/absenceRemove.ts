@@ -13,25 +13,23 @@ import {
 } from "discord.js";
 import { removeAbsence } from "../absenceService";
 import { notifyAbsenceRemoved } from "./absenceNotification";
-import { createTraceId } from "../../../core/ids/IdGenerator";
-import { logger } from "../../../core/logger/log";
+import { log } from "../../../core/logger/log";
+import { TraceContext } from "../../../core/trace/TraceContext";
 
 // ----------------------------
 // SHOW REMOVE MODAL
 // ----------------------------
-export async function handleRemoveAbsence(interaction: ButtonInteraction) {
+export async function handleRemoveAbsence(
+  interaction: ButtonInteraction,
+  ctx: TraceContext
+) {
   if (!interaction.isButton()) return;
 
-  const traceId = createTraceId();
+  const l = log.ctx(ctx);
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "remove_modal_open",
-    traceId,
-    context: {
-      guildId: interaction.guildId,
-      userId: interaction.user?.id,
-    },
+  l.event("remove_modal_open", {
+    guildId: interaction.guildId,
+    userId: interaction.user?.id,
   });
 
   const modal = new ModalBuilder()
@@ -55,8 +53,11 @@ export async function handleRemoveAbsence(interaction: ButtonInteraction) {
 // ----------------------------
 // HANDLE MODAL SUBMIT
 // ----------------------------
-export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteraction) {
-  const traceId = createTraceId();
+export async function handleRemoveAbsenceSubmit(
+  interaction: ModalSubmitInteraction,
+  ctx: TraceContext
+) {
+  const l = log.ctx(ctx);
 
   await interaction.deferReply({ ephemeral: true });
 
@@ -64,29 +65,18 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
   const guild = interaction.guild as Guild;
   const nick = interaction.fields.getTextInputValue("player_nick").trim();
 
-  logger.emit({
-    scope: "absence.buttons",
-    event: "remove_submit",
-    traceId,
-    input: {
-      guildId,
-      nick,
-    },
+  l.event("remove_submit", {
+    guildId,
+    nick,
   });
 
   try {
     const removed = await removeAbsence(guildId, nick);
 
     if (!removed) {
-      logger.emit({
-        scope: "absence.buttons",
-        event: "remove_not_found",
-        traceId,
-        level: "warn",
-        context: {
-          guildId,
-          nick,
-        },
+      l.warn("remove_not_found", {
+        guildId,
+        nick,
       });
 
       await interaction.followUp({
@@ -95,34 +85,22 @@ export async function handleRemoveAbsenceSubmit(interaction: ModalSubmitInteract
       return;
     }
 
-    logger.emit({
-      scope: "absence.buttons",
-      event: "remove_success",
-      traceId,
-      context: {
-        guildId,
-        nick,
-        absenceId: removed.id,
-      },
+    l.event("remove_success", {
+      guildId,
+      nick,
+      absenceId: removed.id,
     });
 
     await interaction.followUp({
       content: `📌 Absence for ${nick} removed from the list.`
     });
 
-    await notifyAbsenceRemoved(guild, nick);
+    await notifyAbsenceRemoved(guild, nick, ctx);
 
   } catch (err) {
-    logger.emit({
-      scope: "absence.buttons",
-      event: "remove_failed",
-      traceId,
-      level: "error",
-      context: {
-        guildId,
-        nick,
-      },
-      error: err,
+    l.error("remove_failed", err, {
+      guildId,
+      nick,
     });
 
     await interaction.followUp({
