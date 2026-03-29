@@ -69,6 +69,18 @@ function formatDateDisplay({ day, month, year }: { day: number; month: number; y
 export async function handleAddAbsence(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
+  const traceId = createTraceId();
+
+  logger.emit({
+    scope: "absence.buttons",
+    event: "add_modal_open",
+    traceId,
+    context: {
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+    },
+  });
+
   const modal = new ModalBuilder()
     .setTitle("Add Absence")
     .setCustomId("absence_add_modal");
@@ -97,6 +109,16 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const guildId = interaction.guildId!;
   const guild = interaction.guild as Guild;
 
+  logger.emit({
+    scope: "absence.buttons",
+    event: "add_submit_received",
+    traceId,
+    input: {
+      guildId,
+      userId: interaction.user.id,
+    },
+  });
+
   if (!guild) {
     logger.emit({
       scope: "absence.buttons",
@@ -112,7 +134,16 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toRaw = interaction.fields.getTextInputValue("absence_to").trim();
 
   const absences = await getAbsences(guildId);
+
   if (absences.some(a => a.player.toLowerCase() === nick.toLowerCase())) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "duplicate_player",
+      traceId,
+      level: "warn",
+      context: { player: nick },
+    });
+
     await interaction.followUp({ content: `❌ Player ${nick} is already on the absence list.` });
     return;
   }
@@ -121,6 +152,14 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toDate = parseDayMonth(toRaw);
 
   if (!fromDate || !toDate) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "invalid_date_format",
+      traceId,
+      level: "warn",
+      input: { fromRaw, toRaw },
+    });
+
     await interaction.followUp({ content: "❌ Invalid date format. Use day.month or DDMM" });
     return;
   }
@@ -129,6 +168,14 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
   const toTs = new Date(toDate.year, toDate.month - 1, toDate.day).getTime();
 
   if (fromTs > toTs) {
+    logger.emit({
+      scope: "absence.buttons",
+      event: "invalid_date_range",
+      traceId,
+      level: "warn",
+      input: { fromRaw, toRaw },
+    });
+
     await interaction.followUp({ content: "❌ From date cannot be after To date." });
     return;
   }
@@ -144,6 +191,16 @@ export async function handleAddAbsenceSubmit(interaction: ModalSubmitInteraction
       endDate: `${toDate.day}/${toDate.month}`,
       year: fromDate.year,
       createdAt: Date.now()
+    });
+
+    logger.emit({
+      scope: "absence.buttons",
+      event: "absence_created",
+      traceId,
+      result: {
+        player: nick,
+        id,
+      },
     });
 
     await interaction.followUp({
