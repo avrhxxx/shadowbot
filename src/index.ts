@@ -37,7 +37,7 @@
  * - init moduły NIE używają ctx (API ograniczenie)
  */
 
-import "./integrations/google/googleSheetsClient";
+import "@/integrations/google/googleSheetsClient";
 
 import {
   Client,
@@ -50,22 +50,22 @@ import {
 // 🧠 CORE
 // =============================
 
-import { handleSystemInteraction } from "./core/router/systemRouter";
-import { log } from "./core/logger/log";
+import { handleSystemInteraction } from "@/core/router/systemRouter";
+import { log } from "@/core/logger/log";
 import {
   createAppContext,
   createChildContext,
-} from "./core/trace/TraceContext";
+} from "@/core/trace/TraceContext";
 
 // =============================
 // 🧩 SYSTEMS (INIT ONLY)
 // =============================
 
-import { initTranslationModule } from "./system/translation";
-import { initModeratorPanel } from "./system/moderator";
+import { initTranslationModule } from "@/system/translation";
+import { initModeratorPanel } from "@/system/moderator";
 
-import { initEventReminders } from "./system/events";
-import { initAbsenceNotifications } from "./system/absence";
+import { initEventReminders } from "@/system/events";
+import { initAbsenceNotifications } from "@/system/absence";
 
 // =============================
 // 🔥 QUICKADD (SPECIAL SYSTEM)
@@ -74,13 +74,13 @@ import { initAbsenceNotifications } from "./system/absence";
 import {
   registerQuickAddListener,
   startQuickAddWorker,
-} from "./system/quickadd";
+} from "@/system/quickadd";
 
 // =============================
 // 🌍 INTEGRATIONS
 // =============================
 
-import { ensureAllSheets } from "./integrations/google";
+import { ensureAllSheets } from "@/integrations/google";
 
 // =============================
 // 🚀 CLIENT SETUP
@@ -103,66 +103,55 @@ if (!process.env.BOT_TOKEN) {
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // =============================
+// 🛑 GLOBAL ERROR HANDLING
+// =============================
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED_REJECTION", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT_EXCEPTION", err);
+});
+
+// =============================
 // 🚀 READY EVENT
 // =============================
 
 client.once("clientReady", async () => {
   const appCtx = createAppContext();
-  const logger = log.ctx(appCtx);
+  const l = log.ctx(appCtx);
 
-  logger.event("app.client.ready", {
+  l.event("app.client.ready", {
     context: {
       user: client.user?.tag,
     },
   });
 
-  // =============================
-  // 🌍 INTEGRATIONS INIT
-  // =============================
-
   try {
     await ensureAllSheets();
-
-    logger.event("app.sheets.initialized");
+    l.event("app.sheets.initialized");
   } catch (err) {
-    logger.error("app.sheets.failed", err);
+    l.error("app.sheets.failed", err);
   }
-
-  // =============================
-  // 🔥 QUICKADD WORKER
-  // =============================
 
   try {
     startQuickAddWorker();
-
-    logger.event("app.quickadd.worker.started");
+    l.event("app.quickadd.worker.started");
   } catch (err) {
-    logger.error("app.quickadd.worker.failed", err);
+    l.error("app.quickadd.worker.failed", err);
   }
-
-  // =============================
-  // ⚙️ SLASH COMMANDS
-  // =============================
 
   try {
     await client.application?.commands.set([]);
-
-    logger.event("app.slash.commands.skipped");
+    l.event("app.slash.commands.skipped");
   } catch (err) {
-    logger.error("app.slash.commands.failed", err);
+    l.error("app.slash.commands.failed", err);
   }
-
-  // =============================
-  // 🧩 SYSTEM INIT
-  // =============================
 
   initTranslationModule(client);
   initModeratorPanel(client);
   registerQuickAddListener(client);
-
-  // =============================
-  // 🏰 GUILD INIT
-  // =============================
 
   await Promise.all(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
@@ -204,10 +193,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
     await handleSystemInteraction(interaction);
   } catch (err) {
-    const ctx = createAppContext();
-    const logger = log.ctx(ctx);
-
-    logger.error("app.interaction.error", err);
+    console.error("INTERACTION_ERROR", err);
 
     if (interaction.isRepliable()) {
       await interaction
@@ -224,4 +210,4 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 // 🔐 LOGIN
 // =============================
 
-client.login(BOT_TOKEN);
+await client.login(BOT_TOKEN);
