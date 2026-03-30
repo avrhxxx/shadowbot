@@ -3,8 +3,8 @@
 // =====================================
 
 import { sheetsClient } from "./googleSheetsClient";
-import { writeSheet, readSheet } from "./googleSheetsStorage";
-import { SHEETS, SheetName } from "./googleSheetsSchema";
+import { readSheet, writeSheet } from "./googleSheetsStorage";
+import { ALL_SHEETS, SheetDefinition } from "./googleSheetsSchema";
 
 // =====================================
 // 🔐 ENV
@@ -20,39 +20,36 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 // 🔍 GET ALL SHEETS
 // =====================================
 
-async function getAllSheets() {
+async function getExistingSheetTitles(): Promise<Set<string>> {
   const res = await sheetsClient.spreadsheets.get({
     spreadsheetId: SHEET_ID,
   });
 
-  return res.data?.sheets ?? [];
+  const sheets = res.data?.sheets ?? [];
+
+  return new Set(
+    sheets.map((s) => s.properties?.title).filter(Boolean)
+  );
 }
 
 // =====================================
 // 🧠 ENSURE SINGLE SHEET
 // =====================================
 
-async function ensureSheetExists(
-  tab: SheetName,
-  headers: unknown[][]
-) {
-  const allSheets = await getAllSheets();
+async function ensureSheet(def: SheetDefinition) {
+  const existing = await getExistingSheetTitles();
 
-  const exists = allSheets.some(
-    (s) => s.properties?.title === tab
-  );
-
-  // --------------------------
-  // CREATE TAB
-  // --------------------------
-  if (!exists) {
+  // ----------------------------
+  // 🆕 CREATE TAB IF MISSING
+  // ----------------------------
+  if (!existing.has(def.name)) {
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SHEET_ID,
       requestBody: {
         requests: [
           {
             addSheet: {
-              properties: { title: tab },
+              properties: { title: def.name },
             },
           },
         ],
@@ -60,38 +57,39 @@ async function ensureSheetExists(
     });
   }
 
-  // --------------------------
-  // ENSURE HEADERS
-  // --------------------------
-  const rows = await readSheet(tab);
+  // ----------------------------
+  // 🧱 ENSURE HEADERS
+  // ----------------------------
+  const rows = await readSheet(def.name);
 
-  if (!rows.length || !(rows[0]?.length > 0)) {
-    await writeSheet(`${tab}!A1`, headers);
+  if (!rows.length) {
+    await writeSheet(def.name, [def.headers]);
+    return;
+  }
+
+  const currentHeaders = rows[0] ?? [];
+
+  const isSame =
+    currentHeaders.length === def.headers.length &&
+    currentHeaders.every((h, i) => h === def.headers[i]);
+
+  // ❗ STRICT MODE:
+  // do NOT auto-migrate silently
+  if (!isSame) {
+    throw new Error(
+      `❌ Sheet "${def.name}" has invalid headers.\nExpected: ${def.headers.join(
+        ", "
+      )}\nGot: ${currentHeaders.join(", ")}`
+    );
   }
 }
 
 // =====================================
-// 🚀 INIT ALL SHEETS
+// 🚀 INIT ALL
 // =====================================
 
 export async function ensureAllSheets() {
-  // 🔥 QUICKADD (no schema yet)
-  await ensureSheetExists(SHEETS.QUICKADD_EVENTS_QUEUE_TAB, [[]]);
-  await ensureSheetExists(SHEETS.QUICKADD_POINTS_QUEUE_TAB, [[]]);
-  await ensureSheetExists(SHEETS.QUICKADD_NICKNAMES_TAB, [[]]);
-
-  // 🔥 CORE SYSTEMS (future-ready)
-  await ensureSheetExists(SHEETS.EVENTS_TAB, [[]]);
-  await ensureSheetExists(SHEETS.POINTS_WEEKS_TAB, [[]]);
-  await ensureSheetExists(SHEETS.POINTS_DONATIONS_TAB, [[]]);
-  await ensureSheetExists(SHEETS.POINTS_DUEL_TAB, [[]]);
-  await ensureSheetExists(SHEETS.ABSENCE_TAB, [[]]);
-  await ensureSheetExists(SHEETS.TRANSLATE_TAB, [[]]);
-
-  // 🔥 CONFIGS
-  await ensureSheetExists(SHEETS.EVENTS_CONFIG_TAB, [[]]);
-  await ensureSheetExists(SHEETS.POINTS_CONFIG_TAB, [[]]);
-  await ensureSheetExists(SHEETS.ABSENCE_CONFIG_TAB, [[]]);
-  await ensureSheetExists(SHEETS.TRANSLATE_CONFIG_TAB, [[]]);
-  await ensureSheetExists(SHEETS.MODERATOR_CONFIG_TAB, [[]]);
+  for (const sheet of ALL_SHEETS) {
+    await ensureSheet(sheet);
+  }
 }
