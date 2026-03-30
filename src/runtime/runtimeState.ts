@@ -1,12 +1,12 @@
 // =====================================
-// 📁 src/runtime/systemState.ts
+// 📁 src/runtime/runtimeState.ts
 // =====================================
 
 import { SheetRepository } from "@/integrations/google";
 import { log } from "@/core/logger/log";
 import { createChildContext, TraceContext } from "@/core/trace/TraceContext";
 
-import type { SystemName } from "./runtimeTypes";
+import type { SystemName, RuntimeKey } from "./runtimeTypes";
 
 // =====================================
 // 🔹 TYPES
@@ -14,7 +14,7 @@ import type { SystemName } from "./runtimeTypes";
 
 type SystemRow = {
   id?: string;
-  system: SystemName | "global";
+  system: string;
   enabled: string;
   reason?: string;
 };
@@ -31,59 +31,82 @@ const repo = new SheetRepository<SystemRow>("system_flags");
 
 const CACHE_TTL = 30_000;
 
-let cache: Map<SystemName | "__global__", { enabled: boolean; reason?: string }> =
+let cache: Map<RuntimeKey, { enabled: boolean; reason?: string }> =
   new Map();
 
 let lastFetch = 0;
-let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
+
+// =====================================
+// 🔹 HELPERS
+// =====================================
+
+function normalizeError(err: unknown) {
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
+  }
+
+  return {
+    message: String(err),
+  };
+}
+
+function parseBoolean(value: string): boolean {
+  return value?.toLowerCase() === "true";
+}
+
+function mapSystemKey(system: string): RuntimeKey | null {
+  if (system === "global") return "__global__";
+  return system as SystemName;
+}
 
 // =====================================
 // 🔹 INTERNAL
 // =====================================
 
 async function refreshCache(ctx: TraceContext) {
-  if (isRefreshing) return;
-  isRefreshing = true;
+  if (refreshPromise) return refreshPromise;
 
-  const l = log.ctx(ctx);
+  refreshPromise = (async () => {
+    const l = log.ctx(ctx);
 
-  try {
-    const rows = await repo.findAll({});
+    try {
+      const rows = await repo.findAll({});
 
-    const newCache = new Map<
-      SystemName | "__global__",
-      { enabled: boolean; reason?: string }
-    >();
+      const newCache = new Map<
+        RuntimeKey,
+        { enabled: boolean; reason?: string }
+      >();
 
-    for (const row of rows) {
-      if (!row.system) continue;
+      for (const row of rows) {
+        if (!row.system) continue;
 
-      const enabled = String(row.enabled).toLowerCase() === "true";
+        const key = mapSystemKey(row.system);
+        if (!key) continue;
 
-      const key =
-        row.system === "global"
-          ? "__global__"
-          : row.system;
+        newCache.set(key, {
+          enabled: parseBoolean(row.enabled),
+          reason: row.reason,
+        });
+      }
 
-      newCache.set(key, {
-        enabled,
-        reason: row.reason,
+      cache = newCache;
+      lastFetch = Date.now();
+
+      l.event("runtime_state.refresh.success", {
+        count: newCache.size,
       });
+    } catch (err) {
+      l.error("runtime_state.refresh.error", normalizeError(err));
+    } finally {
+      refreshPromise = null;
     }
+  })();
 
-    cache = newCache;
-    lastFetch = Date.now();
-
-    l.event("system_state.refresh.success", {
-      count: newCache.size,
-    });
-  } catch (err) {
-    l.error("system_state.refresh.error", {
-      error: err,
-    });
-  } finally {
-    isRefreshing = false;
-  }
+  return refreshPromise;
 }
 
 async function ensureCache(ctx: TraceContext) {
