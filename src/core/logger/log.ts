@@ -111,7 +111,7 @@ export function log(
     schemaVersion: payload.schemaVersion ?? 1,
     context: {
       ...(payload.context || {}),
-      trace: ctx, // ✅ kontrolowane opakowanie
+      trace: ctx,
     },
   });
 }
@@ -146,10 +146,10 @@ log.fatal = (
   log(ctx, event, { ...payload, level: "fatal", error });
 
 // =====================================
-// 🔥 CTX LOGGER
+// 🔥 CTX LOGGER (STANDARD)
 // =====================================
 
-export function createLogger(ctx: TraceContext) {
+log.ctx = function (ctx: TraceContext) {
   return {
     event: (event: string, payload = {}) => log(ctx, event, payload),
     debug: (event: string, payload = {}) =>
@@ -163,4 +163,4 @@ export function createLogger(ctx: TraceContext) {
     fatal: (event: string, error: unknown, payload = {}) =>
       log(ctx, event, { ...payload, level: "fatal", error }),
   };
-}
+};
