@@ -56,7 +56,6 @@ export async function handleSystemInteraction(
   const flowId = createFlowId();
   const interactionId = createInteractionId();
 
-  // 🔥 BASE CTX
   const baseCtx: TraceContext = {
     traceId,
     correlationId,
@@ -72,26 +71,6 @@ export async function handleSystemInteraction(
 
   l.event("interaction.received", {
     eventType: "interaction",
-    interaction: {
-      type: interaction.isChatInputCommand()
-        ? "command"
-        : interaction.isButton()
-        ? "button"
-        : interaction.isStringSelectMenu()
-        ? "select"
-        : interaction.isModalSubmit()
-        ? "modal"
-        : undefined,
-      name: interaction.isChatInputCommand()
-        ? interaction.commandName
-        : undefined,
-      customId:
-        interaction.isButton() ||
-        interaction.isStringSelectMenu() ||
-        interaction.isModalSubmit()
-          ? interaction.customId
-          : undefined,
-    },
     flow: { step: "router:start" },
   });
 
@@ -108,7 +87,6 @@ export async function handleSystemInteraction(
     try {
       l.event("handler.attempt", {
         eventType: "system",
-        flow: { step: `router:handler:${name}` },
       });
 
       const handled = await handler(interaction, ctx);
@@ -124,7 +102,6 @@ export async function handleSystemInteraction(
       if (handled) {
         l.event("handler.handled", {
           eventType: "system",
-          result: { handled: true },
           timing: {
             label: name!,
             durationMs: Date.now() - startTime,
@@ -148,14 +125,6 @@ export async function handleSystemInteraction(
 
   lFinal.warn("interaction.unhandled", {
     eventType: "interaction",
-    interaction: {
-      type: interaction.type as unknown as string,
-      customId:
-        interaction.isButton() ||
-        interaction.isStringSelectMenu() ||
-        interaction.isModalSubmit()
-          ? interaction.customId
-          : undefined,
-    },
+    flow: { step: "router:end" },
   });
 }
