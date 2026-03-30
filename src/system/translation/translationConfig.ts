@@ -11,8 +11,8 @@
  * - provider endpoints (no logic)
  *
  * ❗ RULES:
- * - NO logic
- * - NO imports
+ * - NO business logic
+ * - NO dynamic transformations
  * - PURE config only
  */
 
@@ -72,16 +72,7 @@ export const LANGUAGES = [
 ] as const;
 
 // =====================================
-// 🔹 DERIVED TYPES
+// 🔹 TYPES
 // =====================================
 
 export type LanguageCode = (typeof LANGUAGES)[number]["code"];
-
-// =====================================
-// 🔹 LOOKUP MAP (NO RUNTIME COST)
-// =====================================
-
-export const LANGUAGE_MAP: Record<LanguageCode, (typeof LANGUAGES)[number]> =
-  Object.fromEntries(
-    LANGUAGES.map((l) => [l.code, l])
-  ) as Record<LanguageCode, (typeof LANGUAGES)[number]>;
