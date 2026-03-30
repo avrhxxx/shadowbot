@@ -2,10 +2,42 @@
 // 📁 src/system/absence/absenceService.ts
 // =====================================
 
-import { SheetRepository } from "../../integrations/google/SheetRepository";
-import crypto from "crypto";
-import { log } from "../../core/logger/log";
-import { TraceContext } from "../../core/trace/TraceContext";
+/**
+ * 📁 File: src/system/absence/absenceService.ts
+ * 🧠 Role: domain service
+ *
+ * 📄 Description:
+ * Business logic for absence system.
+ *
+ * 📥 Input:
+ * - guildId, player, absence data
+ * - ctx (REQUIRED)
+ *
+ * 📤 Output:
+ * - absence objects / config
+ *
+ * 🔗 Dependencies:
+ * - SheetRepository
+ * - core/logger
+ * - core/trace
+ *
+ * 📡 Used by:
+ * - absenceHandler
+ *
+ * 🆔 Flow:
+ * - traceId: REQUIRED
+ *
+ * 📊 Logging:
+ * - logger: YES (ctx)
+ *
+ * ⚠️ Notes:
+ * - STRICT CORE COMPLIANCE
+ * - ctx is REQUIRED everywhere
+ */
+
+import { SheetRepository } from "@/integrations/google/SheetRepository";
+import { log } from "@/core/logger/log";
+import { TraceContext } from "@/core/trace/TraceContext";
 
 // =============================
 // TYPES
@@ -25,7 +57,7 @@ export interface AbsenceConfig {
   guildId: string;
   notificationChannel?: string;
   absenceEmbedId?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // =============================
@@ -38,22 +70,37 @@ const configRepo = new SheetRepository<AbsenceConfig>("absence_config");
 // 📥 LOAD
 // =============================
 export async function getAbsences(
-  guildId: string
+  guildId: string,
+  ctx: TraceContext
 ): Promise<AbsenceObject[]> {
+  const l = log.ctx(ctx);
+
+  l.event("absence.get_all", {
+    context: { guildId },
+  });
+
   return absenceRepo.findAll({ guildId });
 }
 
 export async function getAbsenceByPlayer(
   guildId: string,
-  player: string
+  player: string,
+  ctx: TraceContext
 ): Promise<AbsenceObject | null> {
-  const absences = await getAbsences(guildId);
+  const l = log.ctx(ctx);
 
-  return (
+  const absences = await getAbsences(guildId, ctx);
+
+  const found =
     absences.find(
       (a) => a.player.toLowerCase() === player.toLowerCase()
-    ) || null
-  );
+    ) || null;
+
+  l.event("absence.get_by_player", {
+    context: { guildId, player, found: !!found },
+  });
+
+  return found;
 }
 
 // =============================
@@ -61,17 +108,18 @@ export async function getAbsenceByPlayer(
 // =============================
 export async function createAbsence(
   data: AbsenceObject,
-  ctx?: TraceContext
+  ctx: TraceContext
 ): Promise<AbsenceObject> {
-  const l = ctx ? log.ctx(ctx) : null;
+  const l = log.ctx(ctx);
 
   const existing = await getAbsenceByPlayer(
     data.guildId,
-    data.player
+    data.player,
+    ctx
   );
 
   if (existing) {
-    l?.warn("create_duplicate", {
+    l.warn("absence.create.duplicate", {
       context: {
         guildId: data.guildId,
         player: data.player,
@@ -92,7 +140,7 @@ export async function createAbsence(
 
   await absenceRepo.create(newAbsence);
 
-  l?.event("created", {
+  l.event("absence.created", {
     result: {
       guildId: data.guildId,
       player: data.player,
@@ -109,18 +157,18 @@ export async function createAbsence(
 export async function removeAbsence(
   guildId: string,
   player: string,
-  ctx?: TraceContext
+  ctx: TraceContext
 ): Promise<AbsenceObject | null> {
-  const l = ctx ? log.ctx(ctx) : null;
+  const l = log.ctx(ctx);
 
-  const absences = await getAbsences(guildId);
+  const absences = await getAbsences(guildId, ctx);
 
   const target = absences.find(
     (a) => a.player.toLowerCase() === player.toLowerCase()
   );
 
   if (!target) {
-    l?.warn("remove_not_found", {
+    l.warn("absence.remove.not_found", {
       context: { guildId, player },
     });
     return null;
@@ -128,7 +176,7 @@ export async function removeAbsence(
 
   await absenceRepo.deleteById(target.id);
 
-  l?.event("removed", {
+  l.event("absence.removed", {
     result: {
       guildId,
       player,
@@ -143,22 +191,30 @@ export async function removeAbsence(
 // ⚙️ CONFIG
 // =============================
 export async function getAbsenceConfig(
-  guildId: string
+  guildId: string,
+  ctx: TraceContext
 ): Promise<AbsenceConfig> {
+  const l = log.ctx(ctx);
+
   const rows = await configRepo.findAll({ guildId });
+
+  l.event("absence.config.get", {
+    context: { guildId, found: rows.length > 0 },
+  });
+
   return rows[0] || { guildId };
 }
 
 export async function setNotificationChannel(
   guildId: string,
   channelId: string,
-  ctx?: TraceContext
+  ctx: TraceContext
 ) {
-  const l = ctx ? log.ctx(ctx) : null;
+  const l = log.ctx(ctx);
 
   await setConfig(guildId, "notificationChannel", channelId, ctx);
 
-  l?.event("set_notification_channel", {
+  l.event("absence.config.notification_channel.set", {
     context: { guildId, channelId },
   });
 }
@@ -166,13 +222,13 @@ export async function setNotificationChannel(
 export async function setAbsenceEmbedId(
   guildId: string,
   messageId: string,
-  ctx?: TraceContext
+  ctx: TraceContext
 ) {
-  const l = ctx ? log.ctx(ctx) : null;
+  const l = log.ctx(ctx);
 
   await setConfig(guildId, "absenceEmbedId", messageId, ctx);
 
-  l?.event("set_embed_id", {
+  l.event("absence.config.embed_id.set", {
     context: { guildId, messageId },
   });
 }
@@ -180,10 +236,10 @@ export async function setAbsenceEmbedId(
 export async function setConfig(
   guildId: string,
   key: string,
-  value: any,
-  ctx?: TraceContext
+  value: unknown,
+  ctx: TraceContext
 ) {
-  const l = ctx ? log.ctx(ctx) : null;
+  const l = log.ctx(ctx);
 
   const existing = await configRepo.findAll({ guildId });
 
@@ -194,7 +250,7 @@ export async function setConfig(
       [key]: value,
     });
 
-    l?.event("config_created", {
+    l.event("absence.config.created", {
       context: { guildId, key },
     });
 
@@ -205,7 +261,7 @@ export async function setConfig(
     [key]: value,
   });
 
-  l?.event("config_updated", {
+  l.event("absence.config.updated", {
     context: { guildId, key },
   });
 }
