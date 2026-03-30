@@ -2,10 +2,11 @@
 // 📁 src/runtime/runtimeTypes.ts
 // =====================================
 
-import { Client } from "discord.js";
+import { Client, Guild } from "discord.js";
+import { TraceContext } from "@/core/trace/TraceContext";
 
 // =============================
-// 🔹 SYSTEM NAME
+// 🔹 SYSTEM NAME (SOURCE OF TRUTH)
 // =============================
 
 export type SystemName =
@@ -17,21 +18,21 @@ export type SystemName =
   | "quickadd";
 
 // =============================
-// 🔹 SYSTEM CONFIG (RUNTIME)
+// 🔹 SYSTEM STATE
 // =============================
 
-export interface SystemConfig {
-  system: SystemName;
+export interface SystemStateEntry {
   enabled: boolean;
   reason?: string;
 }
 
 // =============================
-// 🔹 SYSTEM MODULE (DYNAMIC IMPORT)
+// 🔹 SYSTEM MODULE CONTRACT
 // =============================
 
 export interface SystemModule {
-  init?: (client: Client) => Promise<void> | void;
+  initGlobal?: (client: Client, ctx: TraceContext) => Promise<void> | void;
+  initGuild?: (guild: Guild, ctx: TraceContext) => Promise<void> | void;
 }
 
 // =============================
@@ -41,6 +42,7 @@ export interface SystemModule {
 export interface SystemRegistryEntry {
   name: SystemName;
 
-  // lazy loader (dynamic import)
   loader: () => Promise<SystemModule>;
+
+  type: "global" | "guild";
 }
