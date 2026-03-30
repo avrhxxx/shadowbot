@@ -5,7 +5,7 @@
 import { sheetsClient } from "@/integrations/google/googleSheetsClient";
 import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
 import { ALL_SHEETS, SheetDefinition } from "@/integrations/google/googleSheetsSchema";
-import pRetry from "p-retry";
+import pRetry, { AbortError } from "p-retry";
 
 // =====================================
 // 🔐 ENV
@@ -18,12 +18,47 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 }
 
 // =====================================
-// 🔁 RETRY WRAPPER
+// 🔍 ERROR HELPER
+// =====================================
+
+function getStatus(err: unknown): number | undefined {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "response" in err
+  ) {
+    const response = (err as { response?: unknown }).response;
+
+    if (
+      typeof response === "object" &&
+      response !== null &&
+      "status" in response
+    ) {
+      const status = (response as { status?: unknown }).status;
+
+      if (typeof status === "number") {
+        return status;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+// =====================================
+// 🔁 RETRY WRAPPER (CONSISTENT)
 // =====================================
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   return pRetry(fn, {
     retries: 3,
+    onFailedAttempt: (error) => {
+      const status = getStatus(error);
+
+      if (status && status >= 400 && status < 500 && status !== 429) {
+        throw new AbortError("Non-retryable error");
+      }
+    },
   });
 }
 
@@ -83,11 +118,15 @@ async function ensureSheet(
   const rows = await readSheet(def.name);
 
   if (!rows.length) {
-    await writeSheet(def.name, [Array.from(def.headers)]);
+    await writeSheet(def.name, [def.headers]);
     return;
   }
 
-  const currentHeaders = (rows[0] ?? []) as string[];
+  const currentHeaders = rows[0];
+
+  if (!Array.isArray(currentHeaders)) {
+    throw new Error(`Invalid header row in sheet "${def.name}"`);
+  }
 
   const isSame =
     currentHeaders.length === def.headers.length &&
