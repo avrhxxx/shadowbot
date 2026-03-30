@@ -118,15 +118,17 @@ async function ensureSheet(
   const rows = await readSheet(def.name);
 
   if (!rows.length) {
-    await writeSheet(def.name, [def.headers]);
+    await writeSheet(def.name, [Array.from(def.headers)]);
     return;
   }
 
-  const currentHeaders = rows[0];
+  const currentHeadersRaw = rows[0];
 
-  if (!Array.isArray(currentHeaders)) {
+  if (!Array.isArray(currentHeadersRaw)) {
     throw new Error(`Invalid header row in sheet "${def.name}"`);
   }
+
+  const currentHeaders = currentHeadersRaw as string[];
 
   const isSame =
     currentHeaders.length === def.headers.length &&
