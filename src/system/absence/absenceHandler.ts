@@ -1,6 +1,38 @@
-// =====================================
-// 📁 src/system/absence/absenceHandler.ts
-// =====================================
+/**
+ * 📁 File: src/system/absence/absenceHandler.ts
+ * 🧠 Role: handler
+ *
+ * 📄 Description:
+ * Główny handler systemu absence.
+ * Odpowiada za routing interakcji:
+ * - button
+ * - select
+ * - modal
+ *
+ * 📥 Input:
+ * - Discord Interaction
+ * - TraceContext
+ *
+ * 📤 Output:
+ * - boolean (czy obsłużono)
+ *
+ * 🔗 Dependencies:
+ * - absenceButtons
+ * - core logger
+ *
+ * 📡 Used by:
+ * - systemRouter
+ *
+ * 🆔 Flow:
+ * - traceId: TAK
+ *
+ * 📊 Logging:
+ * - logger: TAK
+ * - level: medium
+ *
+ * ⚠️ Notes:
+ * - prefix isolation chroni przed kolizjami systemów
+ */
 
 import {
   Interaction,
@@ -10,8 +42,8 @@ import {
   CacheType,
 } from "discord.js";
 
-import { log } from "../../core/logger/log";
-import { TraceContext } from "../../core/trace/TraceContext";
+import { log } from "@/core/logger/log";
+import { TraceContext } from "@/core/trace/TraceContext";
 
 import {
   handleAddAbsence,
@@ -22,10 +54,10 @@ import {
   handleSettingsSelect,
   handleAddAbsenceSubmit,
   handleRemoveAbsenceSubmit,
-} from "./absenceButtons";
+} from "@/system/absence/absenceButtons";
 
 // =====================================
-// 🔹 IDS (WITH PREFIX)
+// 🔹 IDS
 // =====================================
 
 const PREFIX = "absence";
@@ -48,12 +80,12 @@ export const IDS = {
 };
 
 // =====================================
-// 🧩 HANDLERS (CTX VERSION)
+// 🧩 HANDLERS
 // =====================================
 
 const BUTTON_HANDLERS: Record<
   string,
-  (i: ButtonInteraction<CacheType>, ctx: TraceContext) => Promise<any>
+  (i: ButtonInteraction<CacheType>, ctx: TraceContext) => Promise<void>
 > = {
   [IDS.BUTTONS.ADD]: handleAddAbsence,
   [IDS.BUTTONS.REMOVE]: handleRemoveAbsence,
@@ -64,7 +96,7 @@ const BUTTON_HANDLERS: Record<
 
 const SELECT_HANDLERS: Record<
   string,
-  (i: StringSelectMenuInteraction<CacheType>, ctx: TraceContext) => Promise<any>
+  (i: StringSelectMenuInteraction<CacheType>, ctx: TraceContext) => Promise<void>
 > = {
   [IDS.SELECTS.SETTINGS_NOTIFICATION]: handleSettingsSelect,
 };
@@ -80,7 +112,15 @@ async function handleModal(
   const { customId } = interaction;
   const l = log.ctx(ctx);
 
-  l.event("modal_received", { customId });
+  if (!customId.startsWith(PREFIX)) return false;
+
+  l.event("absence.modal.received", {
+    eventType: "interaction",
+    interaction: {
+      type: "modal",
+      customId,
+    },
+  });
 
   if (customId === IDS.MODALS.ADD) {
     await handleAddAbsenceSubmit(interaction, ctx);
@@ -96,7 +136,7 @@ async function handleModal(
 }
 
 // =====================================
-// 🚀 MAIN HANDLER (CTX READY)
+// 🚀 MAIN HANDLER
 // =====================================
 
 export async function handleAbsenceInteraction(
@@ -112,11 +152,19 @@ export async function handleAbsenceInteraction(
 
     if (interaction.isButton()) {
       const id = interaction.customId;
-      const handler = BUTTON_HANDLERS[id];
 
+      if (!id.startsWith(PREFIX)) return false;
+
+      const handler = BUTTON_HANDLERS[id];
       if (!handler) return false;
 
-      l.event("button_click", { id });
+      l.event("absence.button.click", {
+        eventType: "interaction",
+        interaction: {
+          type: "button",
+          customId: id,
+        },
+      });
 
       await handler(interaction, ctx);
       return true;
@@ -128,11 +176,19 @@ export async function handleAbsenceInteraction(
 
     if (interaction.isStringSelectMenu()) {
       const id = interaction.customId;
-      const handler = SELECT_HANDLERS[id];
 
+      if (!id.startsWith(PREFIX)) return false;
+
+      const handler = SELECT_HANDLERS[id];
       if (!handler) return false;
 
-      l.event("select_change", { id });
+      l.event("absence.select.change", {
+        eventType: "interaction",
+        interaction: {
+          type: "select",
+          customId: id,
+        },
+      });
 
       await handler(interaction, ctx);
       return true;
@@ -148,7 +204,7 @@ export async function handleAbsenceInteraction(
 
     return false;
   } catch (error) {
-    l.error("handler_error", error);
+    l.error("absence.handler.error", error);
 
     if (interaction.isRepliable()) {
       const payload = {
