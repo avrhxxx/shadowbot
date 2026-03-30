@@ -1,6 +1,41 @@
-// =====================================
-// 📁 src/index.ts
-// =====================================
+/**
+ * 📁 File: src/index.ts
+ * 🧠 Role: entrypoint
+ *
+ * 📄 Description:
+ * Główny entrypoint aplikacji Discord.
+ * Odpowiada za:
+ * - inicjalizację klienta
+ * - bootstrap systemów
+ * - routing interakcji
+ *
+ * 📥 Input:
+ * - Discord events
+ *
+ * 📤 Output:
+ * - uruchomiona aplikacja + logi
+ *
+ * 🔗 Dependencies:
+ * - discord.js
+ * - core (router, logger, trace)
+ * - system modules
+ *
+ * 📡 Used by:
+ * - runtime (node)
+ *
+ * 🆔 Flow:
+ * - traceId: TAK (app lifecycle)
+ * - sessionId: NIE
+ * - queueId: NIE
+ *
+ * 📊 Logging:
+ * - logger: TAK
+ * - level: high
+ *
+ * ⚠️ Notes:
+ * - systemRouter zarządza trace dla interakcji
+ * - init moduły NIE używają ctx (API ograniczenie)
+ */
 
 import "./integrations/google/googleSheetsClient";
 
@@ -16,7 +51,11 @@ import {
 // =============================
 
 import { handleSystemInteraction } from "./core/router/systemRouter";
-import { logger } from "./core/logger/log";
+import { log } from "./core/logger/log";
+import {
+  createAppContext,
+  createChildContext,
+} from "./core/trace/TraceContext";
 
 // =============================
 // 🧩 SYSTEMS (INIT ONLY)
@@ -36,9 +75,6 @@ import {
   registerQuickAddListener,
   startQuickAddWorker,
 } from "./system/quickadd";
-
-// ❗ tymczasowo bez qCommand / handleQuickAddCommand / ensureQuickAddChannel
-// (bo nie są eksportowane — dodamy później jak poprawimy quickadd/index)
 
 // =============================
 // 🌍 INTEGRATIONS
@@ -71,9 +107,10 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 // =============================
 
 client.once("clientReady", async () => {
-  logger.emit({
-    scope: "app",
-    event: "client_ready",
+  const appCtx = createAppContext();
+  const logger = log.ctx(appCtx);
+
+  logger.event("app.client.ready", {
     context: {
       user: client.user?.tag,
     },
@@ -86,17 +123,9 @@ client.once("clientReady", async () => {
   try {
     await ensureAllSheets();
 
-    logger.emit({
-      scope: "app",
-      event: "sheets_initialized",
-    });
+    logger.event("app.sheets.initialized");
   } catch (err) {
-    logger.emit({
-      scope: "app",
-      event: "sheets_init_failed",
-      level: "error",
-      error: err,
-    });
+    logger.error("app.sheets.failed", err);
   }
 
   // =============================
@@ -106,37 +135,21 @@ client.once("clientReady", async () => {
   try {
     startQuickAddWorker();
 
-    logger.emit({
-      scope: "app",
-      event: "quickadd_worker_started",
-    });
+    logger.event("app.quickadd.worker.started");
   } catch (err) {
-    logger.emit({
-      scope: "app",
-      event: "quickadd_worker_failed",
-      level: "error",
-      error: err,
-    });
+    logger.error("app.quickadd.worker.failed", err);
   }
 
   // =============================
-  // ⚙️ SLASH COMMANDS (TEMP OFF)
+  // ⚙️ SLASH COMMANDS
   // =============================
 
   try {
     await client.application?.commands.set([]);
 
-    logger.emit({
-      scope: "app",
-      event: "slash_commands_skipped",
-    });
+    logger.event("app.slash.commands.skipped");
   } catch (err) {
-    logger.emit({
-      scope: "app",
-      event: "slash_commands_failed",
-      level: "error",
-      error: err,
-    });
+    logger.error("app.slash.commands.failed", err);
   }
 
   // =============================
@@ -148,57 +161,34 @@ client.once("clientReady", async () => {
   registerQuickAddListener(client);
 
   // =============================
-  // 🏰 GUILD INIT (PARALLEL)
+  // 🏰 GUILD INIT
   // =============================
 
   await Promise.all(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
-      try {
-        logger.emit({
-          scope: "app.guild",
-          event: "guild_init",
-          context: {
-            guild: guild.name,
-          },
-        });
-      } catch (err) {
-        logger.emit({
-          scope: "app.guild",
-          event: "guild_init_failed",
-          level: "error",
-          context: {
-            guild: guild.name,
-          },
-          error: err,
-        });
-      }
+      const guildCtx = createChildContext(appCtx, {
+        system: "app",
+        guildId: guild.id,
+      });
+
+      const l = log.ctx(guildCtx);
+
+      l.event("app.guild.init", {
+        context: {
+          guild: guild.name,
+        },
+      });
 
       try {
         initEventReminders(guild);
       } catch (err) {
-        logger.emit({
-          scope: "app.guild",
-          event: "event_reminders_failed",
-          level: "error",
-          context: {
-            guild: guild.name,
-          },
-          error: err,
-        });
+        l.error("app.guild.events.failed", err);
       }
 
       try {
         await initAbsenceNotifications(guild);
       } catch (err) {
-        logger.emit({
-          scope: "app.guild",
-          event: "absence_notifications_failed",
-          level: "error",
-          context: {
-            guild: guild.id,
-          },
-          error: err,
-        });
+        l.error("app.guild.absence.failed", err);
       }
     })
   );
@@ -210,20 +200,14 @@ client.once("clientReady", async () => {
 
 client.on("interactionCreate", async (interaction: Interaction) => {
   try {
-    // =============================
-    // 🧠 SYSTEM ROUTER
-    // =============================
-
     if (!interaction.isRepliable()) return;
 
     await handleSystemInteraction(interaction);
   } catch (err) {
-    logger.emit({
-      scope: "app",
-      event: "interaction_error",
-      level: "error",
-      error: err,
-    });
+    const ctx = createAppContext();
+    const logger = log.ctx(ctx);
+
+    logger.error("app.interaction.error", err);
 
     if (interaction.isRepliable()) {
       await interaction
