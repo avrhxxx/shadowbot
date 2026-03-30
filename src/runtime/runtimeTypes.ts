@@ -19,6 +19,12 @@ export type SystemName =
   | "quickadd_worker";
 
 // =============================
+// 🔹 RUNTIME KEY (INTERNAL)
+// =============================
+
+export type RuntimeKey = SystemName | "__global__";
+
+// =============================
 // 🔹 SYSTEM CONFIG (RUNTIME)
 // =============================
 
