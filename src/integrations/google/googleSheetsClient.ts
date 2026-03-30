@@ -8,11 +8,11 @@ import { google } from "googleapis";
 // 🔹 TYPES
 // =====================================
 
-type GoogleServiceAccount = {
+type GoogleServiceAccount = Readonly<{
   client_email: string;
   private_key: string;
   [key: string]: unknown;
-};
+}>;
 
 // =====================================
 // 🔐 ENV VALIDATION
@@ -65,7 +65,7 @@ const googleAuth = new google.auth.GoogleAuth({
   scopes: [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/cloud-vision",
-  ],
+  ] as const,
 });
 
 // =====================================
