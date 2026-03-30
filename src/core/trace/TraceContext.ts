@@ -13,7 +13,7 @@ import type {
 } from "../ids/IdGenerator";
 
 // =====================================
-// 🔹 SYSTEM DOMAIN (CENTRALIZED)
+// 🔹 SYSTEM DOMAIN
 // =====================================
 
 export type SystemType =
@@ -40,66 +40,25 @@ export type SourceType =
 // =====================================
 
 export type TraceContext = Readonly<{
-  // =============================
-  // 🧠 CORE
-  // =============================
-
   traceId: TraceId;
 
-  /**
-   * 🔗 Parent trace (chain tracking)
-   */
   parentTraceId?: TraceId;
-
-  /**
-   * 🔗 Cross-system correlation
-   */
   correlationId?: CorrelationId;
-
-  /**
-   * 🔁 Multi-step flow (long processes)
-   */
   flowId?: FlowId;
 
-  /**
-   * 🔹 origin of execution
-   */
   source: SourceType;
-
-  /**
-   * 🔹 system domain (feature / module)
-   */
   system?: SystemType;
-
-  // =============================
-  // 👤 USER / SESSION
-  // =============================
 
   userId?: string;
   sessionId?: SessionId;
-
-  // =============================
-  // 💬 DISCORD CONTEXT
-  // =============================
 
   guildId?: string;
   channelId?: string;
   messageId?: string;
 
-  /**
-   * 🔘 internal interaction tracking
-   */
   interactionId?: InteractionId;
 
-  // =============================
-  // ⚙️ ASYNC / WORKERS
-  // =============================
-
   jobId?: JobId;
-
-  // =============================
-  // 🌍 EXTERNAL SYSTEMS
-  // =============================
 
   externalId?: ExternalId;
 }>;
