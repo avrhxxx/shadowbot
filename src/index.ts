@@ -3,9 +3,29 @@
 // =====================================
 
 /**
- * 📁 File: src/index.ts
- * 🧠 Role: entrypoint
+ * 🧠 ROLE:
+ * Application entrypoint
+ *
+ * Responsibilities:
+ * - bootstrap integrations
+ * - initialize systems
+ * - manage lifecycle
+ *
+ * ❗ RULES:
+ * - NO business logic
+ * - MUST propagate ctx
+ * - MUST use structured logging
  */
+
+// =====================================
+// 🔹 BOOTSTRAP (SIDE EFFECTS)
+// =====================================
+
+import "@/integrations/google/googleSheetsClient";
+
+// =====================================
+// 🔹 LIBS
+// =====================================
 
 import {
   Client,
@@ -14,9 +34,9 @@ import {
   Interaction,
 } from "discord.js";
 
-// =============================
-// 🧠 CORE
-// =============================
+// =====================================
+// 🔹 CORE
+// =====================================
 
 import { handleSystemInteraction } from "@/core/router/systemRouter";
 import { log } from "@/core/logger/log";
@@ -25,34 +45,33 @@ import {
   createChildContext,
 } from "@/core/trace/TraceContext";
 
-// =============================
-// 🧩 SYSTEMS
-// =============================
+// =====================================
+// 🔹 SYSTEMS
+// =====================================
 
 import { initTranslationModule } from "@/system/translation";
 import { initModeratorPanel } from "@/system/moderator";
-
 import { initEventReminders } from "@/system/events";
 import { initAbsenceNotifications } from "@/system/absence";
 
-// =============================
-// 🔥 QUICKADD
-// =============================
+// =====================================
+// 🔹 QUICKADD
+// =====================================
 
 import {
   registerQuickAddListener,
   startQuickAddWorker,
 } from "@/system/quickadd";
 
-// =============================
-// 🌍 INTEGRATIONS
-// =============================
+// =====================================
+// 🔹 INTEGRATIONS
+// =====================================
 
 import { ensureAllSheets } from "@/integrations/google";
 
-// =============================
-// 🚀 CLIENT SETUP
-// =============================
+// =====================================
+// 🔹 CLIENT SETUP
+// =====================================
 
 const client = new Client({
   intents: [
@@ -70,16 +89,16 @@ if (!process.env.BOT_TOKEN) {
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// =============================
-// 🌍 APP CONTEXT (GLOBAL)
-// =============================
+// =====================================
+// 🔹 APP CONTEXT
+// =====================================
 
 const appCtx = createAppContext();
 const appLog = log.ctx(appCtx);
 
-// =============================
-// 🛑 GLOBAL ERROR HANDLING
-// =============================
+// =====================================
+// 🔹 ERROR NORMALIZATION
+// =====================================
 
 function normalizeError(err: unknown) {
   if (err instanceof Error) {
@@ -94,6 +113,10 @@ function normalizeError(err: unknown) {
   };
 }
 
+// =====================================
+// 🔹 GLOBAL ERROR HANDLING
+// =====================================
+
 process.on("unhandledRejection", (err) => {
   appLog.error("app.unhandled_rejection", normalizeError(err));
 });
@@ -103,9 +126,9 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-// =============================
-// 🚀 READY EVENT
-// =============================
+// =====================================
+// 🔹 READY EVENT
+// =====================================
 
 client.once("clientReady", async () => {
   appLog.event("app.client.ready", {
@@ -203,9 +226,9 @@ client.once("clientReady", async () => {
   });
 });
 
-// =============================
-// 🎯 INTERACTIONS
-// =============================
+// =====================================
+// 🔹 INTERACTIONS
+// =====================================
 
 client.on("interactionCreate", async (interaction: Interaction) => {
   try {
@@ -235,8 +258,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   }
 });
 
-// =============================
+// =====================================
 // 🔐 LOGIN
-// =============================
+// =====================================
 
 client.login(BOT_TOKEN);
