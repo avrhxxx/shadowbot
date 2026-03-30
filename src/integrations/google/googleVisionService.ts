@@ -18,7 +18,7 @@
  */
 
 import * as vision from "@google-cloud/vision";
-import { googleCredentials } from "./googleSheetsClient";
+import { googleCredentials } from "@/integrations/google/googleSheetsClient";
 
 // =====================================
 // 🔥 CLIENT (shared credentials)
