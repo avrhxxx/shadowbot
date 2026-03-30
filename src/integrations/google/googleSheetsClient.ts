@@ -21,7 +21,7 @@ type GoogleServiceAccount = {
 const rawEnv = process.env.GOOGLE_SERVICE_ACCOUNT;
 
 if (!rawEnv || !rawEnv.trim()) {
-  throw new Error("❌ Missing GOOGLE_SERVICE_ACCOUNT environment variable");
+  throw new Error("Missing GOOGLE_SERVICE_ACCOUNT environment variable");
 }
 
 // =====================================
@@ -33,27 +33,28 @@ let credentials: GoogleServiceAccount;
 try {
   credentials = JSON.parse(rawEnv) as GoogleServiceAccount;
 } catch {
-  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
+  throw new Error("GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
 }
 
 // =====================================
 // 🔍 VALIDATION
 // =====================================
 
-if (!credentials.client_email || !credentials.private_key) {
-  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT is missing required fields");
+if (
+  typeof credentials.client_email !== "string" ||
+  typeof credentials.private_key !== "string"
+) {
+  throw new Error("GOOGLE_SERVICE_ACCOUNT is missing required fields");
 }
 
-// Fix multiline private key (CRITICAL for GCP)
-if (typeof credentials.private_key === "string") {
-  credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
-}
+// Fix multiline private key (CRITICAL for GCP / Railway)
+credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
 // =====================================
 // 🔥 SHARED AUTH (Sheets + Vision)
 // =====================================
 
-export const googleAuth = new google.auth.GoogleAuth({
+const googleAuth = new google.auth.GoogleAuth({
   credentials,
   scopes: [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -65,13 +66,13 @@ export const googleAuth = new google.auth.GoogleAuth({
 // 📊 SHEETS CLIENT
 // =====================================
 
-export const sheetsClient = google.sheets({
+const sheetsClient = google.sheets({
   version: "v4",
   auth: googleAuth,
 });
 
 // =====================================
-// 🔄 EXPORT RAW CREDS (dla Vision API)
+// 🔄 EXPORTS
 // =====================================
 
-export const googleCredentials = credentials;
+export { googleAuth, sheetsClient, credentials as googleCredentials };
