@@ -1,148 +1,124 @@
 // =====================================
-// 📁 src/runtime/systemLoader.ts
+// 📁 src/runtime/systemState.ts
 // =====================================
 
-import { systems } from "./systemRegistry";
-import { isSystemEnabled } from "./systemState";
-
+import { SheetRepository } from "@/integrations/google";
 import { log } from "@/core/logger/log";
 import {
   createChildContext,
-  TraceContext,
+  createAppContext,
 } from "@/core/trace/TraceContext";
 
-import type { Client, Guild } from "discord.js";
+import type { SystemName } from "./runtimeTypes";
 
-// =============================
-// 🔹 GLOBAL SYSTEMS
-// =============================
+// =====================================
+// 🔹 TYPES
+// =====================================
 
-export async function loadGlobalSystems(
-  client: Client,
-  ctx: TraceContext
-) {
+type SystemRow = {
+  id?: string;
+  system: string;
+  enabled: string;
+  reason?: string;
+};
+
+// =====================================
+// 🔹 REPO
+// =====================================
+
+const repo = new SheetRepository<SystemRow>("system_flags");
+
+// =====================================
+// 🔹 CACHE
+// =====================================
+
+const CACHE_TTL = 30_000;
+
+let cache: Map<SystemName | "__global__", { enabled: boolean; reason?: string }> =
+  new Map();
+
+let lastFetch = 0;
+
+// =====================================
+// 🔹 INTERNAL
+// =====================================
+
+const appCtx = createAppContext();
+
+async function refreshCache() {
+  const ctx = createChildContext(appCtx, {
+    system: "runtime",
+  });
+
   const l = log.ctx(ctx);
 
-  let loaded = 0;
-  let skipped = 0;
-  let failed = 0;
+  try {
+    const rows = await repo.findAll({});
 
-  for (const sys of systems) {
-    if (sys.type !== "global") continue;
+    const newCache = new Map<
+      SystemName | "__global__",
+      { enabled: boolean; reason?: string }
+    >();
 
-    const sysCtx = createChildContext(ctx, {
-      system: sys.name,
+    for (const row of rows) {
+      const enabled = String(row.enabled).toLowerCase() === "true";
+
+      const key =
+        row.system === "global"
+          ? "__global__"
+          : (row.system as SystemName);
+
+      newCache.set(key, {
+        enabled,
+        reason: row.reason,
+      });
+    }
+
+    cache = newCache;
+    lastFetch = Date.now();
+
+    l.event("system_state.refresh.success", {
+      count: newCache.size,
     });
-
-    const enabledState = await isSystemEnabled(sys.name, sysCtx);
-
-    if (!enabledState.enabled) {
-      skipped++;
-      log.ctx(sysCtx).event("system.skipped", {
-        reason: enabledState.reason,
-      });
-      continue;
-    }
-
-    try {
-      const mod = await sys.loader();
-
-      if (typeof mod.initGlobal !== "function") {
-        failed++;
-        log.ctx(sysCtx).error("system.init.missing", {
-          type: "global",
-        });
-        continue;
-      }
-
-      const start = Date.now();
-
-      await mod.initGlobal(client, sysCtx);
-
-      loaded++;
-
-      log.ctx(sysCtx).event("system.loaded", {
-        duration: Date.now() - start,
-      });
-    } catch (err) {
-      failed++;
-      log.ctx(sysCtx).error("system.load.failed", {
-        error: err,
-      });
-    }
+  } catch (err) {
+    l.error("system_state.refresh.error", {
+      error: err,
+    });
   }
-
-  l.event("system.global.load.complete", {
-    loaded,
-    skipped,
-    failed,
-  });
 }
 
-// =============================
-// 🔹 GUILD SYSTEMS
-// =============================
+async function ensureCache() {
+  if (Date.now() - lastFetch > CACHE_TTL) {
+    await refreshCache();
+  }
+}
 
-export async function loadGuildSystems(
-  guild: Guild,
-  ctx: TraceContext
-) {
-  const l = log.ctx(ctx);
+// =====================================
+// 🌍 PUBLIC API
+// =====================================
 
-  let loaded = 0;
-  let skipped = 0;
-  let failed = 0;
+export async function isSystemEnabled(
+  system: SystemName
+): Promise<{ enabled: boolean; reason?: string }> {
+  await ensureCache();
 
-  for (const sys of systems) {
-    if (sys.type !== "guild") continue;
+  const global = cache.get("__global__");
 
-    const sysCtx = createChildContext(ctx, {
-      system: sys.name,
-      guildId: guild.id,
-    });
-
-    const enabledState = await isSystemEnabled(sys.name, sysCtx);
-
-    if (!enabledState.enabled) {
-      skipped++;
-      log.ctx(sysCtx).event("system.skipped", {
-        reason: enabledState.reason,
-      });
-      continue;
-    }
-
-    try {
-      const mod = await sys.loader();
-
-      if (typeof mod.initGuild !== "function") {
-        failed++;
-        log.ctx(sysCtx).error("system.init.missing", {
-          type: "guild",
-        });
-        continue;
-      }
-
-      const start = Date.now();
-
-      await mod.initGuild(guild, sysCtx);
-
-      loaded++;
-
-      log.ctx(sysCtx).event("system.loaded", {
-        duration: Date.now() - start,
-      });
-    } catch (err) {
-      failed++;
-      log.ctx(sysCtx).error("system.load.failed", {
-        error: err,
-      });
-    }
+  if (global && !global.enabled) {
+    return {
+      enabled: false,
+      reason: global.reason ?? "Global disable",
+    };
   }
 
-  l.event("system.guild.load.complete", {
-    guildId: guild.id,
-    loaded,
-    skipped,
-    failed,
-  });
+  const entry = cache.get(system);
+
+  if (!entry) {
+    return {
+      enabled: false,
+      reason: "System not configured",
+    };
+  }
+
+  return entry;
 }
