@@ -70,21 +70,28 @@ export type TraceContext = Readonly<{
 }>;
 
 // =====================================
-// 🔹 HELPERS
+// 🔹 CHILD CONTEXT (FIXED)
 // =====================================
 
 export function createChildContext(
   parent: TraceContext,
-  overrides: Partial<TraceContext>
+  overrides: Partial<Omit<TraceContext, "traceId" | "parentTraceId" | "correlationId" | "flowId">>
 ): TraceContext {
   return {
     ...parent,
+
+    traceId: createTraceId(),
+    parentTraceId: parent.traceId,
+
+    correlationId: parent.correlationId ?? createCorrelationId(),
+    flowId: parent.flowId ?? createFlowId(),
+
     ...overrides,
   };
 }
 
 // =====================================
-// 🚀 APP CONTEXT (OPTIONAL HELPER)
+// 🚀 APP CONTEXT
 // =====================================
 
 export function createAppContext(): TraceContext {
