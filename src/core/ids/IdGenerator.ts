@@ -4,10 +4,6 @@
 
 import { randomUUID } from "crypto";
 
-// =====================================
-// 🔹 BRANDING TYPES (TYPE-SAFE IDS)
-// =====================================
-
 type Brand<K, T> = K & { __brand: T };
 
 export type TraceId = Brand<string, "TraceId">;
@@ -18,10 +14,6 @@ export type InteractionId = Brand<string, "InteractionId">;
 export type ExternalId = Brand<string, "ExternalId">;
 export type CorrelationId = Brand<string, "CorrelationId">;
 export type FlowId = Brand<string, "FlowId">;
-
-// =====================================
-// 🔹 INTERNAL CONFIG
-// =====================================
 
 const ID_LENGTH = 8;
 
@@ -42,10 +34,6 @@ function generate(prefix: IdPrefix): string {
   return `${prefix}-${randomUUID().slice(0, ID_LENGTH)}`;
 }
 
-// =====================================
-// 🔥 PUBLIC GENERATORS
-// =====================================
-
 export const createTraceId = () => generate(ID_PREFIX_MAP.trace) as TraceId;
 export const createSessionId = () => generate(ID_PREFIX_MAP.session) as SessionId;
 export const createQueueId = () => generate(ID_PREFIX_MAP.queue) as QueueId;
@@ -54,10 +42,6 @@ export const createInteractionId = () => generate(ID_PREFIX_MAP.interaction) as 
 export const createExternalId = () => generate(ID_PREFIX_MAP.external) as ExternalId;
 export const createCorrelationId = () => generate(ID_PREFIX_MAP.correlation) as CorrelationId;
 export const createFlowId = () => generate(ID_PREFIX_MAP.flow) as FlowId;
-
-// =====================================
-// 🔒 TYPE GUARDS
-// =====================================
 
 export const isTraceId = (id: string): id is TraceId =>
   id.startsWith(`${ID_PREFIX_MAP.trace}-`);
@@ -83,10 +67,6 @@ export const isCorrelationId = (id: string): id is CorrelationId =>
 export const isFlowId = (id: string): id is FlowId =>
   id.startsWith(`${ID_PREFIX_MAP.flow}-`);
 
-// =====================================
-// 🧠 GENERIC HELPERS
-// =====================================
-
 export function isValidId(id: string): boolean {
   return new RegExp(`^[${Object.values(ID_PREFIX_MAP).join("")}]-[a-f0-9]{8}$`).test(id);
 }
@@ -103,10 +83,6 @@ export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
   return entry ? (entry[0] as keyof typeof ID_PREFIX_MAP) : null;
 }
 
-// =====================================
-// 🧠 DISPLAY HELPERS
-// =====================================
-
 function extractSuffix(id: string): string | null {
   const parts = id.split("-");
   return parts[1] ?? null;
@@ -117,10 +93,6 @@ export function toDisplayId(id: string, length = 4): string {
   if (!suffix) return id;
   return suffix.slice(0, Math.min(length, suffix.length));
 }
-
-// =====================================
-// 🔹 TYPED DISPLAY HELPERS
-// =====================================
 
 export const toDisplayTraceId = (id: TraceId, l = 4) =>
   `${ID_PREFIX_MAP.trace}-${toDisplayId(id, l)}`;
