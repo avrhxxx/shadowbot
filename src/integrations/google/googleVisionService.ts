@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/integrations/google/GoogleVisionService.ts
+// 📁 src/integrations/google/googleVisionService.ts
 // =====================================
 
 /**
