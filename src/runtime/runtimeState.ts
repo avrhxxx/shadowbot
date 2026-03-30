@@ -4,10 +4,7 @@
 
 import { SheetRepository } from "@/integrations/google";
 import { log } from "@/core/logger/log";
-import {
-  createChildContext,
-  createAppContext,
-} from "@/core/trace/TraceContext";
+import { createChildContext, TraceContext } from "@/core/trace/TraceContext";
 
 import type { SystemName } from "./runtimeTypes";
 
@@ -17,7 +14,7 @@ import type { SystemName } from "./runtimeTypes";
 
 type SystemRow = {
   id?: string;
-  system: string;
+  system: SystemName | "global";
   enabled: string;
   reason?: string;
 };
@@ -38,17 +35,15 @@ let cache: Map<SystemName | "__global__", { enabled: boolean; reason?: string }>
   new Map();
 
 let lastFetch = 0;
+let isRefreshing = false;
 
 // =====================================
 // 🔹 INTERNAL
 // =====================================
 
-const appCtx = createAppContext();
-
-async function refreshCache() {
-  const ctx = createChildContext(appCtx, {
-    system: "runtime",
-  });
+async function refreshCache(ctx: TraceContext) {
+  if (isRefreshing) return;
+  isRefreshing = true;
 
   const l = log.ctx(ctx);
 
@@ -61,12 +56,14 @@ async function refreshCache() {
     >();
 
     for (const row of rows) {
+      if (!row.system) continue;
+
       const enabled = String(row.enabled).toLowerCase() === "true";
 
       const key =
         row.system === "global"
           ? "__global__"
-          : (row.system as SystemName);
+          : row.system;
 
       newCache.set(key, {
         enabled,
@@ -84,12 +81,14 @@ async function refreshCache() {
     l.error("system_state.refresh.error", {
       error: err,
     });
+  } finally {
+    isRefreshing = false;
   }
 }
 
-async function ensureCache() {
+async function ensureCache(ctx: TraceContext) {
   if (Date.now() - lastFetch > CACHE_TTL) {
-    await refreshCache();
+    await refreshCache(ctx);
   }
 }
 
@@ -98,9 +97,14 @@ async function ensureCache() {
 // =====================================
 
 export async function isSystemEnabled(
-  system: SystemName
+  system: SystemName,
+  parentCtx: TraceContext
 ): Promise<{ enabled: boolean; reason?: string }> {
-  await ensureCache();
+  const ctx = createChildContext(parentCtx, {
+    system: "runtime",
+  });
+
+  await ensureCache(ctx);
 
   const global = cache.get("__global__");
 
