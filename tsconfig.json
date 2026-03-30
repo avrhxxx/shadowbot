@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
 
-    // 🔥 KLUCZOWE
+    // 🔥 ZOSTAJE — bo działa i wspiera aliasy
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
@@ -10,16 +10,23 @@
     "rootDir": "src",
 
     "strict": true,
+
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
 
-    // 🔥 ALIAS @
+    // 🔥 alias system
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+
+    // 🔥 jakość kodu
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src/**/*"]
 }
