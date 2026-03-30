@@ -8,7 +8,7 @@
  *
  * Responsibilities:
  * - bootstrap integrations
- * - initialize systems
+ * - initialize systems (via runtime)
  * - manage lifecycle
  *
  * ❗ RULES:
@@ -46,22 +46,19 @@ import {
 } from "@/core/trace/TraceContext";
 
 // =====================================
-// 🔹 SYSTEMS
-// =====================================
-
-import { initTranslationModule } from "@/system/translation";
-import { initModeratorPanel } from "@/system/moderator";
-import { initEventReminders } from "@/system/events";
-import { initAbsenceNotifications } from "@/system/absence";
-
-// =====================================
-// 🔹 QUICKADD
+// 🔹 RUNTIME
 // =====================================
 
 import {
-  registerQuickAddListener,
-  startQuickAddWorker,
-} from "@/system/quickadd";
+  loadGlobalSystems,
+  loadGuildSystems,
+} from "@/runtime/systemLoader";
+
+// =====================================
+// 🔹 QUICKADD (independent worker)
+// =====================================
+
+import { startQuickAddWorker } from "@/system/quickadd";
 
 // =====================================
 // 🔹 INTEGRATIONS
@@ -154,7 +151,7 @@ client.once("clientReady", async () => {
   }
 
   // =============================
-  // 🔥 WORKER
+  // 🔥 WORKER (independent)
   // =============================
 
   try {
@@ -176,21 +173,27 @@ client.once("clientReady", async () => {
   }
 
   // =============================
-  // 🧩 SYSTEM INIT
+  // 🧠 RUNTIME — GLOBAL SYSTEMS
   // =============================
 
-  initTranslationModule(client);
-  initModeratorPanel(client);
-  registerQuickAddListener(client);
+  try {
+    const ctx = createChildContext(appCtx, {
+      system: "runtime",
+    });
+
+    await loadGlobalSystems(client, ctx);
+  } catch (err) {
+    appLog.error("app.runtime.global.failed", normalizeError(err));
+  }
 
   // =============================
-  // 🏰 GUILD INIT
+  // 🏰 RUNTIME — GUILD SYSTEMS
   // =============================
 
   const results = await Promise.allSettled(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
       const guildCtx = createChildContext(appCtx, {
-        system: "app",
+        system: "runtime",
         guildId: guild.id,
       });
 
@@ -203,15 +206,9 @@ client.once("clientReady", async () => {
       });
 
       try {
-        initEventReminders(guild);
+        await loadGuildSystems(guild, guildCtx);
       } catch (err) {
-        l.error("app.guild.events.failed", normalizeError(err));
-      }
-
-      try {
-        await initAbsenceNotifications(guild);
-      } catch (err) {
-        l.error("app.guild.absence.failed", normalizeError(err));
+        l.error("app.runtime.guild.failed", normalizeError(err));
       }
     })
   );
