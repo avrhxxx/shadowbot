@@ -3,8 +3,6 @@
  * 🧠 Role: entrypoint
  */
 
-import "@/integrations/google/googleSheetsClient";
-
 import {
   Client,
   GatewayIntentBits,
@@ -80,13 +78,16 @@ const appLog = log.ctx(appCtx);
 // =============================
 
 process.on("unhandledRejection", (err) => {
-  appLog.error("app.unhandled_rejection", err);
+  appLog.error("app.unhandled_rejection", {
+    error: err instanceof Error ? err.message : String(err),
+  });
 });
 
 process.on("uncaughtException", (err) => {
-  appLog.error("app.uncaught_exception", err);
+  appLog.error("app.uncaught_exception", {
+    error: err instanceof Error ? err.message : String(err),
+  });
 
-  // 🔥 controlled crash (important for stability)
   process.exit(1);
 });
 
@@ -106,8 +107,13 @@ client.once("clientReady", async () => {
   // =============================
 
   try {
+    const ctx = createChildContext(appCtx, {
+      system: "google",
+    });
+
     await ensureAllSheets();
-    appLog.event("app.sheets.initialized");
+
+    log.ctx(ctx).event("app.sheets.initialized");
   } catch (err) {
     appLog.error("app.sheets.failed", err);
   }
@@ -146,7 +152,7 @@ client.once("clientReady", async () => {
   // 🏰 GUILD INIT
   // =============================
 
-  await Promise.all(
+  await Promise.allSettled(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
       const guildCtx = createChildContext(appCtx, {
         system: "app",
@@ -188,6 +194,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   } catch (err) {
     const ctx = createChildContext(appCtx, {
       source: "discord",
+      guildId: interaction.guildId ?? undefined,
+      userId: interaction.user?.id,
+      interactionId: interaction.id,
     });
 
     const l = log.ctx(ctx);
