@@ -29,7 +29,20 @@ export type FlowId = Brand<string, "FlowId">;
 
 const ID_LENGTH = 8;
 
-function generate(prefix: string): string {
+const ID_PREFIX_MAP = {
+  trace: "t",
+  session: "s",
+  queue: "q",
+  job: "j",
+  interaction: "i",
+  external: "x",
+  correlation: "c",
+  flow: "f",
+} as const;
+
+type IdPrefix = typeof ID_PREFIX_MAP[keyof typeof ID_PREFIX_MAP];
+
+function generate(prefix: IdPrefix): string {
   return `${prefix}-${randomUUID().slice(0, ID_LENGTH)}`;
 }
 
@@ -38,35 +51,35 @@ function generate(prefix: string): string {
 // =====================================
 
 export function createTraceId(): TraceId {
-  return generate("t") as TraceId;
+  return generate(ID_PREFIX_MAP.trace) as TraceId;
 }
 
 export function createSessionId(): SessionId {
-  return generate("s") as SessionId;
+  return generate(ID_PREFIX_MAP.session) as SessionId;
 }
 
 export function createQueueId(): QueueId {
-  return generate("q") as QueueId;
+  return generate(ID_PREFIX_MAP.queue) as QueueId;
 }
 
 export function createJobId(): JobId {
-  return generate("j") as JobId;
+  return generate(ID_PREFIX_MAP.job) as JobId;
 }
 
 export function createInteractionId(): InteractionId {
-  return generate("i") as InteractionId;
+  return generate(ID_PREFIX_MAP.interaction) as InteractionId;
 }
 
 export function createExternalId(): ExternalId {
-  return generate("x") as ExternalId;
+  return generate(ID_PREFIX_MAP.external) as ExternalId;
 }
 
 export function createCorrelationId(): CorrelationId {
-  return generate("c") as CorrelationId;
+  return generate(ID_PREFIX_MAP.correlation) as CorrelationId;
 }
 
 export function createFlowId(): FlowId {
-  return generate("f") as FlowId;
+  return generate(ID_PREFIX_MAP.flow) as FlowId;
 }
 
 // =====================================
@@ -74,35 +87,35 @@ export function createFlowId(): FlowId {
 // =====================================
 
 export function isTraceId(id: string): id is TraceId {
-  return typeof id === "string" && id.startsWith("t-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.trace}-`);
 }
 
 export function isSessionId(id: string): id is SessionId {
-  return typeof id === "string" && id.startsWith("s-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.session}-`);
 }
 
 export function isQueueId(id: string): id is QueueId {
-  return typeof id === "string" && id.startsWith("q-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.queue}-`);
 }
 
 export function isJobId(id: string): id is JobId {
-  return typeof id === "string" && id.startsWith("j-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.job}-`);
 }
 
 export function isInteractionId(id: string): id is InteractionId {
-  return typeof id === "string" && id.startsWith("i-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.interaction}-`);
 }
 
 export function isExternalId(id: string): id is ExternalId {
-  return typeof id === "string" && id.startsWith("x-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.external}-`);
 }
 
 export function isCorrelationId(id: string): id is CorrelationId {
-  return typeof id === "string" && id.startsWith("c-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.correlation}-`);
 }
 
 export function isFlowId(id: string): id is FlowId {
-  return typeof id === "string" && id.startsWith("f-");
+  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.flow}-`);
 }
 
 // =====================================
@@ -110,49 +123,22 @@ export function isFlowId(id: string): id is FlowId {
 // =====================================
 
 export function isValidId(id: string): boolean {
-  return /^[a-z]-[a-f0-9]{8}$/.test(id);
+  return new RegExp(`^[${Object.values(ID_PREFIX_MAP).join("")}]-[a-f0-9]{8}$`).test(id);
 }
 
 /**
  * 🔹 Debug helper ONLY
  */
-export function getIdType(id: string): string | null {
+export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
   if (!isValidId(id)) return null;
 
-  const prefix = id[0];
+  const prefix = id[0] as IdPrefix;
 
-  switch (prefix) {
-    case "t":
-      return "trace";
-    case "s":
-      return "session";
-    case "q":
-      return "queue";
-    case "j":
-      return "job";
-    case "i":
-      return "interaction";
-    case "x":
-      return "external";
-    case "c":
-      return "correlation";
-    case "f":
-      return "flow";
-    default:
-      return null;
-  }
-}
+  const entry = Object.entries(ID_PREFIX_MAP).find(
+    ([, value]) => value === prefix
+  );
 
-// =====================================
-// 🔗 CORRELATION HELPERS
-// =====================================
-
-/**
- * 🔹 Creates correlationId linked to existing trace
- * (semantic helper — not strict binding)
- */
-export function createCorrelationFromTrace(): CorrelationId {
-  return createCorrelationId();
+  return entry ? (entry[0] as keyof typeof ID_PREFIX_MAP) : null;
 }
 
 // =====================================
@@ -172,18 +158,33 @@ export function toDisplayId(id: string, length = 4): string {
   const suffix = extractSuffix(id);
   if (!suffix) return id;
 
-  return suffix.slice(0, length);
+  return suffix.slice(0, Math.min(length, suffix.length));
 }
 
 // =====================================
 // 🔹 TYPED DISPLAY HELPERS
 // =====================================
 
-export const toDisplayTraceId = (id: TraceId, l = 4) => `t-${toDisplayId(id, l)}`;
-export const toDisplaySessionId = (id: SessionId, l = 4) => `s-${toDisplayId(id, l)}`;
-export const toDisplayQueueId = (id: QueueId, l = 4) => `q-${toDisplayId(id, l)}`;
-export const toDisplayJobId = (id: JobId, l = 4) => `j-${toDisplayId(id, l)}`;
-export const toDisplayInteractionId = (id: InteractionId, l = 4) => `i-${toDisplayId(id, l)}`;
-export const toDisplayExternalId = (id: ExternalId, l = 4) => `x-${toDisplayId(id, l)}`;
-export const toDisplayCorrelationId = (id: CorrelationId, l = 4) => `c-${toDisplayId(id, l)}`;
-export const toDisplayFlowId = (id: FlowId, l = 4) => `f-${toDisplayId(id, l)}`;
+export const toDisplayTraceId = (id: TraceId, l = 4) =>
+  `${ID_PREFIX_MAP.trace}-${toDisplayId(id, l)}`;
+
+export const toDisplaySessionId = (id: SessionId, l = 4) =>
+  `${ID_PREFIX_MAP.session}-${toDisplayId(id, l)}`;
+
+export const toDisplayQueueId = (id: QueueId, l = 4) =>
+  `${ID_PREFIX_MAP.queue}-${toDisplayId(id, l)}`;
+
+export const toDisplayJobId = (id: JobId, l = 4) =>
+  `${ID_PREFIX_MAP.job}-${toDisplayId(id, l)}`;
+
+export const toDisplayInteractionId = (id: InteractionId, l = 4) =>
+  `${ID_PREFIX_MAP.interaction}-${toDisplayId(id, l)}`;
+
+export const toDisplayExternalId = (id: ExternalId, l = 4) =>
+  `${ID_PREFIX_MAP.external}-${toDisplayId(id, l)}`;
+
+export const toDisplayCorrelationId = (id: CorrelationId, l = 4) =>
+  `${ID_PREFIX_MAP.correlation}-${toDisplayId(id, l)}`;
+
+export const toDisplayFlowId = (id: FlowId, l = 4) =>
+  `${ID_PREFIX_MAP.flow}-${toDisplayId(id, l)}`;
