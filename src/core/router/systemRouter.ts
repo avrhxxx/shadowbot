@@ -12,22 +12,40 @@ import {
 import { log } from "../logger/log";
 import { TraceContext, createChildContext } from "../trace/TraceContext";
 
+// =============================
+// 🧩 SYSTEM IMPORTS
+// =============================
+
 import { handleEventInteraction } from "../../system/events";
 import { handleAbsenceInteraction } from "../../system/absence";
 import { handlePointsInteraction } from "../../system/points";
+
+// =============================
+// 🧠 TYPES
+// =============================
 
 type SystemHandler = (
   interaction: Interaction,
   ctx: TraceContext
 ) => Promise<boolean>;
 
-const SYSTEM_HANDLERS: { name: TraceContext["system"]; handler: SystemHandler }[] = [
+// =============================
+// 🧩 REGISTRY
+// =============================
+
+const SYSTEM_HANDLERS = [
   { name: "events", handler: handleEventInteraction },
   { name: "absence", handler: handleAbsenceInteraction },
   { name: "points", handler: handlePointsInteraction },
-];
+] as const;
 
-export async function handleSystemInteraction(interaction: Interaction) {
+// =============================
+// 🚀 ROUTER
+// =============================
+
+export async function handleSystemInteraction(
+  interaction: Interaction
+) {
   const baseCtx: TraceContext = {
     traceId: createTraceId(),
     correlationId: createCorrelationId(),
@@ -47,30 +65,53 @@ export async function handleSystemInteraction(interaction: Interaction) {
   });
 
   for (const { name, handler } of SYSTEM_HANDLERS) {
-    const start = Date.now();
+    const startTime = Date.now();
 
     const ctx = createChildContext(baseCtx, { system: name });
     const l = log.ctx(ctx);
 
     try {
-      l.event("handler.attempt");
+      l.event("handler.attempt", {
+        eventType: "system",
+        flow: { step: `router:handler:${name}` },
+      });
 
       const handled = await handler(interaction, ctx);
 
       l.event("handler.result", {
-        decision: { condition: "handler_returned_true", result: handled },
+        eventType: "system",
+        decision: {
+          condition: "handler_returned_true",
+          result: handled,
+        },
       });
 
       if (handled) {
         l.event("handler.handled", {
-          timing: { label: name!, durationMs: Date.now() - start },
+          eventType: "system",
+          result: { handled: true },
+          timing: {
+            label: name!,
+            durationMs: Date.now() - startTime,
+          },
         });
+
         return;
       }
     } catch (err) {
-      l.error("handler.error", err);
+      l.error("handler.error", err, {
+        eventType: "system",
+        timing: {
+          label: name!,
+          durationMs: Date.now() - startTime,
+        },
+      });
     }
   }
 
-  log.ctx(baseCtx).warn("interaction.unhandled");
+  const lFinal = log.ctx(baseCtx);
+
+  lFinal.warn("interaction.unhandled", {
+    eventType: "interaction",
+  });
 }
