@@ -14,9 +14,7 @@ export const systems: SystemRegistryEntry[] = [
     type: "global",
     loader: async () => {
       const mod = await import("@/system/moderator");
-      return {
-        init: mod.initModeratorPanel,
-      };
+      return { init: mod.initModeratorPanel };
     },
   },
   {
@@ -24,9 +22,7 @@ export const systems: SystemRegistryEntry[] = [
     type: "global",
     loader: async () => {
       const mod = await import("@/system/translation");
-      return {
-        init: mod.initTranslationModule,
-      };
+      return { init: mod.initTranslationModule };
     },
   },
   {
@@ -34,9 +30,7 @@ export const systems: SystemRegistryEntry[] = [
     type: "guild",
     loader: async () => {
       const mod = await import("@/system/events");
-      return {
-        init: mod.initEventReminders,
-      };
+      return { init: mod.initEventReminders };
     },
   },
   {
@@ -44,9 +38,7 @@ export const systems: SystemRegistryEntry[] = [
     type: "guild",
     loader: async () => {
       const mod = await import("@/system/absence");
-      return {
-        init: mod.initAbsenceNotifications,
-      };
+      return { init: mod.initAbsenceNotifications };
     },
   },
   {
@@ -54,21 +46,15 @@ export const systems: SystemRegistryEntry[] = [
     type: "global",
     loader: async () => {
       const mod = await import("@/system/quickadd");
-      return {
-        init: mod.registerQuickAddListener,
-      };
+      return { init: mod.registerQuickAddListener };
     },
   },
-
-  // 🔥 NOWY: WORKER JAKO SYSTEM
   {
-    name: "quickadd_worker" as any, // tymczasowo, patrz niżej
+    name: "quickadd_worker",
     type: "global",
     loader: async () => {
       const mod = await import("@/system/quickadd");
-      return {
-        init: mod.startQuickAddWorker,
-      };
+      return { init: mod.startQuickAddWorker };
     },
   },
 ];
