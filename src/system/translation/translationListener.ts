@@ -18,6 +18,7 @@ import { log } from "@/core/logger/log";
 import {
   TRANSLATION_TRIGGER_EMOJI,
   LANGUAGES,
+  LANGUAGE_MAP,
 } from "./translationConfig";
 
 import { translateText } from "./translationService";
@@ -26,15 +27,15 @@ import {
   setUserLanguage,
 } from "./translationPreferencesService";
 
-export function initTranslationListener(client: Client) {
+// =====================================
+// 🚀 INIT
+// =====================================
+
+export function initTranslationListener(
+  client: Client,
+  appCtx: Parameters<typeof createChildContext>[0]
+) {
   client.on("messageReactionAdd", async (reaction, user) => {
-    const ctx = createChildContext({
-      source: "discord",
-      userId: user.id,
-    });
-
-    const l = log.ctx(ctx);
-
     try {
       if (user.bot) return;
 
@@ -45,10 +46,25 @@ export function initTranslationListener(client: Client) {
       if (!reaction.message.inGuild()) return;
 
       const message = reaction.message;
-      if (!message.content) return;
 
-      const guildId = message.guildId!;
+      if (!message.content) return;
+      if (!message.guildId) return;
+
+      const ctx = createChildContext(appCtx, {
+        system: "translation",
+        source: "discord",
+        guildId: message.guildId,
+        userId: user.id,
+      });
+
+      const l = log.ctx(ctx);
+
+      const guildId = message.guildId;
       const userId = user.id;
+
+      l.event("translation.trigger", {
+        messageId: message.id,
+      });
 
       const savedLang = await getUserLanguage(guildId, userId);
 
@@ -56,6 +72,8 @@ export function initTranslationListener(client: Client) {
       // AUTO TRANSLATE
       // =============================
       if (savedLang) {
+        l.event("translation.auto", { lang: savedLang });
+
         const translated = await translateText(
           message.content,
           savedLang
@@ -126,17 +144,17 @@ export function initTranslationListener(client: Client) {
 
           const langCode = parts[2];
 
-          const isValidLang = LANGUAGES.some(
-            (l) => l.code === langCode
-          );
-
-          if (!isValidLang) {
+          if (!LANGUAGE_MAP[langCode as keyof typeof LANGUAGE_MAP]) {
             await interaction.reply({
               content: "❌ Invalid language.",
               ephemeral: true,
             });
             return;
           }
+
+          l.event("translation.language_selected", {
+            lang: langCode,
+          });
 
           await setUserLanguage(guildId, userId, langCode);
 
@@ -186,7 +204,13 @@ export function initTranslationListener(client: Client) {
         }
       });
     } catch (err) {
-      l.error("translation.listener.error", err);
+      const fallbackCtx = createChildContext(appCtx, {
+        system: "translation",
+        source: "discord",
+        userId: user.id,
+      });
+
+      log.ctx(fallbackCtx).error("translation.listener.error", err);
     }
   });
 }
