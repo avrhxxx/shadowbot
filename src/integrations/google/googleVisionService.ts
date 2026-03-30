@@ -35,6 +35,10 @@ const client = new vision.ImageAnnotatorClient({
 export async function runVisionOCR(
   buffer: Buffer
 ): Promise<vision.protos.google.cloud.vision.v1.IAnnotateImageResponse | null> {
+  if (!buffer || buffer.length === 0) {
+    return null;
+  }
+
   try {
     const [result] = await client.documentTextDetection({
       image: { content: buffer },
