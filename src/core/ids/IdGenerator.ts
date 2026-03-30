@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/core/ids/IdGenerator.ts
-// =====================================
-
 import { randomUUID } from "crypto";
 
 // =====================================
@@ -22,10 +18,6 @@ export type FlowId = Brand<string, "FlowId">;
 // =====================================
 // 🔹 INTERNAL CONFIG
 // =====================================
-
-// ❗ ID FORMAT: <prefix>-<8char uuid>
-// - NEVER rely on prefix in business logic
-// - prefix is ONLY for debugging / observability
 
 const ID_LENGTH = 8;
 
@@ -50,73 +42,42 @@ function generate(prefix: IdPrefix): string {
 // 🔥 PUBLIC GENERATORS
 // =====================================
 
-export function createTraceId(): TraceId {
-  return generate(ID_PREFIX_MAP.trace) as TraceId;
-}
-
-export function createSessionId(): SessionId {
-  return generate(ID_PREFIX_MAP.session) as SessionId;
-}
-
-export function createQueueId(): QueueId {
-  return generate(ID_PREFIX_MAP.queue) as QueueId;
-}
-
-export function createJobId(): JobId {
-  return generate(ID_PREFIX_MAP.job) as JobId;
-}
-
-export function createInteractionId(): InteractionId {
-  return generate(ID_PREFIX_MAP.interaction) as InteractionId;
-}
-
-export function createExternalId(): ExternalId {
-  return generate(ID_PREFIX_MAP.external) as ExternalId;
-}
-
-export function createCorrelationId(): CorrelationId {
-  return generate(ID_PREFIX_MAP.correlation) as CorrelationId;
-}
-
-export function createFlowId(): FlowId {
-  return generate(ID_PREFIX_MAP.flow) as FlowId;
-}
+export const createTraceId = () => generate(ID_PREFIX_MAP.trace) as TraceId;
+export const createSessionId = () => generate(ID_PREFIX_MAP.session) as SessionId;
+export const createQueueId = () => generate(ID_PREFIX_MAP.queue) as QueueId;
+export const createJobId = () => generate(ID_PREFIX_MAP.job) as JobId;
+export const createInteractionId = () => generate(ID_PREFIX_MAP.interaction) as InteractionId;
+export const createExternalId = () => generate(ID_PREFIX_MAP.external) as ExternalId;
+export const createCorrelationId = () => generate(ID_PREFIX_MAP.correlation) as CorrelationId;
+export const createFlowId = () => generate(ID_PREFIX_MAP.flow) as FlowId;
 
 // =====================================
 // 🔒 TYPE GUARDS
 // =====================================
 
-export function isTraceId(id: string): id is TraceId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.trace}-`);
-}
+export const isTraceId = (id: string): id is TraceId =>
+  id.startsWith(`${ID_PREFIX_MAP.trace}-`);
 
-export function isSessionId(id: string): id is SessionId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.session}-`);
-}
+export const isSessionId = (id: string): id is SessionId =>
+  id.startsWith(`${ID_PREFIX_MAP.session}-`);
 
-export function isQueueId(id: string): id is QueueId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.queue}-`);
-}
+export const isQueueId = (id: string): id is QueueId =>
+  id.startsWith(`${ID_PREFIX_MAP.queue}-`);
 
-export function isJobId(id: string): id is JobId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.job}-`);
-}
+export const isJobId = (id: string): id is JobId =>
+  id.startsWith(`${ID_PREFIX_MAP.job}-`);
 
-export function isInteractionId(id: string): id is InteractionId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.interaction}-`);
-}
+export const isInteractionId = (id: string): id is InteractionId =>
+  id.startsWith(`${ID_PREFIX_MAP.interaction}-`);
 
-export function isExternalId(id: string): id is ExternalId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.external}-`);
-}
+export const isExternalId = (id: string): id is ExternalId =>
+  id.startsWith(`${ID_PREFIX_MAP.external}-`);
 
-export function isCorrelationId(id: string): id is CorrelationId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.correlation}-`);
-}
+export const isCorrelationId = (id: string): id is CorrelationId =>
+  id.startsWith(`${ID_PREFIX_MAP.correlation}-`);
 
-export function isFlowId(id: string): id is FlowId {
-  return typeof id === "string" && id.startsWith(`${ID_PREFIX_MAP.flow}-`);
-}
+export const isFlowId = (id: string): id is FlowId =>
+  id.startsWith(`${ID_PREFIX_MAP.flow}-`);
 
 // =====================================
 // 🧠 GENERIC HELPERS
@@ -126,9 +87,6 @@ export function isValidId(id: string): boolean {
   return new RegExp(`^[${Object.values(ID_PREFIX_MAP).join("")}]-[a-f0-9]{8}$`).test(id);
 }
 
-/**
- * 🔹 Debug helper ONLY
- */
 export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
   if (!isValidId(id)) return null;
 
@@ -142,22 +100,17 @@ export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
 }
 
 // =====================================
-// 🧠 DISPLAY HELPERS (LOGGING ONLY)
+// 🧠 DISPLAY HELPERS
 // =====================================
 
 function extractSuffix(id: string): string | null {
-  if (typeof id !== "string") return null;
-
   const parts = id.split("-");
-  if (parts.length < 2) return null;
-
   return parts[1] ?? null;
 }
 
 export function toDisplayId(id: string, length = 4): string {
   const suffix = extractSuffix(id);
   if (!suffix) return id;
-
   return suffix.slice(0, Math.min(length, suffix.length));
 }
 
