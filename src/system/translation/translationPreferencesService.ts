@@ -4,16 +4,29 @@
 
 import { SheetRepository } from "@/integrations/google";
 import { TRANSLATE_SHEET } from "@/integrations/google/googleSheetsSchema";
+import { LANGUAGES } from "./translationConfig";
+
+// =====================================
+// 🔧 TYPES
+// =====================================
 
 type TranslateRow = {
   id?: string;
   guildId: string;
-  key: string;   // userId
+  key: string; // userId
   lang: string;
   value?: string;
 };
 
+// =====================================
+// 🔧 REPO
+// =====================================
+
 const repo = new SheetRepository<TranslateRow>(TRANSLATE_SHEET);
+
+// =====================================
+// 🔍 GET
+// =====================================
 
 export async function getUserLanguage(
   guildId: string,
@@ -21,30 +34,56 @@ export async function getUserLanguage(
 ): Promise<string | null> {
   const results = await repo.findAll({
     guildId,
-    key: userId
+    key: userId,
   });
 
-  return results[0]?.lang ?? null;
+  if (!results.length) return null;
+
+  return results[0].lang ?? null;
 }
+
+// =====================================
+// 💾 SET
+// =====================================
 
 export async function setUserLanguage(
   guildId: string,
   userId: string,
   lang: string
 ): Promise<void> {
+  // =============================
+  // VALIDATE LANGUAGE
+  // =============================
+  const isValid = LANGUAGES.some((l) => l.code === lang);
+
+  if (!isValid) {
+    throw new Error(`Invalid language: ${lang}`);
+  }
+
+  // =============================
+  // FIND EXISTING
+  // =============================
   const existing = await repo.findAll({
     guildId,
-    key: userId
+    key: userId,
   });
 
-  if (existing.length > 0 && existing[0].id) {
-    await repo.updateById(existing[0].id, { lang });
+  const first = existing[0];
+
+  // =============================
+  // UPDATE
+  // =============================
+  if (first?.id) {
+    await repo.updateById(first.id, { lang });
     return;
   }
 
+  // =============================
+  // CREATE
+  // =============================
   await repo.create({
     guildId,
     key: userId,
-    lang
+    lang,
   });
 }
