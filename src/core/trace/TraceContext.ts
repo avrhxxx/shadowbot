@@ -2,21 +2,50 @@
 // 📁 src/core/trace/TraceContext.ts
 // =====================================
 
-import type { TraceId } from "../ids/IdGenerator";
-
 /**
- * 🔍 TraceContext
+ * 🧾 FILE DESCRIPTION
  *
- * - immutable context passed through system flows
- * - used for logging, tracing and observability
- * - SHOULD NOT be mutated after creation
+ * 📁 Path: src/core/trace/TraceContext.ts
+ * 🧠 Role: core type (trace context definition)
+ * 📄 Description:
+ * Central immutable context passed through all system flows.
+ * Used for logging, tracing and observability across the entire application.
+ *
+ * 📥 Input:
+ * - created at entry points (e.g. router, workers, bootstrap)
+ *
+ * 📤 Output:
+ * - passed through services, handlers, pipelines
+ *
+ * 🔗 Dependencies:
+ * - IdGenerator (TraceId)
+ *
+ * 📡 Used by:
+ * - logger
+ * - systemRouter
+ * - all system modules
+ *
+ * 🆔 ID flow:
+ * - traceId (required)
+ * - sessionId (optional)
+ *
+ * 📊 Logging:
+ * - core element for structured logging (log.ctx)
+ *
+ * ⚠️ Notes:
+ * - MUST remain immutable
+ * - MUST be passed through entire flow
+ * - "app" system added to support bootstrap / entrypoint layer
  */
+
+import type { TraceId } from "../ids/IdGenerator";
 
 // =====================================
 // 🔹 SYSTEM DOMAIN (CENTRALIZED)
 // =====================================
 
 export type SystemType =
+  | "app"       // 🔥 bootstrap / entrypoint (index.ts, init)
   | "events"
   | "absence"
   | "points"
@@ -32,7 +61,7 @@ export type TraceContext = Readonly<{
   // 🔹 origin of execution
   source: "discord" | "system" | "worker";
 
-  // 🔹 system domain
+  // 🔹 system domain (feature / module)
   system?: SystemType;
 
   // 🔹 optional user context
