@@ -16,6 +16,39 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 }
 
 // =====================================
+// 🔍 ERROR HELPERS
+// =====================================
+
+function getStatus(err: unknown): number | undefined {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "response" in err
+  ) {
+    const response = (err as { response?: unknown }).response;
+
+    if (
+      typeof response === "object" &&
+      response !== null &&
+      "status" in response
+    ) {
+      const status = (response as { status?: unknown }).status;
+
+      if (typeof status === "number") {
+        return status;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+// =====================================
 // 🔁 RETRY WRAPPER
 // =====================================
 
@@ -23,25 +56,13 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   return pRetry(fn, {
     retries: 3,
     onFailedAttempt: (error) => {
-      const err = error as unknown as { response?: { status?: number } };
+      const status = getStatus(error);
 
-      const status = err?.response?.status;
-
-      // ❌ do NOT retry client errors
       if (status && status >= 400 && status < 500 && status !== 429) {
         throw new AbortError("Non-retryable error");
       }
     },
   });
-}
-
-// =====================================
-// 🧾 ERROR HELPER
-// =====================================
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
 }
 
 // =====================================
@@ -171,7 +192,7 @@ export async function deleteRow(
               deleteDimension: {
                 range: {
                   sheetId,
-                  dimension: "ROWS",
+                  dimension: "ROWS" as const,
                   startIndex: row - 1,
                   endIndex: row,
                 },
@@ -220,11 +241,12 @@ async function getSheetId(tab: string): Promise<number> {
 
 function toA1(col: number, row: number): string {
   let result = "";
+  let currentCol = col;
 
-  while (col > 0) {
-    const rem = (col - 1) % 26;
+  while (currentCol > 0) {
+    const rem = (currentCol - 1) % 26;
     result = String.fromCharCode(65 + rem) + result;
-    col = Math.floor((col - 1) / 26);
+    currentCol = Math.floor((currentCol - 1) / 26);
   }
 
   return result + row;
