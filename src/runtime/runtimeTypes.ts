@@ -15,17 +15,14 @@ export type SystemName =
   | "points"
   | "translation"
   | "absence"
-  | "quickadd";
+  | "quickadd"
+  | "quickadd_worker";
 
 // =============================
-// 🔹 SYSTEM CONFIG (RUNTIME)
+// 🔹 RUNTIME KEY (INTERNAL)
 // =============================
 
-export interface SystemConfig {
-  system: SystemName;
-  enabled: boolean;
-  reason?: string;
-}
+export type RuntimeKey = SystemName | "__global__";
 
 // =============================
 // 🔹 SYSTEM MODULE (DYNAMIC IMPORT)
@@ -45,13 +42,7 @@ export interface SystemModule {
 export interface SystemRegistryEntry {
   name: SystemName;
 
-  /**
-   * fully typed dynamic loader
-   */
   loader: () => Promise<SystemModule>;
 
-  /**
-   * execution type
-   */
   type: "global" | "guild";
 }
