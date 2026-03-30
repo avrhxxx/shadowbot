@@ -12,20 +12,12 @@ import type {
   ExternalId,
 } from "../ids/IdGenerator";
 
-// =====================================
-// 🔹 SYSTEM DOMAIN
-// =====================================
-
 export type SystemType =
   | "app"
   | "events"
   | "absence"
   | "points"
   | "quickadd";
-
-// =====================================
-// 🔹 SOURCE TYPE
-// =====================================
 
 export type SourceType =
   | "discord"
@@ -34,10 +26,6 @@ export type SourceType =
   | "api"
   | "cron"
   | "external";
-
-// =====================================
-// 🔹 TRACE CONTEXT
-// =====================================
 
 export type TraceContext = Readonly<{
   traceId: TraceId;
@@ -62,3 +50,13 @@ export type TraceContext = Readonly<{
 
   externalId?: ExternalId;
 }>;
+
+export function createChildContext(
+  parent: TraceContext,
+  overrides: Partial<TraceContext>
+): TraceContext {
+  return {
+    ...parent,
+    ...overrides,
+  };
+}
