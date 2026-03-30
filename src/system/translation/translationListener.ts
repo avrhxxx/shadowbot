@@ -28,6 +28,13 @@ import {
 
 export function initTranslationListener(client: Client) {
   client.on("messageReactionAdd", async (reaction, user) => {
+    const ctx = createChildContext({
+      source: "discord",
+      userId: user.id,
+    });
+
+    const l = log.ctx(ctx);
+
     try {
       if (user.bot) return;
 
@@ -39,14 +46,6 @@ export function initTranslationListener(client: Client) {
 
       const message = reaction.message;
       if (!message.content) return;
-
-      const ctx = createChildContext({
-        source: "discord",
-        guildId: message.guildId ?? undefined,
-        userId: user.id,
-      });
-
-      const l = log.ctx(ctx);
 
       const guildId = message.guildId!;
       const userId = user.id;
@@ -112,31 +111,82 @@ export function initTranslationListener(client: Client) {
       });
 
       collector.on("collect", async (interaction: Interaction) => {
-        if (!interaction.isButton()) return;
+        try {
+          if (!interaction.isButton()) return;
 
-        const parts = interaction.customId.split("_");
-        const langCode = parts[2];
+          const parts = interaction.customId.split("_");
 
-        await setUserLanguage(guildId, userId, langCode);
+          if (parts.length < 3) {
+            await interaction.reply({
+              content: "❌ Invalid interaction.",
+              ephemeral: true,
+            });
+            return;
+          }
 
-        const translated = await translateText(
-          message.content,
-          langCode
-        );
+          const langCode = parts[2];
 
-        await interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setDescription(
-                `🌍 Translation (${langCode.toUpperCase()})\n\n"${translated}"`
-              )
-              .setColor("Green"),
-          ],
-          ephemeral: true,
-        });
+          const isValidLang = LANGUAGES.some(
+            (l) => l.code === langCode
+          );
+
+          if (!isValidLang) {
+            await interaction.reply({
+              content: "❌ Invalid language.",
+              ephemeral: true,
+            });
+            return;
+          }
+
+          await setUserLanguage(guildId, userId, langCode);
+
+          const translated = await translateText(
+            message.content,
+            langCode
+          );
+
+          await interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setDescription(
+                  `🌍 Translation (${langCode.toUpperCase()})\n\n"${translated}"`
+                )
+                .setColor("Green"),
+            ],
+            ephemeral: true,
+          });
+        } catch (err) {
+          l.error("translation.collect.error", err);
+        }
       });
-    } catch {
-      // silent
+
+      collector.on("end", async () => {
+        try {
+          const disabledRows = rows.map((row) => {
+            const newRow = new ActionRowBuilder<ButtonBuilder>();
+
+            row.components.forEach((btn) => {
+              newRow.addComponents(
+                ButtonBuilder.from(btn).setDisabled(true)
+              );
+            });
+
+            return newRow;
+          });
+
+          await panel.edit({
+            components: disabledRows,
+          });
+
+          setTimeout(() => {
+            panel.delete().catch(() => null);
+          }, 1000);
+        } catch (err) {
+          l.error("translation.collect.cleanup_error", err);
+        }
+      });
+    } catch (err) {
+      l.error("translation.listener.error", err);
     }
   });
 }
