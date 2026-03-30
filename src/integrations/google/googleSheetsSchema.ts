@@ -42,7 +42,7 @@ export const MODERATOR_CONFIG_SHEET: SheetDefinition = {
     "version",
     "lastUpdated",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 EVENTS
@@ -70,7 +70,7 @@ export const EVENTS_SHEET: SheetDefinition = {
     "started",
     "lastBirthdayYear",
   ],
-};
+} as const;
 
 export const EVENTS_CONFIG_SHEET: SheetDefinition = {
   name: "events_config",
@@ -80,7 +80,7 @@ export const EVENTS_CONFIG_SHEET: SheetDefinition = {
     "notificationChannel",
     "downloadChannel",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 POINTS
@@ -95,7 +95,7 @@ export const POINTS_WEEKS_SHEET: SheetDefinition = {
     "week",
     "createdAt",
   ],
-};
+} as const;
 
 export const POINTS_DONATIONS_SHEET: SheetDefinition = {
   name: "points_donations",
@@ -107,7 +107,7 @@ export const POINTS_DONATIONS_SHEET: SheetDefinition = {
     "points",
     "week",
   ],
-};
+} as const;
 
 export const POINTS_DUEL_SHEET: SheetDefinition = {
   name: "points_duel",
@@ -119,7 +119,7 @@ export const POINTS_DUEL_SHEET: SheetDefinition = {
     "points",
     "week",
   ],
-};
+} as const;
 
 export const POINTS_CONFIG_SHEET: SheetDefinition = {
   name: "points_config",
@@ -127,7 +127,7 @@ export const POINTS_CONFIG_SHEET: SheetDefinition = {
     "id",
     "guildId",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 ABSENCE
@@ -144,7 +144,7 @@ export const ABSENCE_SHEET: SheetDefinition = {
     "createdAt",
     "year",
   ],
-};
+} as const;
 
 export const ABSENCE_CONFIG_SHEET: SheetDefinition = {
   name: "absence_config",
@@ -154,11 +154,11 @@ export const ABSENCE_CONFIG_SHEET: SheetDefinition = {
     "notificationChannel",
     "absenceEmbedId",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 TRANSLATION (FUTURE)
- // =====================================
+// =====================================
 
 export const TRANSLATE_SHEET: SheetDefinition = {
   name: "translate",
@@ -169,7 +169,7 @@ export const TRANSLATE_SHEET: SheetDefinition = {
     "lang",
     "value",
   ],
-};
+} as const;
 
 export const TRANSLATE_CONFIG_SHEET: SheetDefinition = {
   name: "translate_config",
@@ -177,7 +177,7 @@ export const TRANSLATE_CONFIG_SHEET: SheetDefinition = {
     "id",
     "guildId",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 QUICKADD
@@ -194,7 +194,7 @@ export const QUICKADD_NICKNAMES_SHEET: SheetDefinition = {
     "override",
     "createdAt",
   ],
-};
+} as const;
 
 export const QUICKADD_POINTS_QUEUE_SHEET: SheetDefinition = {
   name: "quickadd_points_queue",
@@ -207,7 +207,7 @@ export const QUICKADD_POINTS_QUEUE_SHEET: SheetDefinition = {
     "status",
     "createdAt",
   ],
-};
+} as const;
 
 export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
   name: "quickadd_events_queue",
@@ -219,7 +219,7 @@ export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
     "status",
     "createdAt",
   ],
-};
+} as const;
 
 // =====================================
 // 🔹 REGISTRY
