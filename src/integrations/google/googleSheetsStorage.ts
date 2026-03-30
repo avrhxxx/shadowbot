@@ -29,7 +29,7 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 // 📥 READ
 // =====================================
 
-export async function readSheet(tab: string): Promise<unknown[][]> {
+export async function readSheet(tab: string): Promise<readonly unknown[][]> {
   try {
     const res = await withRetry(() =>
       sheetsClient.spreadsheets.values.get({
@@ -40,7 +40,9 @@ export async function readSheet(tab: string): Promise<unknown[][]> {
 
     return res.data?.values ?? [];
   } catch (err) {
-    throw new Error(`Failed to read sheet "${tab}"`);
+    throw new Error(
+      `Failed to read sheet "${tab}": ${(err as Error).message}`
+    );
   }
 }
 
@@ -50,7 +52,7 @@ export async function readSheet(tab: string): Promise<unknown[][]> {
 
 export async function writeSheet(
   tab: string,
-  values: unknown[][]
+  values: readonly unknown[][]
 ): Promise<void> {
   try {
     await withRetry(() =>
@@ -61,8 +63,10 @@ export async function writeSheet(
         requestBody: { values },
       })
     );
-  } catch {
-    throw new Error(`Failed to write sheet "${tab}"`);
+  } catch (err) {
+    throw new Error(
+      `Failed to write sheet "${tab}": ${(err as Error).message}`
+    );
   }
 }
 
@@ -72,7 +76,7 @@ export async function writeSheet(
 
 export async function appendSheet(
   tab: string,
-  values: unknown[][]
+  values: readonly unknown[][]
 ): Promise<void> {
   if (!values.length) return;
 
@@ -85,8 +89,10 @@ export async function appendSheet(
         requestBody: { values },
       })
     );
-  } catch {
-    throw new Error(`Failed to append sheet "${tab}"`);
+  } catch (err) {
+    throw new Error(
+      `Failed to append sheet "${tab}": ${(err as Error).message}`
+    );
   }
 }
 
@@ -115,8 +121,10 @@ export async function updateCell(
         requestBody: { values: [[value]] },
       })
     );
-  } catch {
-    throw new Error(`Failed to update cell in "${tab}"`);
+  } catch (err) {
+    throw new Error(
+      `Failed to update cell in "${tab}": ${(err as Error).message}`
+    );
   }
 }
 
@@ -154,8 +162,10 @@ export async function deleteRow(
         },
       })
     );
-  } catch {
-    throw new Error(`Failed to delete row in "${tab}"`);
+  } catch (err) {
+    throw new Error(
+      `Failed to delete row in "${tab}": ${(err as Error).message}`
+    );
   }
 }
 
@@ -170,7 +180,9 @@ async function getSheetId(tab: string): Promise<number> {
     })
   );
 
-  const sheet = res.data?.sheets?.find(
+  const sheets = res.data?.sheets ?? [];
+
+  const sheet = sheets.find(
     (s) => s.properties?.title === tab
   );
 
