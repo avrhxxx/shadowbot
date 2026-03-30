@@ -2,7 +2,8 @@
 // 📁 src/integrations/google/googleSheetsStorage.ts
 // =====================================
 
-import { sheetsClient } from "./googleSheetsClient";
+import { sheetsClient } from "@/integrations/google/googleSheetsClient";
+import pRetry from "p-retry";
 
 // =====================================
 // 🔐 ENV
@@ -15,16 +16,32 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 }
 
 // =====================================
+// 🔁 RETRY WRAPPER
+// =====================================
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  return pRetry(fn, {
+    retries: 3,
+  });
+}
+
+// =====================================
 // 📥 READ
 // =====================================
 
 export async function readSheet(tab: string): Promise<unknown[][]> {
-  const res = await sheetsClient.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: tab,
-  });
+  try {
+    const res = await withRetry(() =>
+      sheetsClient.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: tab,
+      })
+    );
 
-  return res.data?.values ?? [];
+    return res.data?.values ?? [];
+  } catch (err) {
+    throw new Error(`Failed to read sheet "${tab}"`);
+  }
 }
 
 // =====================================
@@ -35,12 +52,18 @@ export async function writeSheet(
   tab: string,
   values: unknown[][]
 ): Promise<void> {
-  await sheetsClient.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: tab,
-    valueInputOption: "RAW",
-    requestBody: { values },
-  });
+  try {
+    await withRetry(() =>
+      sheetsClient.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: tab,
+        valueInputOption: "RAW",
+        requestBody: { values },
+      })
+    );
+  } catch {
+    throw new Error(`Failed to write sheet "${tab}"`);
+  }
 }
 
 // =====================================
@@ -53,12 +76,18 @@ export async function appendSheet(
 ): Promise<void> {
   if (!values.length) return;
 
-  await sheetsClient.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
-    range: tab,
-    valueInputOption: "RAW",
-    requestBody: { values },
-  });
+  try {
+    await withRetry(() =>
+      sheetsClient.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: tab,
+        valueInputOption: "RAW",
+        requestBody: { values },
+      })
+    );
+  } catch {
+    throw new Error(`Failed to append sheet "${tab}"`);
+  }
 }
 
 // =====================================
@@ -77,12 +106,18 @@ export async function updateCell(
 
   const range = `${tab}!${toA1(col, row)}`;
 
-  await sheetsClient.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range,
-    valueInputOption: "RAW",
-    requestBody: { values: [[value]] },
-  });
+  try {
+    await withRetry(() =>
+      sheetsClient.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range,
+        valueInputOption: "RAW",
+        requestBody: { values: [[value]] },
+      })
+    );
+  } catch {
+    throw new Error(`Failed to update cell in "${tab}"`);
+  }
 }
 
 // =====================================
@@ -97,25 +132,31 @@ export async function deleteRow(
     throw new Error("Invalid row index");
   }
 
-  const sheetId = await getSheetId(tab);
+  try {
+    const sheetId = await getSheetId(tab);
 
-  await sheetsClient.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId,
-              dimension: "ROWS",
-              startIndex: row - 1,
-              endIndex: row,
+    await withRetry(() =>
+      sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: "ROWS",
+                  startIndex: row - 1,
+                  endIndex: row,
+                },
+              },
             },
-          },
+          ],
         },
-      ],
-    },
-  });
+      })
+    );
+  } catch {
+    throw new Error(`Failed to delete row in "${tab}"`);
+  }
 }
 
 // =====================================
@@ -123,9 +164,11 @@ export async function deleteRow(
 // =====================================
 
 async function getSheetId(tab: string): Promise<number> {
-  const res = await sheetsClient.spreadsheets.get({
-    spreadsheetId: SHEET_ID,
-  });
+  const res = await withRetry(() =>
+    sheetsClient.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+    })
+  );
 
   const sheet = res.data?.sheets?.find(
     (s) => s.properties?.title === tab
