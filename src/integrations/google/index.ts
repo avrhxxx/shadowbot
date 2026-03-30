@@ -10,20 +10,27 @@
  * - NO logic
  */
 
-// 🔹 CORE
+// =====================================
+// 🔹 AUTH / CLIENT
+// =====================================
 export * from "./googleSheetsClient";
 
-// 🔹 STORAGE (low-level)
-export * from "./googleSheetsStorage";
+// =====================================
+// 🔹 DATA LAYER
+// =====================================
+export * from "./googleSheetsRepository";
 
-// 🔹 SETUP (init / self-healing)
+// =====================================
+// 🔹 SETUP / INIT
+// =====================================
 export * from "./googleSheetsSetup";
 
-// 🔹 SCHEMA (tabs)
+// =====================================
+// 🔹 SCHEMA
+// =====================================
 export * from "./googleSheetsSchema";
 
-// 🔹 REPOSITORY
-export * from "./SheetRepository";
-
-// 🔹 OCR
+// =====================================
+// 🔹 OCR (VISION API)
+// =====================================
 export * from "./GoogleVisionService";
