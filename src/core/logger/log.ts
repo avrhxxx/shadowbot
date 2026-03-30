@@ -5,14 +5,29 @@
 import { TraceContext } from "../trace/TraceContext";
 import { formatLog } from "./formatter";
 
+// =====================================
+// 🔹 TYPES
+// =====================================
+
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 export type LogPayload = {
   scope?: string;
   event: string;
   traceId?: string;
+
   level?: LogLevel;
-  eventType?: string;
+
+  eventType?:
+    | "system"
+    | "user"
+    | "interaction"
+    | "external"
+    | "job"
+    | "security"
+    | "performance"
+    | "debug";
+
   timestamp?: string;
   schemaVersion?: number;
 
@@ -46,42 +61,76 @@ export type LogPayload = {
   };
 };
 
+// =====================================
+// 🔧 HELPERS
+// =====================================
+
 function normalizeError(err: unknown) {
   if (!err) return undefined;
-  if (err instanceof Error) return { message: err.message, stack: err.stack };
-  return { message: String(err) };
+
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
+  }
+
+  return {
+    message: String(err),
+  };
 }
 
+// =====================================
+// 🔻 INTERNAL LOGGER
+// =====================================
+
 function emit(payload: LogPayload): void {
-  payload.timestamp ??= new Date().toISOString();
+  payload.timestamp = payload.timestamp ?? new Date().toISOString();
   payload.error = normalizeError(payload.error);
 
   formatLog(payload);
 }
 
+// =====================================
+// 🔥 MAIN API
+// =====================================
+
 export function log(
-  ctx: TraceContext,
+  ctx: TraceContext | undefined,
   event: string,
   payload: Omit<LogPayload, "event" | "traceId"> = {}
 ) {
   emit({
     ...payload,
     event,
-    traceId: ctx.traceId,
-    scope: payload.scope ?? ctx.system ?? "unknown",
+    traceId: ctx?.traceId ?? "no-trace",
+    scope: payload.scope ?? ctx?.system ?? "unknown",
     schemaVersion: payload.schemaVersion ?? 1,
     context: {
       ...(payload.context || {}),
-      ...ctx,
+      ...(ctx || {}),
     },
   });
 }
 
-log.warn = (ctx: TraceContext, event: string, payload = {}) =>
+// =====================================
+// 🔥 SHORTCUTS
+// =====================================
+
+log.warn = (ctx: TraceContext | undefined, event: string, payload = {}) =>
   log(ctx, event, { ...payload, level: "warn" });
 
-log.error = (ctx: TraceContext, event: string, error: unknown, payload = {}) =>
+log.error = (
+  ctx: TraceContext | undefined,
+  event: string,
+  error: unknown,
+  payload = {}
+) =>
   log(ctx, event, { ...payload, level: "error", error });
+
+// =====================================
+// 🔥 CTX LOGGER
+// =====================================
 
 log.ctx = function (ctx: TraceContext) {
   return {
