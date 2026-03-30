@@ -2,22 +2,6 @@
 // 📁 src/runtime/systemLoader.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Runtime system loader (execution layer)
- *
- * Responsibilities:
- * - check system flags (enabled/disabled)
- * - dynamically load modules
- * - execute init functions
- * - isolate failures (never crash app)
- *
- * ❗ RULES:
- * - MUST respect systemState
- * - MUST NOT throw (log only)
- * - MUST isolate broken systems
- */
-
 import { systems } from "./systemRegistry";
 import { isSystemEnabled } from "./systemState";
 
@@ -29,9 +13,9 @@ import {
 
 import type { Client, Guild } from "discord.js";
 
-// =====================================
+// =============================
 // 🔹 GLOBAL SYSTEMS
-// =====================================
+// =============================
 
 export async function loadGlobalSystems(
   client: Client,
@@ -43,10 +27,10 @@ export async function loadGlobalSystems(
     if (sys.type !== "global") continue;
 
     const sysCtx = createChildContext(ctx, {
-      system: sys.id,
+      system: sys.name,
     });
 
-    const enabledState = await isSystemEnabled(sys.id);
+    const enabledState = await isSystemEnabled(sys.name, sysCtx);
 
     if (!enabledState.enabled) {
       log.ctx(sysCtx).event("system.skipped", {
@@ -58,16 +42,14 @@ export async function loadGlobalSystems(
     try {
       const mod = await sys.loader();
 
-      const initFn = mod[sys.init];
-
-      if (typeof initFn !== "function") {
+      if (typeof mod.initGlobal !== "function") {
         log.ctx(sysCtx).error("system.init.missing", {
-          init: sys.init,
+          type: "global",
         });
         continue;
       }
 
-      await initFn(client, sysCtx);
+      await mod.initGlobal(client, sysCtx);
 
       log.ctx(sysCtx).event("system.loaded");
     } catch (err) {
@@ -80,9 +62,9 @@ export async function loadGlobalSystems(
   l.event("system.global.load.complete");
 }
 
-// =====================================
+// =============================
 // 🔹 GUILD SYSTEMS
-// =====================================
+// =============================
 
 export async function loadGuildSystems(
   guild: Guild,
@@ -94,11 +76,11 @@ export async function loadGuildSystems(
     if (sys.type !== "guild") continue;
 
     const sysCtx = createChildContext(ctx, {
-      system: sys.id,
+      system: sys.name,
       guildId: guild.id,
     });
 
-    const enabledState = await isSystemEnabled(sys.id);
+    const enabledState = await isSystemEnabled(sys.name, sysCtx);
 
     if (!enabledState.enabled) {
       log.ctx(sysCtx).event("system.skipped", {
@@ -110,16 +92,14 @@ export async function loadGuildSystems(
     try {
       const mod = await sys.loader();
 
-      const initFn = mod[sys.init];
-
-      if (typeof initFn !== "function") {
+      if (typeof mod.initGuild !== "function") {
         log.ctx(sysCtx).error("system.init.missing", {
-          init: sys.init,
+          type: "guild",
         });
         continue;
       }
 
-      await initFn(guild, sysCtx);
+      await mod.initGuild(guild, sysCtx);
 
       log.ctx(sysCtx).event("system.loaded");
     } catch (err) {
