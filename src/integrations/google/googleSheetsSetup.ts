@@ -2,9 +2,9 @@
 // 📁 src/integrations/google/googleSheetsSetup.ts
 // =====================================
 
-import { sheetsClient } from "./googleSheetsClient";
-import { readSheet, writeSheet } from "./googleSheetsStorage";
-import { ALL_SHEETS, SheetDefinition } from "./googleSheetsSchema";
+import { sheetsClient } from "@/integrations/google/googleSheetsClient";
+import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
+import { ALL_SHEETS, SheetDefinition } from "@/integrations/google/googleSheetsSchema";
 
 // =====================================
 // 🔐 ENV
@@ -17,7 +17,7 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 }
 
 // =====================================
-// 🔍 GET ALL SHEETS
+// 🔍 GET ALL SHEETS (ONCE)
 // =====================================
 
 async function getExistingSheetTitles(): Promise<Set<string>> {
@@ -28,7 +28,9 @@ async function getExistingSheetTitles(): Promise<Set<string>> {
   const sheets = res.data?.sheets ?? [];
 
   return new Set(
-    sheets.map((s) => s.properties?.title).filter(Boolean)
+    sheets
+      .map((s) => s.properties?.title)
+      .filter((t): t is string => typeof t === "string")
   );
 }
 
@@ -36,9 +38,10 @@ async function getExistingSheetTitles(): Promise<Set<string>> {
 // 🧠 ENSURE SINGLE SHEET
 // =====================================
 
-async function ensureSheet(def: SheetDefinition) {
-  const existing = await getExistingSheetTitles();
-
+async function ensureSheet(
+  def: SheetDefinition,
+  existing: Set<string>
+) {
   // ----------------------------
   // 🆕 CREATE TAB IF MISSING
   // ----------------------------
@@ -55,6 +58,9 @@ async function ensureSheet(def: SheetDefinition) {
         ],
       },
     });
+
+    // add to cache (IMPORTANT)
+    existing.add(def.name);
   }
 
   // ----------------------------
@@ -67,14 +73,13 @@ async function ensureSheet(def: SheetDefinition) {
     return;
   }
 
-  const currentHeaders = rows[0] ?? [];
+  const currentHeaders = (rows[0] ?? []) as string[];
 
   const isSame =
     currentHeaders.length === def.headers.length &&
     currentHeaders.every((h, i) => h === def.headers[i]);
 
-  // ❗ STRICT MODE:
-  // do NOT auto-migrate silently
+  // ❗ STRICT MODE (NO AUTO MIGRATION)
   if (!isSame) {
     throw new Error(
       `❌ Sheet "${def.name}" has invalid headers.\nExpected: ${def.headers.join(
@@ -89,7 +94,9 @@ async function ensureSheet(def: SheetDefinition) {
 // =====================================
 
 export async function ensureAllSheets() {
+  const existing = await getExistingSheetTitles();
+
   for (const sheet of ALL_SHEETS) {
-    await ensureSheet(sheet);
+    await ensureSheet(sheet, existing);
   }
 }
