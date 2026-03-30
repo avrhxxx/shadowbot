@@ -17,24 +17,104 @@ export type LogPayload = {
 
   level?: LogLevel;
 
+  // =============================
+  // 🧠 CORE
+  // =============================
+
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
-  stats?: Record<string, number>;
-  meta?: Record<string, unknown>;
-
-  metrics?: {
-    increment?: string;
-    value?: number;
-    [key: string]: unknown;
-  };
+  error?: unknown;
 
   timing?: {
     label: string;
     durationMs: number;
   };
 
-  error?: unknown;
+  // =============================
+  // 📊 ANALYTICS
+  // =============================
+
+  stats?: Record<string, number>;
+
+  metrics?: {
+    increment?: string;
+    value?: number;
+    unit?: string;
+    tags?: Record<string, string>;
+  };
+
+  // =============================
+  // ⚙️ SYSTEM / INFRA
+  // =============================
+
+  meta?: Record<string, unknown>;
+
+  environment?: {
+    service?: string;
+    version?: string;
+    env?: "dev" | "prod" | "test";
+  };
+
+  external?: {
+    service: string;
+    action?: string;
+    status?: number;
+  };
+
+  retry?: {
+    attempt: number;
+    max?: number;
+  };
+
+  cache?: {
+    hit: boolean;
+    key?: string;
+  };
+
+  // =============================
+  // 🔗 FLOW / ARCHITEKTURA
+  // =============================
+
+  flow?: {
+    step?: string;
+    parent?: string;
+    chain?: string[];
+  };
+
+  relations?: {
+    calls?: string[];
+    calledBy?: string;
+  };
+
+  transaction?: {
+    id: string;
+    type?: string;
+  };
+
+  state?: {
+    from?: string;
+    to?: string;
+  };
+
+  decision?: {
+    condition: string;
+    result: boolean;
+  };
+
+  // =============================
+  // ⚡ PERFORMANCE
+  // =============================
+
+  performance?: {
+    memoryUsage?: number;
+    cpuUsage?: number;
+  };
+
+  dataFlow?: {
+    inputSize?: number;
+    outputSize?: number;
+  };
 };
 
 // =====================================
@@ -83,6 +163,20 @@ function emit(payload: LogPayload | string): void {
     metrics,
     timing,
     error,
+
+    environment,
+    external,
+    retry,
+    cache,
+
+    flow,
+    relations,
+    transaction,
+    state,
+    decision,
+
+    performance,
+    dataFlow,
   } = payload;
 
   if (!event) {
@@ -103,6 +197,17 @@ function emit(payload: LogPayload | string): void {
       ...(meta && { meta }),
       ...(metrics && { metrics }),
       ...(timing && { timing }),
+      ...(environment && { environment }),
+      ...(external && { external }),
+      ...(retry && { retry }),
+      ...(cache && { cache }),
+      ...(flow && { flow }),
+      ...(relations && { relations }),
+      ...(transaction && { transaction }),
+      ...(state && { state }),
+      ...(decision && { decision }),
+      ...(performance && { performance }),
+      ...(dataFlow && { dataFlow }),
       ...(normalizedError && { error: normalizedError }),
     }
   );
@@ -175,12 +280,4 @@ log.ctx = function (ctx: TraceContext): CtxLogger {
       log(ctx, event, { ...payload, level: "error", error });
     },
   };
-};
-
-// =====================================
-// 🔥 BACKWARD COMPAT (OPTIONAL)
-// =====================================
-
-export const logger = {
-  emit,
 };
