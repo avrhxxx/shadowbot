@@ -27,6 +27,20 @@ export type SheetDefinition = Readonly<{
 }>;
 
 // =====================================
+// 🔹 SYSTEM FLAGS (🆕 RUNTIME CORE)
+// =====================================
+
+export const SYSTEM_FLAGS_SHEET: SheetDefinition = {
+  name: "system_flags",
+  headers: [
+    "id",
+    "system",
+    "enabled",
+    "reason",
+  ],
+} as const;
+
+// =====================================
 // 🔹 MODERATOR
 // =====================================
 
@@ -226,6 +240,8 @@ export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
 // =====================================
 
 export const ALL_SHEETS = [
+  SYSTEM_FLAGS_SHEET, // ✅ MUST BE FIRST (runtime critical)
+
   MODERATOR_CONFIG_SHEET,
 
   EVENTS_SHEET,
