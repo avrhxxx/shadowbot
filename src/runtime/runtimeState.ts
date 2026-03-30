@@ -19,6 +19,23 @@ type SystemRow = {
 };
 
 // =============================
+// 🔹 VALID SYSTEMS
+// =============================
+
+const VALID_SYSTEMS: SystemName[] = [
+  "moderator",
+  "events",
+  "points",
+  "translation",
+  "absence",
+  "quickadd",
+];
+
+function isValidSystemName(value: string): value is SystemName {
+  return VALID_SYSTEMS.includes(value as SystemName);
+}
+
+// =============================
 // 🔹 REPO
 // =============================
 
@@ -47,9 +64,17 @@ async function refreshCache(ctx: TraceContext) {
     const newCache = new Map<SystemName, SystemStateEntry>();
 
     for (const row of rows) {
-      const enabled = String(row.enabled).toLowerCase() === "true";
+      if (!isValidSystemName(row.system)) {
+        l.warn("runtime.state.invalid_system", {
+          system: row.system,
+        });
+        continue;
+      }
 
-      newCache.set(row.system as SystemName, {
+      const enabled =
+        String(row.enabled).toLowerCase() === "true";
+
+      newCache.set(row.system, {
         enabled,
         reason: row.reason,
       });
