@@ -2,18 +2,25 @@
 // 📁 src/core/trace/TraceContext.ts
 // =====================================
 
+import type {
+  TraceId,
+  SessionId,
+  FlowId,
+  CorrelationId,
+  InteractionId,
+  JobId,
+  ExternalId,
+} from "../ids/IdGenerator";
+
 import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-  type TraceId,
-  type SessionId,
-  type FlowId,
-  type CorrelationId,
-  type InteractionId,
-  type JobId,
-  type ExternalId,
 } from "../ids/IdGenerator";
+
+// =====================================
+// 🔹 SYSTEM DOMAIN
+// =====================================
 
 export type SystemType =
   | "app"
@@ -22,6 +29,10 @@ export type SystemType =
   | "points"
   | "quickadd";
 
+// =====================================
+// 🔹 SOURCE TYPE
+// =====================================
+
 export type SourceType =
   | "discord"
   | "system"
@@ -29,6 +40,10 @@ export type SourceType =
   | "api"
   | "cron"
   | "external";
+
+// =====================================
+// 🔹 TRACE CONTEXT
+// =====================================
 
 export type TraceContext = Readonly<{
   traceId: TraceId;
@@ -52,30 +67,11 @@ export type TraceContext = Readonly<{
   jobId?: JobId;
 
   externalId?: ExternalId;
-
-  createdAt?: number;
 }>;
 
-export function createRootContext(input: {
-  source: SourceType;
-  system?: SystemType;
-  userId?: string;
-  sessionId?: SessionId;
-  guildId?: string;
-  channelId?: string;
-  messageId?: string;
-  interactionId?: InteractionId;
-  jobId?: JobId;
-  externalId?: ExternalId;
-}): TraceContext {
-  return {
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
-    createdAt: Date.now(),
-    ...input,
-  };
-}
+// =====================================
+// 🔹 HELPERS
+// =====================================
 
 export function createChildContext(
   parent: TraceContext,
@@ -83,7 +79,20 @@ export function createChildContext(
 ): TraceContext {
   return {
     ...parent,
-    parentTraceId: parent.traceId,
     ...overrides,
+  };
+}
+
+// =====================================
+// 🚀 APP CONTEXT (OPTIONAL HELPER)
+// =====================================
+
+export function createAppContext(): TraceContext {
+  return {
+    traceId: createTraceId(),
+    correlationId: createCorrelationId(),
+    flowId: createFlowId(),
+    source: "system",
+    system: "app",
   };
 }
