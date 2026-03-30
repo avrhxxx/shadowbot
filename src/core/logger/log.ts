@@ -72,14 +72,25 @@ export type LogPayload = {
     key?: string;
   };
 
-  // 🔌 CONNECTION (NOWE)
   connection?: {
-    service: string; // discord / google / api
+    service: string;
     status: "connected" | "disconnected" | "degraded";
     latencyMs?: number;
     attempt?: number;
     endpoint?: string;
     protocol?: string;
+  };
+
+  rateLimit?: {
+    limit?: number;
+    remaining?: number;
+    resetMs?: number;
+  };
+
+  security?: {
+    action?: string;
+    allowed?: boolean;
+    reason?: string;
   };
 
   // =============================
@@ -125,6 +136,41 @@ export type LogPayload = {
     inputSize?: number;
     outputSize?: number;
   };
+
+  // =============================
+  // 🎯 DISCORD / INPUT
+  // =============================
+
+  interaction?: {
+    type?: "command" | "button" | "select" | "modal";
+    name?: string;
+    customId?: string;
+  };
+
+  attachment?: {
+    url?: string;
+    name?: string;
+    size?: number;
+    contentType?: string;
+  };
+
+  // =============================
+  // ⚙️ WORKERS / JOBS
+  // =============================
+
+  job?: {
+    id?: string;
+    type?: string;
+    status?: "started" | "completed" | "failed";
+  };
+
+  // =============================
+  // 🏷️ TAGGING / DEBUG
+  // =============================
+
+  tags?: string[];
+
+  debug?: Record<string, unknown>;
 };
 
 // =====================================
@@ -174,13 +220,15 @@ function emit(payload: LogPayload | string): void {
     timing,
     stats,
     metrics,
-    meta,
 
+    meta,
     environment,
     external,
     retry,
     cache,
     connection,
+    rateLimit,
+    security,
 
     flow,
     relations,
@@ -190,6 +238,13 @@ function emit(payload: LogPayload | string): void {
 
     performance,
     dataFlow,
+
+    interaction,
+    attachment,
+    job,
+
+    tags,
+    debug,
   } = payload;
 
   if (!event) {
@@ -218,6 +273,8 @@ function emit(payload: LogPayload | string): void {
       ...(retry && { retry }),
       ...(cache && { cache }),
       ...(connection && { connection }),
+      ...(rateLimit && { rateLimit }),
+      ...(security && { security }),
 
       ...(flow && { flow }),
       ...(relations && { relations }),
@@ -227,6 +284,13 @@ function emit(payload: LogPayload | string): void {
 
       ...(performance && { performance }),
       ...(dataFlow && { dataFlow }),
+
+      ...(interaction && { interaction }),
+      ...(attachment && { attachment }),
+      ...(job && { job }),
+
+      ...(tags && { tags }),
+      ...(debug && { debug }),
 
       ...(normalizedError && { error: normalizedError }),
     }
@@ -249,8 +313,8 @@ export function log(
     scope: payload.scope ?? ctx.system ?? "unknown",
 
     context: {
-      ...ctx,
       ...(payload.context || {}),
+      ...ctx, // 🔥 ctx ALWAYS wins
     },
   });
 }
