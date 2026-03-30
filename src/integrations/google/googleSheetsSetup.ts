@@ -4,7 +4,11 @@
 
 import { sheetsClient } from "@/integrations/google/googleSheetsClient";
 import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
-import { ALL_SHEETS, SheetDefinition } from "@/integrations/google/googleSheetsSchema";
+import {
+  ALL_SHEETS,
+  SheetDefinition,
+} from "@/integrations/google/googleSheetsSchema";
+
 import pRetry, { AbortError } from "p-retry";
 
 // =====================================
@@ -46,7 +50,7 @@ function getStatus(err: unknown): number | undefined {
 }
 
 // =====================================
-// 🔁 RETRY WRAPPER (CONSISTENT)
+// 🔁 RETRY WRAPPER
 // =====================================
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -63,7 +67,7 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // =====================================
-// 🔍 GET ALL SHEETS (ONCE)
+// 🔍 GET ALL SHEETS
 // =====================================
 
 async function getExistingSheetTitles(): Promise<Set<string>> {
@@ -80,6 +84,24 @@ async function getExistingSheetTitles(): Promise<Set<string>> {
       .map((s) => s.properties?.title)
       .filter((t): t is string => typeof t === "string")
   );
+}
+
+// =====================================
+// 🧠 DEFAULT SYSTEM FLAGS (SEED)
+// =====================================
+
+function getDefaultSystemFlags(): string[][] {
+  return [
+    ["id", "system", "enabled", "reason"],
+
+    ["1", "global", "true", ""],
+
+    ["2", "moderator", "false", ""],
+    ["3", "translation", "false", ""],
+    ["4", "events", "false", ""],
+    ["5", "absence", "false", ""],
+    ["6", "quickadd", "false", ""],
+  ];
 }
 
 // =====================================
@@ -113,12 +135,17 @@ async function ensureSheet(
   }
 
   // ----------------------------
-  // 🧱 ENSURE HEADERS
+  // 🧱 ENSURE HEADERS / DATA
   // ----------------------------
   const rows = await readSheet(def.name);
 
+  // 🆕 AUTO SEED
   if (!rows.length) {
-    await writeSheet(def.name, [Array.from(def.headers)]);
+    if (def.name === "system_flags") {
+      await writeSheet(def.name, getDefaultSystemFlags());
+    } else {
+      await writeSheet(def.name, [Array.from(def.headers)]);
+    }
     return;
   }
 
@@ -134,7 +161,7 @@ async function ensureSheet(
     currentHeaders.length === def.headers.length &&
     currentHeaders.every((h, i) => h === def.headers[i]);
 
-  // ❗ STRICT MODE (NO AUTO MIGRATION)
+  // ❗ STRICT MODE
   if (!isSame) {
     throw new Error(
       `❌ Sheet "${def.name}" has invalid headers.\nExpected: ${def.headers.join(
