@@ -5,32 +5,14 @@
 import { TraceContext } from "../trace/TraceContext";
 import { formatLog } from "./formatter";
 
-// =====================================
-// 🔹 TYPES
-// =====================================
-
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
-
-export const EVENT_TYPES = {
-  system: "system",
-  user: "user",
-  interaction: "interaction",
-  external: "external",
-  job: "job",
-  security: "security",
-  performance: "performance",
-  debug: "debug",
-} as const;
 
 export type LogPayload = {
   scope?: string;
   event: string;
   traceId?: string;
-
   level?: LogLevel;
-
-  eventType?: keyof typeof EVENT_TYPES;
-
+  eventType?: string;
   timestamp?: string;
   schemaVersion?: number;
 
@@ -38,11 +20,27 @@ export type LogPayload = {
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
   error?: unknown;
-};
 
-// =====================================
-// 🔧 HELPERS
-// =====================================
+  timing?: {
+    label: string;
+    durationMs: number;
+  };
+
+  flow?: {
+    step?: string;
+  };
+
+  decision?: {
+    condition: string;
+    result: boolean;
+  };
+
+  interaction?: {
+    type?: string;
+    name?: string;
+    customId?: string;
+  };
+};
 
 function normalizeError(err: unknown) {
   if (!err) return undefined;
@@ -54,42 +52,15 @@ function normalizeError(err: unknown) {
     };
   }
 
-  return {
-    message: String(err),
-  };
+  return { message: String(err) };
 }
 
-// =====================================
-// 🔻 INTERNAL LOGGER
-// =====================================
+function emit(payload: LogPayload) {
+  payload.timestamp = payload.timestamp ?? new Date().toISOString();
+  payload.error = normalizeError(payload.error);
 
-function emit(payload: LogPayload | string): void {
-  if (!payload) {
-    console.log("LOGGER_ERROR: empty payload");
-    return;
-  }
-
-  if (typeof payload === "string") {
-    payload = { event: payload };
-  }
-
-  if (!payload.event) {
-    console.log("LOGGER_ERROR: missing event", payload);
-    return;
-  }
-
-  formatLog({
-    ...payload,
-    timestamp: payload.timestamp ?? new Date().toISOString(),
-    error: normalizeError(payload.error),
-    eventType: payload.eventType ?? "system",
-    schemaVersion: payload.schemaVersion ?? 1,
-  });
+  formatLog(payload);
 }
-
-// =====================================
-// 🔥 MAIN API
-// =====================================
 
 export function log(
   ctx: TraceContext,
@@ -101,27 +72,16 @@ export function log(
     event,
     traceId: ctx.traceId,
     scope: payload.scope ?? ctx.system ?? "unknown",
-
-    context: {
-      ...(payload.context || {}),
-      ...ctx,
-    },
+    schemaVersion: payload.schemaVersion ?? 1,
+    context: { ...(payload.context || {}), ...ctx },
   });
 }
-
-// =====================================
-// 🔥 SHORTCUTS
-// =====================================
 
 log.warn = (ctx: TraceContext, event: string, payload = {}) =>
   log(ctx, event, { ...payload, level: "warn" });
 
 log.error = (ctx: TraceContext, event: string, error: unknown, payload = {}) =>
   log(ctx, event, { ...payload, level: "error", error });
-
-// =====================================
-// 🔥 CTX LOGGER
-// =====================================
 
 log.ctx = function (ctx: TraceContext) {
   return {
