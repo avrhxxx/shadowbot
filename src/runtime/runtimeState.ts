@@ -60,7 +60,21 @@ function parseBoolean(value: string): boolean {
 
 function mapSystemKey(system: string): RuntimeKey | null {
   if (system === "global") return "__global__";
-  return system as SystemName;
+
+  // 🔒 whitelist runtime systems only
+  const allowed: SystemName[] = [
+    "moderator",
+    "events",
+    "points",
+    "translation",
+    "absence",
+    "quickadd",
+    "quickadd_worker",
+  ];
+
+  return allowed.includes(system as SystemName)
+    ? (system as SystemName)
+    : null;
 }
 
 // =====================================
