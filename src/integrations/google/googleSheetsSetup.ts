@@ -5,6 +5,7 @@
 import { sheetsClient } from "@/integrations/google/googleSheetsClient";
 import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
 import { ALL_SHEETS, SheetDefinition } from "@/integrations/google/googleSheetsSchema";
+import pRetry from "p-retry";
 
 // =====================================
 // 🔐 ENV
@@ -17,13 +18,25 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 }
 
 // =====================================
+// 🔁 RETRY WRAPPER
+// =====================================
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  return pRetry(fn, {
+    retries: 3,
+  });
+}
+
+// =====================================
 // 🔍 GET ALL SHEETS (ONCE)
 // =====================================
 
 async function getExistingSheetTitles(): Promise<Set<string>> {
-  const res = await sheetsClient.spreadsheets.get({
-    spreadsheetId: SHEET_ID,
-  });
+  const res = await withRetry(() =>
+    sheetsClient.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+    })
+  );
 
   const sheets = res.data?.sheets ?? [];
 
@@ -46,20 +59,21 @@ async function ensureSheet(
   // 🆕 CREATE TAB IF MISSING
   // ----------------------------
   if (!existing.has(def.name)) {
-    await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SHEET_ID,
-      requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: { title: def.name },
+    await withRetry(() =>
+      sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: { title: def.name },
+              },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      })
+    );
 
-    // add to cache (IMPORTANT)
     existing.add(def.name);
   }
 
@@ -69,7 +83,7 @@ async function ensureSheet(
   const rows = await readSheet(def.name);
 
   if (!rows.length) {
-    await writeSheet(def.name, [def.headers]);
+    await writeSheet(def.name, [Array.from(def.headers)]);
     return;
   }
 
