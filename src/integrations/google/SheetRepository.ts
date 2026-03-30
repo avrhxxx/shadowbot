@@ -2,9 +2,35 @@
 // 📁 src/integrations/google/SheetRepository.ts
 // =====================================
 
-import { readSheet, writeSheet } from "./googleSheetsStorage";
+import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
+import PQueue from "p-queue";
+
+// =====================================
+// 🔹 TYPES
+// =====================================
 
 type Filter<T> = Partial<{ [K in keyof T]: T[K] }>;
+
+// =====================================
+// 🔹 GLOBAL QUEUE (PER TAB)
+// =====================================
+
+const queueMap = new Map<string, PQueue>();
+
+function getQueue(tab: string) {
+  if (!queueMap.has(tab)) {
+    queueMap.set(
+      tab,
+      new PQueue({ concurrency: 1 }) // 🔒 SERIALIZE OPERATIONS
+    );
+  }
+
+  return queueMap.get(tab)!;
+}
+
+// =====================================
+// 🧠 REPOSITORY
+// =====================================
 
 export class SheetRepository<T extends { id?: string }> {
   private tab: string;
@@ -26,7 +52,7 @@ export class SheetRepository<T extends { id?: string }> {
       return { headers: [], dataRows: [] };
     }
 
-    const headers: string[] = (rows[0] as string[]) || [];
+    const headers: string[] = [...((rows[0] as string[]) || [])];
     const dataRows = rows.slice(1) as unknown[][];
 
     return { headers, dataRows };
@@ -49,7 +75,7 @@ export class SheetRepository<T extends { id?: string }> {
         try {
           val = JSON.parse(val);
         } catch {
-          // ignore invalid JSON
+          // ignore
         }
       }
 
@@ -83,16 +109,20 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 🧠 ENSURE COLUMNS
   // =============================
-  private ensureColumns(headers: string[], data: Partial<T>): void {
+  private ensureColumns(headers: string[], data: Partial<T>): string[] {
+    const newHeaders = [...headers];
+
     for (const key of Object.keys(data)) {
-      if (!headers.includes(key)) {
-        headers.push(key);
+      if (!newHeaders.includes(key)) {
+        newHeaders.push(key);
       }
     }
+
+    return newHeaders;
   }
 
   // =============================
-  // 📤 SAVE ALL
+  // 📤 SAVE
   // =============================
   private async save(headers: string[], rows: unknown[][]): Promise<void> {
     await writeSheet(this.tab, [headers, ...rows]);
@@ -129,67 +159,78 @@ export class SheetRepository<T extends { id?: string }> {
   // ➕ CREATE
   // =============================
   async create(data: T): Promise<T> {
-    const { headers, dataRows } = await this.load();
+    return getQueue(this.tab).add(async () => {
+      const { headers, dataRows } = await this.load();
 
-    this.ensureColumns(headers, data);
+      const newHeaders = this.ensureColumns(headers, data);
+      const row = this.mapObject(newHeaders, data);
 
-    const row = this.mapObject(headers, data);
+      await this.save(newHeaders, [...dataRows, row]);
 
-    await this.save(headers, [...dataRows, row]);
-
-    return data;
+      return data;
+    });
   }
 
   // =============================
-  // 🚀 CREATE MANY (BATCH INSERT)
+  // 🚀 CREATE MANY
   // =============================
   async createMany(dataArray: T[]): Promise<void> {
     if (!dataArray.length) return;
 
-    const { headers, dataRows } = await this.load();
+    return getQueue(this.tab).add(async () => {
+      const { headers, dataRows } = await this.load();
 
-    dataArray.forEach((data) => this.ensureColumns(headers, data));
+      let newHeaders = [...headers];
 
-    const newRows = dataArray.map((data) =>
-      this.mapObject(headers, data)
-    );
+      dataArray.forEach((data) => {
+        newHeaders = this.ensureColumns(newHeaders, data);
+      });
 
-    await this.save(headers, [...dataRows, ...newRows]);
+      const newRows = dataArray.map((data) =>
+        this.mapObject(newHeaders, data)
+      );
+
+      await this.save(newHeaders, [...dataRows, ...newRows]);
+    });
   }
 
   // =============================
   // ✏️ UPDATE
   // =============================
   async updateById(id: string, partial: Partial<T>): Promise<void> {
-    const { headers, dataRows } = await this.load();
+    return getQueue(this.tab).add(async () => {
+      const { headers, dataRows } = await this.load();
 
-    const idIndex = headers.indexOf("id");
-    if (idIndex === -1) throw new Error("No 'id' column");
+      const idIndex = headers.indexOf("id");
+      if (idIndex === -1) throw new Error("No 'id' column");
 
-    const rowIndex = dataRows.findIndex((r) => r[idIndex] === id);
-    if (rowIndex === -1) throw new Error("Row not found");
+      const rowIndex = dataRows.findIndex((r) => r[idIndex] === id);
+      if (rowIndex === -1) throw new Error("Row not found");
 
-    this.ensureColumns(headers, partial);
+      const newHeaders = this.ensureColumns(headers, partial);
 
-    const existing = this.mapRow(headers, dataRows[rowIndex]);
-    const updated = { ...existing, ...partial };
+      const existing = this.mapRow(headers, dataRows[rowIndex]);
+      const updated = { ...existing, ...partial };
 
-    dataRows[rowIndex] = this.mapObject(headers, updated);
+      dataRows[rowIndex] = this.mapObject(newHeaders, updated);
 
-    await this.save(headers, dataRows);
+      await this.save(newHeaders, dataRows);
+    });
   }
 
   // =============================
   // ❌ DELETE
   // =============================
   async deleteById(id: string): Promise<void> {
-    const { headers, dataRows } = await this.load();
+    return getQueue(this.tab).add(async () => {
+      const { headers, dataRows } = await this.load();
 
-    const idIndex = headers.indexOf("id");
-    if (idIndex === -1) throw new Error("No 'id' column");
+      const idIndex = headers.indexOf("id");
+      if (idIndex === -1) throw new Error("No 'id' column");
 
-    const filtered = dataRows.filter((r) => r[idIndex] !== id);
+      const filtered = dataRows.filter((r) => r[idIndex] !== id);
 
-    await this.save(headers, filtered);
+      await this.save(headers, filtered);
+    });
   }
 }
