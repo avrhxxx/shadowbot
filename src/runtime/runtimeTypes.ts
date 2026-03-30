@@ -3,6 +3,7 @@
 // =====================================
 
 import { Client, Guild } from "discord.js";
+import type { TraceContext } from "@/core/trace/TraceContext";
 
 // =============================
 // 🔹 SYSTEM NAME
@@ -31,7 +32,10 @@ export interface SystemConfig {
 // =============================
 
 export interface SystemModule {
-  init?: (target: Client | Guild, ctx: any) => Promise<void> | void;
+  init?: (
+    target: Client | Guild,
+    ctx: TraceContext
+  ) => Promise<void> | void;
 }
 
 // =============================
