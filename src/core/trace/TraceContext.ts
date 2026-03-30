@@ -10,13 +10,13 @@ import type {
   InteractionId,
   JobId,
   ExternalId,
-} from "../ids/IdGenerator";
+} from "@/core/ids/IdGenerator";
 
 import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-} from "../ids/IdGenerator";
+} from "@/core/ids/IdGenerator";
 
 // =====================================
 // 🔹 SYSTEM DOMAIN
@@ -70,12 +70,35 @@ export type TraceContext = Readonly<{
 }>;
 
 // =====================================
-// 🔹 CHILD CONTEXT (FIXED)
+// 🔹 ROOT CONTEXT (ENTRY)
+// =====================================
+
+export function createRootContext(
+  base: Omit<
+    TraceContext,
+    "traceId" | "parentTraceId" | "correlationId" | "flowId"
+  >
+): TraceContext {
+  return {
+    ...base,
+    traceId: createTraceId(),
+    correlationId: createCorrelationId(),
+    flowId: createFlowId(),
+  };
+}
+
+// =====================================
+// 🔹 CHILD CONTEXT (CHAIN SAFE)
 // =====================================
 
 export function createChildContext(
   parent: TraceContext,
-  overrides: Partial<Omit<TraceContext, "traceId" | "parentTraceId" | "correlationId" | "flowId">>
+  overrides: Partial<
+    Omit<
+      TraceContext,
+      "traceId" | "parentTraceId" | "correlationId" | "flowId"
+    >
+  >
 ): TraceContext {
   return {
     ...parent,
@@ -91,7 +114,7 @@ export function createChildContext(
 }
 
 // =====================================
-// 🚀 APP CONTEXT
+// 🚀 APP CONTEXT (BOOTSTRAP)
 // =====================================
 
 export function createAppContext(): TraceContext {
