@@ -2,70 +2,54 @@
 // 📁 src/runtime/systemState.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Runtime system toggle state (Google Sheets + cache)
- *
- * Responsibilities:
- * - fetch system flags from Sheets
- * - cache results (TTL)
- * - provide safe access API
- *
- * ❗ RULES:
- * - NO business logic
- * - FAIL SAFE → system disabled by default
- * - MUST be fast (cache first)
- */
-
 import { SheetRepository } from "@/integrations/google";
 import { log } from "@/core/logger/log";
-import { createChildContext } from "@/core/trace/TraceContext";
+import { TraceContext, createChildContext } from "@/core/trace/TraceContext";
+import { SystemName, SystemStateEntry } from "./runtimeTypes";
 
-// =====================================
+// =============================
 // 🔹 TYPES
-// =====================================
+// =============================
 
 type SystemRow = {
   id?: string;
   system: string;
-  enabled: string; // "true" | "false"
+  enabled: string;
   reason?: string;
 };
 
-// =====================================
+// =============================
 // 🔹 REPO
-// =====================================
+// =============================
 
 const repo = new SheetRepository<SystemRow>("system_flags");
 
-// =====================================
+// =============================
 // 🔹 CACHE
-// =====================================
+// =============================
 
-const CACHE_TTL = 30_000; // 30s
+const CACHE_TTL = 30_000;
 
-let cache: Map<string, { enabled: boolean; reason?: string }> =
-  new Map();
-
+let cache = new Map<SystemName, SystemStateEntry>();
 let lastFetch = 0;
+let loading: Promise<void> | null = null;
 
-// =====================================
+// =============================
 // 🔹 INTERNAL
-// =====================================
+// =============================
 
-async function refreshCache(ctx: ReturnType<typeof createChildContext>) {
+async function refreshCache(ctx: TraceContext) {
   const l = log.ctx(ctx);
 
   try {
     const rows = await repo.findAll({});
 
-    const newCache = new Map<string, { enabled: boolean; reason?: string }>();
+    const newCache = new Map<SystemName, SystemStateEntry>();
 
     for (const row of rows) {
-      const enabled =
-        String(row.enabled).toLowerCase() === "true";
+      const enabled = String(row.enabled).toLowerCase() === "true";
 
-      newCache.set(row.system, {
+      newCache.set(row.system as SystemName, {
         enabled,
         reason: row.reason,
       });
@@ -74,40 +58,46 @@ async function refreshCache(ctx: ReturnType<typeof createChildContext>) {
     cache = newCache;
     lastFetch = Date.now();
 
-    l.event("system_state.refresh.success", {
+    l.event("runtime.state.refresh.success", {
       count: newCache.size,
     });
   } catch (err) {
-    l.error("system_state.refresh.error", {
+    l.error("runtime.state.refresh.error", {
       error: err,
     });
   }
 }
 
-async function ensureCache(ctx: ReturnType<typeof createChildContext>) {
+async function ensureCache(ctx: TraceContext) {
   const now = Date.now();
 
-  if (now - lastFetch > CACHE_TTL) {
-    await refreshCache(ctx);
+  if (now - lastFetch <= CACHE_TTL) return;
+
+  if (!loading) {
+    loading = refreshCache(ctx).finally(() => {
+      loading = null;
+    });
   }
+
+  await loading;
 }
 
-// =====================================
+// =============================
 // 🌍 PUBLIC API
-// =====================================
+// =============================
 
 export async function isSystemEnabled(
-  system: string
-): Promise<{ enabled: boolean; reason?: string }> {
-  const ctx = createChildContext({
+  system: SystemName,
+  ctx: TraceContext
+): Promise<SystemStateEntry> {
+  const stateCtx = createChildContext(ctx, {
     system: "runtime",
   });
 
-  await ensureCache(ctx);
+  await ensureCache(stateCtx);
 
   const entry = cache.get(system);
 
-  // FAIL SAFE → disabled if not found
   if (!entry) {
     return {
       enabled: false,
