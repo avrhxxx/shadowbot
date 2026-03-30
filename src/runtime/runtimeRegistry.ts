@@ -2,36 +2,61 @@
 // 📁 src/runtime/systemRegistry.ts
 // =====================================
 
-import { SystemRegistryEntry } from "./runtimeTypes";
+import type { SystemRegistryEntry } from "./runtimeTypes";
 
-// =============================
+// =====================================
 // 🔹 REGISTRY
-// =============================
+// =====================================
 
 export const systems: SystemRegistryEntry[] = [
   {
     name: "moderator",
-    loader: () => import("@/system/moderator"),
     type: "global",
+    loader: async () => {
+      const mod = await import("@/system/moderator");
+      return {
+        init: mod.initModeratorPanel,
+      };
+    },
   },
   {
     name: "translation",
-    loader: () => import("@/system/translation"),
     type: "global",
+    loader: async () => {
+      const mod = await import("@/system/translation");
+      return {
+        init: mod.initTranslationModule,
+      };
+    },
   },
   {
     name: "events",
-    loader: () => import("@/system/events"),
     type: "guild",
+    loader: async () => {
+      const mod = await import("@/system/events");
+      return {
+        init: mod.initEventReminders,
+      };
+    },
   },
   {
     name: "absence",
-    loader: () => import("@/system/absence"),
     type: "guild",
+    loader: async () => {
+      const mod = await import("@/system/absence");
+      return {
+        init: mod.initAbsenceNotifications,
+      };
+    },
   },
   {
     name: "quickadd",
-    loader: () => import("@/system/quickadd"),
     type: "global",
+    loader: async () => {
+      const mod = await import("@/system/quickadd");
+      return {
+        init: mod.registerQuickAddListener,
+      };
+    },
   },
 ];
