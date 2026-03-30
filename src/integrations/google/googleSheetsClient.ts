@@ -28,10 +28,10 @@ if (!rawEnv || !rawEnv.trim()) {
 // 🔑 PARSE CREDENTIALS (SAFE)
 // =====================================
 
-let credentials: GoogleServiceAccount;
+let parsed: GoogleServiceAccount;
 
 try {
-  credentials = JSON.parse(rawEnv) as GoogleServiceAccount;
+  parsed = JSON.parse(rawEnv) as GoogleServiceAccount;
 } catch {
   throw new Error("GOOGLE_SERVICE_ACCOUNT has invalid JSON format");
 }
@@ -41,21 +41,27 @@ try {
 // =====================================
 
 if (
-  typeof credentials.client_email !== "string" ||
-  typeof credentials.private_key !== "string"
+  typeof parsed.client_email !== "string" ||
+  typeof parsed.private_key !== "string"
 ) {
   throw new Error("GOOGLE_SERVICE_ACCOUNT is missing required fields");
 }
 
-// Fix multiline private key (CRITICAL for GCP / Railway)
-credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+// =====================================
+// 🔒 IMMUTABLE NORMALIZED CREDENTIALS
+// =====================================
+
+const googleCredentials: GoogleServiceAccount = Object.freeze({
+  ...parsed,
+  private_key: parsed.private_key.replace(/\\n/g, "\n"),
+});
 
 // =====================================
 // 🔥 SHARED AUTH (Sheets + Vision)
 // =====================================
 
 const googleAuth = new google.auth.GoogleAuth({
-  credentials,
+  credentials: googleCredentials,
   scopes: [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/cloud-vision",
@@ -75,4 +81,4 @@ const sheetsClient = google.sheets({
 // 🔄 EXPORTS
 // =====================================
 
-export { googleAuth, sheetsClient, credentials as googleCredentials };
+export { googleAuth, sheetsClient, googleCredentials };
