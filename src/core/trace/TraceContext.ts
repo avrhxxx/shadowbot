@@ -2,76 +2,104 @@
 // 📁 src/core/trace/TraceContext.ts
 // =====================================
 
-/**
- * 🧾 FILE DESCRIPTION
- *
- * 📁 Path: src/core/trace/TraceContext.ts
- * 🧠 Role: core type (trace context definition)
- * 📄 Description:
- * Central immutable context passed through all system flows.
- * Used for logging, tracing and observability across the entire application.
- *
- * 📥 Input:
- * - created at entry points (e.g. router, workers, bootstrap)
- *
- * 📤 Output:
- * - passed through services, handlers, pipelines
- *
- * 🔗 Dependencies:
- * - IdGenerator (TraceId)
- *
- * 📡 Used by:
- * - logger
- * - systemRouter
- * - all system modules
- *
- * 🆔 ID flow:
- * - traceId (required)
- * - sessionId (optional)
- *
- * 📊 Logging:
- * - core element for structured logging (log.ctx)
- *
- * ⚠️ Notes:
- * - MUST remain immutable
- * - MUST be passed through entire flow
- * - "app" system added to support bootstrap / entrypoint layer
- */
-
-import type { TraceId } from "../ids/IdGenerator";
+import type {
+  TraceId,
+  SessionId,
+  FlowId,
+  CorrelationId,
+  InteractionId,
+  JobId,
+  ExternalId,
+} from "../ids/IdGenerator";
 
 // =====================================
 // 🔹 SYSTEM DOMAIN (CENTRALIZED)
 // =====================================
 
 export type SystemType =
-  | "app"       // 🔥 bootstrap / entrypoint (index.ts, init)
+  | "app"
   | "events"
   | "absence"
   | "points"
   | "quickadd";
 
 // =====================================
+// 🔹 SOURCE TYPE
+// =====================================
+
+export type SourceType =
+  | "discord"
+  | "system"
+  | "worker"
+  | "api"
+  | "cron"
+  | "external";
+
+// =====================================
 // 🔹 TRACE CONTEXT
 // =====================================
 
 export type TraceContext = Readonly<{
+  // =============================
+  // 🧠 CORE
+  // =============================
+
   traceId: TraceId;
 
-  // 🔹 origin of execution
-  source: "discord" | "system" | "worker";
+  /**
+   * 🔗 Parent trace (chain tracking)
+   */
+  parentTraceId?: TraceId;
 
-  // 🔹 system domain (feature / module)
+  /**
+   * 🔗 Cross-system correlation
+   */
+  correlationId?: CorrelationId;
+
+  /**
+   * 🔁 Multi-step flow (long processes)
+   */
+  flowId?: FlowId;
+
+  /**
+   * 🔹 origin of execution
+   */
+  source: SourceType;
+
+  /**
+   * 🔹 system domain (feature / module)
+   */
   system?: SystemType;
 
-  // 🔹 optional user context
-  userId?: string;
+  // =============================
+  // 👤 USER / SESSION
+  // =============================
 
-  // 🔹 optional discord context
+  userId?: string;
+  sessionId?: SessionId;
+
+  // =============================
+  // 💬 DISCORD CONTEXT
+  // =============================
+
   guildId?: string;
   channelId?: string;
   messageId?: string;
 
-  // 🔹 optional session / flow context
-  sessionId?: string;
+  /**
+   * 🔘 internal interaction tracking
+   */
+  interactionId?: InteractionId;
+
+  // =============================
+  // ⚙️ ASYNC / WORKERS
+  // =============================
+
+  jobId?: JobId;
+
+  // =============================
+  // 🌍 EXTERNAL SYSTEMS
+  // =============================
+
+  externalId?: ExternalId;
 }>;
