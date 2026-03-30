@@ -135,8 +135,10 @@ client.once("clientReady", async () => {
   });
 
   // =============================
-  // 🌍 INTEGRATIONS
+  // 🌍 INTEGRATIONS (CRITICAL)
   // =============================
+
+  let sheetsReady = false;
 
   try {
     const ctx = createChildContext(appCtx, {
@@ -146,8 +148,18 @@ client.once("clientReady", async () => {
     await ensureAllSheets();
 
     log.ctx(ctx).event("app.sheets.initialized");
+
+    sheetsReady = true;
   } catch (err) {
     appLog.error("app.sheets.failed", normalizeError(err));
+  }
+
+  // ❌ HARD GUARD — runtime depends on sheets
+  if (!sheetsReady) {
+    appLog.error("app.bootstrap.aborted", {
+      reason: "sheets_not_ready",
+    });
+    return;
   }
 
   // =============================
@@ -180,6 +192,8 @@ client.once("clientReady", async () => {
     const ctx = createChildContext(appCtx, {
       system: "runtime",
     });
+
+    log.ctx(ctx).event("runtime.start");
 
     await loadGlobalSystems(client, ctx);
   } catch (err) {
