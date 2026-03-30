@@ -1,40 +1,6 @@
 /**
  * 📁 File: src/index.ts
  * 🧠 Role: entrypoint
- *
- * 📄 Description:
- * Główny entrypoint aplikacji Discord.
- * Odpowiada za:
- * - inicjalizację klienta
- * - bootstrap systemów
- * - routing interakcji
- *
- * 📥 Input:
- * - Discord events
- *
- * 📤 Output:
- * - uruchomiona aplikacja + logi
- *
- * 🔗 Dependencies:
- * - discord.js
- * - core (router, logger, trace)
- * - system modules
- *
- * 📡 Used by:
- * - runtime (node)
- *
- * 🆔 Flow:
- * - traceId: TAK (app lifecycle)
- * - sessionId: NIE
- * - queueId: NIE
- *
- * 📊 Logging:
- * - logger: TAK
- * - level: high
- *
- * ⚠️ Notes:
- * - systemRouter zarządza trace dla interakcji
- * - init moduły NIE używają ctx (API ograniczenie)
  */
 
 import "@/integrations/google/googleSheetsClient";
@@ -58,7 +24,7 @@ import {
 } from "@/core/trace/TraceContext";
 
 // =============================
-// 🧩 SYSTEMS (INIT ONLY)
+// 🧩 SYSTEMS
 // =============================
 
 import { initTranslationModule } from "@/system/translation";
@@ -68,7 +34,7 @@ import { initEventReminders } from "@/system/events";
 import { initAbsenceNotifications } from "@/system/absence";
 
 // =============================
-// 🔥 QUICKADD (SPECIAL SYSTEM)
+// 🔥 QUICKADD
 // =============================
 
 import {
@@ -103,15 +69,25 @@ if (!process.env.BOT_TOKEN) {
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 // =============================
+// 🌍 APP CONTEXT (GLOBAL)
+// =============================
+
+const appCtx = createAppContext();
+const appLog = log.ctx(appCtx);
+
+// =============================
 // 🛑 GLOBAL ERROR HANDLING
 // =============================
 
 process.on("unhandledRejection", (err) => {
-  console.error("UNHANDLED_REJECTION", err);
+  appLog.error("app.unhandled_rejection", err);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT_EXCEPTION", err);
+  appLog.error("app.uncaught_exception", err);
+
+  // 🔥 controlled crash (important for stability)
+  process.exit(1);
 });
 
 // =============================
@@ -119,39 +95,56 @@ process.on("uncaughtException", (err) => {
 // =============================
 
 client.once("clientReady", async () => {
-  const appCtx = createAppContext();
-  const l = log.ctx(appCtx);
-
-  l.event("app.client.ready", {
+  appLog.event("app.client.ready", {
     context: {
       user: client.user?.tag,
     },
   });
 
+  // =============================
+  // 🌍 INTEGRATIONS
+  // =============================
+
   try {
     await ensureAllSheets();
-    l.event("app.sheets.initialized");
+    appLog.event("app.sheets.initialized");
   } catch (err) {
-    l.error("app.sheets.failed", err);
+    appLog.error("app.sheets.failed", err);
   }
+
+  // =============================
+  // 🔥 WORKER
+  // =============================
 
   try {
     startQuickAddWorker();
-    l.event("app.quickadd.worker.started");
+    appLog.event("app.quickadd.worker.started");
   } catch (err) {
-    l.error("app.quickadd.worker.failed", err);
+    appLog.error("app.quickadd.worker.failed", err);
   }
+
+  // =============================
+  // ⚙️ SLASH COMMANDS
+  // =============================
 
   try {
     await client.application?.commands.set([]);
-    l.event("app.slash.commands.skipped");
+    appLog.event("app.slash.commands.skipped");
   } catch (err) {
-    l.error("app.slash.commands.failed", err);
+    appLog.error("app.slash.commands.failed", err);
   }
+
+  // =============================
+  // 🧩 SYSTEM INIT
+  // =============================
 
   initTranslationModule(client);
   initModeratorPanel(client);
   registerQuickAddListener(client);
+
+  // =============================
+  // 🏰 GUILD INIT
+  // =============================
 
   await Promise.all(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
@@ -193,7 +186,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
     await handleSystemInteraction(interaction);
   } catch (err) {
-    console.error("INTERACTION_ERROR", err);
+    const ctx = createChildContext(appCtx, {
+      source: "discord",
+    });
+
+    const l = log.ctx(ctx);
+
+    l.error("app.interaction.error", err);
 
     if (interaction.isRepliable()) {
       await interaction
@@ -210,4 +209,4 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 // 🔐 LOGIN
 // =============================
 
-await client.login(BOT_TOKEN);
+client.login(BOT_TOKEN);
