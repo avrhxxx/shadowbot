@@ -10,57 +10,29 @@ import {
   createInteractionId,
 } from "../ids/IdGenerator";
 import { log } from "../logger/log";
-import { TraceContext } from "../trace/TraceContext";
-
-// =============================
-// 🧩 SYSTEM IMPORTS
-// =============================
+import { TraceContext, createChildContext } from "../trace/TraceContext";
 
 import { handleEventInteraction } from "../../system/events";
 import { handleAbsenceInteraction } from "../../system/absence";
 import { handlePointsInteraction } from "../../system/points";
-
-// =============================
-// 🧠 TYPES
-// =============================
 
 type SystemHandler = (
   interaction: Interaction,
   ctx: TraceContext
 ) => Promise<boolean>;
 
-type SystemHandlerEntry = {
-  name: TraceContext["system"];
-  handler: SystemHandler;
-};
-
-// =============================
-// 🧩 REGISTRY
-// =============================
-
-const SYSTEM_HANDLERS: SystemHandlerEntry[] = [
+const SYSTEM_HANDLERS: { name: TraceContext["system"]; handler: SystemHandler }[] = [
   { name: "events", handler: handleEventInteraction },
   { name: "absence", handler: handleAbsenceInteraction },
   { name: "points", handler: handlePointsInteraction },
 ];
 
-// =============================
-// 🚀 ROUTER
-// =============================
-
-export async function handleSystemInteraction(
-  interaction: Interaction
-) {
-  const traceId = createTraceId();
-  const correlationId = createCorrelationId();
-  const flowId = createFlowId();
-  const interactionId = createInteractionId();
-
+export async function handleSystemInteraction(interaction: Interaction) {
   const baseCtx: TraceContext = {
-    traceId,
-    correlationId,
-    flowId,
-    interactionId,
+    traceId: createTraceId(),
+    correlationId: createCorrelationId(),
+    flowId: createFlowId(),
+    interactionId: createInteractionId(),
     source: "discord",
     userId: interaction.isRepliable() ? interaction.user.id : undefined,
     guildId: interaction.guildId ?? undefined,
@@ -75,56 +47,30 @@ export async function handleSystemInteraction(
   });
 
   for (const { name, handler } of SYSTEM_HANDLERS) {
-    const startTime = Date.now();
+    const start = Date.now();
 
-    const ctx: TraceContext = {
-      ...baseCtx,
-      system: name,
-    };
-
+    const ctx = createChildContext(baseCtx, { system: name });
     const l = log.ctx(ctx);
 
     try {
-      l.event("handler.attempt", {
-        eventType: "system",
-      });
+      l.event("handler.attempt");
 
       const handled = await handler(interaction, ctx);
 
       l.event("handler.result", {
-        eventType: "system",
-        decision: {
-          condition: "handler_returned_true",
-          result: handled,
-        },
+        decision: { condition: "handler_returned_true", result: handled },
       });
 
       if (handled) {
         l.event("handler.handled", {
-          eventType: "system",
-          timing: {
-            label: name!,
-            durationMs: Date.now() - startTime,
-          },
+          timing: { label: name!, durationMs: Date.now() - start },
         });
-
         return;
       }
     } catch (err) {
-      l.error("handler.error", err, {
-        eventType: "system",
-        timing: {
-          label: name!,
-          durationMs: Date.now() - startTime,
-        },
-      });
+      l.error("handler.error", err);
     }
   }
 
-  const lFinal = log.ctx(baseCtx);
-
-  lFinal.warn("interaction.unhandled", {
-    eventType: "interaction",
-    flow: { step: "router:end" },
-  });
+  log.ctx(baseCtx).warn("interaction.unhandled");
 }
