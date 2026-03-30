@@ -27,9 +27,7 @@ export class SheetRepository<T extends { id?: string }> {
   }> {
     const rows = await readSheet(this.sheet.name);
 
-    // 🔥 STRICT: headers ALWAYS from schema
     const headers = this.sheet.headers;
-
     const dataRows = rows.length > 1 ? rows.slice(1) : [];
 
     return { headers, dataRows };
@@ -86,8 +84,8 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 📤 SAVE
   // =============================
-  private async save(headers: readonly string[], rows: unknown[][]): Promise<void> {
-    await writeSheet(this.sheet.name, [headers, ...rows]);
+  private async save(rows: unknown[][]): Promise<void> {
+    await writeSheet(this.sheet.name, [this.sheet.headers, ...rows]);
   }
 
   // =============================
@@ -126,7 +124,7 @@ export class SheetRepository<T extends { id?: string }> {
 
     const row = this.mapObject(headers, data);
 
-    await this.save(headers, [...dataRows, row]);
+    await this.save([...dataRows, row]);
 
     return data;
   }
@@ -143,7 +141,7 @@ export class SheetRepository<T extends { id?: string }> {
       this.mapObject(headers, data)
     );
 
-    await this.save(headers, [...dataRows, ...newRows]);
+    await this.save([...dataRows, ...newRows]);
   }
 
   // =============================
@@ -168,7 +166,7 @@ export class SheetRepository<T extends { id?: string }> {
 
     dataRows[rowIndex] = this.mapObject(headers, updated);
 
-    await this.save(headers, dataRows);
+    await this.save(dataRows);
   }
 
   // =============================
@@ -184,6 +182,6 @@ export class SheetRepository<T extends { id?: string }> {
       (r) => r[idIndex] !== id
     );
 
-    await this.save(headers, filtered);
+    await this.save(filtered);
   }
 }
