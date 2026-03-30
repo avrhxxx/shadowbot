@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/integrations/google/SheetsRepository.ts
+// 📁 src/integrations/google/googleSheetsRepository.ts
 // =====================================
 
 import { readSheet, writeSheet } from "./googleSheetsStorage";
