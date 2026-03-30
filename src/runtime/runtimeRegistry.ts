@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/runtime/systemRegistry.ts
+// 📁 src/runtime/runtimeRegistry.ts
 // =====================================
 
 import type { SystemRegistryEntry } from "./runtimeTypes";
@@ -56,6 +56,18 @@ export const systems: SystemRegistryEntry[] = [
       const mod = await import("@/system/quickadd");
       return {
         init: mod.registerQuickAddListener,
+      };
+    },
+  },
+
+  // 🔥 NOWY: WORKER JAKO SYSTEM
+  {
+    name: "quickadd_worker" as any, // tymczasowo, patrz niżej
+    type: "global",
+    loader: async () => {
+      const mod = await import("@/system/quickadd");
+      return {
+        init: mod.startQuickAddWorker,
       };
     },
   },
