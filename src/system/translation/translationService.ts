@@ -2,7 +2,10 @@
 // 📁 src/system/translation/translationService.ts
 // =====================================
 
-import { LIBRE_URL, GOOGLE_URL } from "./translationConfig";
+import {
+  TRANSLATION_PROVIDERS,
+  DEFAULT_PROVIDER_ORDER,
+} from "./translationConfig";
 import LRUCache from "lru-cache";
 
 // =====================================
@@ -11,7 +14,7 @@ import LRUCache from "lru-cache";
 
 const cache = new LRUCache<string, string>({
   max: 500,
-  ttl: 1000 * 60 * 10, // 10 min
+  ttl: 1000 * 60 * 10,
 });
 
 // =====================================
@@ -51,6 +54,72 @@ async function fetchWithTimeout(
 }
 
 // =====================================
+// 🔌 PROVIDERS
+// =====================================
+
+async function tryLibre(
+  text: string,
+  target: string
+): Promise<string | null> {
+  const url = TRANSLATION_PROVIDERS.libre.url;
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        q: text,
+        source: "auto",
+        target,
+        format: "text",
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as LibreResponse;
+
+    if (typeof data.translatedText === "string") {
+      return data.translatedText;
+    }
+  } catch {}
+
+  return null;
+}
+
+async function tryGoogleFree(
+  text: string,
+  target: string
+): Promise<string | null> {
+  const url = TRANSLATION_PROVIDERS.googleFree.url;
+
+  try {
+    const params = new URLSearchParams({
+      client: "gtx",
+      sl: "auto",
+      tl: target,
+      dt: "t",
+      q: text,
+    });
+
+    const res = await fetchWithTimeout(`${url}?${params.toString()}`);
+
+    const data = (await res.json()) as GoogleResponse;
+
+    if (
+      Array.isArray(data) &&
+      Array.isArray(data[0]) &&
+      Array.isArray(data[0][0]) &&
+      typeof data[0][0][0] === "string"
+    ) {
+      return data[0][0][0];
+    }
+  } catch {}
+
+  return null;
+}
+
+// =====================================
 // 🌍 TRANSLATE
 // =====================================
 
@@ -67,64 +136,23 @@ export async function translateText(
   if (cached) return cached;
 
   // =============================
-  // LIBRE
+  // PROVIDER LOOP
   // =============================
-  try {
-    const res = await fetchWithTimeout(LIBRE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        q: text,
-        source: "auto",
-        target,
-        format: "text",
-      }),
-    });
+  for (const provider of DEFAULT_PROVIDER_ORDER) {
+    let result: string | null = null;
 
-    if (res.ok) {
-      const data = (await res.json()) as LibreResponse;
-
-      if (typeof data.translatedText === "string") {
-        cache.set(key, data.translatedText);
-        return data.translatedText;
-      }
+    if (provider === "libre") {
+      result = await tryLibre(text, target);
     }
-  } catch {
-    // silent fallback
-  }
 
-  // =============================
-  // GOOGLE FALLBACK
-  // =============================
-  try {
-    const params = new URLSearchParams({
-      client: "gtx",
-      sl: "auto",
-      tl: target,
-      dt: "t",
-      q: text,
-    });
+    if (provider === "googleFree") {
+      result = await tryGoogleFree(text, target);
+    }
 
-    const res = await fetchWithTimeout(
-      `${GOOGLE_URL}?${params.toString()}`
-    );
-
-    const data = (await res.json()) as GoogleResponse;
-
-    if (
-      Array.isArray(data) &&
-      Array.isArray(data[0]) &&
-      Array.isArray(data[0][0]) &&
-      typeof data[0][0][0] === "string"
-    ) {
-      const result = data[0][0][0];
-
+    if (result) {
       cache.set(key, result);
-
       return result;
     }
-  } catch {
-    // silent fallback
   }
 
   return "Translation failed.";
