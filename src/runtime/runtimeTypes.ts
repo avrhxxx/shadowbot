@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/runtime/types.ts
+// 📁 src/runtime/runtimeTypes.ts
 // =====================================
 
 import { Client } from "discord.js";
