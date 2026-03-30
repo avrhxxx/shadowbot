@@ -6,16 +6,14 @@ import { systems } from "./systemRegistry";
 import { isSystemEnabled } from "./systemState";
 
 import { log } from "@/core/logger/log";
-import {
-  createChildContext,
-  TraceContext,
-} from "@/core/trace/TraceContext";
+import { createChildContext } from "@/core/trace/TraceContext";
 
 import type { Client, Guild } from "discord.js";
+import type { TraceContext } from "@/core/trace/TraceContext";
 
-// =============================
+// =====================================
 // 🔹 GLOBAL SYSTEMS
-// =============================
+// =====================================
 
 export async function loadGlobalSystems(
   client: Client,
@@ -30,7 +28,7 @@ export async function loadGlobalSystems(
       system: sys.name,
     });
 
-    const enabledState = await isSystemEnabled(sys.name, sysCtx);
+    const enabledState = await isSystemEnabled(sys.name);
 
     if (!enabledState.enabled) {
       log.ctx(sysCtx).event("system.skipped", {
@@ -42,14 +40,12 @@ export async function loadGlobalSystems(
     try {
       const mod = await sys.loader();
 
-      if (typeof mod.initGlobal !== "function") {
-        log.ctx(sysCtx).error("system.init.missing", {
-          type: "global",
-        });
+      if (typeof mod.init !== "function") {
+        log.ctx(sysCtx).error("system.init.missing");
         continue;
       }
 
-      await mod.initGlobal(client, sysCtx);
+      await mod.init(client, sysCtx);
 
       log.ctx(sysCtx).event("system.loaded");
     } catch (err) {
@@ -62,9 +58,9 @@ export async function loadGlobalSystems(
   l.event("system.global.load.complete");
 }
 
-// =============================
+// =====================================
 // 🔹 GUILD SYSTEMS
-// =============================
+// =====================================
 
 export async function loadGuildSystems(
   guild: Guild,
@@ -80,7 +76,7 @@ export async function loadGuildSystems(
       guildId: guild.id,
     });
 
-    const enabledState = await isSystemEnabled(sys.name, sysCtx);
+    const enabledState = await isSystemEnabled(sys.name);
 
     if (!enabledState.enabled) {
       log.ctx(sysCtx).event("system.skipped", {
@@ -92,14 +88,12 @@ export async function loadGuildSystems(
     try {
       const mod = await sys.loader();
 
-      if (typeof mod.initGuild !== "function") {
-        log.ctx(sysCtx).error("system.init.missing", {
-          type: "guild",
-        });
+      if (typeof mod.init !== "function") {
+        log.ctx(sysCtx).error("system.init.missing");
         continue;
       }
 
-      await mod.initGuild(guild, sysCtx);
+      await mod.init(guild, sysCtx);
 
       log.ctx(sysCtx).event("system.loaded");
     } catch (err) {
