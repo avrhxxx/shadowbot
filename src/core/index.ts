@@ -5,4 +5,5 @@
 export * from "./ids/IdGenerator";
 export * from "./trace/TraceContext";
 export * from "./logger/log";
+export * from "./logger/formatter";
 export * from "./router/systemRouter";
