@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/core/ids/IdGenerator.ts
+// =====================================
+
 import { randomUUID } from "crypto";
 
 // =====================================
@@ -18,6 +22,10 @@ export type FlowId = Brand<string, "FlowId">;
 // =====================================
 // 🔹 INTERNAL CONFIG
 // =====================================
+
+// ❗ ID FORMAT: <prefix>-<8char uuid>
+// - NEVER rely on prefix in business logic
+// - prefix is ONLY for debugging / observability
 
 const ID_LENGTH = 8;
 
@@ -87,6 +95,9 @@ export function isValidId(id: string): boolean {
   return new RegExp(`^[${Object.values(ID_PREFIX_MAP).join("")}]-[a-f0-9]{8}$`).test(id);
 }
 
+/**
+ * 🔹 Debug helper ONLY
+ */
 export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
   if (!isValidId(id)) return null;
 
@@ -100,7 +111,7 @@ export function getIdType(id: string): keyof typeof ID_PREFIX_MAP | null {
 }
 
 // =====================================
-// 🧠 DISPLAY HELPERS
+// 🧠 DISPLAY HELPERS (LOGGING ONLY)
 // =====================================
 
 function extractSuffix(id: string): string | null {
