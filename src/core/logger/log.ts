@@ -1,73 +1,134 @@
 // =====================================
-// 📁 src/core/logger/formatter.ts
+// 📁 src/core/logger/log.ts
 // =====================================
 
-import type { LogPayload } from "./log";
-import { toDisplayTraceId } from "../ids/IdGenerator";
+import { TraceContext } from "../trace/TraceContext";
+import { formatLog } from "./formatter";
 
 // =====================================
-// 🎨 ANSI COLORS
+// 🔹 TYPES
 // =====================================
 
-const COLORS = {
-  reset: "\x1b[0m",
-  dim: "\x1b[2m",
-  gray: "\x1b[90m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  green: "\x1b[32m",
-  cyan: "\x1b[36m",
+type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
+
+export const EVENT_TYPES = {
+  system: "system",
+  user: "user",
+  interaction: "interaction",
+  external: "external",
+  job: "job",
+  security: "security",
+  performance: "performance",
+  debug: "debug",
+} as const;
+
+export type LogPayload = {
+  scope?: string;
+  event: string;
+  traceId?: string;
+
+  level?: LogLevel;
+
+  eventType?: keyof typeof EVENT_TYPES;
+
+  timestamp?: string;
+  schemaVersion?: number;
+
+  context?: Record<string, unknown>;
+  input?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: unknown;
 };
 
-function getLevelColor(level: string) {
-  switch (level) {
-    case "fatal":
-    case "error":
-      return COLORS.red;
-    case "warn":
-      return COLORS.yellow;
-    case "info":
-      return COLORS.green;
-    default:
-      return COLORS.gray;
+// =====================================
+// 🔧 HELPERS
+// =====================================
+
+function normalizeError(err: unknown) {
+  if (!err) return undefined;
+
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
   }
+
+  return {
+    message: String(err),
+  };
 }
 
 // =====================================
-// 🧠 HELPERS
+// 🔻 INTERNAL LOGGER
 // =====================================
 
-function clean(obj: any) {
-  if (!obj || typeof obj !== "object") return obj;
-  const entries = Object.entries(obj).filter(([, v]) => v != null);
-  return entries.length ? Object.fromEntries(entries) : undefined;
-}
-
-// =====================================
-// 🎯 MAIN FORMATTER
-// =====================================
-
-export function formatLog(payload: LogPayload) {
-  try {
-    const level = payload.level ?? "info";
-    const color = getLevelColor(level);
-
-    const header =
-      `${COLORS.dim}${payload.timestamp}${COLORS.reset} ` +
-      `${color}[${level.toUpperCase()}]${COLORS.reset} ` +
-      `${COLORS.cyan}[${payload.scope}]${COLORS.reset} ` +
-      `${payload.event} ` +
-      `${COLORS.gray}(${toDisplayTraceId(payload.traceId as any)})${COLORS.reset}`;
-
-    console.group(header);
-
-    if (payload.context) console.log("context:", clean(payload.context));
-    if (payload.input) console.log("input:", clean(payload.input));
-    if (payload.result) console.log("result:", clean(payload.result));
-    if (payload.error) console.log("error:", payload.error);
-
-    console.groupEnd();
-  } catch (err) {
-    console.log("LOGGER_FORMAT_ERROR", err, payload);
+function emit(payload: LogPayload | string): void {
+  if (!payload) {
+    console.log("LOGGER_ERROR: empty payload");
+    return;
   }
+
+  if (typeof payload === "string") {
+    payload = { event: payload };
+  }
+
+  if (!payload.event) {
+    console.log("LOGGER_ERROR: missing event", payload);
+    return;
+  }
+
+  formatLog({
+    ...payload,
+    timestamp: payload.timestamp ?? new Date().toISOString(),
+    error: normalizeError(payload.error),
+    eventType: payload.eventType ?? "system",
+    schemaVersion: payload.schemaVersion ?? 1,
+  });
 }
+
+// =====================================
+// 🔥 MAIN API
+// =====================================
+
+export function log(
+  ctx: TraceContext,
+  event: string,
+  payload: Omit<LogPayload, "event" | "traceId"> = {}
+) {
+  emit({
+    ...payload,
+    event,
+    traceId: ctx.traceId,
+    scope: payload.scope ?? ctx.system ?? "unknown",
+
+    context: {
+      ...(payload.context || {}),
+      ...ctx,
+    },
+  });
+}
+
+// =====================================
+// 🔥 SHORTCUTS
+// =====================================
+
+log.warn = (ctx: TraceContext, event: string, payload = {}) =>
+  log(ctx, event, { ...payload, level: "warn" });
+
+log.error = (ctx: TraceContext, event: string, error: unknown, payload = {}) =>
+  log(ctx, event, { ...payload, level: "error", error });
+
+// =====================================
+// 🔥 CTX LOGGER
+// =====================================
+
+log.ctx = function (ctx: TraceContext) {
+  return {
+    event: (event: string, payload = {}) => log(ctx, event, payload),
+    warn: (event: string, payload = {}) =>
+      log(ctx, event, { ...payload, level: "warn" }),
+    error: (event: string, error: unknown, payload = {}) =>
+      log(ctx, event, { ...payload, level: "error", error }),
+  };
+};
