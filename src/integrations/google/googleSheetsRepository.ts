@@ -28,7 +28,10 @@ export class SheetRepository<T extends { id?: string }> {
     const rows = await readSheet(this.sheet.name);
 
     const headers = this.sheet.headers;
-    const dataRows = rows.length > 1 ? rows.slice(1) : [];
+
+    // force mutable copy
+    const dataRows: unknown[][] =
+      rows.length > 1 ? rows.slice(1).map((r) => [...r]) : [];
 
     return { headers, dataRows };
   }
@@ -36,7 +39,7 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 🔄 MAP ROW → OBJECT
   // =============================
-  private mapRow(headers: readonly string[], row: unknown[]): T {
+  private mapRow(headers: readonly string[], row: readonly unknown[]): T {
     const obj: Record<string, unknown> = {};
 
     headers.forEach((h, i) => {
@@ -63,7 +66,10 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   // 🔄 MAP OBJECT → ROW
   // =============================
-  private mapObject(headers: readonly string[], data: Partial<T>): unknown[] {
+  private mapObject(
+    headers: readonly string[],
+    data: Partial<T>
+  ): unknown[] {
     return headers.map((h) => {
       const val = (data as Record<string, unknown>)[h];
 
@@ -98,10 +104,10 @@ export class SheetRepository<T extends { id?: string }> {
 
     if (filter) {
       data = data.filter((item) =>
-        Object.entries(filter).every(
-          ([key, val]) =>
-            (item as Record<string, unknown>)[key] === val
-        )
+        Object.entries(filter).every(([key, val]) => {
+          const current = (item as Record<string, unknown>)[key];
+          return current === val;
+        })
       );
     }
 
@@ -120,6 +126,10 @@ export class SheetRepository<T extends { id?: string }> {
   // ➕ CREATE
   // =============================
   async create(data: T): Promise<T> {
+    if (!data.id) {
+      throw new Error("Cannot create entity without 'id'");
+    }
+
     const { headers, dataRows } = await this.load();
 
     const row = this.mapObject(headers, data);
@@ -134,6 +144,12 @@ export class SheetRepository<T extends { id?: string }> {
   // =============================
   async createMany(dataArray: T[]): Promise<void> {
     if (!dataArray.length) return;
+
+    dataArray.forEach((d) => {
+      if (!d.id) {
+        throw new Error("Cannot create entity without 'id'");
+      }
+    });
 
     const { headers, dataRows } = await this.load();
 
