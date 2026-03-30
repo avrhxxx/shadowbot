@@ -8,7 +8,7 @@ import { TraceContext } from "../trace/TraceContext";
 // 🔹 TYPES
 // =====================================
 
-type LogLevel = "info" | "warn" | "error";
+type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 export type LogPayload = {
   scope?: string;
@@ -16,6 +16,19 @@ export type LogPayload = {
   traceId?: string;
 
   level?: LogLevel;
+
+  eventType?:
+    | "system"
+    | "user"
+    | "interaction"
+    | "external"
+    | "job"
+    | "security"
+    | "performance"
+    | "debug";
+
+  timestamp?: string;
+  schemaVersion?: number;
 
   // =============================
   // 🧠 CORE
@@ -94,7 +107,7 @@ export type LogPayload = {
   };
 
   // =============================
-  // 🔗 FLOW / ARCHITEKTURA
+  // 🔗 FLOW
   // =============================
 
   flow?: {
@@ -123,6 +136,12 @@ export type LogPayload = {
     result: boolean;
   };
 
+  span?: {
+    id?: string;
+    parentId?: string;
+    name?: string;
+  };
+
   // =============================
   // ⚡ PERFORMANCE
   // =============================
@@ -138,7 +157,7 @@ export type LogPayload = {
   };
 
   // =============================
-  // 🎯 DISCORD / INPUT
+  // 🎯 DISCORD
   // =============================
 
   interaction?: {
@@ -155,7 +174,7 @@ export type LogPayload = {
   };
 
   // =============================
-  // ⚙️ WORKERS / JOBS
+  // ⚙️ JOBS
   // =============================
 
   job?: {
@@ -165,11 +184,10 @@ export type LogPayload = {
   };
 
   // =============================
-  // 🏷️ TAGGING / DEBUG
+  // 🏷️ DEBUG
   // =============================
 
   tags?: string[];
-
   debug?: Record<string, unknown>;
 };
 
@@ -193,7 +211,7 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
-// 🔻 LOW LEVEL LOGGER (INTERNAL)
+// 🔻 INTERNAL LOGGER
 // =====================================
 
 function emit(payload: LogPayload | string): void {
@@ -206,99 +224,25 @@ function emit(payload: LogPayload | string): void {
     payload = { event: payload };
   }
 
-  const {
-    scope,
-    event,
-    traceId,
-    level = "info",
-
-    context,
-    input,
-    result,
-    error,
-
-    timing,
-    stats,
-    metrics,
-
-    meta,
-    environment,
-    external,
-    retry,
-    cache,
-    connection,
-    rateLimit,
-    security,
-
-    flow,
-    relations,
-    transaction,
-    state,
-    decision,
-
-    performance,
-    dataFlow,
-
-    interaction,
-    attachment,
-    job,
-
-    tags,
-    debug,
-  } = payload;
-
-  if (!event) {
+  if (!payload.event) {
     console.log("LOGGER_ERROR: missing event", payload);
     return;
   }
 
-  const time = new Date().toISOString();
-  const normalizedError = normalizeError(error);
+  const time = payload.timestamp ?? new Date().toISOString();
+  const normalizedError = normalizeError(payload.error);
 
   console.log(
-    `${time} | ${level.toUpperCase()} | ${traceId || "-"} | ${scope || "unknown"} | ${event}`,
+    `${time} | ${(payload.level ?? "info").toUpperCase()} | ${payload.traceId || "-"} | ${payload.scope || "unknown"} | ${payload.event}`,
     {
-      ...(context && { context }),
-      ...(input && { input }),
-      ...(result && { result }),
-
-      ...(timing && { timing }),
-
-      ...(stats && { stats }),
-      ...(metrics && { metrics }),
-
-      ...(meta && { meta }),
-      ...(environment && { environment }),
-      ...(external && { external }),
-      ...(retry && { retry }),
-      ...(cache && { cache }),
-      ...(connection && { connection }),
-      ...(rateLimit && { rateLimit }),
-      ...(security && { security }),
-
-      ...(flow && { flow }),
-      ...(relations && { relations }),
-      ...(transaction && { transaction }),
-      ...(state && { state }),
-      ...(decision && { decision }),
-
-      ...(performance && { performance }),
-      ...(dataFlow && { dataFlow }),
-
-      ...(interaction && { interaction }),
-      ...(attachment && { attachment }),
-      ...(job && { job }),
-
-      ...(tags && { tags }),
-      ...(debug && { debug }),
-
+      ...payload,
       ...(normalizedError && { error: normalizedError }),
     }
   );
 }
 
 // =====================================
-// 🔥 HIGH LEVEL LOGGER (MAIN API)
+// 🔥 MAIN API
 // =====================================
 
 export function log(
@@ -311,10 +255,11 @@ export function log(
     event,
     traceId: ctx.traceId,
     scope: payload.scope ?? ctx.system ?? "unknown",
+    schemaVersion: payload.schemaVersion ?? 1,
 
     context: {
       ...(payload.context || {}),
-      ...ctx, // 🔥 ctx ALWAYS wins
+      ...ctx,
     },
   });
 }
@@ -323,45 +268,21 @@ export function log(
 // 🔥 SHORTCUTS
 // =====================================
 
-log.warn = function (
-  ctx: TraceContext,
-  event: string,
-  payload: Omit<LogPayload, "event" | "traceId" | "level"> = {}
-) {
+log.warn = (ctx: TraceContext, event: string, payload = {}) =>
   log(ctx, event, { ...payload, level: "warn" });
-};
 
-log.error = function (
-  ctx: TraceContext,
-  event: string,
-  error: unknown,
-  payload: Omit<LogPayload, "event" | "traceId" | "error" | "level"> = {}
-) {
+log.error = (ctx: TraceContext, event: string, error: unknown, payload = {}) =>
   log(ctx, event, { ...payload, level: "error", error });
-};
 
 // =====================================
-// 🔥 CTX LOGGER (ULTRA SHORT API)
+// 🔥 CTX LOGGER
 // =====================================
 
-type CtxLogger = {
-  event: (event: string, payload?: Omit<LogPayload, "event" | "traceId">) => void;
-  warn: (event: string, payload?: Omit<LogPayload, "event" | "traceId" | "level">) => void;
-  error: (event: string, error: unknown, payload?: Omit<LogPayload, "event" | "traceId" | "error" | "level">) => void;
-};
-
-log.ctx = function (ctx: TraceContext): CtxLogger {
+log.ctx = function (ctx: TraceContext) {
   return {
-    event(event, payload = {}) {
-      log(ctx, event, payload);
-    },
-
-    warn(event, payload = {}) {
-      log(ctx, event, { ...payload, level: "warn" });
-    },
-
-    error(event, error, payload = {}) {
-      log(ctx, event, { ...payload, level: "error", error });
-    },
+    event: (event: string, payload = {}) => log(ctx, event, payload),
+    warn: (event: string, payload = {}) => log(ctx, event, { ...payload, level: "warn" }),
+    error: (event: string, error: unknown, payload = {}) =>
+      log(ctx, event, { ...payload, level: "error", error }),
   };
 };
