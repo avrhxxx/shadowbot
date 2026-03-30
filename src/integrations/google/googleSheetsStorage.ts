@@ -3,7 +3,7 @@
 // =====================================
 
 import { sheetsClient } from "@/integrations/google/googleSheetsClient";
-import pRetry from "p-retry";
+import pRetry, { AbortError } from "p-retry";
 
 // =====================================
 // 🔐 ENV
@@ -22,7 +22,26 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   return pRetry(fn, {
     retries: 3,
+    onFailedAttempt: (error) => {
+      const err = error as unknown as { response?: { status?: number } };
+
+      const status = err?.response?.status;
+
+      // ❌ do NOT retry client errors
+      if (status && status >= 400 && status < 500 && status !== 429) {
+        throw new AbortError("Non-retryable error");
+      }
+    },
   });
+}
+
+// =====================================
+// 🧾 ERROR HELPER
+// =====================================
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 // =====================================
@@ -41,7 +60,7 @@ export async function readSheet(tab: string): Promise<readonly unknown[][]> {
     return res.data?.values ?? [];
   } catch (err) {
     throw new Error(
-      `Failed to read sheet "${tab}": ${(err as Error).message}`
+      `Failed to read sheet "${tab}": ${getErrorMessage(err)}`
     );
   }
 }
@@ -65,7 +84,7 @@ export async function writeSheet(
     );
   } catch (err) {
     throw new Error(
-      `Failed to write sheet "${tab}": ${(err as Error).message}`
+      `Failed to write sheet "${tab}": ${getErrorMessage(err)}`
     );
   }
 }
@@ -91,7 +110,7 @@ export async function appendSheet(
     );
   } catch (err) {
     throw new Error(
-      `Failed to append sheet "${tab}": ${(err as Error).message}`
+      `Failed to append sheet "${tab}": ${getErrorMessage(err)}`
     );
   }
 }
@@ -123,7 +142,7 @@ export async function updateCell(
     );
   } catch (err) {
     throw new Error(
-      `Failed to update cell in "${tab}": ${(err as Error).message}`
+      `Failed to update cell in "${tab}": ${getErrorMessage(err)}`
     );
   }
 }
@@ -164,7 +183,7 @@ export async function deleteRow(
     );
   } catch (err) {
     throw new Error(
-      `Failed to delete row in "${tab}": ${(err as Error).message}`
+      `Failed to delete row in "${tab}": ${getErrorMessage(err)}`
     );
   }
 }
