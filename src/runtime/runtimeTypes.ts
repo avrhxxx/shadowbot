@@ -30,10 +30,17 @@ export interface SystemStateEntry {
 // 🔹 SYSTEM MODULE CONTRACT
 // =============================
 
-export interface SystemModule {
-  initGlobal?: (client: Client, ctx: TraceContext) => Promise<void> | void;
-  initGuild?: (guild: Guild, ctx: TraceContext) => Promise<void> | void;
-}
+export type GlobalSystemModule = {
+  initGlobal: (client: Client, ctx: TraceContext) => Promise<void> | void;
+};
+
+export type GuildSystemModule = {
+  initGuild: (guild: Guild, ctx: TraceContext) => Promise<void> | void;
+};
+
+export type SystemModule = Partial<
+  GlobalSystemModule & GuildSystemModule
+>;
 
 // =============================
 // 🔹 REGISTRY ENTRY
