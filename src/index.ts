@@ -55,12 +55,6 @@ import {
 } from "@/runtime/systemLoader";
 
 // =====================================
-// 🔹 QUICKADD (independent worker)
-// =====================================
-
-import { startQuickAddWorker } from "@/system/quickadd";
-
-// =====================================
 // 🔹 INTEGRATIONS
 // =====================================
 
@@ -160,17 +154,6 @@ client.once("clientReady", async () => {
       reason: "sheets_not_ready",
     });
     return;
-  }
-
-  // =============================
-  // 🔥 WORKER (independent)
-  // =============================
-
-  try {
-    startQuickAddWorker();
-    appLog.event("app.quickadd.worker.started");
-  } catch (err) {
-    appLog.error("app.quickadd.worker.failed", normalizeError(err));
   }
 
   // =============================
