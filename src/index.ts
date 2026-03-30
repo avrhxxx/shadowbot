@@ -52,7 +52,7 @@ import {
 import {
   loadGlobalSystems,
   loadGuildSystems,
-} from "@/runtime/systemLoader";
+} from "@/runtime/runtimeLoader";
 
 // =====================================
 // 🔹 INTEGRATIONS
