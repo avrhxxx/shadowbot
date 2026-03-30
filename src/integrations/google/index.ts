@@ -16,6 +16,11 @@
 export * from "./googleSheetsClient";
 
 // =====================================
+// 🔹 STORAGE (LOW LEVEL)
+// =====================================
+export * from "./googleSheetsStorage";
+
+// =====================================
 // 🔹 DATA LAYER
 // =====================================
 export * from "./googleSheetsRepository";
@@ -33,4 +38,4 @@ export * from "./googleSheetsSchema";
 // =====================================
 // 🔹 OCR (VISION API)
 // =====================================
-export * from "./GoogleVisionService";
+export * from "./googleVisionService";
