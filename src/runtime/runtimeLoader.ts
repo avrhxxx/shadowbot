@@ -2,8 +2,8 @@
 // 📁 src/runtime/runtimeLoader.ts
 // =====================================
 
-import { systems } from "./systemRegistry";
-import { isSystemEnabled } from "./systemState";
+import { systems } from "./runtimeRegistry";
+import { isSystemEnabled } from "./runtimeState";
 
 import { log } from "@/core/logger/log";
 import { createChildContext } from "@/core/trace/TraceContext";
@@ -29,6 +29,14 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
+// 🔹 TYPE GUARD
+// =====================================
+
+function isGuild(target: Client | Guild): target is Guild {
+  return (target as Guild).id !== undefined;
+}
+
+// =====================================
 // 🔹 INTERNAL EXECUTOR
 // =====================================
 
@@ -39,9 +47,7 @@ async function executeSystem(
 ) {
   const sysCtx = createChildContext(ctx, {
     system: sys.name,
-    ...(target instanceof Object && "id" in target
-      ? { guildId: (target as Guild).id }
-      : {}),
+    ...(isGuild(target) ? { guildId: target.id } : {}),
   });
 
   const l = log.ctx(sysCtx);
@@ -57,6 +63,8 @@ async function executeSystem(
 
   const start = Date.now();
 
+  l.event("system.starting");
+
   try {
     const mod = await sys.loader();
 
@@ -71,9 +79,7 @@ async function executeSystem(
       durationMs: Date.now() - start,
     });
   } catch (err) {
-    l.error("system.load.failed", {
-      ...normalizeError(err),
-    });
+    l.error("system.load.failed", normalizeError(err));
   }
 }
 
