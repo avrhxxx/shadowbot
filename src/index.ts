@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/index.ts
+// =====================================
+
 /**
  * 📁 File: src/index.ts
  * 🧠 Role: entrypoint
@@ -77,17 +81,25 @@ const appLog = log.ctx(appCtx);
 // 🛑 GLOBAL ERROR HANDLING
 // =============================
 
+function normalizeError(err: unknown) {
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
+  }
+
+  return {
+    message: String(err),
+  };
+}
+
 process.on("unhandledRejection", (err) => {
-  appLog.error("app.unhandled_rejection", {
-    error: err instanceof Error ? err.message : String(err),
-  });
+  appLog.error("app.unhandled_rejection", normalizeError(err));
 });
 
 process.on("uncaughtException", (err) => {
-  appLog.error("app.uncaught_exception", {
-    error: err instanceof Error ? err.message : String(err),
-  });
-
+  appLog.error("app.uncaught_exception", normalizeError(err));
   process.exit(1);
 });
 
@@ -115,7 +127,7 @@ client.once("clientReady", async () => {
 
     log.ctx(ctx).event("app.sheets.initialized");
   } catch (err) {
-    appLog.error("app.sheets.failed", err);
+    appLog.error("app.sheets.failed", normalizeError(err));
   }
 
   // =============================
@@ -126,7 +138,7 @@ client.once("clientReady", async () => {
     startQuickAddWorker();
     appLog.event("app.quickadd.worker.started");
   } catch (err) {
-    appLog.error("app.quickadd.worker.failed", err);
+    appLog.error("app.quickadd.worker.failed", normalizeError(err));
   }
 
   // =============================
@@ -137,7 +149,7 @@ client.once("clientReady", async () => {
     await client.application?.commands.set([]);
     appLog.event("app.slash.commands.skipped");
   } catch (err) {
-    appLog.error("app.slash.commands.failed", err);
+    appLog.error("app.slash.commands.failed", normalizeError(err));
   }
 
   // =============================
@@ -152,7 +164,7 @@ client.once("clientReady", async () => {
   // 🏰 GUILD INIT
   // =============================
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     Array.from(client.guilds.cache.values()).map(async (guild) => {
       const guildCtx = createChildContext(appCtx, {
         system: "app",
@@ -170,16 +182,25 @@ client.once("clientReady", async () => {
       try {
         initEventReminders(guild);
       } catch (err) {
-        l.error("app.guild.events.failed", err);
+        l.error("app.guild.events.failed", normalizeError(err));
       }
 
       try {
         await initAbsenceNotifications(guild);
       } catch (err) {
-        l.error("app.guild.absence.failed", err);
+        l.error("app.guild.absence.failed", normalizeError(err));
       }
     })
   );
+
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      appLog.error("app.guild.init.failed", {
+        index: i,
+        ...normalizeError(r.reason),
+      });
+    }
+  });
 });
 
 // =============================
@@ -195,13 +216,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
     const ctx = createChildContext(appCtx, {
       source: "discord",
       guildId: interaction.guildId ?? undefined,
-      userId: interaction.user?.id,
+      userId: interaction.user.id,
       interactionId: interaction.id,
     });
 
     const l = log.ctx(ctx);
 
-    l.error("app.interaction.error", err);
+    l.error("app.interaction.error", normalizeError(err));
 
     if (interaction.isRepliable()) {
       await interaction
