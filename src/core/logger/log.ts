@@ -72,6 +72,16 @@ export type LogPayload = {
     key?: string;
   };
 
+  // 🔌 CONNECTION (NOWE)
+  connection?: {
+    service: string; // discord / google / api
+    status: "connected" | "disconnected" | "degraded";
+    latencyMs?: number;
+    attempt?: number;
+    endpoint?: string;
+    protocol?: string;
+  };
+
   // =============================
   // 🔗 FLOW / ARCHITEKTURA
   // =============================
@@ -155,19 +165,22 @@ function emit(payload: LogPayload | string): void {
     event,
     traceId,
     level = "info",
+
     context,
     input,
     result,
-    stats,
-    meta,
-    metrics,
-    timing,
     error,
+
+    timing,
+    stats,
+    metrics,
+    meta,
 
     environment,
     external,
     retry,
     cache,
+    connection,
 
     flow,
     relations,
@@ -193,21 +206,28 @@ function emit(payload: LogPayload | string): void {
       ...(context && { context }),
       ...(input && { input }),
       ...(result && { result }),
-      ...(stats && { stats }),
-      ...(meta && { meta }),
-      ...(metrics && { metrics }),
+
       ...(timing && { timing }),
+
+      ...(stats && { stats }),
+      ...(metrics && { metrics }),
+
+      ...(meta && { meta }),
       ...(environment && { environment }),
       ...(external && { external }),
       ...(retry && { retry }),
       ...(cache && { cache }),
+      ...(connection && { connection }),
+
       ...(flow && { flow }),
       ...(relations && { relations }),
       ...(transaction && { transaction }),
       ...(state && { state }),
       ...(decision && { decision }),
+
       ...(performance && { performance }),
       ...(dataFlow && { dataFlow }),
+
       ...(normalizedError && { error: normalizedError }),
     }
   );
