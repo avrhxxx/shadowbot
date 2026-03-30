@@ -2,8 +2,21 @@
 // 📁 src/system/translation/translationService.ts
 // =====================================
 
-import fetch from "node-fetch";
 import { LIBRE_URL, GOOGLE_URL } from "./translationConfig";
+import LRUCache from "lru-cache";
+
+// =====================================
+// 🔧 CACHE
+// =====================================
+
+const cache = new LRUCache<string, string>({
+  max: 500,
+  ttl: 1000 * 60 * 10, // 10 min
+});
+
+// =====================================
+// 🔧 TYPES
+// =====================================
 
 type LibreResponse = {
   translatedText?: string;
@@ -11,29 +24,68 @@ type LibreResponse = {
 
 type GoogleResponse = string[][][];
 
+// =====================================
+// 🔧 HELPERS
+// =====================================
+
+function buildCacheKey(text: string, target: string): string {
+  return `${text.trim().toLowerCase()}::${target}`;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo,
+  init?: RequestInit,
+  timeout = 5000
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+// =====================================
+// 🌍 TRANSLATE
+// =====================================
+
 export async function translateText(
   text: string,
   target: string
 ): Promise<string> {
+  const key = buildCacheKey(text, target);
+
+  // =============================
+  // CACHE
+  // =============================
+  const cached = cache.get(key);
+  if (cached) return cached;
+
   // =============================
   // LIBRE
   // =============================
   try {
-    const res = await fetch(LIBRE_URL, {
+    const res = await fetchWithTimeout(LIBRE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         q: text,
         source: "auto",
         target,
-        format: "text"
-      })
+        format: "text",
+      }),
     });
 
     if (res.ok) {
       const data = (await res.json()) as LibreResponse;
 
       if (typeof data.translatedText === "string") {
+        cache.set(key, data.translatedText);
         return data.translatedText;
       }
     }
@@ -50,10 +102,13 @@ export async function translateText(
       sl: "auto",
       tl: target,
       dt: "t",
-      q: text
+      q: text,
     });
 
-    const res = await fetch(`${GOOGLE_URL}?${params.toString()}`);
+    const res = await fetchWithTimeout(
+      `${GOOGLE_URL}?${params.toString()}`
+    );
+
     const data = (await res.json()) as GoogleResponse;
 
     if (
@@ -62,7 +117,11 @@ export async function translateText(
       Array.isArray(data[0][0]) &&
       typeof data[0][0][0] === "string"
     ) {
-      return data[0][0][0];
+      const result = data[0][0][0];
+
+      cache.set(key, result);
+
+      return result;
     }
   } catch {
     // silent fallback
