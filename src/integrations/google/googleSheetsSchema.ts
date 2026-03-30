@@ -2,36 +2,27 @@
 // 📁 src/integrations/google/googleSheetsSchema.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Single source of truth for ALL Google Sheets structure.
- *
- * Defines:
- * - sheet names
- * - column headers (order matters!)
- *
- * ❗ RULES:
- * - NO logic
- * - NO imports
- * - NO validation (ZOD belongs to system layer)
- */
-
-// =====================================
-// 🔹 TYPE
-// =====================================
-
 export type SheetDefinition = {
   name: string;
   headers: readonly string[];
 };
 
 // =====================================
-// 🔹 GLOBAL / MODERATOR
+// 🔹 MODERATOR
 // =====================================
 
 export const MODERATOR_CONFIG_SHEET: SheetDefinition = {
   name: "moderator_config",
-  headers: [],
+  headers: [
+    "id",
+    "guildId",
+    "modChannelId",
+    "updateChannelId",
+    "dateEmbedId",
+    "hubMessageId",
+    "version",
+    "lastUpdated",
+  ],
 };
 
 // =====================================
@@ -40,12 +31,36 @@ export const MODERATOR_CONFIG_SHEET: SheetDefinition = {
 
 export const EVENTS_SHEET: SheetDefinition = {
   name: "events",
-  headers: ["id", "name", "date", "participants"],
+  headers: [
+    "id",
+    "guildId",
+    "name",
+    "eventType",
+    "day",
+    "month",
+    "hour",
+    "minute",
+    "year",
+    "reminderBefore",
+    "status",
+    "participants",
+    "results",
+    "absent",
+    "createdAt",
+    "reminderSent",
+    "started",
+    "lastBirthdayYear",
+  ],
 };
 
 export const EVENTS_CONFIG_SHEET: SheetDefinition = {
   name: "events_config",
-  headers: ["key", "value"],
+  headers: [
+    "id",
+    "guildId",
+    "notificationChannel",
+    "downloadChannel",
+  ],
 };
 
 // =====================================
@@ -54,22 +69,47 @@ export const EVENTS_CONFIG_SHEET: SheetDefinition = {
 
 export const POINTS_WEEKS_SHEET: SheetDefinition = {
   name: "points_weeks",
-  headers: ["id", "week", "year"],
+  headers: [
+    "id",
+    "guildId",
+    "category",
+    "week",
+    "nick",
+    "points",
+  ],
 };
 
 export const POINTS_DONATIONS_SHEET: SheetDefinition = {
   name: "points_donations",
-  headers: ["id", "userId", "amount", "date"],
+  headers: [
+    "id",
+    "guildId",
+    "category",
+    "nick",
+    "points",
+    "week",
+  ],
 };
 
 export const POINTS_DUEL_SHEET: SheetDefinition = {
   name: "points_duel",
-  headers: ["id", "userA", "userB", "winner", "points"],
+  headers: [
+    "id",
+    "guildId",
+    "category",
+    "nick",
+    "points",
+    "week",
+  ],
 };
 
 export const POINTS_CONFIG_SHEET: SheetDefinition = {
   name: "points_config",
-  headers: ["key", "value"],
+  headers: [
+    "id",
+    "guildId",
+    "someFutureField", // placeholder
+  ],
 };
 
 // =====================================
@@ -78,26 +118,52 @@ export const POINTS_CONFIG_SHEET: SheetDefinition = {
 
 export const ABSENCE_SHEET: SheetDefinition = {
   name: "absence",
-  headers: ["id", "userId", "from", "to", "reason"],
+  headers: [
+    "id",
+    "guildId",
+    "player",
+    "startDate",
+    "endDate",
+    "createdAt",
+    "year",
+  ],
 };
 
 export const ABSENCE_CONFIG_SHEET: SheetDefinition = {
   name: "absence_config",
-  headers: ["key", "value"],
+  headers: [
+    "id",
+    "guildId",
+    "notificationChannel",
+    "absenceEmbedId",
+  ],
 };
 
 // =====================================
-// 🔹 TRANSLATION
+// 🔹 TRANSLATION (FUTURE READY)
 // =====================================
 
 export const TRANSLATE_SHEET: SheetDefinition = {
   name: "translate",
-  headers: ["id", "key", "value", "lang"],
+  headers: [
+    "id",
+    "guildId",
+    "userId",
+    "sourceLang",
+    "targetLang",
+    "originalText",
+    "translatedText",
+    "createdAt",
+  ],
 };
 
 export const TRANSLATE_CONFIG_SHEET: SheetDefinition = {
   name: "translate_config",
-  headers: ["key", "value"],
+  headers: [
+    "id",
+    "guildId",
+    "enabled",
+  ],
 };
 
 // =====================================
@@ -106,23 +172,44 @@ export const TRANSLATE_CONFIG_SHEET: SheetDefinition = {
 
 export const QUICKADD_NICKNAMES_SHEET: SheetDefinition = {
   name: "quickadd_nicknames",
-  headers: ["id", "nickname", "userId"],
-};
-
-// 🔥 QUEUES
-
-export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
-  name: "quickadd_events_queue",
-  headers: ["id", "rawText", "status", "createdAt"],
+  headers: [
+    "type",
+    "ocr_raw",
+    "layout_text",
+    "parser_output",
+    "adjusted",
+    "override",
+    "createdAt",
+  ],
 };
 
 export const QUICKADD_POINTS_QUEUE_SHEET: SheetDefinition = {
   name: "quickadd_points_queue",
-  headers: ["id", "rawText", "status", "createdAt"],
+  headers: [
+    "guildId",
+    "category",
+    "week",
+    "nickname",
+    "points",
+    "status",
+    "createdAt",
+  ],
+};
+
+export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
+  name: "quickadd_events_queue",
+  headers: [
+    "guildId",
+    "eventId",
+    "type",
+    "nickname",
+    "status",
+    "createdAt",
+  ],
 };
 
 // =====================================
-// 🔹 REGISTRY (ALL SHEETS)
+// 🔹 REGISTRY
 // =====================================
 
 export const ALL_SHEETS = [
@@ -143,12 +230,8 @@ export const ALL_SHEETS = [
   TRANSLATE_CONFIG_SHEET,
 
   QUICKADD_NICKNAMES_SHEET,
-  QUICKADD_EVENTS_QUEUE_SHEET,
   QUICKADD_POINTS_QUEUE_SHEET,
+  QUICKADD_EVENTS_QUEUE_SHEET,
 ] as const;
-
-// =====================================
-// 🔹 HELPERS (TYPE ONLY)
-// =====================================
 
 export type SheetName = (typeof ALL_SHEETS)[number]["name"];
