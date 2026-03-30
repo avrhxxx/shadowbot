@@ -3,10 +3,9 @@
 // =====================================
 
 import { Client, Guild } from "discord.js";
-import { TraceContext } from "@/core/trace/TraceContext";
 
 // =============================
-// 🔹 SYSTEM NAME (SOURCE OF TRUTH)
+// 🔹 SYSTEM NAME
 // =============================
 
 export type SystemName =
@@ -18,29 +17,22 @@ export type SystemName =
   | "quickadd";
 
 // =============================
-// 🔹 SYSTEM STATE
+// 🔹 SYSTEM CONFIG (RUNTIME)
 // =============================
 
-export interface SystemStateEntry {
+export interface SystemConfig {
+  system: SystemName;
   enabled: boolean;
   reason?: string;
 }
 
 // =============================
-// 🔹 SYSTEM MODULE CONTRACT
+// 🔹 SYSTEM MODULE (DYNAMIC IMPORT)
 // =============================
 
-export type GlobalSystemModule = {
-  initGlobal: (client: Client, ctx: TraceContext) => Promise<void> | void;
-};
-
-export type GuildSystemModule = {
-  initGuild: (guild: Guild, ctx: TraceContext) => Promise<void> | void;
-};
-
-export type SystemModule = Partial<
-  GlobalSystemModule & GuildSystemModule
->;
+export interface SystemModule {
+  init?: (target: Client | Guild, ctx: any) => Promise<void> | void;
+}
 
 // =============================
 // 🔹 REGISTRY ENTRY
@@ -49,7 +41,13 @@ export type SystemModule = Partial<
 export interface SystemRegistryEntry {
   name: SystemName;
 
+  /**
+   * fully typed dynamic loader
+   */
   loader: () => Promise<SystemModule>;
 
+  /**
+   * execution type
+   */
   type: "global" | "guild";
 }
