@@ -3,35 +3,12 @@
 // =====================================
 
 import { Interaction } from "discord.js";
-import {
-  createTraceId,
-  createCorrelationId,
-  createFlowId,
-  createInteractionId,
-} from "../ids/IdGenerator";
+import { createRootContext, createChildContext } from "../trace/TraceContext";
 import { log } from "../logger/log";
-import { TraceContext, createChildContext } from "../trace/TraceContext";
-
-// =============================
-// 🧩 SYSTEM IMPORTS
-// =============================
 
 import { handleEventInteraction } from "../../system/events";
 import { handleAbsenceInteraction } from "../../system/absence";
 import { handlePointsInteraction } from "../../system/points";
-
-// =============================
-// 🧠 TYPES
-// =============================
-
-type SystemHandler = (
-  interaction: Interaction,
-  ctx: TraceContext
-) => Promise<boolean>;
-
-// =============================
-// 🧩 REGISTRY
-// =============================
 
 const SYSTEM_HANDLERS = [
   { name: "events", handler: handleEventInteraction },
@@ -39,23 +16,15 @@ const SYSTEM_HANDLERS = [
   { name: "points", handler: handlePointsInteraction },
 ] as const;
 
-// =============================
-// 🚀 ROUTER
-// =============================
-
 export async function handleSystemInteraction(
   interaction: Interaction
 ) {
-  const baseCtx: TraceContext = {
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
-    interactionId: createInteractionId(),
+  const baseCtx = createRootContext({
     source: "discord",
     userId: interaction.isRepliable() ? interaction.user.id : undefined,
     guildId: interaction.guildId ?? undefined,
     channelId: interaction.channelId ?? undefined,
-  };
+  });
 
   const l = log.ctx(baseCtx);
 
@@ -109,9 +78,7 @@ export async function handleSystemInteraction(
     }
   }
 
-  const lFinal = log.ctx(baseCtx);
-
-  lFinal.warn("interaction.unhandled", {
+  log.ctx(baseCtx).warn("interaction.unhandled", {
     eventType: "interaction",
   });
 }
