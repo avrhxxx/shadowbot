@@ -13,6 +13,9 @@ import {
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
 
+// 🔥 NEW
+import { handleUIInteraction } from "@/core/ui/uiDiscordAdapter";
+
 // =====================================
 // 🔐 ENV
 // =====================================
@@ -62,6 +65,25 @@ process.on("uncaughtException", (err) => {
 });
 
 // =====================================
+// 🖱️ INTERACTIONS (🔥 UI ENGINE)
+// =====================================
+
+client.on("interactionCreate", async (interaction) => {
+  const uiCtx = createRootContext({
+    source: "interaction",
+    system: "ui",
+  });
+
+  const handled = await handleUIInteraction(interaction, uiCtx);
+
+  if (handled) return;
+
+  // 👉 tutaj w przyszłości:
+  // - slash commands
+  // - inne systemy
+});
+
+// =====================================
 // 🚀 READY
 // =====================================
 
@@ -73,7 +95,7 @@ client.once("ready", async () => {
   });
 
   // =============================
-  // 🧠 GOOGLE INIT (oddzielny system!)
+  // 🧠 GOOGLE INIT
   // =============================
 
   const googleCtx = createRootContext({
@@ -95,7 +117,7 @@ client.once("ready", async () => {
   }
 
   // =============================
-  // 🧠 RUNTIME (oddzielny system!)
+  // 🧠 RUNTIME
   // =============================
 
   const runtimeCtx = createRootContext({
