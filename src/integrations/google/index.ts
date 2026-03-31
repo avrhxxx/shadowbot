@@ -13,7 +13,7 @@
 // =====================================
 // 🔹 AUTH / CLIENT
 // =====================================
-export * from "./googleSheetsClient.js";
+export * from "./googleClient.js"; // ✅ FIX
 
 // =====================================
 // 🔹 CORE API (LOW LEVEL)
