@@ -2,12 +2,12 @@
 // 📁 src/integrations/google/googleSheetsSetup.ts
 // =====================================
 
-import { sheetsClient } from "@/integrations/google/googleSheetsClient";
-import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
+import { sheetsClient } from "@/integrations/google/googleSheetsClient.js";
+import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage.js";
 import {
   ALL_SHEETS,
   SheetDefinition,
-} from "@/integrations/google/googleSheetsSchema";
+} from "@/integrations/google/googleSheetsSchema.js";
 
 import pRetry, { AbortError } from "p-retry";
 
