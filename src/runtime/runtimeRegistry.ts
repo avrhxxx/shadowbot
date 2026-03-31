@@ -2,26 +2,6 @@
 // 📁 src/runtime/runtimeRegistry.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Auto-build system registry from simple list
- *
- * 📥 INPUT:
- * - list of system names
- *
- * 📤 OUTPUT:
- * - full SYSTEM_REGISTRY with loaders
- *
- * ❗ GOAL:
- * - ZERO duplication
- * - ONE place to register systems
- * - NO manual loaders
- */
-
-// =====================================
-// 🔹 TYPES
-// =====================================
-
 import type { SystemRegistryEntry } from "./runtimeTypes";
 
 // =====================================
@@ -29,13 +9,16 @@ import type { SystemRegistryEntry } from "./runtimeTypes";
 // =====================================
 
 export const SYSTEM_NAMES = [
-  // 👇 dodajesz tylko tutaj
   // "moderator",
   // "events",
   // "absence",
-] as const; // ✅ FIX
+] as const;
 
-export type SystemName = (typeof SYSTEM_NAMES)[number];
+// 🔥 FIX: fallback do string
+export type SystemName =
+  (typeof SYSTEM_NAMES)[number] extends never
+    ? string
+    : (typeof SYSTEM_NAMES)[number];
 
 // =====================================
 // 🔹 HELPERS
