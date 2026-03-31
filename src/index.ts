@@ -2,34 +2,12 @@
 // 📁 src/index.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Application entrypoint (minimal bootstrap)
- */
-
-// =====================================
-// 🔹 LIBS
-// =====================================
-
 import { Client, GatewayIntentBits, Partials } from "discord.js";
-
-// =====================================
-// 🔹 FOUNDATION
-// =====================================
 
 import { createLogger } from "@/foundation/logger";
 import { createAppContext } from "@/trace";
 
-// =====================================
-// 🔹 RUNTIME
-// =====================================
-
 import { loadAllSystems } from "@/runtime/runtimeLoader";
-
-// =====================================
-// 🔹 INTEGRATIONS
-// =====================================
-
 import { ensureAllSheets } from "@/integrations/google";
 
 // =====================================
@@ -59,6 +37,13 @@ const ctx = createAppContext();
 const log = createLogger(ctx);
 
 // =====================================
+// 🔥 BOOTSTRAP LOGS (KLUCZOWE)
+// =====================================
+
+console.log("🔥 APP START");
+log.info("app.init");
+
+// =====================================
 // 🔹 GLOBAL ERRORS
 // =====================================
 
@@ -80,10 +65,6 @@ client.once("clientReady", async () => {
     meta: { user: client.user?.tag },
   });
 
-  // =============================
-  // 🧠 INIT GOOGLE (SELF-HEALING)
-  // =============================
-
   try {
     await ensureAllSheets();
     log.info("app.google.ready");
@@ -91,10 +72,6 @@ client.once("clientReady", async () => {
     log.error("app.google.failed", err);
     return;
   }
-
-  // =============================
-  // 🧠 RUNTIME START
-  // =============================
 
   try {
     log.info("runtime.start");
@@ -108,7 +85,15 @@ client.once("clientReady", async () => {
 });
 
 // =====================================
-// 🔐 LOGIN
+// 🔐 LOGIN (DEBUG)
 // =====================================
 
-client.login(BOT_TOKEN);
+log.info("app.login.start");
+
+client.login(BOT_TOKEN)
+  .then(() => {
+    log.info("app.login.success");
+  })
+  .catch((err) => {
+    log.error("app.login.failed", err);
+  });
