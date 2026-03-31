@@ -7,23 +7,42 @@ import type { LogPayload } from "./loggerTypes.js";
 import { loggerEmit } from "./loggerEmit.js";
 
 // =====================================
+// 🔧 HELPERS
+// =====================================
+
+function safePayload(
+  payload?: Omit<LogPayload, "event" | "traceId">
+): Omit<LogPayload, "event" | "traceId"> {
+  return payload ?? {};
+}
+
+// =====================================
 // 🔹 BASE LOG FUNCTION
 // =====================================
 
 function baseLog(
   ctx: TraceContext,
   event: string,
-  payload: Omit<LogPayload, "event" | "traceId"> = {}
+  payload?: Omit<LogPayload, "event" | "traceId">
 ) {
+  const p = safePayload(payload);
+
   loggerEmit({
-    ...payload,
+    ...p,
+
+    // 🔹 identity
     event,
     traceId: ctx.traceId,
-    scope: payload.scope ?? ctx.system ?? "unknown",
-    schemaVersion: payload.schemaVersion ?? 1,
+    scope: p.scope ?? ctx.system ?? "unknown",
+
+    // 🔹 meta
+    schemaVersion: p.schemaVersion ?? 1,
+
+    // 🔹 structured
+    trace: ctx,
+
     context: {
-      ...(payload.context || {}),
-      trace: ctx,
+      ...(p.context || {}),
     },
   });
 }
@@ -40,13 +59,22 @@ export function createLoggerCtx(ctx: TraceContext) {
 
     // 🔹 levels
     debug: (event: string, payload?: Omit<LogPayload, "event">) =>
-      baseLog(ctx, event, { ...payload, level: "debug" }),
+      baseLog(ctx, event, {
+        ...safePayload(payload),
+        level: "debug",
+      }),
 
     info: (event: string, payload?: Omit<LogPayload, "event">) =>
-      baseLog(ctx, event, { ...payload, level: "info" }),
+      baseLog(ctx, event, {
+        ...safePayload(payload),
+        level: "info",
+      }),
 
     warn: (event: string, payload?: Omit<LogPayload, "event">) =>
-      baseLog(ctx, event, { ...payload, level: "warn" }),
+      baseLog(ctx, event, {
+        ...safePayload(payload),
+        level: "warn",
+      }),
 
     error: (
       event: string,
@@ -54,7 +82,7 @@ export function createLoggerCtx(ctx: TraceContext) {
       payload?: Omit<LogPayload, "event" | "error">
     ) =>
       baseLog(ctx, event, {
-        ...payload,
+        ...safePayload(payload),
         level: "error",
         error,
       }),
@@ -65,7 +93,7 @@ export function createLoggerCtx(ctx: TraceContext) {
       payload?: Omit<LogPayload, "event" | "error">
     ) =>
       baseLog(ctx, event, {
-        ...payload,
+        ...safePayload(payload),
         level: "fatal",
         error,
       }),
