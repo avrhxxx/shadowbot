@@ -1,8 +1,14 @@
-import { baseLogger } from "./loggerCore";
-import { createFlowLogger } from "./helpers/flowLogger";
+// =====================================
+// 📁 src/foundation/logger/loggerFactory.ts
+// =====================================
 
+import { baseLogger } from "./loggerCore";
 import type { LogPayload, LogLevel } from "./loggerTypes";
 import type { TraceContext } from "@/trace";
+
+// =====================================
+// 🔧 HELPERS
+// =====================================
 
 function normalizeError(err: unknown) {
   if (!err) return undefined;
@@ -17,6 +23,10 @@ function normalizeError(err: unknown) {
   return { message: String(err) };
 }
 
+// =====================================
+// 🏭 FACTORY
+// =====================================
+
 type LogInput = Partial<LogPayload>;
 
 export function createLogger(ctx?: TraceContext) {
@@ -28,12 +38,15 @@ export function createLogger(ctx?: TraceContext) {
     baseLogger[level]({
       event,
 
+      // 🔥 CONTEXT
       traceId: ctx?.traceId,
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
-      system: ctx?.system,
 
+      // 🔥 PAYLOAD
       ...(payload ?? {}),
+
+      // 🔥 ERROR
       error: normalizeError(payload?.error),
     });
   }
@@ -55,15 +68,5 @@ export function createLogger(ctx?: TraceContext) {
       baseLog("fatal", event, { ...(payload ?? {}), error }),
   };
 
-  return {
-    ...raw,
-
-    system(systemName: string) {
-      return {
-        flow(flowName: string) {
-          return createFlowLogger(raw, systemName, flowName);
-        },
-      };
-    },
-  };
+  return raw;
 }
