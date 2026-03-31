@@ -15,36 +15,33 @@ type FlowStepPayload = Partial<LogPayload>;
 // =====================================
 
 export function createFlowLogger(
-  baseLog: any,
-  system: string,
-  flowName: string
+  log: any,
+  baseEvent: string
 ) {
-  const baseEvent = `${system}.${flowName}`;
-
-  function withSystem(payload?: FlowStepPayload) {
-    return {
-      ...(payload ?? {}),
-      meta: {
-        ...(payload?.meta ?? {}),
-        system,
-      },
-    };
-  }
-
   return {
     // =====================================
     // ▶ START
     // =====================================
     start(payload?: FlowStepPayload) {
-      baseLog.info(`${baseEvent}.start`, withSystem(payload));
+      log.info(`${baseEvent}.start`, payload);
     },
 
     // =====================================
-    // 🔹 GENERIC STEP
+    // 🔹 STEP (DEBUG default)
     // =====================================
     step(step: string, payload?: FlowStepPayload) {
-      baseLog.debug(`${baseEvent}.${step}`, {
-        ...withSystem(payload),
+      log.debug(`${baseEvent}.${step}`, {
+        ...payload,
+        flow: { step },
+      });
+    },
+
+    // =====================================
+    // 🔹 STEP DEBUG
+    // =====================================
+    stepDebug(step: string, payload?: FlowStepPayload) {
+      log.debug(`${baseEvent}.${step}`, {
+        ...payload,
         flow: { step },
       });
     },
@@ -53,8 +50,8 @@ export function createFlowLogger(
     // ℹ STEP INFO
     // =====================================
     stepInfo(step: string, payload?: FlowStepPayload) {
-      baseLog.info(`${baseEvent}.${step}`, {
-        ...withSystem(payload),
+      log.info(`${baseEvent}.${step}`, {
+        ...payload,
         flow: { step },
       });
     },
@@ -63,8 +60,8 @@ export function createFlowLogger(
     // ⚠ STEP WARN
     // =====================================
     stepWarn(step: string, payload?: FlowStepPayload) {
-      baseLog.warn(`${baseEvent}.${step}`, {
-        ...withSystem(payload),
+      log.warn(`${baseEvent}.${step}`, {
+        ...payload,
         flow: { step },
       });
     },
@@ -77,43 +74,24 @@ export function createFlowLogger(
       error?: unknown,
       payload?: FlowStepPayload
     ) {
-      baseLog.error(`${baseEvent}.${step}`, error, {
-        ...withSystem(payload),
+      log.error(`${baseEvent}.${step}`, error, {
+        ...payload,
         flow: { step },
       });
-    },
-
-    // =====================================
-    // 📌 CUSTOM EVENT
-    // =====================================
-    event(event: string) {
-      return {
-        info: (payload?: FlowStepPayload) =>
-          baseLog.info(`${baseEvent}.${event}`, withSystem(payload)),
-
-        debug: (payload?: FlowStepPayload) =>
-          baseLog.debug(`${baseEvent}.${event}`, withSystem(payload)),
-
-        warn: (payload?: FlowStepPayload) =>
-          baseLog.warn(`${baseEvent}.${event}`, withSystem(payload)),
-
-        error: (error?: unknown, payload?: FlowStepPayload) =>
-          baseLog.error(`${baseEvent}.${event}`, error, withSystem(payload)),
-      };
     },
 
     // =====================================
     // ✅ SUCCESS
     // =====================================
     success(payload?: FlowStepPayload) {
-      baseLog.info(`${baseEvent}.success`, withSystem(payload));
+      log.info(`${baseEvent}.success`, payload);
     },
 
     // =====================================
     // 💥 FAIL
     // =====================================
     fail(error?: unknown, payload?: FlowStepPayload) {
-      baseLog.error(`${baseEvent}.fail`, error, withSystem(payload));
+      log.error(`${baseEvent}.fail`, error, payload);
     },
   };
 }
