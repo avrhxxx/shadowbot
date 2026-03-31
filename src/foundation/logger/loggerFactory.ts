@@ -42,11 +42,13 @@ function normalizeError(err: unknown) {
 // 🏭 FACTORY
 // =====================================
 
+type LogInput = Omit<LogPayload, "event" | "level">;
+
 export function createLogger(ctx?: TraceContext) {
   function log(
     level: LogLevel,
     event: string,
-    payload?: LogPayload
+    payload?: LogInput
   ) {
     baseLogger[level]({
       event,
@@ -61,19 +63,19 @@ export function createLogger(ctx?: TraceContext) {
   }
 
   return {
-    debug: (event: string, payload?: LogPayload) =>
+    debug: (event: string, payload?: LogInput) =>
       log("debug", event, payload),
 
-    info: (event: string, payload?: LogPayload) =>
+    info: (event: string, payload?: LogInput) =>
       log("info", event, payload),
 
-    warn: (event: string, payload?: LogPayload) =>
+    warn: (event: string, payload?: LogInput) =>
       log("warn", event, payload),
 
-    error: (event: string, error?: unknown, payload?: LogPayload) =>
+    error: (event: string, error?: unknown, payload?: LogInput) =>
       log("error", event, { ...(payload ?? {}), error }),
 
-    fatal: (event: string, error?: unknown, payload?: LogPayload) =>
+    fatal: (event: string, error?: unknown, payload?: LogInput) =>
       log("fatal", event, { ...(payload ?? {}), error }),
   };
 }
