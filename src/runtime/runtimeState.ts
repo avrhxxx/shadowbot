@@ -8,6 +8,8 @@ import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
 
+import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
+
 import type { SystemName } from "./runtimeTypes";
 
 // =====================================
@@ -15,7 +17,6 @@ import type { SystemName } from "./runtimeTypes";
 // =====================================
 
 type SystemFlag = {
-  id: string;
   system: string;
   enabled: string;
   reason?: string;
@@ -33,7 +34,7 @@ const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 
 const ctx = createRootContext({
   source: "system",
-  system: "runtime", // 🔥 było runtime_flags → upraszczamy
+  system: "runtime",
 });
 
 const log = createLogger(ctx);
@@ -59,24 +60,41 @@ async function refresh() {
   try {
     const data = await repo.findAll();
 
-    if (data.length === 0) {
-      flow.stepWarn("empty");
+    const requiredSystems = [
+      "global",
+      ...SYSTEM_REGISTRY.map((s) => s.name),
+    ];
 
-      await repo.createMany([
-        { id: "global", system: "global", enabled: "true" },
-      ]);
+    const existing = new Set(data.map((d) => d.system));
 
-      return refresh();
+    const missing = requiredSystems.filter(
+      (s) => !existing.has(s)
+    );
+
+    if (missing.length > 0) {
+      flow.stepWarn("missing.systems", {
+        meta: { missing },
+      });
+
+      await repo.createMany(
+        missing.map((system) => ({
+          system,
+          enabled: "true",
+        }))
+      );
     }
 
+    const finalData =
+      missing.length > 0 ? await repo.findAll() : data;
+
     cache = new Map(
-      data.map((d) => [d.system, d.enabled === "true"])
+      finalData.map((d) => [d.system, d.enabled === "true"])
     );
 
     lastFetch = Date.now();
 
     flow.success({
-      stats: { count: data.length },
+      stats: { count: finalData.length },
     });
   } catch (err) {
     flow.fail(err);
