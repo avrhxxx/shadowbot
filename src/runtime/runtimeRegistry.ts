@@ -28,25 +28,25 @@ import type { SystemRegistryEntry } from "./runtimeTypes";
 // 🔹 SOURCE OF TRUTH (ONLY EDIT THIS)
 // =====================================
 
-const SYSTEM_NAMES = [
+export const SYSTEM_NAMES = [
   // 👇 dodajesz tylko tutaj
   // "moderator",
   // "events",
   // "absence",
-];
+] as const; // ✅ FIX
+
+export type SystemName = (typeof SYSTEM_NAMES)[number];
 
 // =====================================
 // 🔹 HELPERS
 // =====================================
 
-function resolveSystemType(name: string): "global" | "guild" {
-  // 🔥 możesz to później rozbudować
+function resolveSystemType(name: SystemName): "global" | "guild" {
   if (name.includes("worker")) return "global";
-
   return "guild";
 }
 
-function buildPath(name: string): string {
+function buildPath(name: SystemName): string {
   return `../systems/${name}/index.js`;
 }
 
