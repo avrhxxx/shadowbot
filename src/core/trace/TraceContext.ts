@@ -10,13 +10,13 @@ import type {
   InteractionId,
   JobId,
   ExternalId,
-} from "@/core/ids/IdGenerator";
+} from "../ids/IdGenerator.js";
 
 import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-} from "@/core/ids/IdGenerator";
+} from "../ids/IdGenerator.js";
 
 // =====================================
 // 🔹 SYSTEM DOMAIN
