@@ -14,11 +14,6 @@ function resolveScope(obj: any): string {
   return "APP";
 }
 
-function formatTime(ts?: number) {
-  const date = ts ? new Date(ts) : new Date();
-  return date.toISOString().split("T")[1].split(".")[0]; // HH:MM:SS
-}
-
 function simplifyEvent(event?: string): string {
   if (!event) return "log";
   const parts = event.split(".");
@@ -31,12 +26,19 @@ function stripIdPrefix(id?: string) {
   return parts.length > 1 ? parts[1] : id;
 }
 
+function formatObject(obj?: Record<string, any>) {
+  if (!obj) return null;
+
+  return Object.entries(obj)
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(" ");
+}
+
 // =====================================
 // 🔹 CUSTOM FORMATTER (STACKED CARD)
 // =====================================
 
 function formatLog(log: any) {
-  const time = formatTime(log.time);
   const scope = resolveScope(log);
   const event = simplifyEvent(log.event);
 
@@ -44,15 +46,27 @@ function formatLog(log: any) {
   const flow = stripIdPrefix(log.flowId);
   const corr = stripIdPrefix(log.correlationId);
 
+  const step = log.flow?.step;
+  const meta = log.meta;
+  const stats = log.stats;
+  const error = log.error;
+  const decision = log.decision;
+  const interaction = log.interaction;
+
   return `
 ═══════════════════════════════
 ${scope}
-EVENT : ${event}
-TIME  : ${time}
-──────────────
+EVENT : ${event}${step ? ` → ${step}` : ""}
+
 TRACE : ${trace}
 FLOW  : ${flow}
 CORR  : ${corr}
+
+${meta ? `META  : ${formatObject(meta)}` : ""}
+${stats ? `STATS : ${formatObject(stats)}` : ""}
+${decision ? `DECISION : ${decision.condition} => ${decision.result}` : ""}
+${interaction ? `INTERACTION : ${formatObject(interaction)}` : ""}
+${error ? `ERROR : ${error.message ?? error}` : ""}
 ═══════════════════════════════
 `.trim();
 }
