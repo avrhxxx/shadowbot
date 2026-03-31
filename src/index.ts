@@ -21,7 +21,7 @@
 // 🔹 BOOTSTRAP (SIDE EFFECTS)
 // =====================================
 
-import "@/integrations/google/googleSheetsClient";
+import "./integrations/google/googleSheetsClient.js";
 
 // =====================================
 // 🔹 LIBS
@@ -38,12 +38,12 @@ import {
 // 🔹 CORE
 // =====================================
 
-import { handleSystemInteraction } from "@/core/router/systemRouter";
-import { log } from "@/core/logger/log";
+import { handleSystemInteraction } from "./core/router/systemRouter.js";
+import { log } from "./core/logger/log.js";
 import {
   createAppContext,
   createChildContext,
-} from "@/core/trace/TraceContext";
+} from "./core/trace/TraceContext.js";
 
 // =====================================
 // 🔹 RUNTIME
@@ -52,13 +52,13 @@ import {
 import {
   loadGlobalSystems,
   loadGuildSystems,
-} from "@/runtime/runtimeLoader";
+} from "./runtime/runtimeLoader.js";
 
 // =====================================
 // 🔹 INTEGRATIONS
 // =====================================
 
-import { ensureAllSheets } from "@/integrations/google";
+import { ensureAllSheets } from "./integrations/google/index.js";
 
 // =====================================
 // 🔹 CLIENT SETUP
@@ -148,7 +148,6 @@ client.once("clientReady", async () => {
     appLog.error("app.sheets.failed", normalizeError(err));
   }
 
-  // ❌ HARD GUARD — runtime depends on sheets
   if (!sheetsReady) {
     appLog.error("app.bootstrap.aborted", {
       reason: "sheets_not_ready",
