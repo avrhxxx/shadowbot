@@ -2,11 +2,12 @@
 // 📁 src/runtime/runtimeState.ts
 // =====================================
 
-import { SheetRepository } from "@/integrations/google";
-import { log } from "@/core/logger/log";
-import { createChildContext, TraceContext } from "@/core/trace/TraceContext";
+import { SheetRepository } from "../integrations/google/index.js";
+import { log } from "../core/logger/log.js";
+import { createChildContext } from "../core/trace/TraceContext.js";
 
-import type { SystemName, RuntimeKey } from "./runtimeTypes";
+import type { TraceContext } from "../core/trace/TraceContext.js";
+import type { SystemName, RuntimeKey } from "./runtimeTypes.js";
 
 // =====================================
 // 🔹 TYPES
@@ -61,7 +62,6 @@ function parseBoolean(value: string): boolean {
 function mapSystemKey(system: string): RuntimeKey | null {
   if (system === "global") return "__global__";
 
-  // 🔒 whitelist runtime systems only
   const allowed: SystemName[] = [
     "moderator",
     "events",
