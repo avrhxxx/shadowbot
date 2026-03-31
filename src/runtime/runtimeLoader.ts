@@ -17,38 +17,46 @@
 import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
 import { isSystemEnabled } from "./runtimeState.js";
 
-import { createRootContext, createChildContext } from "@/core/trace/TraceContext.js";
-import { log } from "@/core/logger/log.js";
+import { createRootContext } from "@/trace";
+import { createLogger } from "@/foundation/logger";
 
 // =====================================
 // 🚀 EXECUTE ONE SYSTEM
 // =====================================
 
 async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
-  const baseCtx = createRootContext({
+  const ctx = createRootContext({
     source: "system",
     system: entry.name,
   });
 
-  const l = log.ctx(baseCtx);
+  const log = createLogger(ctx);
+
+  // =============================
+  // 🔒 ENABLE CHECK
+  // =============================
 
   if (!(await isSystemEnabled(entry.name))) {
-    l.warn("system.disabled", {
+    log.warn("system.disabled", {
       meta: { system: entry.name },
     });
     return;
   }
 
+  // =============================
+  // 🚀 LOAD + INIT
+  // =============================
+
   try {
     const module = await entry.loader();
 
-    await module.init(baseCtx);
+    await module.init(ctx);
 
-    l.event("system.started", {
+    log.info("system.started", {
       meta: { system: entry.name },
     });
   } catch (err) {
-    l.error("system.error", err, {
+    log.error("system.error", err, {
       meta: { system: entry.name },
     });
   }
