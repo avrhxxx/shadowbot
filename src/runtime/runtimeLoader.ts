@@ -39,9 +39,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const enabled = await isSystemEnabled(entry.name);
 
   if (!enabled) {
-    flow.stepInfo("check.disabled", {
-      meta: { system: entry.name },
-    });
+    flow.stepInfo("disabled");
     return;
   }
 
@@ -72,14 +70,8 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
       ? (mod as RuntimeModule)
       : (mod as { default?: RuntimeModule })?.default;
 
-  // =============================
-  // 🛑 VALIDATION
-  // =============================
-
   if (!module?.init) {
-    flow.fail(new Error("invalid_module"), {
-      meta: { system: entry.name },
-    });
+    flow.fail(new Error("invalid_module"));
     return;
   }
 
@@ -107,12 +99,12 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
 export async function loadAllSystems() {
   const ctx = createRootContext({
     source: "system",
-    system: "app",
+    system: "runtime",
   });
 
   const log = createLogger(ctx);
 
-  const flow = log.system("app").flow("runtime");
+  const flow = log.system("runtime").flow("load");
 
   flow.start();
 
