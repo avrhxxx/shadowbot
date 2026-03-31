@@ -5,22 +5,7 @@
 /**
  * 🧠 ROLE:
  * Application entrypoint (minimal bootstrap)
- *
- * Responsibilities:
- * - initialize integrations
- * - start runtime systems
- * - setup Discord client
- *
- * ❗ RULES:
- * - NO business logic
- * - NO system logic
  */
-
-// =====================================
-// 🔹 BOOTSTRAP (SIDE EFFECTS)
-// =====================================
-
-import "./integrations/google/googleSheetsClient.js";
 
 // =====================================
 // 🔹 LIBS
@@ -62,9 +47,7 @@ if (!BOT_TOKEN) {
 // =====================================
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-  ],
+  intents: [GatewayIntentBits.Guilds],
   partials: [Partials.Channel],
 });
 
@@ -98,14 +81,14 @@ client.once("clientReady", async () => {
   });
 
   // =============================
-  // 🧠 INIT SHEETS
+  // 🧠 INIT GOOGLE (SELF-HEALING)
   // =============================
 
   try {
     await ensureAllSheets();
-    log.info("app.sheets.ready");
+    log.info("app.google.ready");
   } catch (err) {
-    log.error("app.sheets.failed", err);
+    log.error("app.google.failed", err);
     return;
   }
 
