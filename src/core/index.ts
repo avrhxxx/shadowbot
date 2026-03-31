@@ -2,8 +2,8 @@
 // 📁 src/core/index.ts
 // =====================================
 
-export * from "./ids/IdGenerator";
-export * from "./trace/TraceContext";
-export * from "./logger/log";
-export * from "./logger/formatter";
-export * from "./router/systemRouter";
+export * from "./ids/IdGenerator.js";
+export * from "./trace/TraceContext.js";
+export * from "./logger/log.js";
+export * from "./logger/formatter.js";
+export * from "./router/systemRouter.js";
