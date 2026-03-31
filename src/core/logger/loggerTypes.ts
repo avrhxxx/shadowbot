@@ -1,6 +1,4 @@
-// =====================================
-// 📁 src/core/logger/loggerTypes.ts
-// =====================================
+import type { TraceId } from "../ids/idTypes.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -20,7 +18,9 @@ export type LogTiming = {
 };
 
 export type LogFlow = {
+  name?: string;
   step?: string;
+  parentStep?: string;
 };
 
 export type LogDecision = {
@@ -34,14 +34,19 @@ export type LogInteraction = {
   customId?: string;
 };
 
+export type NormalizedError = {
+  message: string;
+  stack?: string;
+};
+
 // =====================================
-// 🔥 MAIN PAYLOAD (FUTURE-PROOF)
+// 🔥 MAIN PAYLOAD (B3 READY)
 // =====================================
 
-export type LogPayload = {
+export type LogPayload = Readonly<{
   // 🔹 identity
   event: string;
-  traceId?: string;
+  traceId?: TraceId;
   scope?: string;
 
   // 🔹 meta
@@ -55,9 +60,11 @@ export type LogPayload = {
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
   error?: unknown;
+  trace?: unknown;
 
   // 🔹 observability
   timing?: LogTiming;
+  durationMs?: number;
   stats?: Record<string, number>;
   metrics?: Record<string, unknown>;
 
@@ -71,4 +78,4 @@ export type LogPayload = {
 
   // 🔹 interaction layer
   interaction?: LogInteraction;
-};
+}>;
