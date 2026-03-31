@@ -28,7 +28,6 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
 
   const log = createLogger(ctx);
 
-  // ✅ NOWY FLOW API
   const flow = log.system(entry.name).flow("lifecycle");
 
   flow.start();
@@ -40,7 +39,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const enabled = await isSystemEnabled(entry.name);
 
   if (!enabled) {
-    flow.stepInfo("disabled", {
+    flow.stepInfo("check.disabled", {
       meta: { system: entry.name },
     });
     return;
@@ -53,13 +52,13 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   let mod: unknown;
 
   try {
-    flow.stepDebug("load.start");
+    flow.stepDebug("module.load");
 
     mod = await entry.loader();
 
-    flow.stepInfo("load.success");
+    flow.stepInfo("module.loaded");
   } catch (err) {
-    flow.stepError("load.failed", err);
+    flow.stepError("module.load_failed", err);
     flow.fail(err);
     return;
   }
@@ -78,10 +77,9 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   // =============================
 
   if (!module?.init) {
-    flow.stepError("invalid_module", undefined, {
+    flow.fail(new Error("invalid_module"), {
       meta: { system: entry.name },
     });
-    flow.fail();
     return;
   }
 
@@ -114,8 +112,7 @@ export async function loadAllSystems() {
 
   const log = createLogger(ctx);
 
-  // ✅ NOWY FLOW API
-  const flow = log.system("app").flow("runtime.load_all");
+  const flow = log.system("app").flow("runtime");
 
   flow.start();
 
