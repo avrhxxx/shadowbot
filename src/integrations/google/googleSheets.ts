@@ -2,23 +2,6 @@
 // 📁 src/integrations/google/googleSheets.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Minimal, powerful Google Sheets core API
- *
- * 📥 INPUT:
- * - ranges (A1 notation)
- * - values (mutable arrays)
- *
- * 📤 OUTPUT:
- * - direct interaction with Google Sheets
- *
- * ❗ RULES:
- * - NO business logic
- * - ALWAYS mutable arrays
- * - batch-first design
- */
-
 import { sheetsClient } from "./googleSheetsClient.js";
 import pRetry, { AbortError } from "p-retry";
 
@@ -45,6 +28,8 @@ function getStatus(err: unknown): number | undefined {
     const response = (err as any).response;
     return response?.status;
   }
+
+  return undefined; // ✅ FIX
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -58,6 +43,14 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       }
     },
   });
+}
+
+// =====================================
+// 🔧 INTERNAL
+// =====================================
+
+function toMutable(values: readonly unknown[][]): unknown[][] {
+  return values.map((r) => [...r]);
 }
 
 // =====================================
@@ -81,14 +74,16 @@ export async function read(range: string): Promise<unknown[][]> {
 
 export async function write(
   range: string,
-  values: unknown[][]
+  values: readonly unknown[][]
 ): Promise<void> {
   await withRetry(() =>
     sheetsClient.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range,
       valueInputOption: "RAW",
-      requestBody: { values },
+      requestBody: {
+        values: toMutable(values), // ✅ FIX
+      },
     })
   );
 }
@@ -99,7 +94,7 @@ export async function write(
 
 export async function append(
   range: string,
-  values: unknown[][]
+  values: readonly unknown[][]
 ): Promise<void> {
   if (!values.length) return;
 
@@ -108,7 +103,9 @@ export async function append(
       spreadsheetId: SHEET_ID,
       range,
       valueInputOption: "RAW",
-      requestBody: { values },
+      requestBody: {
+        values: toMutable(values), // ✅ FIX
+      },
     })
   );
 }
@@ -119,7 +116,7 @@ export async function append(
 
 export async function update(
   range: string,
-  values: unknown[][]
+  values: readonly unknown[][]
 ): Promise<void> {
   await write(range, values);
 }
@@ -142,8 +139,8 @@ export async function clear(range: string): Promise<void> {
 // =====================================
 
 export type BatchOperation =
-  | { type: "update"; range: string; values: unknown[][] }
-  | { type: "append"; range: string; values: unknown[][] }
+  | { type: "update"; range: string; values: readonly unknown[][] }
+  | { type: "append"; range: string; values: readonly unknown[][] }
   | { type: "clear"; range: string };
 
 export async function batch(
