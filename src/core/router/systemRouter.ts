@@ -3,12 +3,12 @@
 // =====================================
 
 import { Interaction } from "discord.js";
-import { createRootContext, createChildContext } from "../trace/TraceContext";
-import { log } from "../logger/log";
+import { createRootContext, createChildContext } from "../trace/TraceContext.js";
+import { log } from "../logger/log.js";
 
-import { handleEventInteraction } from "../../system/events";
-import { handleAbsenceInteraction } from "../../system/absence";
-import { handlePointsInteraction } from "../../system/points";
+import { handleEventInteraction } from "../../system/events.js";
+import { handleAbsenceInteraction } from "../../system/absence.js";
+import { handlePointsInteraction } from "../../system/points.js";
 
 const SYSTEM_HANDLERS = [
   { name: "events", handler: handleEventInteraction },
