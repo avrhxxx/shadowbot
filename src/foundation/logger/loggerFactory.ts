@@ -25,12 +25,46 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
-// 🏭 FACTORY
+// 🔹 TYPES (🔥 KLUCZOWE)
 // =====================================
 
 type LogInput = Partial<LogPayload>;
 
-export function createLogger(ctx?: TraceContext) {
+type FlowLogger = {
+  start(payload?: LogInput): void;
+  stepDebug(step: string, payload?: LogInput): void;
+  stepInfo(step: string, payload?: LogInput): void;
+  stepWarn(step: string, payload?: LogInput): void;
+  stepError(step: string, error?: unknown, payload?: LogInput): void;
+  success(payload?: LogInput): void;
+  fail(error?: unknown, payload?: LogInput): void;
+};
+
+type SystemLogger = {
+  debug(event: string, payload?: LogInput): void;
+  info(event: string, payload?: LogInput): void;
+  warn(event: string, payload?: LogInput): void;
+  error(event: string, error?: unknown, payload?: LogInput): void;
+  fatal(event: string, error?: unknown, payload?: LogInput): void;
+
+  flow(flowName: string): FlowLogger;
+};
+
+type Logger = {
+  debug(event: string, payload?: LogInput): void;
+  info(event: string, payload?: LogInput): void;
+  warn(event: string, payload?: LogInput): void;
+  error(event: string, error?: unknown, payload?: LogInput): void;
+  fatal(event: string, error?: unknown, payload?: LogInput): void;
+
+  system(systemName: string): SystemLogger;
+};
+
+// =====================================
+// 🏭 FACTORY
+// =====================================
+
+export function createLogger(ctx?: TraceContext): Logger {
   function baseLog(
     level: LogLevel,
     event: string,
@@ -45,7 +79,7 @@ export function createLogger(ctx?: TraceContext) {
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
 
-      // 🔥 SCOPE (KLUCZOWE)
+      // 🔥 SYSTEM (scope)
       system: overrideSystem ?? ctx?.system ?? "app",
 
       // 🔥 PAYLOAD
@@ -73,11 +107,7 @@ export function createLogger(ctx?: TraceContext) {
       baseLog("fatal", event, { ...(payload ?? {}), error }),
   };
 
-  // =====================================
-  // 🔥 SYSTEM SCOPING (WRACA)
-  // =====================================
-
-  function withSystem(systemName: string) {
+  function withSystem(systemName: string): SystemLogger {
     return {
       debug: (event: string, payload?: LogInput) =>
         baseLog("debug", event, payload, systemName),
@@ -94,30 +124,36 @@ export function createLogger(ctx?: TraceContext) {
       fatal: (event: string, error?: unknown, payload?: LogInput) =>
         baseLog("fatal", event, { ...(payload ?? {}), error }, systemName),
 
-      flow(flowName: string) {
-        const base = `${flowName}`;
+      flow(flowName: string): FlowLogger {
+        const base = flowName;
 
         return {
           start: (payload?: LogInput) =>
             baseLog("info", `${base}.start`, payload, systemName),
 
           stepDebug: (step: string, payload?: LogInput) =>
-            baseLog("debug", `${base}.${step}`, {
-              ...payload,
-              flow: { step },
-            }, systemName),
+            baseLog(
+              "debug",
+              `${base}.${step}`,
+              { ...payload, flow: { step } },
+              systemName
+            ),
 
           stepInfo: (step: string, payload?: LogInput) =>
-            baseLog("info", `${base}.${step}`, {
-              ...payload,
-              flow: { step },
-            }, systemName),
+            baseLog(
+              "info",
+              `${base}.${step}`,
+              { ...payload, flow: { step } },
+              systemName
+            ),
 
           stepWarn: (step: string, payload?: LogInput) =>
-            baseLog("warn", `${base}.${step}`, {
-              ...payload,
-              flow: { step },
-            }, systemName),
+            baseLog(
+              "warn",
+              `${base}.${step}`,
+              { ...payload, flow: { step } },
+              systemName
+            ),
 
           stepError: (step: string, error?: unknown, payload?: LogInput) =>
             baseLog(
@@ -131,7 +167,12 @@ export function createLogger(ctx?: TraceContext) {
             baseLog("info", `${base}.success`, payload, systemName),
 
           fail: (error?: unknown, payload?: LogInput) =>
-            baseLog("error", `${base}.fail`, { ...(payload ?? {}), error }, systemName),
+            baseLog(
+              "error",
+              `${base}.fail`,
+              { ...(payload ?? {}), error },
+              systemName
+            ),
         };
       },
     };
