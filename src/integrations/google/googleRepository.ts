@@ -2,25 +2,8 @@
 // 📁 src/integrations/google/googleRepository.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Generic repository for Google Sheets (typed layer)
- *
- * 📥 INPUT:
- * - SheetDefinition (schema)
- *
- * 📤 OUTPUT:
- * - typed CRUD operations
- *
- * ❗ GOALS:
- * - simple usage in services
- * - future-proof
- * - isolated mapping logic
- * - NO business logic
- */
-
-import { readSheet, writeSheet } from "./googleSheetsStorage.js";
-import type { SheetDefinition } from "./googleSheetsSchema.js";
+import { read, write } from "./googleSheets.js";
+import type { SheetDefinition } from "./googleSchema.js";
 
 // =====================================
 // 🔹 TYPES
@@ -43,15 +26,12 @@ export class GoogleRepository<T extends { id?: string }> {
     headers: readonly string[];
     dataRows: unknown[][];
   }> {
-    const rows = await readSheet(this.sheet.name);
+    const rows = await read(this.sheet.name);
 
     const headers = this.sheet.headers;
 
-    // 🔥 IMPORTANT: force mutable copy
     const dataRows: unknown[][] =
-      rows.length > 1
-        ? rows.slice(1).map((r) => [...r])
-        : [];
+      rows.length > 1 ? rows.slice(1).map((r) => [...r]) : [];
 
     return { headers, dataRows };
   }
@@ -69,7 +49,6 @@ export class GoogleRepository<T extends { id?: string }> {
     headers.forEach((h, i) => {
       let val = row[i];
 
-      // auto JSON parse
       if (
         typeof val === "string" &&
         val.length > 1 &&
@@ -77,9 +56,7 @@ export class GoogleRepository<T extends { id?: string }> {
       ) {
         try {
           val = JSON.parse(val);
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
 
       obj[h] = val ?? null;
@@ -118,10 +95,9 @@ export class GoogleRepository<T extends { id?: string }> {
   // =====================================
 
   private async save(rows: unknown[][]): Promise<void> {
-    // 🔥 FIX: remove readonly issue
     const data = [this.sheet.headers, ...rows].map((r) => [...r]);
 
-    await writeSheet(this.sheet.name, data);
+    await write(this.sheet.name, data);
   }
 
   // =====================================
@@ -172,7 +148,7 @@ export class GoogleRepository<T extends { id?: string }> {
   }
 
   // =====================================
-  // 🚀 CREATE MANY (BATCH BASE)
+  // 🚀 CREATE MANY
   // =====================================
 
   async createMany(dataArray: T[]): Promise<void> {
