@@ -40,18 +40,18 @@ const log = createLogger(ctx);
 // 🔹 BOOTSTRAP
 // =====================================
 
-log.info("app.init");
+log.system("app").flow("bootstrap").start();
 
 // =====================================
 // 🔹 GLOBAL ERRORS
 // =====================================
 
 process.on("unhandledRejection", (err) => {
-  log.error("app.unhandled_rejection", err);
+  log.system("app").flow("runtime").fail(err);
 });
 
 process.on("uncaughtException", (err) => {
-  log.fatal("app.uncaught_exception", err);
+  log.system("app").flow("runtime").fail(err);
   process.exit(1);
 });
 
@@ -60,19 +60,27 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  log.info("app.ready", {
-    meta: { user: client.user?.tag },
-  });
+  log.system("app")
+    .flow("discord")
+    .event("client.ready")
+    .info({
+      meta: { user: client.user?.tag },
+    });
 
   // =============================
   // 🧠 INIT GOOGLE
   // =============================
 
+  const googleFlow = log.system("app").flow("google.init");
+
+  googleFlow.start();
+
   try {
     await ensureAllSheets();
-    log.info("app.google.ready");
+
+    googleFlow.success();
   } catch (err) {
-    log.error("app.google.failed", err);
+    googleFlow.fail(err);
     return;
   }
 
@@ -80,14 +88,16 @@ client.once("ready", async () => {
   // 🧠 RUNTIME START
   // =============================
 
-  try {
-    log.info("runtime.start");
+  const runtimeFlow = log.system("app").flow("runtime");
 
+  runtimeFlow.start();
+
+  try {
     await loadAllSystems();
 
-    log.info("runtime.ready");
+    runtimeFlow.success();
   } catch (err) {
-    log.error("runtime.failed", err);
+    runtimeFlow.fail(err);
   }
 });
 
@@ -95,13 +105,15 @@ client.once("ready", async () => {
 // 🔐 LOGIN
 // =====================================
 
-log.info("app.login.start");
+const loginFlow = log.system("app").flow("discord.login");
+
+loginFlow.start();
 
 client
   .login(BOT_TOKEN)
   .then(() => {
-    log.info("app.login.success");
+    loginFlow.success();
   })
   .catch((err) => {
-    log.error("app.login.failed", err);
+    loginFlow.fail(err);
   });
