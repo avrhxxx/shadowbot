@@ -28,9 +28,11 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
 
   const log = createLogger(ctx);
 
-  const flow = log.system(entry.name).flow("system.lifecycle");
+  const flow = log.flow("lifecycle");
 
-  flow.start();
+  flow.start({
+    meta: { system: entry.name },
+  });
 
   // =============================
   // 🔒 ENABLE CHECK
@@ -39,13 +41,12 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const enabled = await isSystemEnabled(entry.name);
 
   if (!enabled) {
-    flow.stepInfo("check.disabled", {
-      meta: { system: entry.name },
-    });
+    flow.stepInfo("disabled");
+    flow.success(); // 🔥 zamykamy flow
     return;
   }
 
-  flow.stepDebug("check.enabled");
+  flow.stepDebug("enabled");
 
   // =============================
   // 📦 LOAD MODULE
@@ -60,7 +61,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
 
     flow.stepInfo("module.loaded");
   } catch (err) {
-    flow.stepError("module.load.fail", err);
+    flow.stepError("module.load_fail", err);
     flow.fail(err);
     return;
   }
@@ -75,9 +76,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
       : (mod as { default?: RuntimeModule })?.default;
 
   if (!module?.init) {
-    flow.fail(new Error("invalid_module"), {
-      meta: { system: entry.name },
-    });
+    flow.fail(new Error("invalid_module"));
     return;
   }
 
@@ -110,7 +109,7 @@ export async function loadAllSystems() {
 
   const log = createLogger(ctx);
 
-  const flow = log.system("runtime").flow("runtime.load");
+  const flow = log.flow("load");
 
   flow.start();
 
