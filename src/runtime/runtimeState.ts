@@ -2,19 +2,11 @@
 // 📁 src/runtime/runtimeState.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Zarządzanie stanem systemów (ON/OFF)
- *
- * INPUT:
- * - Google Sheets (system_flags)
- *
- * OUTPUT:
- * - czy system jest aktywny
- */
+import { GoogleRepository } from "@/integrations/google/googleRepository.js";
+import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
-import { GoogleRepository } from "@/integrations/google/googleRepository.js"; // ✅ FIX
-import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js"; // ✅ FIX
+import { createRootContext } from "@/trace";
+import { createLogger } from "@/foundation/logger";
 
 import type { SystemName } from "./runtimeTypes";
 
@@ -33,7 +25,18 @@ type SystemFlag = {
 // 🔹 REPO
 // =====================================
 
-const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET); // ✅ FIX
+const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
+
+// =====================================
+// 🔹 LOGGER (GLOBAL)
+// =====================================
+
+const ctx = createRootContext({
+  source: "system",
+  system: "app",
+});
+
+const log = createLogger(ctx);
 
 // =====================================
 // 🔹 CACHE
@@ -49,13 +52,30 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  const data = await repo.findAll();
+  const flow = log.system("app").flow("runtime.flags.refresh");
 
-  cache = new Map(
-    data.map((d: SystemFlag) => [d.system, d.enabled === "true"]) // ✅ FIX
-  );
+  flow.start();
 
-  lastFetch = Date.now();
+  try {
+    const data = await repo.findAll();
+
+    cache = new Map(
+      data.map((d: SystemFlag) => [
+        d.system,
+        d.enabled === "true",
+      ])
+    );
+
+    lastFetch = Date.now();
+
+    flow.stepInfo("flags.loaded", {
+      stats: { count: data.length },
+    });
+
+    flow.success();
+  } catch (err) {
+    flow.fail(err);
+  }
 }
 
 // =====================================
@@ -63,7 +83,18 @@ async function refresh() {
 // =====================================
 
 async function ensure() {
-  if (Date.now() - lastFetch > TTL) {
+  const flow = log.system("app").flow("runtime.flags.ensure");
+
+  const expired = Date.now() - lastFetch > TTL;
+
+  flow.stepDebug("cache.check", {
+    decision: {
+      condition: "ttl_expired",
+      result: expired,
+    },
+  });
+
+  if (expired) {
     await refresh();
   }
 }
@@ -75,13 +106,23 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
+  const flow = log.system("app").flow("runtime.flags.check");
+
   await ensure();
 
   const global = cache.get("global");
   const local = cache.get(system);
 
-  if (global === false) return false;
-  if (local === false) return false;
+  const result =
+    global === false || local === false ? false : true;
 
-  return true;
+  flow.stepInfo("decision", {
+    meta: { system },
+    decision: {
+      condition: "global/local flags",
+      result,
+    },
+  });
+
+  return result;
 }
