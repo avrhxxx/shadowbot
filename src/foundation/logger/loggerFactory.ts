@@ -23,37 +23,6 @@ function normalizeError(err: unknown) {
   return { message: String(err) };
 }
 
-function resolveScope(ctx?: TraceContext, payload?: any): string {
-  if (payload?.meta?.system) return `SYSTEM:${payload.meta.system}`;
-  if (ctx?.system) return `SYSTEM:${ctx.system}`;
-  return "APP";
-}
-
-function simplifyEvent(event: string): string {
-  const parts = event.split(".");
-  return parts[parts.length - 1];
-}
-
-function buildMessage(
-  ctx: TraceContext | undefined,
-  event: string,
-  payload?: any
-): string {
-  const scope = resolveScope(ctx, payload);
-
-  const base = `[${scope}] ${simplifyEvent(event)}`;
-
-  const ids = [
-    ctx?.traceId && `trace=${ctx.traceId}`,
-    ctx?.flowId && `flow=${ctx.flowId}`,
-    ctx?.correlationId && `corr=${ctx.correlationId}`,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return ids ? `${base} | ${ids}` : base;
-}
-
 // =====================================
 // 🏭 FACTORY
 // =====================================
@@ -66,18 +35,21 @@ export function createLogger(ctx?: TraceContext) {
     event: string,
     payload?: LogInput
   ) {
-    baseLogger[level](
-      {
-        event,
-        traceId: ctx?.traceId,
-        correlationId: ctx?.correlationId,
-        flowId: ctx?.flowId,
+    baseLogger[level]({
+      event,
 
-        ...(payload ?? {}),
-        error: normalizeError(payload?.error),
-      },
-      buildMessage(ctx, event, payload) // 🔥 KLUCZ
-    );
+      // 🔥 CONTEXT
+      traceId: ctx?.traceId,
+      correlationId: ctx?.correlationId,
+      flowId: ctx?.flowId,
+      system: ctx?.system,
+
+      // 🔥 PAYLOAD
+      ...(payload ?? {}),
+
+      // 🔥 ERROR NORMALIZATION
+      error: normalizeError(payload?.error),
+    });
   }
 
   return {
