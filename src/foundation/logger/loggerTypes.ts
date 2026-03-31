@@ -2,20 +2,6 @@
 // 📁 src/foundation/logger/loggerTypes.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Full structured log schema (future-proof)
- *
- * 📥 INPUT:
- * - used by loggerFactory
- *
- * 📤 OUTPUT:
- * - typing for structured logs
- *
- * ❗ NOTE:
- * - `event` is NOT part of payload (passed separately)
- */
-
 export type LogLevel =
   | "debug"
   | "info"
@@ -23,7 +9,17 @@ export type LogLevel =
   | "error"
   | "fatal";
 
+// 🔥 NOWE – ARCHITEKTURA SCOPE
+export type LogScope =
+  | "app"
+  | "runtime"
+  | "system"
+  | "integration";
+
 export type LogPayload = {
+  // 🔥 SCOPE (KLUCZOWE)
+  scope?: LogScope;
+
   // classification
   level?: LogLevel;
 
