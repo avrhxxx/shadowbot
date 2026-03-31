@@ -2,16 +2,6 @@
 // 📁 src/systems/test/index.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Minimal test system (runtime validation)
- *
- * ❗ GOALS:
- * - prove runtime works
- * - verify loader + init flow
- * - test logger + trace
- */
-
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
@@ -22,10 +12,39 @@ import type { TraceContext } from "@/trace";
 export async function init(ctx: TraceContext): Promise<void> {
   const log = createLogger(ctx);
 
-  log.info("test.system.init");
+  const flow = log.system("test").flow("test.lifecycle");
 
-  // 🔥 możesz dorzucić coś widocznego
-  await new Promise((res) => setTimeout(res, 100));
+  flow.start();
 
-  log.info("test.system.ready");
+  try {
+    // =====================================
+    // 🔹 STEP 1
+    // =====================================
+
+    flow.stepInfo("init.start");
+
+    await new Promise((res) => setTimeout(res, 100));
+
+    // =====================================
+    // 🔹 STEP 2 (FAKE LOGIC)
+    // =====================================
+
+    flow.stepDebug("processing", {
+      input: { example: "hello" },
+    });
+
+    await new Promise((res) => setTimeout(res, 150));
+
+    // =====================================
+    // 🔹 STEP 3 (RESULT)
+    // =====================================
+
+    flow.stepInfo("done", {
+      result: { status: "ok" },
+    });
+
+    flow.success();
+  } catch (err) {
+    flow.fail(err);
+  }
 }
