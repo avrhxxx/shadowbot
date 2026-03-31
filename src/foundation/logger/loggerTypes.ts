@@ -12,10 +12,6 @@ export type LogLevel =
 export type LogPayload = {
   level?: LogLevel;
 
-  // 🔥 CORE
-  scope?: string;
-  event?: string;
-
   // 🔹 DATA
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
