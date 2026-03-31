@@ -19,7 +19,8 @@ export function createFlowLogger(
   systemName: string,
   flowName: string
 ) {
-  const base = `system.${systemName}.${flowName}`;
+  // ❗ BEZ "system." — czysty namespace
+  const base = `${systemName}.${flowName}`;
 
   return {
     // =====================================
