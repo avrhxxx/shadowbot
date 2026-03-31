@@ -2,7 +2,7 @@
 // 📁 src/integrations/google/googleSheets.ts
 // =====================================
 
-import { sheetsClient } from "./googleSheetsClient.js";
+import { sheetsClient } from "./googleClient.js"; // ✅ FIX
 import pRetry, { AbortError } from "p-retry";
 
 // =====================================
@@ -25,17 +25,17 @@ function getStatus(err: unknown): number | undefined {
     err !== null &&
     "response" in err
   ) {
-    const response = (err as any).response;
+    const response = (err as { response?: { status?: number } }).response;
     return response?.status;
   }
 
-  return undefined; // ✅ FIX
+  return undefined;
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   return pRetry(fn, {
     retries: 3,
-    onFailedAttempt: (error) => {
+    onFailedAttempt: (error: any) => { // ✅ FIX
       const status = getStatus(error);
 
       if (status && status >= 400 && status < 500 && status !== 429) {
@@ -65,7 +65,11 @@ export async function read(range: string): Promise<unknown[][]> {
     })
   );
 
-  return (res.data?.values ?? []) as unknown[][];
+  const data = res as {
+    data?: { values?: unknown[][] };
+  };
+
+  return data.data?.values ?? [];
 }
 
 // =====================================
@@ -82,7 +86,7 @@ export async function write(
       range,
       valueInputOption: "RAW",
       requestBody: {
-        values: toMutable(values), // ✅ FIX
+        values: toMutable(values),
       },
     })
   );
@@ -104,7 +108,7 @@ export async function append(
       range,
       valueInputOption: "RAW",
       requestBody: {
-        values: toMutable(values), // ✅ FIX
+        values: toMutable(values),
       },
     })
   );
