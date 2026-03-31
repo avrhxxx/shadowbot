@@ -13,7 +13,20 @@ type AutoOptions = {
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
   tags?: string[];
+  meta?: Record<string, unknown>;
 };
+
+// =====================================
+// 🔧 HELPERS
+// =====================================
+
+function normalizeResult(result: unknown): Record<string, unknown> {
+  if (result === null || result === undefined) return { value: result };
+
+  if (typeof result === "object") return result as Record<string, unknown>;
+
+  return { value: result };
+}
 
 // =====================================
 // 🔥 AUTO WRAPPER (B3 CORE)
@@ -36,29 +49,48 @@ export function createLoggerAuto(
   ): Promise<T> {
     const start = Date.now();
 
-    base.event(`${event}.start`, {
+    const basePayload: Partial<LogPayload> = {
       eventType: options.eventType,
       context: options.context,
       input: options.input,
       tags: options.tags,
-    });
+      meta: options.meta,
+      flow: {
+        name: event,
+        step: "auto",
+      },
+    };
+
+    // 🔹 START
+    base.event(`${event}.start`, basePayload);
 
     try {
       const result = await fn();
+      const durationMs = Date.now() - start;
 
+      // 🔹 SUCCESS
       base.event(`${event}.success`, {
-        eventType: options.eventType,
-        result: typeof result === "object" ? result : { value: result },
-        durationMs: Date.now() - start,
-        tags: options.tags,
+        ...basePayload,
+        result: normalizeResult(result),
+        durationMs,
+        timing: {
+          label: event,
+          durationMs,
+        },
       });
 
       return result;
     } catch (err) {
+      const durationMs = Date.now() - start;
+
+      // 🔹 ERROR
       base.error(`${event}.error`, err, {
-        eventType: options.eventType,
-        durationMs: Date.now() - start,
-        tags: options.tags,
+        ...basePayload,
+        durationMs,
+        timing: {
+          label: event,
+          durationMs,
+        },
       });
 
       throw err; // 🔥 MUST — nie zjadamy błędów
