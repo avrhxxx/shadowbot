@@ -33,7 +33,7 @@ const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 
 const ctx = createRootContext({
   source: "system",
-  system: "app",
+  system: "runtime_flags" as never,
 });
 
 const log = createLogger(ctx);
@@ -52,29 +52,44 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  const flow = log.system("app").flow("runtime.flags.refresh");
-
-  flow.start();
+  log.info("runtime.flags.refresh.start");
 
   try {
     const data = await repo.findAll();
 
+    // 🔥 AUTO-SEED (KLUCZ DO TWOJEGO PROBLEMU)
+    if (data.length === 0) {
+      log.warn("runtime.flags.empty_sheet");
+
+      const defaults: SystemFlag[] = [
+        {
+          id: "global",
+          system: "global",
+          enabled: "true",
+        },
+      ];
+
+      await repo.createMany(defaults);
+
+      log.info("runtime.flags.seeded", {
+        stats: { count: defaults.length },
+      });
+
+      // reload
+      return await refresh();
+    }
+
     cache = new Map(
-      data.map((d: SystemFlag) => [
-        d.system,
-        d.enabled === "true",
-      ])
+      data.map((d) => [d.system, d.enabled === "true"])
     );
 
     lastFetch = Date.now();
 
-    flow.stepInfo("flags.loaded", {
+    log.info("runtime.flags.refresh.success", {
       stats: { count: data.length },
     });
-
-    flow.success();
   } catch (err) {
-    flow.fail(err);
+    log.error("runtime.flags.refresh.failed", err);
   }
 }
 
@@ -83,11 +98,9 @@ async function refresh() {
 // =====================================
 
 async function ensure() {
-  const flow = log.system("app").flow("runtime.flags.ensure");
-
   const expired = Date.now() - lastFetch > TTL;
 
-  flow.stepDebug("cache.check", {
+  log.debug("runtime.flags.cache.check", {
     decision: {
       condition: "ttl_expired",
       result: expired,
@@ -106,8 +119,6 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
-  const flow = log.system("app").flow("runtime.flags.check");
-
   await ensure();
 
   const global = cache.get("global");
@@ -116,7 +127,7 @@ export async function isSystemEnabled(
   const result =
     global === false || local === false ? false : true;
 
-  flow.stepInfo("decision", {
+  log.info("runtime.flags.check", {
     meta: { system },
     decision: {
       condition: "global/local flags",
