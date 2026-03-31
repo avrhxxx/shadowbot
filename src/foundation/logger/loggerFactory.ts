@@ -40,16 +40,15 @@ export function createLogger(ctx?: TraceContext) {
     baseLogger[level]({
       event,
 
-      // 🔥 CONTEXT
       traceId: ctx?.traceId,
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
-      system: ctx?.system,
 
-      // 🔥 PAYLOAD
+      system: ctx?.system,
+      scope: ctx?.source, // 🔥 KLUCZ
+
       ...(payload ?? {}),
 
-      // 🔥 ERROR NORMALIZATION
       error: normalizeError(payload?.error),
     });
   }
@@ -74,9 +73,6 @@ export function createLogger(ctx?: TraceContext) {
   return {
     ...raw,
 
-    // =====================================
-    // 🔥 SYSTEM SCOPING
-    // =====================================
     system(systemName: string) {
       return {
         flow(flowName: string) {
