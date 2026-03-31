@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/core/ids/IdGenerator.ts
+// 📁 src/core/ids/idGenerator.ts
 // =====================================
 
 import { customAlphabet } from "nanoid";
