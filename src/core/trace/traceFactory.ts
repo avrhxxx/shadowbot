@@ -2,11 +2,7 @@
 // 📁 src/core/trace/traceFactory.ts
 // =====================================
 
-import {
-  createTraceId,
-  createCorrelationId,
-  createFlowId,
-} from "@/core/ids/idGenerator.js";
+import { ids } from "@/core/ids/ids.js";
 
 import type { TraceContext } from "./traceTypes.js";
 
@@ -22,9 +18,9 @@ export function createRootContext(
 ): TraceContext {
   return {
     ...base,
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
+    traceId: ids.trace.create(),
+    correlationId: ids.correlation.create(),
+    flowId: ids.flow.create(),
   };
 }
 
@@ -44,10 +40,10 @@ export function createChildContext(
   return {
     ...parent,
 
-    traceId: createTraceId(),
+    traceId: ids.trace.create(),
     parentTraceId: parent.traceId,
 
-    // 🔥 already guaranteed, but keep safe fallback
+    // 🔥 guaranteed by contract
     correlationId: parent.correlationId,
     flowId: parent.flowId,
 
@@ -61,9 +57,9 @@ export function createChildContext(
 
 export function createAppContext(): TraceContext {
   return {
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
+    traceId: ids.trace.create(),
+    correlationId: ids.correlation.create(),
+    flowId: ids.flow.create(),
     source: "system",
     domain: "app",
     scope: "app",
