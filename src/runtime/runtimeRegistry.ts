@@ -9,7 +9,7 @@ import type { SystemRegistryEntry } from "./runtimeTypes";
 // =====================================
 
 export const SYSTEM_NAMES = [
-  // "moderator",
+  "test",
   // "events",
   // "absence",
 ] as const;
