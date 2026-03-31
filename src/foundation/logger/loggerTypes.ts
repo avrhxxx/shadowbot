@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/foundation/logger/loggerTypes.ts
-// =====================================
-
 export type LogLevel =
   | "debug"
   | "info"
@@ -33,14 +29,19 @@ export type LogPayload = {
     step?: string;
   };
 
+  // 🔹 DECISIONS
   decision?: {
     condition: string;
     result: boolean;
   };
 
+  // 🔹 INTERACTION
   interaction?: {
     type?: string;
     name?: string;
     customId?: string;
   };
+
+  // 🔹 OPTIONAL (🔥 NEW)
+  tags?: string[];
 };
