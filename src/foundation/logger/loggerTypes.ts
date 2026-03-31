@@ -9,36 +9,20 @@ export type LogLevel =
   | "error"
   | "fatal";
 
-// 🔥 NOWE – ARCHITEKTURA SCOPE
-export type LogScope =
-  | "app"
-  | "runtime"
-  | "system"
-  | "integration";
-
 export type LogPayload = {
-  // 🔥 SCOPE (KLUCZOWE)
-  scope?: LogScope;
-
-  // classification
   level?: LogLevel;
 
-  eventType?:
-    | "system"
-    | "user"
-    | "interaction"
-    | "external"
-    | "job"
-    | "performance"
-    | "debug";
+  // 🔥 CORE
+  scope?: string;
+  event?: string;
 
-  // structured data
+  // 🔹 DATA
   context?: Record<string, unknown>;
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
   error?: unknown;
 
-  // observability
+  // 🔹 OBSERVABILITY
   timing?: {
     label: string;
     durationMs: number;
@@ -48,7 +32,7 @@ export type LogPayload = {
   metrics?: Record<string, unknown>;
   meta?: Record<string, unknown>;
 
-  // flow
+  // 🔹 FLOW
   flow?: {
     step?: string;
   };
