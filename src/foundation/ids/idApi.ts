@@ -2,26 +2,16 @@
 // 📁 src/foundation/ids/idApi.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Public API for working with IDs.
- *
- * 📥 INPUT:
- * - IdType
- * - string IDs
- *
- * 📤 OUTPUT:
- * - typed IDs
- * - validation results
- * - formatted IDs
- *
- * ❗ RULES:
- * - acts as FACADE
- * - uses generator + validator + formatter
- * - NO duplication of logic
- */
+import {
+  createTraceId,
+  createFlowId,
+  createCorrelationId,
+  createSessionId,
+  createJobId,
+  createInteractionId,
+  createExternalId,
+} from "./idGenerator";
 
-import { generateId } from "./idGenerator";
 import { isValidId, getIdType, isIdOfType } from "./idValidator";
 import { formatId, shortId } from "./idFormatter";
 
@@ -59,11 +49,36 @@ type IdMap = {
 };
 
 // =====================================
+// 🔹 GENERATOR MAP (🔥 KLUCZOWE)
+// =====================================
+
+const GENERATORS: Record<IdType, () => string> = {
+  trace: createTraceId,
+  flow: createFlowId,
+  correlation: createCorrelationId,
+
+  session: createSessionId,
+  job: createJobId,
+  queue: createJobId, // 👉 jeśli nie masz createQueueId — tymczasowo
+
+  interaction: createInteractionId,
+  external: createExternalId,
+
+  runtime: createExternalId, // 👉 fallback (możemy później zrobić proper)
+};
+
+// =====================================
 // 🔹 CREATE
 // =====================================
 
 function create<T extends IdType>(type: T): IdMap[T] {
-  return generateId(type) as IdMap[T];
+  const generator = GENERATORS[type];
+
+  if (!generator) {
+    throw new Error(`No generator for ID type: ${type}`);
+  }
+
+  return generator() as IdMap[T];
 }
 
 // =====================================
