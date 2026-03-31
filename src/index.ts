@@ -6,6 +6,7 @@ import { Client, GatewayIntentBits, Partials } from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
 import { createAppContext } from "@/trace";
+import { createFlowLogger } from "@/foundation/logger/helpers/flowLogger";
 
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
@@ -37,24 +38,24 @@ const ctx = createAppContext();
 const log = createLogger(ctx);
 
 // =====================================
-// 🔹 BOOTSTRAP
+// 🔹 BOOTSTRAP (APP)
 // =====================================
 
-const bootstrapFlow = log.system("app").flow("bootstrap");
+const bootstrapFlow = createFlowLogger(log, "app.bootstrap");
 bootstrapFlow.start();
 
 // =====================================
-// 🔹 GLOBAL ERRORS
+// 🔹 GLOBAL ERRORS (APP)
 // =====================================
 
-const runtimeFlow = log.system("app").flow("runtime");
+const globalRuntimeFlow = createFlowLogger(log, "app.runtime");
 
 process.on("unhandledRejection", (err) => {
-  runtimeFlow.fail(err);
+  globalRuntimeFlow.fail(err);
 });
 
 process.on("uncaughtException", (err) => {
-  runtimeFlow.fail(err);
+  globalRuntimeFlow.fail(err);
   process.exit(1);
 });
 
@@ -63,7 +64,7 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  const discordFlow = log.system("app").flow("discord");
+  const discordFlow = createFlowLogger(log, "app.discord");
 
   discordFlow.stepInfo("client.ready", {
     meta: { user: client.user?.tag },
@@ -73,13 +74,12 @@ client.once("ready", async () => {
   // 🧠 INIT GOOGLE
   // =============================
 
-  const googleFlow = log.system("app").flow("google.init");
+  const googleFlow = createFlowLogger(log, "app.google.init");
 
   googleFlow.start();
 
   try {
     await ensureAllSheets();
-
     googleFlow.success();
   } catch (err) {
     googleFlow.fail(err);
@@ -90,13 +90,12 @@ client.once("ready", async () => {
   // 🧠 RUNTIME START
   // =============================
 
-  const runtimeFlow = log.system("app").flow("runtime");
+  const runtimeFlow = createFlowLogger(log, "app.runtime");
 
   runtimeFlow.start();
 
   try {
     await loadAllSystems();
-
     runtimeFlow.success();
   } catch (err) {
     runtimeFlow.fail(err);
@@ -107,7 +106,7 @@ client.once("ready", async () => {
 // 🔐 LOGIN
 // =====================================
 
-const loginFlow = log.system("app").flow("discord.login");
+const loginFlow = createFlowLogger(log, "app.discord.login");
 
 loginFlow.start();
 
