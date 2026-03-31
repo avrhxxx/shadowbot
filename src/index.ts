@@ -13,8 +13,8 @@ import {
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
 
-// 🔥 NEW
-import { handleUIInteraction } from "@/core/ui/uiDiscordAdapter";
+// ✅ FIXED PATH
+import { handleUIInteraction } from "@/ui/core/uiDiscordAdapter";
 
 // =====================================
 // 🔐 ENV
@@ -65,13 +65,13 @@ process.on("uncaughtException", (err) => {
 });
 
 // =====================================
-// 🖱️ INTERACTIONS (🔥 UI ENGINE)
+// 🖱️ INTERACTIONS (UI ENGINE)
 // =====================================
 
 client.on("interactionCreate", async (interaction) => {
   const uiCtx = createRootContext({
-    source: "interaction",
-    system: "ui",
+    source: "discord", // ✅ poprawne względem TraceSource
+    system: undefined, // ✅ UI nie jest jeszcze systemem domenowym
   });
 
   const handled = await handleUIInteraction(interaction, uiCtx);
