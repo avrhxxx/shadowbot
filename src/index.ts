@@ -37,24 +37,24 @@ const ctx = createAppContext();
 const log = createLogger(ctx);
 
 // =====================================
-// 🔹 BOOTSTRAP (APP)
+// 🔹 BOOTSTRAP
 // =====================================
 
 const bootstrapFlow = log.system("app").flow("bootstrap");
 bootstrapFlow.start();
 
 // =====================================
-// 🔹 GLOBAL ERRORS (APP)
+// 🔹 GLOBAL ERRORS
 // =====================================
 
-const globalRuntimeFlow = log.system("app").flow("runtime");
+const runtimeFlow = log.system("app").flow("runtime");
 
 process.on("unhandledRejection", (err) => {
-  globalRuntimeFlow.fail(err);
+  runtimeFlow.fail(err);
 });
 
 process.on("uncaughtException", (err) => {
-  globalRuntimeFlow.fail(err);
+  runtimeFlow.fail(err);
   process.exit(1);
 });
 
@@ -63,15 +63,14 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  // 🔹 DISCORD READY (SYSTEM: discord)
-  const discordFlow = log.system("discord").flow("lifecycle");
+  const discordFlow = log.system("app").flow("discord");
 
-  discordFlow.stepInfo("client.ready", {
+  discordFlow.stepInfo("ready", {
     meta: { user: client.user?.tag },
   });
 
   // =============================
-  // 🧠 INIT GOOGLE
+  // 🧠 GOOGLE INIT
   // =============================
 
   const googleFlow = log.system("google").flow("init");
@@ -87,10 +86,10 @@ client.once("ready", async () => {
   }
 
   // =============================
-  // 🧠 RUNTIME START
+  // 🧠 RUNTIME
   // =============================
 
-  const runtimeFlow = log.system("runtime").flow("bootstrap");
+  const runtimeFlow = log.system("runtime").flow("load");
 
   runtimeFlow.start();
 
@@ -103,10 +102,10 @@ client.once("ready", async () => {
 });
 
 // =====================================
-// 🔐 LOGIN (DISCORD)
+// 🔐 LOGIN
 // =====================================
 
-const loginFlow = log.system("discord").flow("login");
+const loginFlow = log.system("app").flow("login");
 
 loginFlow.start();
 
