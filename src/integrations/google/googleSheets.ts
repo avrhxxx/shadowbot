@@ -2,8 +2,9 @@
 // 📁 src/integrations/google/googleSheets.ts
 // =====================================
 
-import { sheetsClient } from "./googleClient.js"; // ✅ FIX
-import pRetry, { AbortError } from "p-retry";
+import { sheetsClient } from "./googleClient.js";
+import pRetry from "p-retry";
+import { AbortError } from "p-retry";
 
 // =====================================
 // 🔐 ENV
@@ -35,14 +36,14 @@ function getStatus(err: unknown): number | undefined {
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   return pRetry(fn, {
     retries: 3,
-    onFailedAttempt: (error: any) => { // ✅ FIX
+    onFailedAttempt: (error: unknown) => {
       const status = getStatus(error);
 
       if (status && status >= 400 && status < 500 && status !== 429) {
         throw new AbortError("Non-retryable error");
       }
     },
-  });
+  } as any); // ✅ FIX pod TS
 }
 
 // =====================================
