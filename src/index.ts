@@ -40,18 +40,21 @@ const log = createLogger(ctx);
 // 🔹 BOOTSTRAP
 // =====================================
 
-log.system("app").flow("bootstrap").start();
+const bootstrapFlow = log.system("app").flow("bootstrap");
+bootstrapFlow.start();
 
 // =====================================
 // 🔹 GLOBAL ERRORS
 // =====================================
 
+const runtimeFlow = log.system("app").flow("runtime");
+
 process.on("unhandledRejection", (err) => {
-  log.system("app").flow("runtime").fail(err);
+  runtimeFlow.fail(err);
 });
 
 process.on("uncaughtException", (err) => {
-  log.system("app").flow("runtime").fail(err);
+  runtimeFlow.fail(err);
   process.exit(1);
 });
 
@@ -60,12 +63,11 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  log.system("app")
-    .flow("discord")
-    .event("client.ready")
-    .info({
-      meta: { user: client.user?.tag },
-    });
+  const discordFlow = log.system("app").flow("discord");
+
+  discordFlow.stepInfo("client.ready", {
+    meta: { user: client.user?.tag },
+  });
 
   // =============================
   // 🧠 INIT GOOGLE
