@@ -6,7 +6,7 @@ import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-} from "@/core/ids/IdGenerator.js";
+} from "@/core/ids/idGenerator.js";
 
 import type { TraceContext } from "./traceTypes.js";
 
@@ -47,8 +47,9 @@ export function createChildContext(
     traceId: createTraceId(),
     parentTraceId: parent.traceId,
 
-    correlationId: parent.correlationId ?? createCorrelationId(),
-    flowId: parent.flowId ?? createFlowId(),
+    // 🔥 already guaranteed, but keep safe fallback
+    correlationId: parent.correlationId,
+    flowId: parent.flowId,
 
     ...overrides,
   };
