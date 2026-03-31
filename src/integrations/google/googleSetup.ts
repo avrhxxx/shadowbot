@@ -16,7 +16,7 @@
  * - runs once at startup
  */
 
-import { sheetsClient } from "./googleSheetsClient.js";
+import { sheetsClient } from "./googleClient.js"; // ✅ FIX
 import { ALL_SHEETS } from "./googleSchema.js";
 
 // =====================================
@@ -33,9 +33,7 @@ if (!SHEET_ID || !SHEET_ID.trim()) {
 // 🔍 GET EXISTING SHEETS
 // =====================================
 
-async function getExistingSheets(): Promise<
-  Map<string, number>
-> {
+async function getExistingSheets(): Promise<Map<string, number>> {
   const res = await sheetsClient.spreadsheets.get({
     spreadsheetId: SHEET_ID,
   });
@@ -86,18 +84,16 @@ async function setHeaders(
     range: `${title}!A1`,
     valueInputOption: "RAW",
     requestBody: {
-      values: [headers],
+      values: [Array.from(headers)], // ✅ FIX (readonly -> mutable)
     },
   });
 }
 
 // =====================================
-// 🔍 CHECK HEADERS
+// 🔍 GET HEADERS
 // =====================================
 
-async function getHeaders(
-  title: string
-): Promise<string[]> {
+async function getHeaders(title: string): Promise<string[]> {
   const res = await sheetsClient.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${title}!A1:Z1`,
