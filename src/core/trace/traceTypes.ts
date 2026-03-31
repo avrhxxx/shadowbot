@@ -10,7 +10,7 @@ import type {
   InteractionId,
   JobId,
   ExternalId,
-} from "@/core/ids/IdGenerator.js";
+} from "@/core/ids/idTypes.js";
 
 // =====================================
 // 🔹 SOURCE
@@ -57,14 +57,17 @@ export type TraceContext = Readonly<{
   traceId: TraceId;
 
   parentTraceId?: TraceId;
-  correlationId?: CorrelationId;
-  flowId?: FlowId;
+
+  // 🔥 STRONG CONTRACT (no optional)
+  correlationId: CorrelationId;
+  flowId: FlowId;
 
   source: SourceType;
 
   domain?: Domain;
   scope?: ContextScope;
 
+  // 🔹 external boundary (string for now)
   userId?: string;
   sessionId?: SessionId;
 
