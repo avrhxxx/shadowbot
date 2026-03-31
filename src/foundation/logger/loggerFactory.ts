@@ -2,21 +2,6 @@
 // 📁 src/foundation/logger/loggerFactory.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Creates context-aware logger
- *
- * 📥 INPUT:
- * - optional TraceContext
- *
- * 📤 OUTPUT:
- * - simple logging API (debug/info/warn/error/fatal)
- *
- * ❗ GOAL:
- * - minimal usage in code
- * - future-proof payload
- */
-
 import { baseLogger } from "./loggerCore";
 import type { LogPayload, LogLevel } from "./loggerTypes";
 import type { TraceContext } from "@/trace";
@@ -38,6 +23,37 @@ function normalizeError(err: unknown) {
   return { message: String(err) };
 }
 
+function resolveScope(ctx?: TraceContext, payload?: any): string {
+  if (payload?.meta?.system) return `SYSTEM:${payload.meta.system}`;
+  if (ctx?.system) return `SYSTEM:${ctx.system}`;
+  return "APP";
+}
+
+function simplifyEvent(event: string): string {
+  const parts = event.split(".");
+  return parts[parts.length - 1];
+}
+
+function buildMessage(
+  ctx: TraceContext | undefined,
+  event: string,
+  payload?: any
+): string {
+  const scope = resolveScope(ctx, payload);
+
+  const base = `[${scope}] ${simplifyEvent(event)}`;
+
+  const ids = [
+    ctx?.traceId && `trace=${ctx.traceId}`,
+    ctx?.flowId && `flow=${ctx.flowId}`,
+    ctx?.correlationId && `corr=${ctx.correlationId}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return ids ? `${base} | ${ids}` : base;
+}
+
 // =====================================
 // 🏭 FACTORY
 // =====================================
@@ -50,16 +66,18 @@ export function createLogger(ctx?: TraceContext) {
     event: string,
     payload?: LogInput
   ) {
-    baseLogger[level]({
-      event,
-      level,
-      traceId: ctx?.traceId,
-      correlationId: ctx?.correlationId,
-      flowId: ctx?.flowId,
+    baseLogger[level](
+      {
+        event,
+        traceId: ctx?.traceId,
+        correlationId: ctx?.correlationId,
+        flowId: ctx?.flowId,
 
-      ...(payload ?? {}),
-      error: normalizeError(payload?.error),
-    });
+        ...(payload ?? {}),
+        error: normalizeError(payload?.error),
+      },
+      buildMessage(ctx, event, payload) // 🔥 KLUCZ
+    );
   }
 
   return {
