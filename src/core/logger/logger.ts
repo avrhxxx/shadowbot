@@ -10,6 +10,22 @@ import { createLoggerAuto } from "./loggerAuto.js";
 import { createLoggerFlow } from "./loggerFlow.js";
 
 // =====================================
+// 🔧 LOGGER FACTORY
+// =====================================
+
+function createLogger(ctx: TraceContext) {
+  const base = createLoggerCtx(ctx);
+
+  return {
+    ...base,
+
+    // 🔥 B3
+    auto: createLoggerAuto(base),
+    flow: createLoggerFlow(base),
+  };
+}
+
+// =====================================
 // 🔹 ROOT LOG FUNCTION (RARELY USED)
 // =====================================
 
@@ -18,8 +34,7 @@ function baseLog(
   event: string,
   payload?: Omit<LogPayload, "event" | "traceId">
 ) {
-  const l = createLoggerCtx(ctx);
-  l.event(event, payload);
+  createLogger(ctx).event(event, payload);
 }
 
 // =====================================
@@ -27,21 +42,6 @@ function baseLog(
 // =====================================
 
 export const log = Object.assign(baseLog, {
-  // =====================================
-  // 🔹 CTX (PRIMARY ENTRYPOINT)
-  // =====================================
-
-  ctx(ctx: TraceContext) {
-    const base = createLoggerCtx(ctx);
-
-    return {
-      ...base,
-
-      // 🔥 AUTO
-      auto: createLoggerAuto(base),
-
-      // 🔥 FLOW
-      flow: createLoggerFlow(base),
-    };
-  },
+  // 🔹 PRIMARY ENTRYPOINT
+  ctx: createLogger,
 });
