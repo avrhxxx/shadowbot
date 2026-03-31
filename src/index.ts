@@ -37,11 +37,23 @@ const ctx = createAppContext();
 const log = createLogger(ctx);
 
 // =====================================
-// 🔥 BOOTSTRAP LOGS (KLUCZOWE)
+// 🔥 BOOTSTRAP LOGS
 // =====================================
 
 console.log("🔥 APP START");
 log.info("app.init");
+
+// =====================================
+// 🧪 DEBUG (KLUCZOWE TERAZ)
+// =====================================
+
+client.on("debug", (msg) => {
+  console.log("🐛 DEBUG:", msg);
+});
+
+client.on("error", (err) => {
+  console.error("❌ CLIENT ERROR:", err);
+});
 
 // =====================================
 // 🔹 GLOBAL ERRORS
@@ -57,13 +69,19 @@ process.on("uncaughtException", (err) => {
 });
 
 // =====================================
-// 🚀 READY
+// 🚀 READY (RAW EVENT)
 // =====================================
 
-client.once("clientReady", async () => {
+client.once("ready", async () => {
+  console.log("🟢 DISCORD READY (raw)");
+
   log.info("app.ready", {
     meta: { user: client.user?.tag },
   });
+
+  // =============================
+  // 🧠 INIT GOOGLE (SELF-HEALING)
+  // =============================
 
   try {
     await ensureAllSheets();
@@ -72,6 +90,10 @@ client.once("clientReady", async () => {
     log.error("app.google.failed", err);
     return;
   }
+
+  // =============================
+  // 🧠 RUNTIME START
+  // =============================
 
   try {
     log.info("runtime.start");
@@ -85,12 +107,13 @@ client.once("clientReady", async () => {
 });
 
 // =====================================
-// 🔐 LOGIN (DEBUG)
+// 🔐 LOGIN
 // =====================================
 
 log.info("app.login.start");
 
-client.login(BOT_TOKEN)
+client
+  .login(BOT_TOKEN)
   .then(() => {
     log.info("app.login.success");
   })
