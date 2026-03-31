@@ -4,50 +4,60 @@
 
 /**
  * 🧠 ROLE:
- * Rejestr wszystkich systemów runtime
+ * Auto-build system registry from simple list
  *
- * INPUT:
- * - brak (statyczny config)
+ * 📥 INPUT:
+ * - list of system names
  *
- * OUTPUT:
- * - lista systemów do uruchomienia
+ * 📤 OUTPUT:
+ * - full SYSTEM_REGISTRY with loaders
+ *
+ * ❗ GOAL:
+ * - ZERO duplication
+ * - ONE place to register systems
+ * - NO manual loaders
  */
+
+// =====================================
+// 🔹 TYPES
+// =====================================
 
 import type { SystemRegistryEntry } from "./runtimeTypes";
 
 // =====================================
-// 🔹 REGISTRY
+// 🔹 SOURCE OF TRUTH (ONLY EDIT THIS)
 // =====================================
 
-export const SYSTEM_REGISTRY: SystemRegistryEntry[] = [
-  {
-    name: "moderator",
-    type: "guild",
-    loader: () => import("../systems/moderator/index.js"),
-  },
-  {
-    name: "events",
-    type: "guild",
-    loader: () => import("../systems/events/index.js"),
-  },
-  {
-    name: "absence",
-    type: "guild",
-    loader: () => import("../systems/absence/index.js"),
-  },
-  {
-    name: "points",
-    type: "guild",
-    loader: () => import("../systems/points/index.js"),
-  },
-  {
-    name: "quickadd",
-    type: "global",
-    loader: () => import("../systems/quickadd/index.js"),
-  },
-  {
-    name: "quickadd_worker",
-    type: "global",
-    loader: () => import("../systems/quickadd/worker.js"),
-  },
+const SYSTEM_NAMES = [
+  // 👇 dodajesz tylko tutaj
+  // "moderator",
+  // "events",
+  // "absence",
 ];
+
+// =====================================
+// 🔹 HELPERS
+// =====================================
+
+function resolveSystemType(name: string): "global" | "guild" {
+  // 🔥 możesz to później rozbudować
+  if (name.includes("worker")) return "global";
+
+  return "guild";
+}
+
+function buildPath(name: string): string {
+  return `../systems/${name}/index.js`;
+}
+
+// =====================================
+// 🔹 BUILD REGISTRY (AUTO)
+// =====================================
+
+export const SYSTEM_REGISTRY: SystemRegistryEntry[] = SYSTEM_NAMES.map(
+  (name) => ({
+    name,
+    type: resolveSystemType(name),
+    loader: () => import(buildPath(name)),
+  })
+);
