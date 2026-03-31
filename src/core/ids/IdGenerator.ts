@@ -1,44 +1,43 @@
 // =====================================
-// 📁 src/core/ids/idGenerator.ts
+// 📁 src/core/ids/IdGenerator.ts
 // =====================================
 
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import {
-  ID_PREFIX_MAP,
   ID_LENGTH,
-  type IdPrefix,
+  ID_PREFIX_MAP,
 } from "./idConfig.js";
 
+import type {
+  TraceId,
+  SessionId,
+  QueueId,
+  JobId,
+  InteractionId,
+  ExternalId,
+  CorrelationId,
+  FlowId,
+} from "./idTypes.js";
+
 // =====================================
-// 🔹 BRAND TYPE
+// 🔹 ALPHABET
 // =====================================
 
-type Brand<K, T> = K & { __brand: T };
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-// =====================================
-// 🔹 ID TYPES
-// =====================================
-
-export type TraceId = Brand<string, "TraceId">;
-export type SessionId = Brand<string, "SessionId">;
-export type QueueId = Brand<string, "QueueId">;
-export type JobId = Brand<string, "JobId">;
-export type InteractionId = Brand<string, "InteractionId">;
-export type ExternalId = Brand<string, "ExternalId">;
-export type CorrelationId = Brand<string, "CorrelationId">;
-export type FlowId = Brand<string, "FlowId">;
-export type RuntimeId = Brand<string, "RuntimeId">;
+// nanoid generator
+const nano = customAlphabet(ALPHABET, ID_LENGTH);
 
 // =====================================
 // 🔹 INTERNAL GENERATOR
 // =====================================
 
-function generate(prefix: IdPrefix): string {
-  return `${prefix}-${nanoid(ID_LENGTH)}`;
+function generate(prefix: string): string {
+  return `${prefix}-${nano()}`;
 }
 
 // =====================================
-// 🔹 FACTORY FUNCTIONS
+// 🔹 PUBLIC API
 // =====================================
 
 export const createTraceId = () =>
@@ -64,6 +63,3 @@ export const createCorrelationId = () =>
 
 export const createFlowId = () =>
   generate(ID_PREFIX_MAP.flow) as FlowId;
-
-export const createRuntimeId = () =>
-  generate(ID_PREFIX_MAP.runtime) as RuntimeId;
