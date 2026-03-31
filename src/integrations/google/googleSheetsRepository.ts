@@ -2,8 +2,8 @@
 // 📁 src/integrations/google/googleSheetsRepository.ts
 // =====================================
 
-import { readSheet, writeSheet } from "@/integrations/google/googleSheetsStorage";
-import { SheetDefinition } from "@/integrations/google/googleSheetsSchema";
+import { readSheet, writeSheet } from "./googleSheetsStorage.js";
+import { SheetDefinition } from "./googleSheetsSchema.js";
 
 // =====================================
 // 🔹 TYPES
