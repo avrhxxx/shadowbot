@@ -24,16 +24,21 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
-// 🏭 FACTORY
+// 🧠 FLOW LOGGER
 // =====================================
 
-type LogInput = Partial<LogPayload>; // 🔥 KLUCZOWE FIX
+type LogInput = Partial<LogPayload>;
 
-export function createLogger(ctx?: TraceContext) {
-  function log(
+function createFlowLogger(
+  ctx: TraceContext | undefined,
+  systemName: string,
+  flowName: string
+) {
+  function emit(
     level: LogLevel,
     event: string,
-    payload?: LogInput
+    payload?: LogInput,
+    error?: unknown
   ) {
     baseLogger[level]({
       event,
@@ -42,30 +47,79 @@ export function createLogger(ctx?: TraceContext) {
       traceId: ctx?.traceId,
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
-      system: ctx?.system,
+      system: systemName,
 
-      // 🔥 PAYLOAD
+      // 🔥 FLOW META
+      flow: {
+        step: event,
+      },
+
       ...(payload ?? {}),
 
-      // 🔥 ERROR NORMALIZATION
-      error: normalizeError(payload?.error),
+      error: normalizeError(error ?? payload?.error),
     });
   }
 
   return {
-    debug: (event: string, payload?: LogInput) =>
-      log("debug", event, payload),
+    // =====================================
+    // 🔹 FLOW LIFECYCLE
+    // =====================================
 
-    info: (event: string, payload?: LogInput) =>
-      log("info", event, payload),
+    start: () => emit("info", `${flowName}.start`),
 
-    warn: (event: string, payload?: LogInput) =>
-      log("warn", event, payload),
+    success: () => emit("info", `${flowName}.success`),
 
-    error: (event: string, error?: unknown, payload?: LogInput) =>
-      log("error", event, { ...(payload ?? {}), error }),
+    fail: (err?: unknown) =>
+      emit("error", `${flowName}.fail`, undefined, err),
 
-    fatal: (event: string, error?: unknown, payload?: LogInput) =>
-      log("fatal", event, { ...(payload ?? {}), error }),
+    // =====================================
+    // 🔹 STEPS
+    // =====================================
+
+    stepDebug: (step: string, payload?: LogInput) =>
+      emit("debug", `${flowName}.${step}`, payload),
+
+    stepInfo: (step: string, payload?: LogInput) =>
+      emit("info", `${flowName}.${step}`, payload),
+
+    stepWarn: (step: string, payload?: LogInput) =>
+      emit("warn", `${flowName}.${step}`, payload),
+
+    stepError: (step: string, err?: unknown, payload?: LogInput) =>
+      emit("error", `${flowName}.${step}`, payload, err),
+
+    // =====================================
+    // 🔹 EVENT (opcjonalny override)
+    // =====================================
+
+    event: (eventName: string) => ({
+      debug: (payload?: LogInput) =>
+        emit("debug", eventName, payload),
+
+      info: (payload?: LogInput) =>
+        emit("info", eventName, payload),
+
+      warn: (payload?: LogInput) =>
+        emit("warn", eventName, payload),
+
+      error: (err?: unknown, payload?: LogInput) =>
+        emit("error", eventName, payload, err),
+    }),
+  };
+}
+
+// =====================================
+// 🏭 FACTORY (LEVEL 2 LOGGER)
+// =====================================
+
+export function createLogger(ctx?: TraceContext) {
+  return {
+    system(systemName: string) {
+      return {
+        flow(flowName: string) {
+          return createFlowLogger(ctx, systemName, flowName);
+        },
+      };
+    },
   };
 }
