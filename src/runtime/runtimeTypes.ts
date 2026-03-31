@@ -5,25 +5,14 @@
 /**
  * 🧠 ROLE:
  * Typy dla runtime systemu (zarządzanie modułami)
- *
- * INPUT:
- * - używane przez runtimeRegistry / runtimeLoader / runtimeState
- *
- * OUTPUT:
- * - spójne typy dla systemów
  */
 
 // =====================================
 // 🔹 SYSTEM NAME
 // =====================================
 
-export type SystemName =
-  | "moderator"
-  | "events"
-  | "absence"
-  | "points"
-  | "quickadd"
-  | "quickadd_worker";
+// 🔥 ELASTYCZNY (NA TEN ETAP)
+export type SystemName = string;
 
 // =====================================
 // 🔹 SYSTEM TYPE
