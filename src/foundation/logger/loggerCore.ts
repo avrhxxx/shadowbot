@@ -15,29 +15,12 @@ const colors = {
 };
 
 // =====================================
-// 🔹 SCOPE PARSER
+// 🔹 SYSTEM FORMATTER
 // =====================================
 
-function parseScope(scope?: string) {
-  if (!scope) return { type: "app", name: undefined };
-
-  if (!scope.includes(":")) {
-    return { type: scope, name: undefined };
-  }
-
-  const [type, name] = scope.split(":");
-
-  return { type, name };
-}
-
-function formatScope(scope?: string) {
-  const parsed = parseScope(scope);
-
-  if (!parsed.name) {
-    return parsed.type.toUpperCase();
-  }
-
-  return `${parsed.type.toUpperCase()} | ${parsed.name}`;
+function formatSystem(system?: string) {
+  if (!system) return "APP";
+  return system.toUpperCase();
 }
 
 // =====================================
@@ -76,10 +59,10 @@ function formatObjectBlock(label: string, obj?: Record<string, any>) {
   return `${colors.magenta}${label}${colors.reset}:\n${entries}`;
 }
 
-function getHeader(level: string, scope?: string) {
-  const scopeLabel = formatScope(scope);
+function getHeader(level: string, system?: string) {
+  const systemLabel = formatSystem(system);
 
-  return `${colors.gray}──────── ${level} | ${colors.cyan}${scopeLabel}${colors.reset} ${colors.gray}────────${colors.reset}`;
+  return `${colors.gray}──────── ${level} | ${colors.cyan}${systemLabel}${colors.reset} ${colors.gray}────────${colors.reset}`;
 }
 
 // =====================================
@@ -91,7 +74,7 @@ function formatLog(log: any) {
   const event = simplifyEvent(log.event);
 
   const lines: (string | null)[] = [
-    getHeader(level, log.scope),
+    getHeader(level, log.system),
 
     `${colors.green}EVENT${colors.reset} : ${event}`,
 
