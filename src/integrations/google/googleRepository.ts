@@ -4,25 +4,23 @@
 
 /**
  * 🧠 ROLE:
- * Generic data repository using Google as storage backend
+ * Generic repository for Google Sheets (typed layer)
  *
  * 📥 INPUT:
- * - SheetDefinition (structure)
+ * - SheetDefinition (schema)
  *
  * 📤 OUTPUT:
  * - typed CRUD operations
  *
- * ❗ NOTE:
- * - Currently uses Google Sheets
- * - Can be swapped in future without changing services
- *
- * ❗ RULES:
- * - NO direct Google API usage
- * - uses googleSheets core
+ * ❗ GOALS:
+ * - simple usage in services
+ * - future-proof
+ * - isolated mapping logic
+ * - NO business logic
  */
 
-import { read, write } from "./googleSheets.js";
-import { SheetDefinition } from "./googleSheetsSchema.js";
+import { readSheet, writeSheet } from "./googleSheetsStorage.js";
+import type { SheetDefinition } from "./googleSheetsSchema.js";
 
 // =====================================
 // 🔹 TYPES
@@ -37,18 +35,19 @@ type Filter<T> = Partial<{ [K in keyof T]: T[K] }>;
 export class GoogleRepository<T extends { id?: string }> {
   constructor(private readonly sheet: SheetDefinition) {}
 
-  // =============================
+  // =====================================
   // 📥 LOAD RAW
-  // =============================
+  // =====================================
 
   private async load(): Promise<{
-    headers: string[];
+    headers: readonly string[];
     dataRows: unknown[][];
   }> {
-    const rows = await read(this.sheet.name);
+    const rows = await readSheet(this.sheet.name);
 
-    const headers = [...this.sheet.headers];
+    const headers = this.sheet.headers;
 
+    // 🔥 IMPORTANT: force mutable copy
     const dataRows: unknown[][] =
       rows.length > 1
         ? rows.slice(1).map((r) => [...r])
@@ -57,16 +56,20 @@ export class GoogleRepository<T extends { id?: string }> {
     return { headers, dataRows };
   }
 
-  // =============================
-  // 🔄 MAP ROW → OBJECT
-  // =============================
+  // =====================================
+  // 🔄 ROW → OBJECT
+  // =====================================
 
-  private mapRow(headers: string[], row: unknown[]): T {
+  private mapRow(
+    headers: readonly string[],
+    row: readonly unknown[]
+  ): T {
     const obj: Record<string, unknown> = {};
 
     headers.forEach((h, i) => {
       let val = row[i];
 
+      // auto JSON parse
       if (
         typeof val === "string" &&
         val.length > 1 &&
@@ -74,7 +77,9 @@ export class GoogleRepository<T extends { id?: string }> {
       ) {
         try {
           val = JSON.parse(val);
-        } catch {}
+        } catch {
+          // ignore
+        }
       }
 
       obj[h] = val ?? null;
@@ -83,12 +88,12 @@ export class GoogleRepository<T extends { id?: string }> {
     return obj as T;
   }
 
-  // =============================
-  // 🔄 MAP OBJECT → ROW
-  // =============================
+  // =====================================
+  // 🔄 OBJECT → ROW
+  // =====================================
 
   private mapObject(
-    headers: string[],
+    headers: readonly string[],
     data: Partial<T>
   ): unknown[] {
     return headers.map((h) => {
@@ -108,17 +113,20 @@ export class GoogleRepository<T extends { id?: string }> {
     });
   }
 
-  // =============================
+  // =====================================
   // 📤 SAVE
-  // =============================
+  // =====================================
 
   private async save(rows: unknown[][]): Promise<void> {
-    await write(this.sheet.name, [this.sheet.headers as string[], ...rows]);
+    // 🔥 FIX: remove readonly issue
+    const data = [this.sheet.headers, ...rows].map((r) => [...r]);
+
+    await writeSheet(this.sheet.name, data);
   }
 
-  // =============================
+  // =====================================
   // 🔍 FIND ALL
-  // =============================
+  // =====================================
 
   async findAll(filter?: Filter<T>): Promise<T[]> {
     const { headers, dataRows } = await this.load();
@@ -128,8 +136,7 @@ export class GoogleRepository<T extends { id?: string }> {
     if (filter) {
       data = data.filter((item) =>
         Object.entries(filter).every(([key, val]) => {
-          const current = (item as Record<string, unknown>)[key];
-          return current === val;
+          return (item as any)[key] === val;
         })
       );
     }
@@ -137,22 +144,22 @@ export class GoogleRepository<T extends { id?: string }> {
     return data;
   }
 
-  // =============================
+  // =====================================
   // 🔍 FIND BY ID
-  // =============================
+  // =====================================
 
   async findById(id: string): Promise<T | null> {
     const items = await this.findAll();
     return items.find((i) => i.id === id) ?? null;
   }
 
-  // =============================
+  // =====================================
   // ➕ CREATE
-  // =============================
+  // =====================================
 
   async create(data: T): Promise<T> {
     if (!data.id) {
-      throw new Error("Cannot create entity without 'id'");
+      throw new Error("Missing 'id'");
     }
 
     const { headers, dataRows } = await this.load();
@@ -164,31 +171,26 @@ export class GoogleRepository<T extends { id?: string }> {
     return data;
   }
 
-  // =============================
-  // 🚀 CREATE MANY
-  // =============================
+  // =====================================
+  // 🚀 CREATE MANY (BATCH BASE)
+  // =====================================
 
   async createMany(dataArray: T[]): Promise<void> {
     if (!dataArray.length) return;
 
-    dataArray.forEach((d) => {
-      if (!d.id) {
-        throw new Error("Cannot create entity without 'id'");
-      }
-    });
-
     const { headers, dataRows } = await this.load();
 
-    const newRows = dataArray.map((data) =>
-      this.mapObject(headers, data)
-    );
+    const newRows = dataArray.map((data) => {
+      if (!data.id) throw new Error("Missing 'id'");
+      return this.mapObject(headers, data);
+    });
 
     await this.save([...dataRows, ...newRows]);
   }
 
-  // =============================
+  // =====================================
   // ✏️ UPDATE
-  // =============================
+  // =====================================
 
   async updateById(id: string, partial: Partial<T>): Promise<void> {
     const { headers, dataRows } = await this.load();
@@ -212,9 +214,9 @@ export class GoogleRepository<T extends { id?: string }> {
     await this.save(dataRows);
   }
 
-  // =============================
+  // =====================================
   // ❌ DELETE
-  // =============================
+  // =====================================
 
   async deleteById(id: string): Promise<void> {
     const { headers, dataRows } = await this.load();
