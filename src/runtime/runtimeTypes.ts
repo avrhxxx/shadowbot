@@ -3,7 +3,7 @@
 // =====================================
 
 import { Client, Guild } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
+import type { TraceContext } from "../core/trace/TraceContext.js";
 
 // =============================
 // 🔹 SYSTEM NAME
