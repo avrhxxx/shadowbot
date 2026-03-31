@@ -9,7 +9,6 @@ import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
 
 import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
-
 import type { SystemName } from "./runtimeTypes";
 
 // =====================================
@@ -17,6 +16,7 @@ import type { SystemName } from "./runtimeTypes";
 // =====================================
 
 type SystemFlag = {
+  id?: string; // ✅ FIX (wymagane przez repo)
   system: string;
   enabled: string;
   reason?: string;
@@ -49,6 +49,39 @@ let lastFetch = 0;
 const TTL = 30_000;
 
 // =====================================
+// 🧠 SEED SYSTEM FLAGS
+// =====================================
+
+async function seedIfEmpty() {
+  const existing = await repo.findAll();
+
+  if (existing.length > 0) return;
+
+  const flow = log.flow("flags.seed");
+
+  flow.start();
+
+  try {
+    const systems = SYSTEM_REGISTRY.map((s) => ({
+      id: s.name,
+      system: s.name,
+      enabled: "true",
+    }));
+
+    await repo.createMany([
+      { id: "global", system: "global", enabled: "true" },
+      ...systems,
+    ]);
+
+    flow.success({
+      stats: { systems: systems.length },
+    });
+  } catch (err) {
+    flow.fail(err);
+  }
+}
+
+// =====================================
 // 🔄 REFRESH
 // =====================================
 
@@ -58,43 +91,18 @@ async function refresh() {
   flow.start();
 
   try {
+    await seedIfEmpty();
+
     const data = await repo.findAll();
 
-    const requiredSystems = [
-      "global",
-      ...SYSTEM_REGISTRY.map((s) => s.name),
-    ];
-
-    const existing = new Set(data.map((d) => d.system));
-
-    const missing = requiredSystems.filter(
-      (s) => !existing.has(s)
-    );
-
-    if (missing.length > 0) {
-      flow.stepWarn("missing.systems", {
-        meta: { missing },
-      });
-
-      await repo.createMany(
-        missing.map((system) => ({
-          system,
-          enabled: "true",
-        }))
-      );
-    }
-
-    const finalData =
-      missing.length > 0 ? await repo.findAll() : data;
-
     cache = new Map(
-      finalData.map((d) => [d.system, d.enabled === "true"])
+      data.map((d) => [d.system, d.enabled === "true"])
     );
 
     lastFetch = Date.now();
 
     flow.success({
-      stats: { count: finalData.length },
+      stats: { count: data.length },
     });
   } catch (err) {
     flow.fail(err);
@@ -110,9 +118,9 @@ async function ensure() {
 
   const expired = Date.now() - lastFetch > TTL;
 
-  flow.stepDebug("cache_check", {
+  flow.stepDebug("cache.check", {
     decision: {
-      condition: "ttl",
+      condition: "ttl_expired",
       result: expired,
     },
   });
