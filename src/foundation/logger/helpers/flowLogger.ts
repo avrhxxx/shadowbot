@@ -4,97 +4,79 @@
 
 import type { LogPayload } from "../loggerTypes";
 
-// =====================================
-// 🔧 TYPES
-// =====================================
-
 type FlowStepPayload = Partial<LogPayload>;
-
-// =====================================
-// 🚀 FLOW LOGGER
-// =====================================
 
 export function createFlowLogger(
   log: any,
-  systemName: string,
+  scope: string,
   flowName: string
 ) {
-  const baseEvent = `system.${systemName}.${flowName}`;
+  const base = flowName;
 
   return {
-    // =====================================
-    // ▶ START
-    // =====================================
     start(payload?: FlowStepPayload) {
-      log.info(`${baseEvent}.start`, payload);
+      log.info(`${base}.start`, {
+        ...payload,
+        scope,
+      });
     },
 
-    // =====================================
-    // 🔹 STEP (DEBUG)
-    // =====================================
     step(step: string, payload?: FlowStepPayload) {
-      log.debug(baseEvent, {
+      log.debug(`${base}.${step}`, {
         ...payload,
+        scope,
         flow: { step },
       });
     },
 
-    // =====================================
-    // 🔹 DEBUG
-    // =====================================
     stepDebug(step: string, payload?: FlowStepPayload) {
-      log.debug(baseEvent, {
+      log.debug(`${base}.${step}`, {
         ...payload,
+        scope,
         flow: { step },
       });
     },
 
-    // =====================================
-    // ℹ INFO
-    // =====================================
     stepInfo(step: string, payload?: FlowStepPayload) {
-      log.info(baseEvent, {
+      log.info(`${base}.${step}`, {
         ...payload,
+        scope,
         flow: { step },
       });
     },
 
-    // =====================================
-    // ⚠ WARN
-    // =====================================
     stepWarn(step: string, payload?: FlowStepPayload) {
-      log.warn(baseEvent, {
+      log.warn(`${base}.${step}`, {
         ...payload,
+        scope,
         flow: { step },
       });
     },
 
-    // =====================================
-    // ❌ ERROR STEP
-    // =====================================
     stepError(
       step: string,
       error?: unknown,
       payload?: FlowStepPayload
     ) {
-      log.error(baseEvent, error, {
+      log.error(`${base}.${step}`, error, {
         ...payload,
+        scope,
         flow: { step },
       });
     },
 
-    // =====================================
-    // ✅ SUCCESS
-    // =====================================
     success(payload?: FlowStepPayload) {
-      log.info(`${baseEvent}.success`, payload);
+      log.info(`${base}.success`, {
+        ...payload,
+        scope,
+      });
     },
 
-    // =====================================
-    // 💥 FAIL
-    // =====================================
     fail(error?: unknown, payload?: FlowStepPayload) {
-      log.error(`${baseEvent}.fail`, error, payload);
+      log.error(`${base}.fail`, error, {
+        ...payload,
+        scope,
+      });
     },
   };
 }
