@@ -31,12 +31,7 @@ export type SheetDefinition = Readonly<{
 
 export const SYSTEM_FLAGS_SHEET = {
   name: "system_flags",
-  headers: [
-    "id",
-    "system",
-    "enabled",
-    "reason",
-  ],
+  headers: ["id", "system", "enabled", "reason"],
 } as const satisfies SheetDefinition;
 
 // =====================================
@@ -101,45 +96,22 @@ export const EVENTS_CONFIG_SHEET = {
 
 export const POINTS_WEEKS_SHEET = {
   name: "points_weeks",
-  headers: [
-    "id",
-    "guildId",
-    "category",
-    "week",
-    "createdAt",
-  ],
+  headers: ["id", "guildId", "category", "week", "createdAt"],
 } as const satisfies SheetDefinition;
 
 export const POINTS_DONATIONS_SHEET = {
   name: "points_donations",
-  headers: [
-    "id",
-    "guildId",
-    "category",
-    "nick",
-    "points",
-    "week",
-  ],
+  headers: ["id", "guildId", "category", "nick", "points", "week"],
 } as const satisfies SheetDefinition;
 
 export const POINTS_DUEL_SHEET = {
   name: "points_duel",
-  headers: [
-    "id",
-    "guildId",
-    "category",
-    "nick",
-    "points",
-    "week",
-  ],
+  headers: ["id", "guildId", "category", "nick", "points", "week"],
 } as const satisfies SheetDefinition;
 
 export const POINTS_CONFIG_SHEET = {
   name: "points_config",
-  headers: [
-    "id",
-    "guildId",
-  ],
+  headers: ["id", "guildId"],
 } as const satisfies SheetDefinition;
 
 // =====================================
@@ -175,21 +147,12 @@ export const ABSENCE_CONFIG_SHEET = {
 
 export const TRANSLATE_SHEET = {
   name: "translate",
-  headers: [
-    "id",
-    "guildId",
-    "key",
-    "lang",
-    "value",
-  ],
+  headers: ["id", "guildId", "key", "lang", "value"],
 } as const satisfies SheetDefinition;
 
 export const TRANSLATE_CONFIG_SHEET = {
   name: "translate_config",
-  headers: [
-    "id",
-    "guildId",
-  ],
+  headers: ["id", "guildId"],
 } as const satisfies SheetDefinition;
 
 // =====================================
@@ -282,6 +245,9 @@ export function getSheetByName(name: SheetName): SheetDefinition {
   return sheet;
 }
 
-export const SHEET_MAP = Object.fromEntries(
-  ALL_SHEETS.map((s) => [s.name, s])
-) as Record<SheetName, SheetDefinition>;
+// ✅ FIXED (type-safe)
+export const SHEET_MAP: Record<SheetName, SheetDefinition> =
+  ALL_SHEETS.reduce((acc, sheet) => {
+    acc[sheet.name] = sheet;
+    return acc;
+  }, {} as Record<SheetName, SheetDefinition>);
