@@ -2,8 +2,8 @@
 // 📁 src/core/logger/log.ts
 // =====================================
 
-import { TraceContext } from "@/core/trace/TraceContext";
-import { formatLog } from "@/core/logger/formatter";
+import type { TraceContext } from "../trace/TraceContext.js";
+import { formatLog } from "./formatter.js";
 
 // =====================================
 // 🔹 TYPES
