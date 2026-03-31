@@ -1,32 +1,25 @@
 // =====================================
-// 📁 src/integrations/google/googleVisionService.ts
+// 📁 src/integrations/google/googleVision.ts
 // =====================================
-
-/**
- * 🧠 ROLE:
- * Minimal Google Vision API client (OCR).
- *
- * Responsibilities:
- * - uses shared Google credentials
- * - sends request to Vision API
- * - returns raw response
- *
- * ❗ RULES:
- * - NO logging
- * - NO trace context
- * - NO parsing / business logic
- */
 
 import * as vision from "@google-cloud/vision";
-import { googleCredentials } from "@/integrations/google/googleSheetsClient.js";
+import { googleCredentials } from "./googleSheetsClient.js";
 
 // =====================================
-// 🔥 CLIENT (shared credentials)
+// 🔥 CLIENT (LAZY)
 // =====================================
 
-const client = new vision.ImageAnnotatorClient({
-  credentials: googleCredentials,
-});
+let client: vision.ImageAnnotatorClient | null = null;
+
+function getClient(): vision.ImageAnnotatorClient {
+  if (!client) {
+    client = new vision.ImageAnnotatorClient({
+      credentials: googleCredentials,
+    });
+  }
+
+  return client;
+}
 
 // =====================================
 // 🔍 OCR
@@ -40,7 +33,7 @@ export async function runVisionOCR(
   }
 
   try {
-    const [result] = await client.documentTextDetection({
+    const [result] = await getClient().documentTextDetection({
       image: { content: buffer },
       imageContext: {
         languageHints: ["en"],
@@ -49,7 +42,16 @@ export async function runVisionOCR(
 
     return result ?? null;
   } catch {
-    // transport layer intentionally silent
     return null;
   }
+}
+
+// =====================================
+// 🔧 OPTIONAL HELPER
+// =====================================
+
+export function extractText(
+  res: vision.protos.google.cloud.vision.v1.IAnnotateImageResponse | null
+): string | null {
+  return res?.fullTextAnnotation?.text ?? null;
 }
