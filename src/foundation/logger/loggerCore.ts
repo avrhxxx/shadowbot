@@ -8,9 +8,8 @@ import pino from "pino";
 // 🔹 ENV
 // =====================================
 
-const isPretty =
-  process.env.LOG_PRETTY === "true" ||
-  process.env.NODE_ENV !== "production";
+const isDev = process.env.NODE_ENV !== "production";
+const usePretty = process.env.LOG_PRETTY === "true";
 
 // =====================================
 // 🔹 HELPERS
@@ -25,19 +24,16 @@ function resolveScope(obj: any): string {
 function simplifyEvent(event: string): string {
   if (!event) return "log";
 
-  // system.init.start → init
   const parts = event.split(".");
   return parts[parts.length - 1];
 }
 
 // =====================================
-// 🔹 LOGGER
+// 🔹 LOGGER CONFIG
 // =====================================
 
-export const baseLogger = pino({
-  level: "debug",
-
-  transport: isPretty
+const transport =
+  isDev && usePretty
     ? {
         target: "pino-pretty",
         options: {
@@ -52,5 +48,13 @@ export const baseLogger = pino({
           },
         },
       }
-    : undefined,
+    : undefined;
+
+// =====================================
+// 🔹 LOGGER
+// =====================================
+
+export const baseLogger = pino({
+  level: "debug",
+  ...(transport ? { transport } : {}),
 });
