@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/integrations/google/googleSheetsSchema.ts
+// 📁 src/integrations/google/googleSchema.ts
 // =====================================
 
 /**
@@ -11,8 +11,7 @@
  * - column headers (STRICT ORDER)
  *
  * ❗ HARD RULES:
- * - NO logic
- * - NO imports
+ * - NO logic (except safe helpers)
  * - NO dynamic columns
  * - MUST match services exactly
  */
@@ -30,7 +29,7 @@ export type SheetDefinition = Readonly<{
 // 🔹 SYSTEM FLAGS (🆕 RUNTIME CORE)
 // =====================================
 
-export const SYSTEM_FLAGS_SHEET: SheetDefinition = {
+export const SYSTEM_FLAGS_SHEET = {
   name: "system_flags",
   headers: [
     "id",
@@ -38,13 +37,13 @@ export const SYSTEM_FLAGS_SHEET: SheetDefinition = {
     "enabled",
     "reason",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 MODERATOR
 // =====================================
 
-export const MODERATOR_CONFIG_SHEET: SheetDefinition = {
+export const MODERATOR_CONFIG_SHEET = {
   name: "moderator_config",
   headers: [
     "id",
@@ -56,13 +55,13 @@ export const MODERATOR_CONFIG_SHEET: SheetDefinition = {
     "version",
     "lastUpdated",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 EVENTS
 // =====================================
 
-export const EVENTS_SHEET: SheetDefinition = {
+export const EVENTS_SHEET = {
   name: "events",
   headers: [
     "id",
@@ -84,9 +83,9 @@ export const EVENTS_SHEET: SheetDefinition = {
     "started",
     "lastBirthdayYear",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const EVENTS_CONFIG_SHEET: SheetDefinition = {
+export const EVENTS_CONFIG_SHEET = {
   name: "events_config",
   headers: [
     "id",
@@ -94,13 +93,13 @@ export const EVENTS_CONFIG_SHEET: SheetDefinition = {
     "notificationChannel",
     "downloadChannel",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 POINTS
 // =====================================
 
-export const POINTS_WEEKS_SHEET: SheetDefinition = {
+export const POINTS_WEEKS_SHEET = {
   name: "points_weeks",
   headers: [
     "id",
@@ -109,9 +108,9 @@ export const POINTS_WEEKS_SHEET: SheetDefinition = {
     "week",
     "createdAt",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const POINTS_DONATIONS_SHEET: SheetDefinition = {
+export const POINTS_DONATIONS_SHEET = {
   name: "points_donations",
   headers: [
     "id",
@@ -121,9 +120,9 @@ export const POINTS_DONATIONS_SHEET: SheetDefinition = {
     "points",
     "week",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const POINTS_DUEL_SHEET: SheetDefinition = {
+export const POINTS_DUEL_SHEET = {
   name: "points_duel",
   headers: [
     "id",
@@ -133,21 +132,21 @@ export const POINTS_DUEL_SHEET: SheetDefinition = {
     "points",
     "week",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const POINTS_CONFIG_SHEET: SheetDefinition = {
+export const POINTS_CONFIG_SHEET = {
   name: "points_config",
   headers: [
     "id",
     "guildId",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 ABSENCE
 // =====================================
 
-export const ABSENCE_SHEET: SheetDefinition = {
+export const ABSENCE_SHEET = {
   name: "absence",
   headers: [
     "id",
@@ -158,9 +157,9 @@ export const ABSENCE_SHEET: SheetDefinition = {
     "createdAt",
     "year",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const ABSENCE_CONFIG_SHEET: SheetDefinition = {
+export const ABSENCE_CONFIG_SHEET = {
   name: "absence_config",
   headers: [
     "id",
@@ -168,13 +167,13 @@ export const ABSENCE_CONFIG_SHEET: SheetDefinition = {
     "notificationChannel",
     "absenceEmbedId",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 TRANSLATION (FUTURE)
 // =====================================
 
-export const TRANSLATE_SHEET: SheetDefinition = {
+export const TRANSLATE_SHEET = {
   name: "translate",
   headers: [
     "id",
@@ -183,21 +182,21 @@ export const TRANSLATE_SHEET: SheetDefinition = {
     "lang",
     "value",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const TRANSLATE_CONFIG_SHEET: SheetDefinition = {
+export const TRANSLATE_CONFIG_SHEET = {
   name: "translate_config",
   headers: [
     "id",
     "guildId",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 QUICKADD
 // =====================================
 
-export const QUICKADD_NICKNAMES_SHEET: SheetDefinition = {
+export const QUICKADD_NICKNAMES_SHEET = {
   name: "quickadd_nicknames",
   headers: [
     "type",
@@ -208,9 +207,9 @@ export const QUICKADD_NICKNAMES_SHEET: SheetDefinition = {
     "override",
     "createdAt",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const QUICKADD_POINTS_QUEUE_SHEET: SheetDefinition = {
+export const QUICKADD_POINTS_QUEUE_SHEET = {
   name: "quickadd_points_queue",
   headers: [
     "guildId",
@@ -221,9 +220,9 @@ export const QUICKADD_POINTS_QUEUE_SHEET: SheetDefinition = {
     "status",
     "createdAt",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
-export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
+export const QUICKADD_EVENTS_QUEUE_SHEET = {
   name: "quickadd_events_queue",
   headers: [
     "guildId",
@@ -233,14 +232,14 @@ export const QUICKADD_EVENTS_QUEUE_SHEET: SheetDefinition = {
     "status",
     "createdAt",
   ],
-} as const;
+} as const satisfies SheetDefinition;
 
 // =====================================
 // 🔹 REGISTRY
 // =====================================
 
 export const ALL_SHEETS = [
-  SYSTEM_FLAGS_SHEET, // ✅ MUST BE FIRST (runtime critical)
+  SYSTEM_FLAGS_SHEET,
 
   MODERATOR_CONFIG_SHEET,
 
@@ -261,10 +260,28 @@ export const ALL_SHEETS = [
   QUICKADD_NICKNAMES_SHEET,
   QUICKADD_POINTS_QUEUE_SHEET,
   QUICKADD_EVENTS_QUEUE_SHEET,
-] as const;
+] as const satisfies readonly SheetDefinition[];
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
 export type SheetName = (typeof ALL_SHEETS)[number]["name"];
+
+// =====================================
+// 🔧 HELPERS (SAFE)
+// =====================================
+
+export function getSheetByName(name: SheetName): SheetDefinition {
+  const sheet = ALL_SHEETS.find((s) => s.name === name);
+
+  if (!sheet) {
+    throw new Error(`Sheet "${name}" not found`);
+  }
+
+  return sheet;
+}
+
+export const SHEET_MAP = Object.fromEntries(
+  ALL_SHEETS.map((s) => [s.name, s])
+) as Record<SheetName, SheetDefinition>;
