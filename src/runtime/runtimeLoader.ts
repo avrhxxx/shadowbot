@@ -23,17 +23,23 @@ type RuntimeModule = {
 async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const ctx = createRootContext({
     source: "system",
-    system: entry.name as never, // ✅ lepsze niż any (świadome ograniczenie)
+    system: entry.name as never,
   });
 
   const log = createLogger(ctx);
+
+  const flow = log.system(entry.name).flow("system.lifecycle");
+
+  flow.start();
 
   // =============================
   // 🔒 ENABLE CHECK
   // =============================
 
-  if (!(await isSystemEnabled(entry.name))) {
-    log.warn("system.disabled", {
+  const enabled = await isSystemEnabled(entry.name);
+
+  if (!enabled) {
+    flow.stepInfo("disabled", {
       meta: { system: entry.name },
     });
     return;
@@ -46,19 +52,14 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   let mod: unknown;
 
   try {
-    log.debug("system.load.start", {
-      meta: { system: entry.name },
-    });
+    flow.stepDebug("load.start");
 
     mod = await entry.loader();
 
-    log.debug("system.load.success", {
-      meta: { system: entry.name },
-    });
+    flow.stepInfo("load.success");
   } catch (err) {
-    log.error("system.load.failed", err, {
-      meta: { system: entry.name },
-    });
+    flow.stepError("load.failed", err);
+    flow.fail(err);
     return;
   }
 
@@ -76,9 +77,10 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   // =============================
 
   if (!module?.init) {
-    log.error("system.invalid_module", {
+    flow.stepError("invalid_module", {
       meta: { system: entry.name },
     });
+    flow.fail();
     return;
   }
 
@@ -87,19 +89,15 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   // =============================
 
   try {
-    log.debug("system.init.start", {
-      meta: { system: entry.name },
-    });
+    flow.stepDebug("init.start");
 
     await module.init(ctx);
 
-    log.info("system.started", {
-      meta: { system: entry.name },
-    });
+    flow.stepInfo("init.success");
+    flow.success();
   } catch (err) {
-    log.error("system.init.failed", err, {
-      meta: { system: entry.name },
-    });
+    flow.stepError("init.failed", err);
+    flow.fail(err);
   }
 }
 
@@ -108,7 +106,19 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
 // =====================================
 
 export async function loadAllSystems() {
+  const ctx = createRootContext({
+    source: "system",
+    system: "app",
+  });
+
+  const log = createLogger(ctx);
+  const flow = log.system("app").flow("runtime.load_all");
+
+  flow.start();
+
   for (const entry of SYSTEM_REGISTRY) {
     await executeSystem(entry);
   }
+
+  flow.success();
 }
