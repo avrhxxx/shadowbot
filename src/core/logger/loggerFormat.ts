@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/core/logger/loggerFormat.ts
-// =====================================
-
 import type { LogPayload } from "./loggerTypes.js";
 
 // =====================================
@@ -48,13 +44,28 @@ function clean<T>(obj: T): T | undefined {
   return Object.fromEntries(entries) as T;
 }
 
+function normalizeError(err: unknown) {
+  if (!err) return undefined;
+
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+    };
+  }
+
+  return {
+    message: String(err),
+  };
+}
+
 function shortId(id?: string) {
   if (!id) return "-";
   return id.split("-")[1]?.slice(0, 4) ?? id;
 }
 
 // =====================================
-// 🔥 FORMATTER
+// 🔥 FORMATTER (PURE)
 // =====================================
 
 export function loggerFormat(payload: LogPayload) {
@@ -71,26 +82,34 @@ export function loggerFormat(payload: LogPayload) {
     `${payload.event} ` +
     `${COLORS.gray}(t-${shortId(payload.traceId)})${COLORS.reset}`;
 
-  console.group(header);
+  const lines: Array<[string, unknown]> = [];
 
-  if (payload.tags) console.log("tags:", payload.tags);
+  if (payload.tags) lines.push(["tags", payload.tags]);
 
-  if (payload.context) console.log("context:", clean(payload.context));
-  if (payload.input) console.log("input:", clean(payload.input));
-  if (payload.result) console.log("result:", clean(payload.result));
-  if (payload.error) console.log("error:", payload.error);
+  if (payload.context) lines.push(["context", clean(payload.context)]);
+  if (payload.input) lines.push(["input", clean(payload.input)]);
+  if (payload.result) lines.push(["result", clean(payload.result)]);
 
-  if (payload.timing) console.log("timing:", payload.timing);
+  const error = normalizeError(payload.error);
+  if (error) lines.push(["error", error]);
 
-  if (payload.stats) console.log("stats:", payload.stats);
-  if (payload.metrics) console.log("metrics:", payload.metrics);
-  if (payload.meta) console.log("meta:", payload.meta);
+  if (payload.timing) lines.push(["timing", payload.timing]);
+  if (payload.durationMs) lines.push(["duration", payload.durationMs]);
 
-  if (payload.flow) console.log("flow:", payload.flow);
-  if (payload.decision) console.log("decision:", payload.decision);
+  if (payload.stats) lines.push(["stats", payload.stats]);
+  if (payload.metrics) lines.push(["metrics", payload.metrics]);
+  if (payload.meta) lines.push(["meta", payload.meta]);
+
+  if (payload.flow) lines.push(["flow", payload.flow]);
+  if (payload.decision) lines.push(["decision", payload.decision]);
 
   if (payload.interaction)
-    console.log("interaction:", payload.interaction);
+    lines.push(["interaction", payload.interaction]);
 
-  console.groupEnd();
+  if (payload.trace) lines.push(["trace", payload.trace]);
+
+  return {
+    header,
+    lines,
+  };
 }
