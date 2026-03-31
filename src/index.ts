@@ -5,7 +5,10 @@
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
-import { createAppContext } from "@/trace";
+import {
+  createAppContext,
+  createRootContext,
+} from "@/trace";
 
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
@@ -33,21 +36,21 @@ const client = new Client({
 // 🔹 APP CONTEXT
 // =====================================
 
-const ctx = createAppContext();
-const log = createLogger(ctx);
+const appCtx = createAppContext();
+const appLog = createLogger(appCtx);
 
 // =====================================
 // 🔹 BOOTSTRAP
 // =====================================
 
-const bootstrapFlow = log.system("app").flow("bootstrap");
+const bootstrapFlow = appLog.flow("bootstrap");
 bootstrapFlow.start();
 
 // =====================================
 // 🔹 GLOBAL ERRORS
 // =====================================
 
-const runtimeFlow = log.system("app").flow("runtime");
+const runtimeFlow = appLog.flow("runtime");
 
 process.on("unhandledRejection", (err) => {
   runtimeFlow.fail(err);
@@ -63,17 +66,23 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  const discordFlow = log.system("app").flow("discord");
+  const discordFlow = appLog.flow("discord");
 
   discordFlow.stepInfo("ready", {
     meta: { user: client.user?.tag },
   });
 
   // =============================
-  // 🧠 GOOGLE INIT
+  // 🧠 GOOGLE INIT (oddzielny system!)
   // =============================
 
-  const googleFlow = log.system("google").flow("init");
+  const googleCtx = createRootContext({
+    source: "system",
+    system: "google",
+  });
+
+  const googleLog = createLogger(googleCtx);
+  const googleFlow = googleLog.flow("init");
 
   googleFlow.start();
 
@@ -86,18 +95,24 @@ client.once("ready", async () => {
   }
 
   // =============================
-  // 🧠 RUNTIME
+  // 🧠 RUNTIME (oddzielny system!)
   // =============================
 
-  const runtimeFlow = log.system("runtime").flow("load");
+  const runtimeCtx = createRootContext({
+    source: "system",
+    system: "runtime",
+  });
 
-  runtimeFlow.start();
+  const runtimeLog = createLogger(runtimeCtx);
+  const runtimeLoadFlow = runtimeLog.flow("load");
+
+  runtimeLoadFlow.start();
 
   try {
     await loadAllSystems();
-    runtimeFlow.success();
+    runtimeLoadFlow.success();
   } catch (err) {
-    runtimeFlow.fail(err);
+    runtimeLoadFlow.fail(err);
   }
 });
 
@@ -105,7 +120,7 @@ client.once("ready", async () => {
 // 🔐 LOGIN
 // =====================================
 
-const loginFlow = log.system("app").flow("login");
+const loginFlow = appLog.flow("login");
 
 loginFlow.start();
 
