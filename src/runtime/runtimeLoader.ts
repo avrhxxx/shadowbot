@@ -2,23 +2,6 @@
 // 📁 src/runtime/runtimeLoader.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Runtime system executor
- *
- * 📥 INPUT:
- * - SYSTEM_REGISTRY
- * - runtime state (enable/disable)
- *
- * 📤 OUTPUT:
- * - initialized systems
- *
- * ❗ GOALS:
- * - safe execution
- * - full observability (logger)
- * - isolation per system
- */
-
 import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
 import { isSystemEnabled } from "./runtimeState.js";
 
@@ -26,7 +9,7 @@ import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
 
 // =====================================
-// 🔹 TYPES (runtime safety)
+// 🔹 TYPES
 // =====================================
 
 type RuntimeModule = {
@@ -40,7 +23,7 @@ type RuntimeModule = {
 async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const ctx = createRootContext({
     source: "system",
-    system: entry.name as any, // 🔥 świadome — dynamic systems
+    system: entry.name as never, // ✅ lepsze niż any (świadome ograniczenie)
   });
 
   const log = createLogger(ctx);
@@ -60,14 +43,14 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   // 📦 LOAD MODULE
   // =============================
 
-  let module: RuntimeModule;
+  let mod: unknown;
 
   try {
     log.debug("system.load.start", {
       meta: { system: entry.name },
     });
 
-    module = await entry.loader();
+    mod = await entry.loader();
 
     log.debug("system.load.success", {
       meta: { system: entry.name },
@@ -78,6 +61,15 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
     });
     return;
   }
+
+  // =============================
+  // 🔍 NORMALIZE MODULE
+  // =============================
+
+  const module: RuntimeModule | undefined =
+    (mod as RuntimeModule)?.init
+      ? (mod as RuntimeModule)
+      : (mod as { default?: RuntimeModule })?.default;
 
   // =============================
   // 🛑 VALIDATION
