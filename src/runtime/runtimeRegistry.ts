@@ -2,7 +2,7 @@
 // 📁 src/runtime/runtimeRegistry.ts
 // =====================================
 
-import type { SystemRegistryEntry } from "./runtimeTypes";
+import type { SystemRegistryEntry } from "./runtimeTypes.js";
 
 // =====================================
 // 🔹 REGISTRY
@@ -13,7 +13,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "moderator",
     type: "global",
     loader: async () => {
-      const mod = await import("@/system/moderator");
+      const mod = await import("../system/moderator.js");
       return { init: mod.initModeratorPanel };
     },
   },
@@ -21,7 +21,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "translation",
     type: "global",
     loader: async () => {
-      const mod = await import("@/system/translation");
+      const mod = await import("../system/translation.js");
       return { init: mod.initTranslationModule };
     },
   },
@@ -29,7 +29,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "events",
     type: "guild",
     loader: async () => {
-      const mod = await import("@/system/events");
+      const mod = await import("../system/events.js");
       return { init: mod.initEventReminders };
     },
   },
@@ -37,7 +37,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "absence",
     type: "guild",
     loader: async () => {
-      const mod = await import("@/system/absence");
+      const mod = await import("../system/absence.js");
       return { init: mod.initAbsenceNotifications };
     },
   },
@@ -45,7 +45,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "quickadd",
     type: "global",
     loader: async () => {
-      const mod = await import("@/system/quickadd");
+      const mod = await import("../system/quickadd.js");
       return { init: mod.registerQuickAddListener };
     },
   },
@@ -53,7 +53,7 @@ export const systems: SystemRegistryEntry[] = [
     name: "quickadd_worker",
     type: "global",
     loader: async () => {
-      const mod = await import("@/system/quickadd");
+      const mod = await import("../system/quickadd.js");
       return { init: mod.startQuickAddWorker };
     },
   },
