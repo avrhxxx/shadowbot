@@ -18,7 +18,7 @@ import type {
 } from "@/foundation/ids/idTypes";
 
 // =====================================
-// 🔹 RE-EXPORT (🔥 FIX)
+// 🔹 RE-EXPORT
 // =====================================
 
 export type {
@@ -44,15 +44,23 @@ export type TraceSource =
   | "external";
 
 // =====================================
-// 🔹 SYSTEM
+// 🔹 SYSTEM (🔥 ROZSZERZONE)
 // =====================================
 
 export type TraceSystem =
+  // 🔹 APP / CORE
   | "app"
+
+  // 🔹 INFRA / RUNTIME
+  | "runtime"
+  | "google"
+
+  // 🔹 FEATURES
   | "events"
   | "absence"
   | "points"
-  | "quickadd";
+  | "quickadd"
+  | "test";
 
 // =====================================
 // 🔹 TRACE CONTEXT
