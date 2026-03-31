@@ -50,10 +50,9 @@ function colorLevel(level: string) {
   }
 }
 
-function formatKV(label: string, value: any) {
-  if (value === undefined || value === null) return null;
-  return `${colors.gray}${label}${colors.reset} : ${value}`;
-}
+// =====================================
+// 🔹 FORMATTERS
+// =====================================
 
 function formatObjectBlock(label: string, obj?: Record<string, any>) {
   if (!obj || Object.keys(obj).length === 0) return null;
@@ -68,21 +67,8 @@ function formatObjectBlock(label: string, obj?: Record<string, any>) {
   return `${colors.magenta}${label}${colors.reset}:\n${entries}`;
 }
 
-// =====================================
-// 🔹 FLOW GROUPING (lekki)
-// =====================================
-
-let lastFlowId: string | undefined;
-
-function getFlowSeparator(flowId?: string) {
-  if (!flowId) return null;
-
-  if (flowId !== lastFlowId) {
-    lastFlowId = flowId;
-    return `${colors.gray}──────── FLOW ${flowId} ────────${colors.reset}`;
-  }
-
-  return null;
+function getHeader(level: string, scope: string) {
+  return `${colors.gray}──────── ${level} | ${colors.cyan}${scope}${colors.reset} ${colors.gray}────────${colors.reset}`;
 }
 
 // =====================================
@@ -94,47 +80,48 @@ function formatLog(log: any) {
   const event = simplifyEvent(log.event);
   const level = colorLevel(log.level ?? "info");
 
-  const flowSeparator = getFlowSeparator(log.flowId);
-
   const lines: (string | null)[] = [
-    flowSeparator,
+    // 🔥 HEADER (zawsze)
+    getHeader(level, scope),
 
-    `${level} | ${colors.cyan}${scope}${colors.reset}`,
-    `${colors.green}EVENT${colors.reset} : ${event}`,
+    // 🔹 CORE
+    `${colors.green}EVENT${colors.reset}   : ${event}`,
 
-    // IDs (pełne, bez stripowania)
-    formatKV("TRACE", log.traceId),
-    formatKV("FLOW", log.flowId),
-    formatKV("CORR", log.correlationId),
-
-    // STEP
     log.flow?.step
-      ? `${colors.yellow}STEP${colors.reset}  : ${log.flow.step}`
+      ? `${colors.yellow}STEP${colors.reset}    : ${log.flow.step}`
       : null,
 
-    // META / INPUT / RESULT
+    // 🔹 STRUCTURED BLOCKS
     formatObjectBlock("META", log.meta),
     formatObjectBlock("INPUT", log.input),
     formatObjectBlock("RESULT", log.result),
 
-    // TIMING
+    log.stats ? formatObjectBlock("STATS", log.stats) : null,
+
     log.timing
       ? `${colors.yellow}TIMING${colors.reset} : ${log.timing.label} (${log.timing.durationMs}ms)`
       : null,
 
-    log.stats ? formatObjectBlock("STATS", log.stats) : null,
-
-    // ERROR BLOCK (mocny wizualnie)
+    // 🔥 ERROR
     log.error
       ? [
-          `${colors.red}──────── ERROR ────────${colors.reset}`,
-          `${colors.red}${log.error.message || log.error}${colors.reset}`,
+          `${colors.red}ERROR${colors.reset}:`,
+          `  ${log.error.message || log.error}`,
           log.error.stack
             ? `${colors.gray}${log.error.stack}${colors.reset}`
             : null,
         ]
           .filter(Boolean)
           .join("\n")
+      : null,
+
+    // 🔹 DEBUG ONLY (trace itp.)
+    log.level === "debug"
+      ? [
+          `${colors.gray}TRACE${colors.reset} : ${log.traceId}`,
+          `${colors.gray}FLOW${colors.reset}  : ${log.flowId}`,
+          `${colors.gray}CORR${colors.reset} : ${log.correlationId}`,
+        ].join("\n")
       : null,
   ];
 
