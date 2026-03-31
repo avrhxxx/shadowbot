@@ -37,23 +37,10 @@ const ctx = createAppContext();
 const log = createLogger(ctx);
 
 // =====================================
-// 🔥 BOOTSTRAP LOGS
+// 🔹 BOOTSTRAP
 // =====================================
 
-console.log("🔥 APP START");
 log.info("app.init");
-
-// =====================================
-// 🧪 DEBUG (KLUCZOWE TERAZ)
-// =====================================
-
-client.on("debug", (msg) => {
-  console.log("🐛 DEBUG:", msg);
-});
-
-client.on("error", (err) => {
-  console.error("❌ CLIENT ERROR:", err);
-});
 
 // =====================================
 // 🔹 GLOBAL ERRORS
@@ -69,18 +56,16 @@ process.on("uncaughtException", (err) => {
 });
 
 // =====================================
-// 🚀 READY (RAW EVENT)
+// 🚀 READY
 // =====================================
 
 client.once("ready", async () => {
-  console.log("🟢 DISCORD READY (raw)");
-
   log.info("app.ready", {
     meta: { user: client.user?.tag },
   });
 
   // =============================
-  // 🧠 INIT GOOGLE (SELF-HEALING)
+  // 🧠 INIT GOOGLE
   // =============================
 
   try {
