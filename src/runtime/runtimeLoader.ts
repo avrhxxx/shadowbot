@@ -2,14 +2,14 @@
 // 📁 src/runtime/runtimeLoader.ts
 // =====================================
 
-import { systems } from "./runtimeRegistry";
-import { isSystemEnabled } from "./runtimeState";
+import { systems } from "./runtimeRegistry.js";
+import { isSystemEnabled } from "./runtimeState.js";
 
-import { log } from "@/core/logger/log";
-import { createChildContext } from "@/core/trace/TraceContext";
+import { log } from "../core/logger/log.js";
+import { createChildContext } from "../core/trace/TraceContext.js";
 
 import type { Client, Guild } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
+import type { TraceContext } from "../core/trace/TraceContext.js";
 
 // =====================================
 // 🔹 ERROR NORMALIZER
