@@ -5,18 +5,12 @@
 import pino from "pino";
 
 // =====================================
-// 🔹 ENV
-// =====================================
-
-const isDev = process.env.NODE_ENV !== "production";
-
-// =====================================
 // 🔹 HELPERS
 // =====================================
 
 function resolveScope(obj: any): string {
-  if (obj?.meta?.system) return `SYSTEM: ${obj.meta.system}`;
-  if (obj?.system) return `SYSTEM: ${obj.system}`;
+  if (obj?.meta?.system) return `SYSTEM ${obj.meta.system}`;
+  if (obj?.system) return `SYSTEM ${obj.system}`;
   return "APP";
 }
 
@@ -31,6 +25,12 @@ function simplifyEvent(event?: string): string {
   return parts[parts.length - 1];
 }
 
+function stripIdPrefix(id?: string) {
+  if (!id) return "-";
+  const parts = id.split(":");
+  return parts.length > 1 ? parts[1] : id;
+}
+
 // =====================================
 // 🔹 CUSTOM FORMATTER (STACKED CARD)
 // =====================================
@@ -40,9 +40,9 @@ function formatLog(log: any) {
   const scope = resolveScope(log);
   const event = simplifyEvent(log.event);
 
-  const trace = log.traceId ?? "-";
-  const flow = log.flowId ?? "-";
-  const corr = log.correlationId ?? "-";
+  const trace = stripIdPrefix(log.traceId);
+  const flow = stripIdPrefix(log.flowId);
+  const corr = stripIdPrefix(log.correlationId);
 
   return `
 ═══════════════════════════════
@@ -64,7 +64,6 @@ CORR  : ${corr}
 export const baseLogger = pino({
   level: "debug",
 
-  // ❗ klucz: wyłączamy JSON output
   formatters: {
     log(obj) {
       return { msg: formatLog(obj) };
@@ -73,8 +72,6 @@ export const baseLogger = pino({
 
   messageKey: "msg",
 
-  // ❗ usuwamy zbędne rzeczy z pino
   base: undefined,
-
   timestamp: false,
 });
