@@ -33,7 +33,7 @@ const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 
 const ctx = createRootContext({
   source: "system",
-  system: "runtime_flags" as never,
+  system: "runtime", // 🔥 było runtime_flags → upraszczamy
 });
 
 const log = createLogger(ctx);
@@ -52,7 +52,7 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  const flow = log.system("runtime_flags").flow("refresh");
+  const flow = log.flow("flags.refresh");
 
   flow.start();
 
@@ -88,7 +88,7 @@ async function refresh() {
 // =====================================
 
 async function ensure() {
-  const flow = log.system("runtime_flags").flow("ensure");
+  const flow = log.flow("flags.ensure");
 
   const expired = Date.now() - lastFetch > TTL;
 
@@ -111,7 +111,7 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
-  const flow = log.system("runtime_flags").flow("check");
+  const flow = log.flow("flags.check");
 
   await ensure();
 
