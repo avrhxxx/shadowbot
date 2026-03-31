@@ -17,27 +17,9 @@ import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-} from "@/foundation/ids/idGenerator"; // ✅ FIXED IMPORT
+} from "@/foundation/ids/idGenerator";
 
 import type { TraceContext } from "./traceTypes";
-
-// =====================================
-// 🚀 APP CONTEXT (ENTRY ROOT)
-// =====================================
-
-/**
- * Used at application bootstrap
- */
-export function createAppContext(): TraceContext {
-  return {
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
-
-    source: "system",
-    system: "app",
-  };
-}
 
 // =====================================
 // 🚀 ROOT CONTEXT
@@ -55,6 +37,23 @@ export function createRootContext(
     flowId: createFlowId(),
     ...data,
   };
+}
+
+// =====================================
+// 🌍 APP CONTEXT (ENTRYPOINT)
+// =====================================
+
+/**
+ * 🧠 ROLE:
+ * Root context for entire application lifecycle
+ *
+ * ❗ ALWAYS use this in src/index.ts
+ */
+export function createAppContext(): TraceContext {
+  return createRootContext({
+    source: "system",
+    system: "app",
+  });
 }
 
 // =====================================
