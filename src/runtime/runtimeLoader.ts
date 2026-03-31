@@ -4,14 +4,19 @@
 
 /**
  * 🧠 ROLE:
- * Uruchamia systemy runtime
+ * Runtime system executor
  *
- * INPUT:
- * - registry
- * - state (czy system aktywny)
+ * 📥 INPUT:
+ * - SYSTEM_REGISTRY
+ * - runtime state (enable/disable)
  *
- * OUTPUT:
- * - inicjalizowane moduły
+ * 📤 OUTPUT:
+ * - initialized systems
+ *
+ * ❗ GOALS:
+ * - safe execution
+ * - full observability (logger)
+ * - isolation per system
  */
 
 import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
@@ -21,13 +26,21 @@ import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
 
 // =====================================
+// 🔹 TYPES (runtime safety)
+// =====================================
+
+type RuntimeModule = {
+  init: (ctx: ReturnType<typeof createRootContext>) => Promise<void> | void;
+};
+
+// =====================================
 // 🚀 EXECUTE ONE SYSTEM
 // =====================================
 
 async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   const ctx = createRootContext({
     source: "system",
-    system: entry.name,
+    system: entry.name as any, // 🔥 świadome — dynamic systems
   });
 
   const log = createLogger(ctx);
@@ -44,11 +57,47 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   }
 
   // =============================
-  // 🚀 LOAD + INIT
+  // 📦 LOAD MODULE
+  // =============================
+
+  let module: RuntimeModule;
+
+  try {
+    log.debug("system.load.start", {
+      meta: { system: entry.name },
+    });
+
+    module = await entry.loader();
+
+    log.debug("system.load.success", {
+      meta: { system: entry.name },
+    });
+  } catch (err) {
+    log.error("system.load.failed", err, {
+      meta: { system: entry.name },
+    });
+    return;
+  }
+
+  // =============================
+  // 🛑 VALIDATION
+  // =============================
+
+  if (!module?.init) {
+    log.error("system.invalid_module", {
+      meta: { system: entry.name },
+    });
+    return;
+  }
+
+  // =============================
+  // 🚀 INIT
   // =============================
 
   try {
-    const module = await entry.loader();
+    log.debug("system.init.start", {
+      meta: { system: entry.name },
+    });
 
     await module.init(ctx);
 
@@ -56,7 +105,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
       meta: { system: entry.name },
     });
   } catch (err) {
-    log.error("system.error", err, {
+    log.error("system.init.failed", err, {
       meta: { system: entry.name },
     });
   }
