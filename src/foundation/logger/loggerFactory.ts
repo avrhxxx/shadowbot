@@ -25,7 +25,7 @@ function normalizeError(err: unknown) {
 }
 
 // =====================================
-// 🔹 TYPES (🔥 KLUCZOWE)
+// 🔹 TYPES
 // =====================================
 
 type LogInput = Partial<LogPayload>;
@@ -40,16 +40,6 @@ type FlowLogger = {
   fail(error?: unknown, payload?: LogInput): void;
 };
 
-type SystemLogger = {
-  debug(event: string, payload?: LogInput): void;
-  info(event: string, payload?: LogInput): void;
-  warn(event: string, payload?: LogInput): void;
-  error(event: string, error?: unknown, payload?: LogInput): void;
-  fatal(event: string, error?: unknown, payload?: LogInput): void;
-
-  flow(flowName: string): FlowLogger;
-};
-
 type Logger = {
   debug(event: string, payload?: LogInput): void;
   info(event: string, payload?: LogInput): void;
@@ -57,7 +47,7 @@ type Logger = {
   error(event: string, error?: unknown, payload?: LogInput): void;
   fatal(event: string, error?: unknown, payload?: LogInput): void;
 
-  system(systemName: string): SystemLogger;
+  flow(flowName: string): FlowLogger;
 };
 
 // =====================================
@@ -68,19 +58,16 @@ export function createLogger(ctx?: TraceContext): Logger {
   function baseLog(
     level: LogLevel,
     event: string,
-    payload?: LogInput,
-    overrideSystem?: string
+    payload?: LogInput
   ) {
     baseLogger[level]({
       event,
 
-      // 🔥 CONTEXT
+      // 🔥 TRACE (SOURCE OF TRUTH)
       traceId: ctx?.traceId,
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
-
-      // 🔥 SYSTEM (scope)
-      system: overrideSystem ?? ctx?.system ?? "app",
+      system: ctx?.system ?? "app",
 
       // 🔥 PAYLOAD
       ...(payload ?? {}),
@@ -107,79 +94,51 @@ export function createLogger(ctx?: TraceContext): Logger {
       baseLog("fatal", event, { ...(payload ?? {}), error }),
   };
 
-  function withSystem(systemName: string): SystemLogger {
+  function flow(flowName: string): FlowLogger {
+    const base = flowName;
+
     return {
-      debug: (event: string, payload?: LogInput) =>
-        baseLog("debug", event, payload, systemName),
+      start: (payload?: LogInput) =>
+        baseLog("info", `${base}.start`, payload),
 
-      info: (event: string, payload?: LogInput) =>
-        baseLog("info", event, payload, systemName),
+      stepDebug: (step: string, payload?: LogInput) =>
+        baseLog("debug", `${base}.${step}`, {
+          ...payload,
+          flow: { step },
+        }),
 
-      warn: (event: string, payload?: LogInput) =>
-        baseLog("warn", event, payload, systemName),
+      stepInfo: (step: string, payload?: LogInput) =>
+        baseLog("info", `${base}.${step}`, {
+          ...payload,
+          flow: { step },
+        }),
 
-      error: (event: string, error?: unknown, payload?: LogInput) =>
-        baseLog("error", event, { ...(payload ?? {}), error }, systemName),
+      stepWarn: (step: string, payload?: LogInput) =>
+        baseLog("warn", `${base}.${step}`, {
+          ...payload,
+          flow: { step },
+        }),
 
-      fatal: (event: string, error?: unknown, payload?: LogInput) =>
-        baseLog("fatal", event, { ...(payload ?? {}), error }, systemName),
+      stepError: (step: string, error?: unknown, payload?: LogInput) =>
+        baseLog("error", `${base}.${step}`, {
+          ...payload,
+          flow: { step },
+          error,
+        }),
 
-      flow(flowName: string): FlowLogger {
-        const base = flowName;
+      success: (payload?: LogInput) =>
+        baseLog("info", `${base}.success`, payload),
 
-        return {
-          start: (payload?: LogInput) =>
-            baseLog("info", `${base}.start`, payload, systemName),
-
-          stepDebug: (step: string, payload?: LogInput) =>
-            baseLog(
-              "debug",
-              `${base}.${step}`,
-              { ...payload, flow: { step } },
-              systemName
-            ),
-
-          stepInfo: (step: string, payload?: LogInput) =>
-            baseLog(
-              "info",
-              `${base}.${step}`,
-              { ...payload, flow: { step } },
-              systemName
-            ),
-
-          stepWarn: (step: string, payload?: LogInput) =>
-            baseLog(
-              "warn",
-              `${base}.${step}`,
-              { ...payload, flow: { step } },
-              systemName
-            ),
-
-          stepError: (step: string, error?: unknown, payload?: LogInput) =>
-            baseLog(
-              "error",
-              `${base}.${step}`,
-              { ...payload, flow: { step }, error },
-              systemName
-            ),
-
-          success: (payload?: LogInput) =>
-            baseLog("info", `${base}.success`, payload, systemName),
-
-          fail: (error?: unknown, payload?: LogInput) =>
-            baseLog(
-              "error",
-              `${base}.fail`,
-              { ...(payload ?? {}), error },
-              systemName
-            ),
-        };
-      },
+      fail: (error?: unknown, payload?: LogInput) =>
+        baseLog("error", `${base}.fail`, {
+          ...(payload ?? {}),
+          error,
+        }),
     };
   }
 
   return {
     ...raw,
-    system: withSystem,
+    flow,
   };
 }
