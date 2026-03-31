@@ -12,7 +12,7 @@ import type { TraceContext } from "@/trace";
 export async function init(ctx: TraceContext): Promise<void> {
   const log = createLogger(ctx);
 
-  const flow = log.system("test").flow("lifecycle");
+  const flow = log.flow("lifecycle");
 
   flow.start();
 
