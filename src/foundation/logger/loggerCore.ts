@@ -1,11 +1,7 @@
-// =====================================
-// 📁 src/foundation/logger/loggerCore.ts
-// =====================================
-
 import pino from "pino";
 
 // =====================================
-// 🎨 COLORS
+// 🎨 COLORS (ANSI - Railway wspiera)
 // =====================================
 
 const colors = {
@@ -24,28 +20,17 @@ const colors = {
 // =====================================
 
 function resolveScope(obj: any): string {
-  const scope = obj?.scope ?? "app";
-  const name = obj?.system;
-
-  if (scope === "system" && name) {
-    return `SYSTEM | ${name}`;
+  if (obj?.system && obj.system !== "app") {
+    return `SYSTEM | ${obj.system}`;
   }
 
-  if (scope === "runtime" && name) {
-    return `RUNTIME | ${name}`;
-  }
-
-  if (scope === "integration" && name) {
-    return `INTEGRATION | ${name}`;
-  }
-
-  return scope.toUpperCase();
+  return "APP";
 }
 
 function simplifyEvent(event?: string): string {
   if (!event) return "log";
   const parts = event.split(".");
-  return parts.slice(-2).join("."); // 🔥 lepszy kontekst
+  return parts[parts.length - 1];
 }
 
 function colorLevel(level: string) {
@@ -57,6 +42,7 @@ function colorLevel(level: string) {
       return `${colors.yellow}${level.toUpperCase()}${colors.reset}`;
     case "info":
       return `${colors.green}${level.toUpperCase()}${colors.reset}`;
+    case "debug":
     default:
       return `${colors.gray}${level.toUpperCase()}${colors.reset}`;
   }
@@ -84,7 +70,7 @@ function getHeader(level: string, scope: string) {
 }
 
 // =====================================
-// 🔹 FORMAT LOG
+// 🔹 CUSTOM FORMATTER
 // =====================================
 
 function formatLog(log: any) {
@@ -93,14 +79,17 @@ function formatLog(log: any) {
   const level = colorLevel(log.level ?? "info");
 
   const lines: (string | null)[] = [
+    // 🔥 HEADER
     getHeader(level, scope),
 
-    `${colors.green}EVENT${colors.reset} : ${event}`,
+    // 🔹 CORE
+    `${colors.green}EVENT${colors.reset}   : ${event}`,
 
     log.flow?.step
-      ? `${colors.yellow}STEP${colors.reset}  : ${log.flow.step}`
+      ? `${colors.yellow}STEP${colors.reset}    : ${log.flow.step}`
       : null,
 
+    // 🔹 STRUCTURED
     formatObjectBlock("META", log.meta),
     formatObjectBlock("INPUT", log.input),
     formatObjectBlock("RESULT", log.result),
@@ -111,6 +100,7 @@ function formatLog(log: any) {
       ? `${colors.yellow}TIMING${colors.reset} : ${log.timing.label} (${log.timing.durationMs}ms)`
       : null,
 
+    // 🔥 ERROR
     log.error
       ? [
           `${colors.red}ERROR${colors.reset}:`,
@@ -123,7 +113,16 @@ function formatLog(log: any) {
           .join("\n")
       : null,
 
-    // 🔥 spacing (rozbija klocek)
+    // 🔹 DEBUG ONLY
+    log.level === "debug"
+      ? [
+          `${colors.gray}TRACE${colors.reset} : ${log.traceId}`,
+          `${colors.gray}FLOW${colors.reset}  : ${log.flowId}`,
+          `${colors.gray}CORR${colors.reset} : ${log.correlationId}`,
+        ].join("\n")
+      : null,
+
+    // 🔥 SPACING (klucz do czytelności)
     "",
   ];
 
