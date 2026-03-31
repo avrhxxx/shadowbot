@@ -7,6 +7,7 @@ import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
+import { createFlowLogger } from "@/foundation/logger/helpers/flowLogger";
 
 import type { SystemName } from "./runtimeTypes";
 
@@ -52,14 +53,16 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  log.info("runtime.flags.refresh.start");
+  const flow = createFlowLogger(log, "runtime.flags.refresh");
+
+  flow.start();
 
   try {
     const data = await repo.findAll();
 
-    // 🔥 AUTO-SEED (KLUCZ DO TWOJEGO PROBLEMU)
+    // 🔥 AUTO-SEED
     if (data.length === 0) {
-      log.warn("runtime.flags.empty_sheet");
+      flow.stepWarn("empty_sheet");
 
       const defaults: SystemFlag[] = [
         {
@@ -71,7 +74,7 @@ async function refresh() {
 
       await repo.createMany(defaults);
 
-      log.info("runtime.flags.seeded", {
+      flow.stepInfo("seeded", {
         stats: { count: defaults.length },
       });
 
@@ -85,11 +88,11 @@ async function refresh() {
 
     lastFetch = Date.now();
 
-    log.info("runtime.flags.refresh.success", {
+    flow.success({
       stats: { count: data.length },
     });
   } catch (err) {
-    log.error("runtime.flags.refresh.failed", err);
+    flow.fail(err);
   }
 }
 
@@ -98,9 +101,11 @@ async function refresh() {
 // =====================================
 
 async function ensure() {
+  const flow = createFlowLogger(log, "runtime.flags.ensure");
+
   const expired = Date.now() - lastFetch > TTL;
 
-  log.debug("runtime.flags.cache.check", {
+  flow.step("cache_check", {
     decision: {
       condition: "ttl_expired",
       result: expired,
@@ -119,6 +124,8 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
+  const flow = createFlowLogger(log, "runtime.flags.check");
+
   await ensure();
 
   const global = cache.get("global");
@@ -127,7 +134,7 @@ export async function isSystemEnabled(
   const result =
     global === false || local === false ? false : true;
 
-  log.info("runtime.flags.check", {
+  flow.stepInfo("decision", {
     meta: { system },
     decision: {
       condition: "global/local flags",
