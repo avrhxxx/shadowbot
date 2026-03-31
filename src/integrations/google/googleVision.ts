@@ -3,7 +3,7 @@
 // =====================================
 
 import * as vision from "@google-cloud/vision";
-import { googleCredentials } from "./googleSheetsClient.js";
+import { googleCredentials } from "./googleClient.js"; // ✅ FIX
 
 // =====================================
 // 🔥 CLIENT (LAZY)
