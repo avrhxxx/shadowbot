@@ -13,8 +13,8 @@
  * - czy system jest aktywny
  */
 
-import { SheetRepository } from "@/integrations/google/googleSheetsRepository.js";
-import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSheetsSchema.js";
+import { GoogleRepository } from "@/integrations/google/googleRepository.js"; // ✅ FIX
+import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js"; // ✅ FIX
 
 import type { SystemName } from "./runtimeTypes";
 
@@ -33,7 +33,7 @@ type SystemFlag = {
 // 🔹 REPO
 // =====================================
 
-const repo = new SheetRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
+const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET); // ✅ FIX
 
 // =====================================
 // 🔹 CACHE
@@ -52,7 +52,7 @@ async function refresh() {
   const data = await repo.findAll();
 
   cache = new Map(
-    data.map((d) => [d.system, d.enabled === "true"])
+    data.map((d: SystemFlag) => [d.system, d.enabled === "true"]) // ✅ FIX
   );
 
   lastFetch = Date.now();
