@@ -4,41 +4,38 @@
 
 /**
  * 🧠 ROLE:
- * Generates new IDs.
- *
- * 📥 INPUT:
- * - IdType (e.g. "trace", "flow")
+ * Generates new IDs (pure, no prefixes)
  *
  * 📤 OUTPUT:
- * - string ID in format: type:nanoid
+ * - nanoid string (clean)
  *
  * ❗ RULES:
- * - NO validation
- * - NO formatting logic
+ * - NO prefixes (trace:, flow:, etc.)
+ * - NO formatting
  * - ONLY generation
  */
 
 import { nanoid } from "nanoid";
-import { ID_LENGTH, IdType } from "./idConfig";
+import { ID_LENGTH } from "./idConfig";
 
 // =====================================
 // 🔹 CORE GENERATOR
 // =====================================
 
-export function generateId(type: IdType): string {
-  return `${type}:${nanoid(ID_LENGTH)}`;
+export function generateId(): string {
+  return nanoid(ID_LENGTH);
 }
 
 // =====================================
-// 🔹 TYPE-SAFE HELPERS (ADAPTER LAYER)
+// 🔹 TYPE-SAFE HELPERS
 // =====================================
 
-export const createTraceId = () => generateId("trace");
-export const createCorrelationId = () => generateId("correlation");
-export const createFlowId = () => generateId("flow");
+export const createTraceId = () => generateId();
+export const createCorrelationId = () => generateId();
+export const createFlowId = () => generateId();
 
 // (future ready)
-export const createSessionId = () => generateId("session");
-export const createInteractionId = () => generateId("interaction");
-export const createJobId = () => generateId("job");
-export const createExternalId = () => generateId("external");
+export const createSessionId = () => generateId();
+export const createInteractionId = () => generateId();
+export const createJobId = () => generateId();
+export const createExternalId = () => generateId();
