@@ -17,9 +17,27 @@ import {
   createTraceId,
   createCorrelationId,
   createFlowId,
-} from "@/ids/idGenerator";
+} from "@/foundation/ids/idGenerator"; // ✅ FIXED IMPORT
 
 import type { TraceContext } from "./traceTypes";
+
+// =====================================
+// 🚀 APP CONTEXT (ENTRY ROOT)
+// =====================================
+
+/**
+ * Used at application bootstrap
+ */
+export function createAppContext(): TraceContext {
+  return {
+    traceId: createTraceId(),
+    correlationId: createCorrelationId(),
+    flowId: createFlowId(),
+
+    source: "system",
+    system: "app",
+  };
+}
 
 // =====================================
 // 🚀 ROOT CONTEXT
