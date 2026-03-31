@@ -16,26 +16,26 @@
 export * from "./googleSheetsClient.js";
 
 // =====================================
-// 🔹 STORAGE (LOW LEVEL)
+// 🔹 CORE API (LOW LEVEL)
 // =====================================
-export * from "./googleSheetsStorage.js";
+export * from "./googleSheets.js";
 
 // =====================================
 // 🔹 DATA LAYER
 // =====================================
-export * from "./googleSheetsRepository.js";
+export * from "./googleRepository.js";
 
 // =====================================
 // 🔹 SETUP / INIT
 // =====================================
-export * from "./googleSheetsSetup.js";
+export * from "./googleSetup.js";
 
 // =====================================
 // 🔹 SCHEMA
 // =====================================
-export * from "./googleSheetsSchema.js";
+export * from "./googleSchema.js";
 
 // =====================================
 // 🔹 OCR (VISION API)
 // =====================================
-export * from "./googleVisionService.js";
+export * from "./googleVision.js";
