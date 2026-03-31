@@ -41,7 +41,6 @@ const log = createLogger(ctx);
 // =====================================
 
 const bootstrapFlow = log.system("app").flow("bootstrap");
-
 bootstrapFlow.start();
 
 // =====================================
@@ -64,7 +63,8 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  const discordFlow = log.system("app").flow("discord");
+  // 🔹 DISCORD READY (SYSTEM: discord)
+  const discordFlow = log.system("discord").flow("lifecycle");
 
   discordFlow.stepInfo("client.ready", {
     meta: { user: client.user?.tag },
@@ -74,7 +74,7 @@ client.once("ready", async () => {
   // 🧠 INIT GOOGLE
   // =============================
 
-  const googleFlow = log.system("app").flow("google");
+  const googleFlow = log.system("google").flow("init");
 
   googleFlow.start();
 
@@ -90,7 +90,7 @@ client.once("ready", async () => {
   // 🧠 RUNTIME START
   // =============================
 
-  const runtimeFlow = log.system("app").flow("runtime");
+  const runtimeFlow = log.system("runtime").flow("bootstrap");
 
   runtimeFlow.start();
 
@@ -103,10 +103,10 @@ client.once("ready", async () => {
 });
 
 // =====================================
-// 🔐 LOGIN
+// 🔐 LOGIN (DISCORD)
 // =====================================
 
-const loginFlow = log.system("app").flow("discord.login");
+const loginFlow = log.system("discord").flow("login");
 
 loginFlow.start();
 
