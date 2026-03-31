@@ -7,7 +7,6 @@ import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
-import { createFlowLogger } from "@/foundation/logger/helpers/flowLogger";
 
 import type { SystemName } from "./runtimeTypes";
 
@@ -53,7 +52,7 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  const flow = createFlowLogger(log, "runtime.flags.refresh");
+  const flow = log.system("runtime_flags").flow("runtime.flags.refresh");
 
   flow.start();
 
@@ -101,11 +100,11 @@ async function refresh() {
 // =====================================
 
 async function ensure() {
-  const flow = createFlowLogger(log, "runtime.flags.ensure");
+  const flow = log.system("runtime_flags").flow("runtime.flags.ensure");
 
   const expired = Date.now() - lastFetch > TTL;
 
-  flow.step("cache_check", {
+  flow.stepDebug("cache_check", {
     decision: {
       condition: "ttl_expired",
       result: expired,
@@ -124,7 +123,7 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
-  const flow = createFlowLogger(log, "runtime.flags.check");
+  const flow = log.system("runtime_flags").flow("runtime.flags.check");
 
   await ensure();
 
