@@ -19,7 +19,21 @@ import {
   createFlowId,
 } from "@/foundation/ids/idGenerator";
 
-import type { TraceContext } from "./traceTypes";
+import type {
+  TraceContext,
+  TraceId,
+  CorrelationId,
+  FlowId,
+} from "./traceTypes";
+
+// =====================================
+// 🔧 CAST HELPERS (BRANDING)
+// =====================================
+
+const toTraceId = (v: string): TraceId => v as TraceId;
+const toCorrelationId = (v: string): CorrelationId =>
+  v as CorrelationId;
+const toFlowId = (v: string): FlowId => v as FlowId;
 
 // =====================================
 // 🚀 ROOT CONTEXT
@@ -32,9 +46,9 @@ export function createRootContext(
   >
 ): TraceContext {
   return {
-    traceId: createTraceId(),
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
+    traceId: toTraceId(createTraceId()), // ✅ FIX
+    correlationId: toCorrelationId(createCorrelationId()), // ✅ FIX
+    flowId: toFlowId(createFlowId()), // ✅ FIX
     ...data,
   };
 }
@@ -43,12 +57,6 @@ export function createRootContext(
 // 🌍 APP CONTEXT (ENTRYPOINT)
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Root context for entire application lifecycle
- *
- * ❗ ALWAYS use this in src/index.ts
- */
 export function createAppContext(): TraceContext {
   return createRootContext({
     source: "system",
@@ -67,8 +75,7 @@ export function createChildContext(
   return {
     ...parent,
 
-    // 🔥 NEW TRACE STEP
-    traceId: createTraceId(),
+    traceId: toTraceId(createTraceId()), // ✅ FIX
     parentTraceId: parent.traceId,
 
     ...overrides,
@@ -86,12 +93,11 @@ export function forkContext(
   return {
     ...parent,
 
-    traceId: createTraceId(),
+    traceId: toTraceId(createTraceId()), // ✅ FIX
     parentTraceId: parent.traceId,
 
-    // 🔥 NEW FLOW
-    correlationId: createCorrelationId(),
-    flowId: createFlowId(),
+    correlationId: toCorrelationId(createCorrelationId()), // ✅ FIX
+    flowId: toFlowId(createFlowId()), // ✅ FIX
 
     ...overrides,
   };
