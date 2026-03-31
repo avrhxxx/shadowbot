@@ -2,44 +2,96 @@
 // 📁 src/core/ids/ids.ts
 // =====================================
 
-import { generateId } from "./idGenerator.js";
-import { formatId } from "./idFormatter.js";
-import { validateId } from "./idValidator.js";
-import type { TraceId } from "./idTypes.js";
+import { customAlphabet } from "nanoid";
+import {
+  ID_LENGTH,
+  DISPLAY_ID_LENGTH,
+  ID_PREFIX_MAP,
+  PREFIX_TO_KEY_MAP,
+  type IdKey,
+} from "./idConfig.js";
+
+import type { IdTypeMap } from "./idTypes.js";
 
 // =====================================
-// 🔥 CREATE TRACE ID
+// 🔹 INTERNALS
 // =====================================
 
-export function createTraceId(): TraceId {
-  const raw = generateId();
-  const formatted = formatId(raw);
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const nano = customAlphabet(ALPHABET, ID_LENGTH);
 
-  if (!validateId(formatted)) {
-    throw new Error("Invalid TraceId generated");
-  }
+function generate(prefix: string): string {
+  return `${prefix}-${nano()}`;
+}
 
-  return formatted as TraceId;
+function isValid(id: string): boolean {
+  const prefixes = Object.values(ID_PREFIX_MAP).join("");
+  const regex = new RegExp(`^[${prefixes}]-[a-z0-9]{${ID_LENGTH}}$`);
+  return regex.test(id);
+}
+
+function getType(id: string): IdKey | null {
+  if (!isValid(id)) return null;
+  return PREFIX_TO_KEY_MAP[id[0] as keyof typeof PREFIX_TO_KEY_MAP] ?? null;
+}
+
+function extractSuffix(id: string): string | null {
+  return id.split("-")[1] ?? null;
+}
+
+function toDisplay(id: string, length = DISPLAY_ID_LENGTH): string {
+  const suffix = extractSuffix(id);
+  if (!suffix) return id;
+  return suffix.slice(0, Math.min(length, suffix.length));
 }
 
 // =====================================
-// 🔥 VALIDATE
+// 🔹 FACTORY BUILDER
 // =====================================
 
-export function isValidTraceId(id: string): id is TraceId {
-  return validateId(id);
+function createIdApi<K extends IdKey>(key: K) {
+  const prefix = ID_PREFIX_MAP[key];
+
+  return {
+    create(): IdTypeMap[K] {
+      const id = generate(prefix);
+
+      if (!isValid(id)) {
+        throw new Error(`Invalid ${key} id generated`);
+      }
+
+      return id as IdTypeMap[K];
+    },
+
+    is(id: string): id is IdTypeMap[K] {
+      return isValid(id) && getType(id) === key;
+    },
+
+    parse(id: string): IdTypeMap[K] {
+      if (!this.is(id)) {
+        throw new Error(`Invalid ${key} id`);
+      }
+      return id as IdTypeMap[K];
+    },
+
+    display(id: IdTypeMap[K], length?: number): string {
+      return `${prefix}-${toDisplay(id, length)}`;
+    },
+  };
 }
 
 // =====================================
-// 🔥 FORMAT (PUBLIC)
+// 🔥 PUBLIC API
 // =====================================
 
-export function toTraceId(id: string): TraceId {
-  const formatted = formatId(id);
-
-  if (!validateId(formatted)) {
-    throw new Error("Invalid TraceId");
-  }
-
-  return formatted as TraceId;
-}
+export const ids = {
+  trace: createIdApi("trace"),
+  session: createIdApi("session"),
+  queue: createIdApi("queue"),
+  job: createIdApi("job"),
+  interaction: createIdApi("interaction"),
+  external: createIdApi("external"),
+  correlation: createIdApi("correlation"),
+  flow: createIdApi("flow"),
+  runtime: createIdApi("runtime"),
+} as const;
