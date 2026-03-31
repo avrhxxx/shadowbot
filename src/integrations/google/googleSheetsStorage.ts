@@ -2,7 +2,7 @@
 // 📁 src/integrations/google/googleSheetsStorage.ts
 // =====================================
 
-import { sheetsClient } from "@/integrations/google/googleSheetsClient";
+import { sheetsClient } from "@/integrations/google/googleSheetsClient.js";
 import pRetry, { AbortError } from "p-retry";
 
 // =====================================
