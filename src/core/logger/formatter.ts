@@ -2,7 +2,7 @@
 // 📁 src/core/logger/formatter.ts
 // =====================================
 
-import type { LogPayload } from "./log";
+import type { LogPayload } from "./log.js";
 
 const COLORS = {
   reset: "\x1b[0m",
