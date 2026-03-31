@@ -41,7 +41,8 @@ export type TraceSource =
   | "worker"
   | "api"
   | "cron"
-  | "external";
+  | "external"
+  | "interaction"; // ✅ DODANE
 
 // =====================================
 // 🔹 SYSTEM (🔥 ROZSZERZONE)
@@ -54,6 +55,9 @@ export type TraceSystem =
   // 🔹 INFRA / RUNTIME
   | "runtime"
   | "google"
+
+  // 🔹 UI LAYER
+  | "ui" // ✅ DODANE
 
   // 🔹 FEATURES
   | "events"
