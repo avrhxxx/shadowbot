@@ -10,11 +10,16 @@ import { handleEventInteraction } from "../../system/events.js";
 import { handleAbsenceInteraction } from "../../system/absence.js";
 import { handlePointsInteraction } from "../../system/points.js";
 
-const SYSTEM_HANDLERS = [
+type SystemHandler = {
+  name: "events" | "absence" | "points";
+  handler: (interaction: Interaction, ctx: any) => Promise<boolean>;
+};
+
+const SYSTEM_HANDLERS: readonly SystemHandler[] = [
   { name: "events", handler: handleEventInteraction },
   { name: "absence", handler: handleAbsenceInteraction },
   { name: "points", handler: handlePointsInteraction },
-] as const;
+];
 
 export async function handleSystemInteraction(
   interaction: Interaction
@@ -60,7 +65,7 @@ export async function handleSystemInteraction(
           eventType: "system",
           result: { handled: true },
           timing: {
-            label: name!,
+            label: name,
             durationMs: Date.now() - startTime,
           },
         });
@@ -71,7 +76,7 @@ export async function handleSystemInteraction(
       l.error("handler.error", err, {
         eventType: "system",
         timing: {
-          label: name!,
+          label: name,
           durationMs: Date.now() - startTime,
         },
       });
