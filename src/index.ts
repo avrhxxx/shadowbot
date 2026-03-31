@@ -6,7 +6,6 @@ import { Client, GatewayIntentBits, Partials } from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
 import { createAppContext } from "@/trace";
-import { createFlowLogger } from "@/foundation/logger/helpers/flowLogger";
 
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
@@ -41,14 +40,15 @@ const log = createLogger(ctx);
 // 🔹 BOOTSTRAP (APP)
 // =====================================
 
-const bootstrapFlow = createFlowLogger(log, "app.bootstrap");
+const bootstrapFlow = log.system("app").flow("bootstrap");
+
 bootstrapFlow.start();
 
 // =====================================
 // 🔹 GLOBAL ERRORS (APP)
 // =====================================
 
-const globalRuntimeFlow = createFlowLogger(log, "app.runtime");
+const globalRuntimeFlow = log.system("app").flow("runtime");
 
 process.on("unhandledRejection", (err) => {
   globalRuntimeFlow.fail(err);
@@ -64,7 +64,7 @@ process.on("uncaughtException", (err) => {
 // =====================================
 
 client.once("ready", async () => {
-  const discordFlow = createFlowLogger(log, "app.discord");
+  const discordFlow = log.system("app").flow("discord");
 
   discordFlow.stepInfo("client.ready", {
     meta: { user: client.user?.tag },
@@ -74,7 +74,7 @@ client.once("ready", async () => {
   // 🧠 INIT GOOGLE
   // =============================
 
-  const googleFlow = createFlowLogger(log, "app.google.init");
+  const googleFlow = log.system("app").flow("google");
 
   googleFlow.start();
 
@@ -90,7 +90,7 @@ client.once("ready", async () => {
   // 🧠 RUNTIME START
   // =============================
 
-  const runtimeFlow = createFlowLogger(log, "app.runtime");
+  const runtimeFlow = log.system("app").flow("runtime");
 
   runtimeFlow.start();
 
@@ -106,7 +106,7 @@ client.once("ready", async () => {
 // 🔐 LOGIN
 // =====================================
 
-const loginFlow = createFlowLogger(log, "app.discord.login");
+const loginFlow = log.system("app").flow("discord.login");
 
 loginFlow.start();
 
