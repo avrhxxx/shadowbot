@@ -5,7 +5,7 @@
 import pino from "pino";
 
 // =====================================
-// 🎨 COLORS (ANSI - Railway wspiera)
+// 🎨 COLORS
 // =====================================
 
 const colors = {
@@ -24,14 +24,28 @@ const colors = {
 // =====================================
 
 function resolveScope(obj: any): string {
-  if (obj?.system) return obj.system;
-  return "app";
+  const scope = obj?.scope ?? "app";
+  const name = obj?.system;
+
+  if (scope === "system" && name) {
+    return `SYSTEM | ${name}`;
+  }
+
+  if (scope === "runtime" && name) {
+    return `RUNTIME | ${name}`;
+  }
+
+  if (scope === "integration" && name) {
+    return `INTEGRATION | ${name}`;
+  }
+
+  return scope.toUpperCase();
 }
 
 function simplifyEvent(event?: string): string {
   if (!event) return "log";
   const parts = event.split(".");
-  return parts[parts.length - 1];
+  return parts.slice(-2).join("."); // 🔥 lepszy kontekst
 }
 
 function colorLevel(level: string) {
@@ -43,7 +57,6 @@ function colorLevel(level: string) {
       return `${colors.yellow}${level.toUpperCase()}${colors.reset}`;
     case "info":
       return `${colors.green}${level.toUpperCase()}${colors.reset}`;
-    case "debug":
     default:
       return `${colors.gray}${level.toUpperCase()}${colors.reset}`;
   }
@@ -71,7 +84,7 @@ function getHeader(level: string, scope: string) {
 }
 
 // =====================================
-// 🔹 CUSTOM FORMATTER
+// 🔹 FORMAT LOG
 // =====================================
 
 function formatLog(log: any) {
@@ -80,17 +93,14 @@ function formatLog(log: any) {
   const level = colorLevel(log.level ?? "info");
 
   const lines: (string | null)[] = [
-    // 🔥 HEADER
     getHeader(level, scope),
 
-    // 🔹 CORE
-    `${colors.green}EVENT${colors.reset}   : ${event}`,
+    `${colors.green}EVENT${colors.reset} : ${event}`,
 
     log.flow?.step
-      ? `${colors.yellow}STEP${colors.reset}    : ${log.flow.step}`
+      ? `${colors.yellow}STEP${colors.reset}  : ${log.flow.step}`
       : null,
 
-    // 🔹 STRUCTURED
     formatObjectBlock("META", log.meta),
     formatObjectBlock("INPUT", log.input),
     formatObjectBlock("RESULT", log.result),
@@ -101,7 +111,6 @@ function formatLog(log: any) {
       ? `${colors.yellow}TIMING${colors.reset} : ${log.timing.label} (${log.timing.durationMs}ms)`
       : null,
 
-    // 🔥 ERROR
     log.error
       ? [
           `${colors.red}ERROR${colors.reset}:`,
@@ -114,16 +123,7 @@ function formatLog(log: any) {
           .join("\n")
       : null,
 
-    // 🔹 DEBUG (tylko debug level)
-    log.level === "debug"
-      ? [
-          `${colors.gray}TRACE${colors.reset} : ${log.traceId}`,
-          `${colors.gray}FLOW${colors.reset}  : ${log.flowId}`,
-          `${colors.gray}CORR${colors.reset} : ${log.correlationId}`,
-        ].join("\n")
-      : null,
-
-    // 🔥 SPACING (NAJWAŻNIEJSZE – rozbija klocek)
+    // 🔥 spacing (rozbija klocek)
     "",
   ];
 
