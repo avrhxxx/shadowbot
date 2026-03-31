@@ -5,6 +5,15 @@
 /**
  * 🧠 ROLE:
  * Full structured log schema (future-proof)
+ *
+ * 📥 INPUT:
+ * - used by loggerFactory
+ *
+ * 📤 OUTPUT:
+ * - typing for structured logs
+ *
+ * ❗ NOTE:
+ * - `event` is NOT part of payload (passed separately)
  */
 
 export type LogLevel =
@@ -15,11 +24,9 @@ export type LogLevel =
   | "fatal";
 
 export type LogPayload = {
-  // identity
-  event: string;
+  // classification
   level?: LogLevel;
 
-  // classification
   eventType?:
     | "system"
     | "user"
