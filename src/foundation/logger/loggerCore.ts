@@ -24,9 +24,8 @@ const colors = {
 // =====================================
 
 function resolveScope(obj: any): string {
-  if (obj?.meta?.system) return `SYSTEM ${obj.meta.system}`;
-  if (obj?.system) return `SYSTEM ${obj.system}`;
-  return "APP";
+  if (obj?.system) return obj.system;
+  return "app";
 }
 
 function simplifyEvent(event?: string): string {
@@ -81,7 +80,7 @@ function formatLog(log: any) {
   const level = colorLevel(log.level ?? "info");
 
   const lines: (string | null)[] = [
-    // 🔥 HEADER (zawsze)
+    // 🔥 HEADER
     getHeader(level, scope),
 
     // 🔹 CORE
@@ -91,7 +90,7 @@ function formatLog(log: any) {
       ? `${colors.yellow}STEP${colors.reset}    : ${log.flow.step}`
       : null,
 
-    // 🔹 STRUCTURED BLOCKS
+    // 🔹 STRUCTURED
     formatObjectBlock("META", log.meta),
     formatObjectBlock("INPUT", log.input),
     formatObjectBlock("RESULT", log.result),
@@ -115,7 +114,7 @@ function formatLog(log: any) {
           .join("\n")
       : null,
 
-    // 🔹 DEBUG ONLY (trace itp.)
+    // 🔹 DEBUG (tylko debug level)
     log.level === "debug"
       ? [
           `${colors.gray}TRACE${colors.reset} : ${log.traceId}`,
@@ -123,6 +122,9 @@ function formatLog(log: any) {
           `${colors.gray}CORR${colors.reset} : ${log.correlationId}`,
         ].join("\n")
       : null,
+
+    // 🔥 SPACING (NAJWAŻNIEJSZE – rozbija klocek)
+    "",
   ];
 
   return lines.filter(Boolean).join("\n");
