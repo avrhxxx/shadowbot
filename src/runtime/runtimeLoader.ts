@@ -7,7 +7,6 @@ import { isSystemEnabled } from "./runtimeState.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
-import { createFlowLogger } from "@/foundation/logger/helpers/flowLogger";
 
 // =====================================
 // 🔹 TYPES
@@ -28,7 +27,9 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   });
 
   const log = createLogger(ctx);
-  const flow = createFlowLogger(log, `system.${entry.name}.lifecycle`);
+
+  // ✅ NOWY FLOW API
+  const flow = log.system(entry.name).flow("lifecycle");
 
   flow.start();
 
@@ -52,7 +53,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   let mod: unknown;
 
   try {
-    flow.step("load.start");
+    flow.stepDebug("load.start");
 
     mod = await entry.loader();
 
@@ -89,7 +90,7 @@ async function executeSystem(entry: typeof SYSTEM_REGISTRY[number]) {
   // =============================
 
   try {
-    flow.step("init.start");
+    flow.stepDebug("init.start");
 
     await module.init(ctx);
 
@@ -112,7 +113,9 @@ export async function loadAllSystems() {
   });
 
   const log = createLogger(ctx);
-  const flow = createFlowLogger(log, "runtime.load_all");
+
+  // ✅ NOWY FLOW API
+  const flow = log.system("app").flow("runtime.load_all");
 
   flow.start();
 
