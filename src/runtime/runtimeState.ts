@@ -16,7 +16,7 @@ import type { SystemName } from "./runtimeTypes";
 // =====================================
 
 type SystemFlag = {
-  id?: string; // ✅ FIX (wymagane przez repo)
+  id?: string;
   system: string;
   enabled: string;
   reason?: string;
@@ -156,4 +156,38 @@ export async function isSystemEnabled(
   });
 
   return result;
+}
+
+// =====================================
+// ✏️ SET FLAG (🔥 NOWE)
+// =====================================
+
+export async function setSystemEnabled(
+  system: SystemName,
+  enabled: boolean
+): Promise<void> {
+  const flow = log.flow("flags.set");
+
+  flow.start({
+    meta: { system },
+    input: { enabled },
+  });
+
+  try {
+    await repo.updateById(system, {
+      enabled: String(enabled),
+    });
+
+    // 🔥 ważne: odśwież cache natychmiast
+    cache.set(system, enabled);
+
+    flow.success({
+      meta: { system },
+      result: { enabled },
+    });
+  } catch (err) {
+    flow.fail(err, {
+      meta: { system },
+    });
+  }
 }
