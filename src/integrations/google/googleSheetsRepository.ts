@@ -31,7 +31,9 @@ export class SheetRepository<T extends { id?: string }> {
 
     // force mutable copy
     const dataRows: unknown[][] =
-      rows.length > 1 ? rows.slice(1).map((r) => [...r]) : [];
+      rows.length > 1
+        ? (rows.slice(1) as unknown[][]).map((r: unknown[]) => [...r])
+        : [];
 
     return { headers, dataRows };
   }
