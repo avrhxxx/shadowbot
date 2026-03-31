@@ -21,7 +21,7 @@ import type {
   InteractionId,
   JobId,
   ExternalId,
-} from "@/ids/idTypes";
+} from "@/foundation/ids/idTypes";
 
 // =====================================
 // 🔹 SOURCE
