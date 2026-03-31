@@ -13,29 +13,29 @@
 // =====================================
 // 🔹 AUTH / CLIENT
 // =====================================
-export * from "./googleSheetsClient";
+export * from "./googleSheetsClient.js";
 
 // =====================================
 // 🔹 STORAGE (LOW LEVEL)
 // =====================================
-export * from "./googleSheetsStorage";
+export * from "./googleSheetsStorage.js";
 
 // =====================================
 // 🔹 DATA LAYER
 // =====================================
-export * from "./googleSheetsRepository";
+export * from "./googleSheetsRepository.js";
 
 // =====================================
 // 🔹 SETUP / INIT
 // =====================================
-export * from "./googleSheetsSetup";
+export * from "./googleSheetsSetup.js";
 
 // =====================================
 // 🔹 SCHEMA
 // =====================================
-export * from "./googleSheetsSchema";
+export * from "./googleSheetsSchema.js";
 
 // =====================================
 // 🔹 OCR (VISION API)
 // =====================================
-export * from "./googleVisionService";
+export * from "./googleVisionService.js";
