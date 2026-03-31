@@ -12,7 +12,7 @@ import type { TraceContext } from "@/trace";
 export async function init(ctx: TraceContext): Promise<void> {
   const log = createLogger(ctx);
 
-  const flow = log.system("test").flow("test.lifecycle");
+  const flow = log.system("test").flow("lifecycle");
 
   flow.start();
 
@@ -21,25 +21,25 @@ export async function init(ctx: TraceContext): Promise<void> {
     // 🔹 STEP 1
     // =====================================
 
-    flow.stepInfo("init.start");
+    flow.stepInfo("init.started");
 
     await new Promise((res) => setTimeout(res, 100));
 
     // =====================================
-    // 🔹 STEP 2 (FAKE LOGIC)
+    // 🔹 STEP 2
     // =====================================
 
-    flow.stepDebug("processing", {
+    flow.stepDebug("processing.data", {
       input: { example: "hello" },
     });
 
     await new Promise((res) => setTimeout(res, 150));
 
     // =====================================
-    // 🔹 STEP 3 (RESULT)
+    // 🔹 STEP 3
     // =====================================
 
-    flow.stepInfo("done", {
+    flow.stepInfo("processing.completed", {
       result: { status: "ok" },
     });
 
