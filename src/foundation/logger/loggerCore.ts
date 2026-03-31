@@ -5,6 +5,21 @@
 import pino from "pino";
 
 // =====================================
+// 🎨 COLORS (ANSI - Railway wspiera)
+// =====================================
+
+const colors = {
+  reset: "\x1b[0m",
+
+  gray: "\x1b[90m",
+  cyan: "\x1b[36m",
+  yellow: "\x1b[33m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  magenta: "\x1b[35m",
+};
+
+// =====================================
 // 🔹 HELPERS
 // =====================================
 
@@ -20,55 +35,110 @@ function simplifyEvent(event?: string): string {
   return parts[parts.length - 1];
 }
 
-function stripIdPrefix(id?: string) {
-  if (!id) return "-";
-  const parts = id.split(":");
-  return parts.length > 1 ? parts[1] : id;
+function colorLevel(level: string) {
+  switch (level) {
+    case "error":
+    case "fatal":
+      return `${colors.red}${level.toUpperCase()}${colors.reset}`;
+    case "warn":
+      return `${colors.yellow}${level.toUpperCase()}${colors.reset}`;
+    case "info":
+      return `${colors.green}${level.toUpperCase()}${colors.reset}`;
+    case "debug":
+    default:
+      return `${colors.gray}${level.toUpperCase()}${colors.reset}`;
+  }
 }
 
-function formatObject(obj?: Record<string, any>) {
-  if (!obj) return null;
+function formatKV(label: string, value: any) {
+  if (value === undefined || value === null) return null;
+  return `${colors.gray}${label}${colors.reset} : ${value}`;
+}
 
-  return Object.entries(obj)
-    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-    .join(" ");
+function formatObjectBlock(label: string, obj?: Record<string, any>) {
+  if (!obj || Object.keys(obj).length === 0) return null;
+
+  const entries = Object.entries(obj)
+    .map(
+      ([k, v]) =>
+        `  ${colors.cyan}${k}${colors.reset}: ${JSON.stringify(v)}`
+    )
+    .join("\n");
+
+  return `${colors.magenta}${label}${colors.reset}:\n${entries}`;
 }
 
 // =====================================
-// 🔹 CUSTOM FORMATTER (STACKED CARD)
+// 🔹 FLOW GROUPING (lekki)
+// =====================================
+
+let lastFlowId: string | undefined;
+
+function getFlowSeparator(flowId?: string) {
+  if (!flowId) return null;
+
+  if (flowId !== lastFlowId) {
+    lastFlowId = flowId;
+    return `${colors.gray}──────── FLOW ${flowId} ────────${colors.reset}`;
+  }
+
+  return null;
+}
+
+// =====================================
+// 🔹 CUSTOM FORMATTER
 // =====================================
 
 function formatLog(log: any) {
   const scope = resolveScope(log);
   const event = simplifyEvent(log.event);
+  const level = colorLevel(log.level ?? "info");
 
-  const trace = stripIdPrefix(log.traceId);
-  const flow = stripIdPrefix(log.flowId);
-  const corr = stripIdPrefix(log.correlationId);
+  const flowSeparator = getFlowSeparator(log.flowId);
 
-  const step = log.flow?.step;
-  const meta = log.meta;
-  const stats = log.stats;
-  const error = log.error;
-  const decision = log.decision;
-  const interaction = log.interaction;
+  const lines: (string | null)[] = [
+    flowSeparator,
 
-  return `
-═══════════════════════════════
-${scope}
-EVENT : ${event}${step ? ` → ${step}` : ""}
+    `${level} | ${colors.cyan}${scope}${colors.reset}`,
+    `${colors.green}EVENT${colors.reset} : ${event}`,
 
-TRACE : ${trace}
-FLOW  : ${flow}
-CORR  : ${corr}
+    // IDs (pełne, bez stripowania)
+    formatKV("TRACE", log.traceId),
+    formatKV("FLOW", log.flowId),
+    formatKV("CORR", log.correlationId),
 
-${meta ? `META  : ${formatObject(meta)}` : ""}
-${stats ? `STATS : ${formatObject(stats)}` : ""}
-${decision ? `DECISION : ${decision.condition} => ${decision.result}` : ""}
-${interaction ? `INTERACTION : ${formatObject(interaction)}` : ""}
-${error ? `ERROR : ${error.message ?? error}` : ""}
-═══════════════════════════════
-`.trim();
+    // STEP
+    log.flow?.step
+      ? `${colors.yellow}STEP${colors.reset}  : ${log.flow.step}`
+      : null,
+
+    // META / INPUT / RESULT
+    formatObjectBlock("META", log.meta),
+    formatObjectBlock("INPUT", log.input),
+    formatObjectBlock("RESULT", log.result),
+
+    // TIMING
+    log.timing
+      ? `${colors.yellow}TIMING${colors.reset} : ${log.timing.label} (${log.timing.durationMs}ms)`
+      : null,
+
+    log.stats ? formatObjectBlock("STATS", log.stats) : null,
+
+    // ERROR BLOCK (mocny wizualnie)
+    log.error
+      ? [
+          `${colors.red}──────── ERROR ────────${colors.reset}`,
+          `${colors.red}${log.error.message || log.error}${colors.reset}`,
+          log.error.stack
+            ? `${colors.gray}${log.error.stack}${colors.reset}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : null,
+  ];
+
+  return lines.filter(Boolean).join("\n");
 }
 
 // =====================================
@@ -85,7 +155,6 @@ export const baseLogger = pino({
   },
 
   messageKey: "msg",
-
   base: undefined,
   timestamp: false,
 });
