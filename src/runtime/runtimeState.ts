@@ -28,12 +28,12 @@ type SystemFlag = {
 const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 
 // =====================================
-// 🔹 LOGGER (GLOBAL)
+// 🔹 LOGGER
 // =====================================
 
 const ctx = createRootContext({
   source: "system",
-  system: "runtime" as never,
+  system: "runtime_flags" as never,
 });
 
 const log = createLogger(ctx);
@@ -52,32 +52,21 @@ const TTL = 30_000;
 // =====================================
 
 async function refresh() {
-  const flow = log.system("runtime").flow("flags");
+  const flow = log.system("runtime_flags").flow("refresh");
 
-  flow.stepInfo("refresh.start");
+  flow.start();
 
   try {
     const data = await repo.findAll();
 
-    // 🔥 AUTO-SEED
     if (data.length === 0) {
-      flow.stepWarn("refresh.empty_sheet");
+      flow.stepWarn("empty");
 
-      const defaults: SystemFlag[] = [
-        {
-          id: "global",
-          system: "global",
-          enabled: "true",
-        },
-      ];
+      await repo.createMany([
+        { id: "global", system: "global", enabled: "true" },
+      ]);
 
-      await repo.createMany(defaults);
-
-      flow.stepInfo("refresh.seeded", {
-        stats: { count: defaults.length },
-      });
-
-      return await refresh();
+      return refresh();
     }
 
     cache = new Map(
@@ -86,26 +75,26 @@ async function refresh() {
 
     lastFetch = Date.now();
 
-    flow.stepInfo("refresh.success", {
+    flow.success({
       stats: { count: data.length },
     });
   } catch (err) {
-    flow.stepError("refresh.failed", err);
+    flow.fail(err);
   }
 }
 
 // =====================================
-// 🔍 ENSURE CACHE
+// 🔍 ENSURE
 // =====================================
 
 async function ensure() {
-  const flow = log.system("runtime").flow("flags");
+  const flow = log.system("runtime_flags").flow("ensure");
 
   const expired = Date.now() - lastFetch > TTL;
 
-  flow.stepDebug("cache.check", {
+  flow.stepDebug("cache_check", {
     decision: {
-      condition: "ttl_expired",
+      condition: "ttl",
       result: expired,
     },
   });
@@ -122,7 +111,7 @@ async function ensure() {
 export async function isSystemEnabled(
   system: SystemName
 ): Promise<boolean> {
-  const flow = log.system("runtime").flow("flags");
+  const flow = log.system("runtime_flags").flow("check");
 
   await ensure();
 
@@ -132,10 +121,10 @@ export async function isSystemEnabled(
   const result =
     global === false || local === false ? false : true;
 
-  flow.stepInfo("check.result", {
+  flow.stepInfo("decision", {
     meta: { system },
     decision: {
-      condition: "global/local flags",
+      condition: "flags",
       result,
     },
   });
