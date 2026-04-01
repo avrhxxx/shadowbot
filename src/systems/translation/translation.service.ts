@@ -8,6 +8,8 @@ import {
 } from "./translationConfig";
 
 import { LRUCache } from "lru-cache";
+import { google } from "googleapis";
+import { googleAuth } from "@/integrations/google/googleClient";
 
 // =====================================
 // 🔧 CACHE
@@ -103,10 +105,7 @@ async function tryGoogleFree(
       q: text,
     });
 
-    const res = await fetchWithTimeout(
-      `${url}?${params.toString()}`
-    );
-
+    const res = await fetchWithTimeout(`${url}?${params.toString()}`);
     const data = (await res.json()) as GoogleResponse;
 
     if (
@@ -118,6 +117,40 @@ async function tryGoogleFree(
       return data[0][0][0];
     }
   } catch {}
+
+  return null;
+}
+
+async function tryGoogleCloud(
+  text: string,
+  target: string
+): Promise<string | null> {
+  if (!TRANSLATION_PROVIDERS.googleCloud.enabled) return null;
+
+  try {
+    const client = await google.auth.getClient({
+      scopes: ["https://www.googleapis.com/auth/cloud-translation"],
+    });
+
+    const translate = google.translate({ version: "v3", auth: client });
+
+    const projectId = process.env.GOOGLE_PROJECT_ID!;
+    const location = "global";
+
+    const [response] = await translate.projects.translateText({
+      parent: `projects/${projectId}/locations/${location}`,
+      requestBody: {
+        contents: [text],
+        targetLanguageCode: target,
+        mimeType: "text/plain",
+      },
+    });
+
+    const translated = response.translations?.[0]?.translatedText;
+    if (translated) return translated;
+  } catch (err) {
+    console.error("Google Cloud translate failed:", err);
+  }
 
   return null;
 }
@@ -135,21 +168,21 @@ export async function translateText(
   // =============================
   // CACHE
   // =============================
-
   const cached = cache.get(key);
   if (cached) return cached;
 
   // =============================
   // PROVIDER LOOP
   // =============================
-
   for (const provider of DEFAULT_PROVIDER_ORDER) {
     let result: string | null = null;
 
+    if (provider === "googleCloud") {
+      result = await tryGoogleCloud(text, target);
+    }
     if (provider === "libre") {
       result = await tryLibre(text, target);
     }
-
     if (provider === "googleFree") {
       result = await tryGoogleFree(text, target);
     }
