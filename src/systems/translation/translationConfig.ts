@@ -23,9 +23,9 @@ export const TRANSLATION_PROVIDERS = {
       process.env.GOOGLE_URL ||
       "https://translate.googleapis.com/translate_a/single",
   },
-  // 🔮 future-ready
+  // 🔮 Google Cloud Translation API
   googleCloud: {
-    enabled: false,
+    enabled: true, // włączone jako główny provider
   },
   deepl: {
     enabled: false,
@@ -37,6 +37,7 @@ export const TRANSLATION_PROVIDERS = {
 // =====================================
 
 export const DEFAULT_PROVIDER_ORDER = [
+  "googleCloud", // teraz Google Cloud jest pierwszy
   "libre",
   "googleFree",
 ] as const;
