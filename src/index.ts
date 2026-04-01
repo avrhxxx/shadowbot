@@ -2,7 +2,11 @@
 // 📁 src/index.ts
 // =====================================
 
-import { Client, GatewayIntentBits, Partials } from "discord.js";
+import {
+  Client,
+  GatewayIntentBits,
+  Partials,
+} from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
 import {
@@ -13,8 +17,11 @@ import {
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
 
-// ✅ FIXED PATH
 import { handleUIInteraction } from "@/ui/core/uiDiscordAdapter";
+
+// 🔥 DEV PANEL
+import { handleDevpanelCommand } from "@/ui/devpanel/devpanel.command";
+import { devpanelSlash } from "@/ui/devpanel/devpanel.slash";
 
 // =====================================
 // 🔐 ENV
@@ -65,22 +72,35 @@ process.on("uncaughtException", (err) => {
 });
 
 // =====================================
-// 🖱️ INTERACTIONS (UI ENGINE)
+// 🖱️ INTERACTIONS
 // =====================================
 
 client.on("interactionCreate", async (interaction) => {
-  const uiCtx = createRootContext({
-    source: "discord", // ✅ poprawne względem TraceSource
-    system: undefined, // ✅ UI nie jest jeszcze systemem domenowym
+  const ctx = createRootContext({
+    source: "discord",
   });
 
-  const handled = await handleUIInteraction(interaction, uiCtx);
+  // =============================
+  // 🔘 UI (BUTTONS)
+  // =============================
+
+  const handled = await handleUIInteraction(
+    interaction,
+    ctx
+  );
 
   if (handled) return;
 
-  // 👉 tutaj w przyszłości:
-  // - slash commands
-  // - inne systemy
+  // =============================
+  // 💬 SLASH COMMANDS
+  // =============================
+
+  if (interaction.isChatInputCommand()) {
+    if (interaction.commandName === "devpanel") {
+      await handleDevpanelCommand(interaction);
+      return;
+    }
+  }
 });
 
 // =====================================
@@ -93,6 +113,24 @@ client.once("ready", async () => {
   discordFlow.stepInfo("ready", {
     meta: { user: client.user?.tag },
   });
+
+  // =============================
+  // 🧠 REGISTER COMMANDS (DEV)
+  // =============================
+
+  const commandsFlow = appLog.flow("commands");
+
+  commandsFlow.start();
+
+  try {
+    await client.application?.commands.set([
+      devpanelSlash.toJSON(),
+    ]);
+
+    commandsFlow.success();
+  } catch (err) {
+    commandsFlow.fail(err);
+  }
 
   // =============================
   // 🧠 GOOGLE INIT
