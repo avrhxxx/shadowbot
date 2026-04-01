@@ -7,7 +7,7 @@ import {
   DEFAULT_PROVIDER_ORDER,
 } from "./translationConfig";
 
-import LRUCache from "lru-cache";
+import { LRUCache } from "lru-cache";
 
 // =====================================
 // 🔧 CACHE
