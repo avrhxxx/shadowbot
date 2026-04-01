@@ -10,46 +10,47 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 // =====================================
 
 export async function renderModeratorHub(): Promise<ViewResult> {
-  const buttons: any[] = [];
+  const rows: any[] = [];
 
-  // 🔹 Lista systemów dla moderatora
   const systems = [
-    { name: "event", label: "Event Menu", action: "moderator.openEventMenu" },
-    { name: "points", label: "Points Menu", action: "moderator.openPointsMenu" },
-    { name: "absence", label: "Absence Menu", action: "moderator.openAbsenceMenu" },
-    { name: "quickadd", label: "QuickAdd Menu", action: "moderator.openQuickAddMenu" },
+    { name: "events", label: "Event Menu" },
+    { name: "points", label: "Points Menu" },
+    { name: "absence", label: "Absence Menu" },
+    { name: "quickadd", label: "QuickAdd Menu" },
   ];
 
-  // 🔹 Generujemy tylko włączone systemy
+  const buttons: any[] = [];
+
   for (const sys of systems) {
     const enabled = await isSystemEnabled(sys.name);
-    if (!enabled) continue; // pomijamy jeśli system wyłączony
+    if (!enabled) continue;
 
     buttons.push({
-      type: 2, // button
+      type: 2,
       label: sys.label,
-      style: 1, // Primary
-      custom_id: sys.action,
-      disabled: false,
+      style: 1,
+      custom_id: `moderator.open|target=${sys.name}`,
     });
   }
 
-  // 🔹 Dodajemy zawsze dostępny przycisk Help
+  // 🔹 HELP (zawsze)
   buttons.push({
     type: 2,
     label: "Help",
-    style: 3, // Success
-    custom_id: "moderator.openHelpMenu",
-    disabled: false,
+    style: 3,
+    custom_id: `moderator.open|target=help`,
   });
+
+  // 🔹 podział na rzędy (max 5)
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push({
+      type: 1,
+      components: buttons.slice(i, i + 5),
+    });
+  }
 
   return {
     content: `📌 **Moderator Panel**\n\nSelect an option:`,
-    components: [
-      {
-        type: 1, // Action Row
-        components: buttons,
-      },
-    ],
+    components: rows,
   };
 }
