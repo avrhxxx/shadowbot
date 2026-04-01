@@ -42,7 +42,7 @@ export function registerUIAction(
 }
 
 // =====================================
-// 🔹 EXECUTE (🔥 NOWE)
+// 🔹 EXECUTE (🔥 CENTRAL LOGIC)
 // =====================================
 
 export async function executeUIAction(
@@ -58,7 +58,7 @@ export async function executeUIAction(
   const enabled = await isSystemEnabled(action.system);
 
   if (!enabled) {
-    // system OFF → blokujemy
+    // system OFF → blokujemy akcję
     return true;
   }
 
@@ -68,17 +68,30 @@ export async function executeUIAction(
 }
 
 // =====================================
-// 🔹 PARSE
+// 🔹 PARSE (🔥 FIXED FORMAT)
 // =====================================
 
 export function parseCustomId(customId: string): {
   action: string;
-  payload?: any;
+  payload?: Record<string, string>;
 } {
-  try {
-    const parsed = JSON.parse(customId);
-    return parsed;
-  } catch {
-    return { action: customId };
+  // 🔹 FORMAT: action|key=value|key=value
+
+  const [action, ...parts] = customId.split("|");
+
+  if (parts.length === 0) {
+    return { action };
   }
+
+  const payload: Record<string, string> = {};
+
+  for (const part of parts) {
+    const [key, value] = part.split("=");
+
+    if (key && value) {
+      payload[key] = value;
+    }
+  }
+
+  return { action, payload };
 }
