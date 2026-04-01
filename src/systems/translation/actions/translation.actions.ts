@@ -53,6 +53,11 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
+function getLanguageEmoji(code: string) {
+  const lang = LANGUAGES.find((l) => l.code === code);
+  return lang ? lang.emoji : "";
+}
+
 // =====================================
 // 🔹 ACTION: OPEN
 // =====================================
@@ -99,8 +104,26 @@ registerUIAction("translation.open", {
           savedLang
         );
 
+        // =====================================
+        // 🌍 FORMAT EPHEMERAL RESPONSE
+        // =====================================
+
+        const sourceEmoji = "🌐"; // default icon if source unknown
+        const targetEmoji = getLanguageEmoji(savedLang);
+
+        const replyContent = `
+${sourceEmoji} Translation
+**From:** auto-detected → ${targetEmoji} ${savedLang.toUpperCase()}
+
+**Original:**
+> ${content}
+
+**Translated:**
+> ${translated}
+        `;
+
         await interaction.reply({
-          content: `🌍 (${savedLang.toUpperCase()})\n\n"${translated}"`,
+          content: replyContent.trim(),
           ephemeral: true,
           components: [
             {
@@ -178,8 +201,21 @@ registerUIAction("translation.select", {
         lang
       );
 
+      const targetEmoji = getLanguageEmoji(lang);
+
+      const replyContent = `
+🌍 Translation
+**From:** auto-detected → ${targetEmoji} ${lang.toUpperCase()}
+
+**Original:**
+> ${content}
+
+**Translated:**
+> ${translated}
+      `;
+
       await interaction.update({
-        content: `🌍 (${lang.toUpperCase()})\n\n"${translated}"`,
+        content: replyContent.trim(),
         components: [
           {
             type: 1,
