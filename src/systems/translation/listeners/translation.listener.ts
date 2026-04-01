@@ -63,7 +63,6 @@ export function initTranslationListener(
       // =====================================
 
       const embed = new EmbedBuilder()
-        .setTitle("🌍 Translation")
         .setDescription(message.content)
         .setAuthor({
           name: message.author?.username || "Unknown",
@@ -95,7 +94,7 @@ export function initTranslationListener(
 
       setTimeout(() => {
         sentMessage.delete().catch(() => {});
-      }, 20_000); // 20 sekund
+      }, 60_000); // 60 sekund
 
       flow.success();
     } catch (err) {
