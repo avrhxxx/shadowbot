@@ -4,16 +4,22 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 
-import { getUserLanguage, setUserLanguage } from "../translationPreferencesService";
-import { translateText } from "../translationService";
+import {
+  getUserLanguage,
+  setUserLanguage,
+} from "../translationPreferencesService";
 
+import { translateText } from "../translationService";
 import { LANGUAGES } from "../translationConfig";
 
 // =====================================
 // 🔹 HELPERS
 // =====================================
 
-function buildLanguageButtons(messageId: string) {
+function buildLanguageButtons(
+  messageId: string,
+  content: string
+) {
   const rows: any[] = [];
 
   for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -30,6 +36,7 @@ function buildLanguageButtons(messageId: string) {
           action: "translation.select",
           payload: {
             messageId,
+            content,
             lang: lang.code,
           },
         }),
@@ -47,7 +54,7 @@ function buildLanguageButtons(messageId: string) {
 registerUIAction("translation.open", {
   system: "translation",
 
-  handler: async (interaction, ctx, payload) => {
+  handler: async (interaction, _ctx, payload) => {
     if (!interaction.isButton()) return;
 
     const { messageId, content } = payload || {};
@@ -56,13 +63,19 @@ registerUIAction("translation.open", {
     const guildId = interaction.guildId!;
     const userId = interaction.user.id;
 
-    const savedLang = await getUserLanguage(guildId, userId);
+    const savedLang = await getUserLanguage(
+      guildId,
+      userId
+    );
 
     // =============================
     // AUTO TRANSLATE
     // =============================
     if (savedLang) {
-      const translated = await translateText(content, savedLang);
+      const translated = await translateText(
+        content,
+        savedLang
+      );
 
       await interaction.reply({
         content: `🌍 (${savedLang.toUpperCase()})\n\n"${translated}"`,
@@ -78,7 +91,10 @@ registerUIAction("translation.open", {
 
     await interaction.reply({
       content: "🌍 Choose your language:",
-      components: buildLanguageButtons(messageId),
+      components: buildLanguageButtons(
+        messageId,
+        content
+      ),
       ephemeral: true,
     });
   },
@@ -94,7 +110,7 @@ registerUIAction("translation.select", {
   handler: async (interaction, _ctx, payload) => {
     if (!interaction.isButton()) return;
 
-    const { messageId, lang, content } = payload || {};
+    const { lang, content } = payload || {};
     if (!lang || !content) return;
 
     const guildId = interaction.guildId!;
@@ -102,32 +118,14 @@ registerUIAction("translation.select", {
 
     await setUserLanguage(guildId, userId, lang);
 
-    const translated = await translateText(content, lang);
+    const translated = await translateText(
+      content,
+      lang
+    );
 
     await interaction.update({
       content: `🌍 (${lang.toUpperCase()})\n\n"${translated}"`,
       components: [],
-    });
-  },
-});
-
-// =====================================
-// 🔹 ACTION: CHANGE LANGUAGE
-// =====================================
-
-registerUIAction("translation.change", {
-  system: "translation",
-
-  handler: async (interaction, _ctx, payload) => {
-    if (!interaction.isButton()) return;
-
-    const { messageId } = payload || {};
-    if (!messageId) return;
-
-    await interaction.reply({
-      content: "🌍 Change language:",
-      components: buildLanguageButtons(messageId),
-      ephemeral: true,
     });
   },
 });
