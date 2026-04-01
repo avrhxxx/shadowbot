@@ -8,9 +8,9 @@ import { createLogger } from "@/foundation/logger";
 import {
   getUserLanguage,
   setUserLanguage,
-} from "../translationPreferencesService";
+} from "../translationPreferences.service";
 
-import { translateText } from "../translationService";
+import { translateText } from "../translation.service";
 import { LANGUAGES } from "../translationConfig";
 
 // =====================================
