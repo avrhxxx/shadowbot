@@ -55,7 +55,7 @@ function buildLanguageButtons(messageId: string) {
 
 function getLanguageEmoji(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
-  return lang ? lang.emoji : "";
+  return lang?.emoji ?? "❓";
 }
 
 // =====================================
@@ -70,7 +70,6 @@ registerUIAction("translation.open", {
 
     const log = createLogger(ctx);
     const flow = log.flow("translation.open");
-
     flow.start();
 
     try {
@@ -80,11 +79,7 @@ registerUIAction("translation.open", {
         return;
       }
 
-      const content = await fetchMessageContent(
-        interaction,
-        messageId
-      );
-
+      const content = await fetchMessageContent(interaction, messageId);
       if (!content) {
         flow.fail(new Error("message_not_found"));
         return;
@@ -93,37 +88,27 @@ registerUIAction("translation.open", {
       const guildId = interaction.guildId!;
       const userId = interaction.user.id;
 
-      const savedLang = await getUserLanguage(
-        guildId,
-        userId
-      );
+      const savedLang = await getUserLanguage(guildId, userId);
 
       if (savedLang) {
-        const translated = await translateText(
-          content,
-          savedLang
-        );
+        // 🔹 TŁUMACZENIE
+        const { translated, detectedSource } = await translateText(content, savedLang);
 
-        // =====================================
-        // 🌍 FORMAT EPHEMERAL RESPONSE
-        // =====================================
-
-        const sourceEmoji = "🌐"; // default icon if source unknown
+        const sourceEmoji = getLanguageEmoji(detectedSource);
         const targetEmoji = getLanguageEmoji(savedLang);
 
         const replyContent = `
-${sourceEmoji} Translation
-**From:** auto-detected → ${targetEmoji} ${savedLang.toUpperCase()}
+${sourceEmoji} → ${targetEmoji} Translation
 
 **Original:**
 > ${content}
 
 **Translated:**
 > ${translated}
-        `;
+`;
 
         await interaction.reply({
-          content: replyContent.trim(),
+          content: replyContent,
           ephemeral: true,
           components: [
             {
@@ -169,7 +154,6 @@ registerUIAction("translation.select", {
 
     const log = createLogger(ctx);
     const flow = log.flow("translation.select");
-
     flow.start();
 
     try {
@@ -181,11 +165,7 @@ registerUIAction("translation.select", {
         return;
       }
 
-      const content = await fetchMessageContent(
-        interaction,
-        messageId
-      );
-
+      const content = await fetchMessageContent(interaction, messageId);
       if (!content) {
         flow.fail(new Error("message_not_found"));
         return;
@@ -196,33 +176,30 @@ registerUIAction("translation.select", {
 
       await setUserLanguage(guildId, userId, lang);
 
-      const translated = await translateText(
-        content,
-        lang
-      );
+      const { translated, detectedSource } = await translateText(content, lang);
 
+      const sourceEmoji = getLanguageEmoji(detectedSource);
       const targetEmoji = getLanguageEmoji(lang);
 
       const replyContent = `
-🌍 Translation
-**From:** auto-detected → ${targetEmoji} ${lang.toUpperCase()}
+${sourceEmoji} → ${targetEmoji} Translation
 
 **Original:**
 > ${content}
 
 **Translated:**
 > ${translated}
-      `;
+`;
 
       await interaction.update({
-        content: replyContent.trim(),
+        content: replyContent,
         components: [
           {
             type: 1,
             components: [
               {
-                type: 2,
                 label: "Change language",
+                type: 2,
                 style: 2,
                 custom_id: `translation.change|messageId=${messageId}`,
               },
@@ -250,12 +227,10 @@ registerUIAction("translation.change", {
 
     const log = createLogger(ctx);
     const flow = log.flow("translation.change");
-
     flow.start();
 
     try {
       const messageId = payload?.messageId;
-
       if (!messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
