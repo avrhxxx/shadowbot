@@ -1,8 +1,9 @@
 // =====================================
-// 📁 src/integrations/google/googleSheetsClient.ts
+// 📁 src/integrations/google/googleClient.ts
 // =====================================
 
 import { google } from "googleapis";
+import { TranslationServiceClient } from "@google-cloud/translate";
 
 // =====================================
 // 🔹 TYPES
@@ -57,7 +58,7 @@ const googleCredentials: GoogleServiceAccount = Object.freeze({
 });
 
 // =====================================
-// 🔥 SHARED AUTH (Sheets + Vision)
+// 🔥 SHARED AUTH (Sheets, Vision, Translate)
 // =====================================
 
 const googleAuth = new google.auth.GoogleAuth({
@@ -65,6 +66,7 @@ const googleAuth = new google.auth.GoogleAuth({
   scopes: [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/cloud-vision",
+    "https://www.googleapis.com/auth/cloud-translation",
   ] as const,
 });
 
@@ -78,7 +80,15 @@ const sheetsClient = google.sheets({
 });
 
 // =====================================
+// 🌐 TRANSLATE CLIENT
+// =====================================
+
+const translateClient = new TranslationServiceClient({
+  auth: googleAuth,
+});
+
+// =====================================
 // 🔄 EXPORTS
 // =====================================
 
-export { googleAuth, sheetsClient, googleCredentials };
+export { googleAuth, sheetsClient, translateClient, googleCredentials };
