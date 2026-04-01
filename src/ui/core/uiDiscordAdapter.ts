@@ -8,7 +8,10 @@ import {
   CacheType,
 } from "discord.js";
 
-import { parseCustomId, getUIAction } from "./uiRouter";
+import {
+  parseCustomId,
+  executeUIAction,
+} from "./uiRouter";
 
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
@@ -47,21 +50,24 @@ export async function handleUIInteraction(
       button.customId
     );
 
-    const handler = getUIAction(action);
+    // =====================================
+    // 🚀 EXECUTE (🔥 przez router + runtime)
+    // =====================================
 
-    if (!handler) {
+    const handled = await executeUIAction(
+      action,
+      button,
+      ctx,
+      payload
+    );
+
+    if (!handled) {
       flow.stepWarn("action.not_found", {
         meta: { action },
       });
 
       return false;
     }
-
-    // =====================================
-    // 🚀 EXECUTE ACTION
-    // =====================================
-
-    await handler(button, ctx, payload);
 
     return true;
   } catch (err) {
