@@ -4,20 +4,24 @@
 
 import { Client } from "discord.js";
 
-import { createRootContext } from "@/trace";
+import { createChildContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
 
 import { TRANSLATION_TRIGGER_EMOJI } from "../translationConfig";
+import type { TraceContext } from "@/trace";
 
 // =====================================
 // 🚀 INIT
 // =====================================
 
-export function initTranslationListener(client: Client) {
+export function initTranslationListener(
+  client: Client,
+  parentCtx: TraceContext
+) {
   client.on("messageReactionAdd", async (reaction, user) => {
-    try {
-      if (user.bot) return;
+    if (user.bot) return;
 
+    try {
       if (reaction.partial) await reaction.fetch();
       if (reaction.message.partial)
         await reaction.message.fetch();
@@ -36,12 +40,16 @@ export function initTranslationListener(client: Client) {
       if (!message.guildId) return;
 
       // =====================================
-      // 🧠 CTX + LOG
+      // 🧠 CTX + LOG (🔥 CHILD CONTEXT)
       // =====================================
 
-      const ctx = createRootContext({
+      const ctx = createChildContext(parentCtx, {
         source: "discord",
         system: "translation",
+        guildId: message.guildId,
+        userId: user.id,
+        channelId: message.channelId,
+        messageId: message.id,
       });
 
       const log = createLogger(ctx);
@@ -80,9 +88,10 @@ export function initTranslationListener(client: Client) {
 
       flow.success();
     } catch (err) {
-      const ctx = createRootContext({
+      const ctx = createChildContext(parentCtx, {
         source: "discord",
         system: "translation",
+        userId: user.id,
       });
 
       const log = createLogger(ctx);
