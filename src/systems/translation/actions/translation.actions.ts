@@ -43,7 +43,6 @@ function buildLanguageButtons(messageId: string) {
       components: slice.map((lang) => ({
         type: 2,
         label: lang.label,
-        emoji: { name: lang.emoji },
         style: 1,
         custom_id: `translation.select|messageId=${messageId}|lang=${lang.code}`,
       })),
@@ -53,7 +52,7 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
-function getLanguageCodeDisplay(code: string) {
+function getLanguageCode(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
   return lang?.label ?? code.toUpperCase();
 }
@@ -91,25 +90,18 @@ registerUIAction("translation.open", {
       const savedLang = await getUserLanguage(guildId, userId);
 
       if (savedLang) {
-        // 🔹 TŁUMACZENIE
         const result = await translateText(content, savedLang);
 
-        let translated: string;
-        let detectedSource: string;
-
-        if (typeof result === "string") {
-          translated = result;
-          detectedSource = "auto";
-        } else if (result && typeof result === "object" && 'translated' in result) {
-          translated = result.translated;
-          detectedSource = result.detectedSource;
-        } else {
-          translated = content;
-          detectedSource = "unknown";
-        }
+        // 🔹 SAFE ACCESS
+        const translated =
+          typeof result === "string" ? result : result.translated;
+        const detectedSource =
+          typeof result === "string" ? "auto" : result.detectedSource;
 
         const replyContent = `
-**Translation from ${getLanguageCodeDisplay(detectedSource)} to ${getLanguageCodeDisplay(savedLang)}**
+Translation from ${getLanguageCode(
+          detectedSource
+        )} to ${getLanguageCode(savedLang)}
 
 **Original:**
 > ${content}
@@ -189,22 +181,15 @@ registerUIAction("translation.select", {
 
       const result = await translateText(content, lang);
 
-      let translated: string;
-      let detectedSource: string;
-
-      if (typeof result === "string") {
-        translated = result;
-        detectedSource = "auto";
-      } else if (result && typeof result === "object" && 'translated' in result) {
-        translated = result.translated;
-        detectedSource = result.detectedSource;
-      } else {
-        translated = content;
-        detectedSource = "unknown";
-      }
+      const translated =
+        typeof result === "string" ? result : result.translated;
+      const detectedSource =
+        typeof result === "string" ? "auto" : result.detectedSource;
 
       const replyContent = `
-**Translation from ${getLanguageCodeDisplay(detectedSource)} to ${getLanguageCodeDisplay(lang)}**
+Translation from ${getLanguageCode(
+        detectedSource
+      )} to ${getLanguageCode(lang)}
 
 **Original:**
 > ${content}
