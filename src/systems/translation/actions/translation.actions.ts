@@ -53,9 +53,9 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
-function getLanguageEmoji(code: string) {
+function getLanguageCodeDisplay(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
-  return lang?.emoji ?? "❓";
+  return lang?.label ?? code.toUpperCase();
 }
 
 // =====================================
@@ -100,16 +100,16 @@ registerUIAction("translation.open", {
         if (typeof result === "string") {
           translated = result;
           detectedSource = "auto";
-        } else {
+        } else if (result && typeof result === "object" && 'translated' in result) {
           translated = result.translated;
           detectedSource = result.detectedSource;
+        } else {
+          translated = content;
+          detectedSource = "unknown";
         }
 
-        const sourceEmoji = getLanguageEmoji(detectedSource);
-        const targetEmoji = getLanguageEmoji(savedLang);
-
         const replyContent = `
-${sourceEmoji} from ${detectedSource.toUpperCase()} to ${savedLang.toUpperCase()} Translation
+**Translation from ${getLanguageCodeDisplay(detectedSource)} to ${getLanguageCodeDisplay(savedLang)}**
 
 **Original:**
 > ${content}
@@ -126,8 +126,8 @@ ${sourceEmoji} from ${detectedSource.toUpperCase()} to ${savedLang.toUpperCase()
               type: 1,
               components: [
                 {
-                  type: 2,
                   label: "Change language",
+                  type: 2,
                   style: 2,
                   custom_id: `translation.change|messageId=${messageId}`,
                 },
@@ -195,16 +195,16 @@ registerUIAction("translation.select", {
       if (typeof result === "string") {
         translated = result;
         detectedSource = "auto";
-      } else {
+      } else if (result && typeof result === "object" && 'translated' in result) {
         translated = result.translated;
         detectedSource = result.detectedSource;
+      } else {
+        translated = content;
+        detectedSource = "unknown";
       }
 
-      const sourceEmoji = getLanguageEmoji(detectedSource);
-      const targetEmoji = getLanguageEmoji(lang);
-
       const replyContent = `
-${sourceEmoji} from ${detectedSource.toUpperCase()} to ${lang.toUpperCase()} Translation
+**Translation from ${getLanguageCodeDisplay(detectedSource)} to ${getLanguageCodeDisplay(lang)}**
 
 **Original:**
 > ${content}
