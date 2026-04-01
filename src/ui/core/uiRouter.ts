@@ -5,6 +5,8 @@
 import type { Interaction } from "discord.js";
 import type { TraceContext } from "@/trace";
 
+import { isSystemEnabled } from "@/runtime/runtimeState";
+
 // =====================================
 // 🔹 TYPES
 // =====================================
@@ -15,7 +17,12 @@ export type UIActionHandler = (
   payload?: any
 ) => Promise<void>;
 
-type Registry = Map<string, UIActionHandler>;
+export type UIActionDefinition = {
+  system: string;
+  handler: UIActionHandler;
+};
+
+type Registry = Map<string, UIActionDefinition>;
 
 // =====================================
 // 🔹 REGISTRY
@@ -29,21 +36,39 @@ const registry: Registry = new Map();
 
 export function registerUIAction(
   id: string,
-  handler: UIActionHandler
+  def: UIActionDefinition
 ) {
-  registry.set(id, handler);
+  registry.set(id, def);
 }
 
 // =====================================
-// 🔹 RESOLVE
+// 🔹 EXECUTE (🔥 NOWE)
 // =====================================
 
-export function getUIAction(id: string) {
-  return registry.get(id);
+export async function executeUIAction(
+  id: string,
+  interaction: Interaction,
+  ctx: TraceContext,
+  payload?: any
+): Promise<boolean> {
+  const action = registry.get(id);
+
+  if (!action) return false;
+
+  const enabled = await isSystemEnabled(action.system);
+
+  if (!enabled) {
+    // system OFF → blokujemy
+    return true;
+  }
+
+  await action.handler(interaction, ctx, payload);
+
+  return true;
 }
 
 // =====================================
-// 🔹 PARSE (🔥 MAGIC)
+// 🔹 PARSE
 // =====================================
 
 export function parseCustomId(customId: string): {
