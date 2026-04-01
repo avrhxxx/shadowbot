@@ -3,6 +3,7 @@
 // =====================================
 
 import { registerModeratorActions } from "./actions/moderator.actions";
+import { registerModeratorHubActions } from "./actions/moderatorHub.actions";
 import { registerModeratorViews } from "./views/moderator.views";
 
 // =====================================
@@ -10,8 +11,11 @@ import { registerModeratorViews } from "./views/moderator.views";
 // =====================================
 
 export async function init(ctx: any) {
-  // Rejestrujemy akcje przycisków
+  // Rejestrujemy ogólne akcje moderatora
   registerModeratorActions();
+
+  // Rejestrujemy akcje przycisków Hub (placeholdery)
+  registerModeratorHubActions();
 
   // Rejestrujemy widoki (hub, event panel itd.)
   registerModeratorViews();
