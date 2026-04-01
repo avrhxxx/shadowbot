@@ -40,7 +40,7 @@ export function initTranslationListener(
       if (!message.guildId) return;
 
       // =====================================
-      // 🧠 CTX + LOG (🔥 CHILD CONTEXT)
+      // 🧠 CTX + LOG
       // =====================================
 
       const ctx = createChildContext(parentCtx, {
@@ -60,7 +60,7 @@ export function initTranslationListener(
       });
 
       // =====================================
-      // 🎯 SEND PUBLIC PANEL
+      // 🎯 SEND PUBLIC PANEL (FIXED)
       // =====================================
 
       await message.channel.send({
@@ -73,11 +73,11 @@ export function initTranslationListener(
                 type: 2,
                 label: "Translate",
                 style: 1,
+                // ✅ FIX: krótkie custom_id
                 custom_id: JSON.stringify({
                   action: "translation.open",
                   payload: {
                     messageId: message.id,
-                    content: message.content,
                   },
                 }),
               },
