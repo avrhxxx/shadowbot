@@ -45,13 +45,7 @@ function buildLanguageButtons(messageId: string) {
         label: lang.label,
         emoji: { name: lang.emoji },
         style: 1,
-        custom_id: JSON.stringify({
-          action: "translation.select",
-          payload: {
-            messageId,
-            lang: lang.code,
-          },
-        }),
+        custom_id: `translation.select|messageId=${messageId}|lang=${lang.code}`,
       })),
     });
   }
@@ -75,7 +69,7 @@ registerUIAction("translation.open", {
     flow.start();
 
     try {
-      const { messageId } = payload || {};
+      const messageId = payload?.messageId;
       if (!messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
@@ -99,10 +93,6 @@ registerUIAction("translation.open", {
         userId
       );
 
-      // =============================
-      // AUTO TRANSLATE
-      // =============================
-
       if (savedLang) {
         const translated = await translateText(
           content,
@@ -120,10 +110,7 @@ registerUIAction("translation.open", {
                   type: 2,
                   label: "Change language",
                   style: 2,
-                  custom_id: JSON.stringify({
-                    action: "translation.change",
-                    payload: { messageId },
-                  }),
+                  custom_id: `translation.change|messageId=${messageId}`,
                 },
               ],
             },
@@ -133,10 +120,6 @@ registerUIAction("translation.open", {
         flow.success();
         return;
       }
-
-      // =============================
-      // SELECT LANGUAGE
-      // =============================
 
       await interaction.reply({
         content: "🌍 Choose your language:",
@@ -167,7 +150,9 @@ registerUIAction("translation.select", {
     flow.start();
 
     try {
-      const { lang, messageId } = payload || {};
+      const messageId = payload?.messageId;
+      const lang = payload?.lang;
+
       if (!lang || !messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
@@ -203,10 +188,7 @@ registerUIAction("translation.select", {
                 type: 2,
                 label: "Change language",
                 style: 2,
-                custom_id: JSON.stringify({
-                  action: "translation.change",
-                  payload: { messageId },
-                }),
+                custom_id: `translation.change|messageId=${messageId}`,
               },
             ],
           },
@@ -236,7 +218,8 @@ registerUIAction("translation.change", {
     flow.start();
 
     try {
-      const { messageId } = payload || {};
+      const messageId = payload?.messageId;
+
       if (!messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
