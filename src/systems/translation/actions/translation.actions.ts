@@ -14,6 +14,15 @@ import { translateText } from "../translation.service";
 import { LANGUAGES } from "../translationConfig";
 
 // =====================================
+// 🔹 TYPES
+// =====================================
+
+type TranslationResult = {
+  translated: string;
+  detectedSource: string;
+};
+
+// =====================================
 // 🔹 HELPERS
 // =====================================
 
@@ -43,6 +52,7 @@ function buildLanguageButtons(messageId: string) {
       components: slice.map((lang) => ({
         type: 2,
         label: lang.label,
+        emoji: { name: lang.emoji },
         style: 1,
         custom_id: `translation.select|messageId=${messageId}|lang=${lang.code}`,
       })),
@@ -52,9 +62,9 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
-function getLanguageFlag(code: string) {
+function getLanguageLabel(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
-  return lang?.emoji ?? "❓";
+  return lang?.label ?? code.toUpperCase();
 }
 
 // =====================================
@@ -90,16 +100,14 @@ registerUIAction("translation.open", {
       const savedLang = await getUserLanguage(guildId, userId);
 
       if (savedLang) {
-        const result = await translateText(content, savedLang);
-        // obsługa zwrotu jako string lub obiekt
+        // 🔹 TŁUMACZENIE
+        const result = await translateText(content, savedLang) as TranslationResult;
+
         const translated = typeof result === "string" ? result : result.translated;
         const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
 
-        const sourceFlag = getLanguageFlag(detectedSource);
-        const targetFlag = getLanguageFlag(savedLang);
-
         const replyContent = `
-**Translation from ${detectedSource.toUpperCase()} ${sourceFlag} to ${savedLang.toUpperCase()} ${targetFlag}**
+Translation from ${getLanguageLabel(detectedSource)} to ${getLanguageLabel(savedLang)}
 
 **Original:**
 > ${content}
@@ -116,8 +124,8 @@ registerUIAction("translation.open", {
               type: 1,
               components: [
                 {
-                  type: 2,
                   label: "Change language",
+                  type: 2,
                   style: 2,
                   custom_id: `translation.change|messageId=${messageId}`,
                 },
@@ -177,15 +185,13 @@ registerUIAction("translation.select", {
 
       await setUserLanguage(guildId, userId, lang);
 
-      const result = await translateText(content, lang);
+      const result = await translateText(content, lang) as TranslationResult;
+
       const translated = typeof result === "string" ? result : result.translated;
       const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
 
-      const sourceFlag = getLanguageFlag(detectedSource);
-      const targetFlag = getLanguageFlag(lang);
-
       const replyContent = `
-**Translation from ${detectedSource.toUpperCase()} ${sourceFlag} to ${lang.toUpperCase()} ${targetFlag}**
+Translation from ${getLanguageLabel(detectedSource)} to ${getLanguageLabel(lang)}
 
 **Original:**
 > ${content}
