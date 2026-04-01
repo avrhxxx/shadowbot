@@ -9,68 +9,42 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 // 🔹 TYPES
 // =====================================
 
-type Button = {
-  label: string;
-  style?: "primary" | "secondary" | "danger";
-  customId: string;
-};
-
 type View = {
   content: string;
   components: any[];
 };
 
 // =====================================
-// 🧠 MAIN VIEW
+// 🧠 VIEW
 // =====================================
 
 export async function devpanelMainView(): Promise<View> {
-  const systems = SYSTEM_REGISTRY;
+  const lines: string[] = [];
 
-  const buttons: Button[] = [];
+  const buttons: any[] = [];
 
-  for (const system of systems) {
+  for (const system of SYSTEM_REGISTRY) {
     const enabled = await isSystemEnabled(system.name);
 
+    const status = enabled ? "🟢 ON" : "🔴 OFF";
+
+    lines.push(`**${system.name}** → ${status}`);
+
     buttons.push({
-      label: `${system.name} → ${
-        enabled ? "🟢 ON" : "🔴 OFF"
-      }`,
-      style: enabled ? "primary" : "secondary",
-      customId: JSON.stringify({
-        action: "devpanel.toggle",
-        payload: { system: system.name },
-      }),
+      type: 2,
+      label: `${system.name}`,
+      style: enabled ? 3 : 2, // green / gray
+      custom_id: `devpanel.toggle|system=${system.name}`,
     });
   }
 
   return {
-    content: "🧠 **Dev Panel — System Control**",
+    content: `⚙️ **Dev Panel**\n\n${lines.join("\n")}`,
     components: [
       {
         type: 1,
-        components: buttons.map((b) => ({
-          type: 2,
-          label: b.label,
-          style: mapStyle(b.style),
-          custom_id: b.customId,
-        })),
+        components: buttons,
       },
     ],
   };
-}
-
-// =====================================
-// 🔧 STYLE MAP
-// =====================================
-
-function mapStyle(style?: string) {
-  switch (style) {
-    case "secondary":
-      return 2;
-    case "danger":
-      return 4;
-    default:
-      return 1;
-  }
 }
