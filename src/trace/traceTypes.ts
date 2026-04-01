@@ -42,7 +42,7 @@ export type TraceSource =
   | "api"
   | "cron"
   | "external"
-  | "interaction"; // ✅ DODANE
+  | "interaction";
 
 // =====================================
 // 🔹 SYSTEM (🔥 ROZSZERZONE)
@@ -57,14 +57,15 @@ export type TraceSystem =
   | "google"
 
   // 🔹 UI LAYER
-  | "ui" // ✅ DODANE
+  | "ui"
 
   // 🔹 FEATURES
   | "events"
   | "absence"
   | "points"
   | "quickadd"
-  | "test";
+  | "test"
+  | "translation"; // ✅ 🔥 DODANE
 
 // =====================================
 // 🔹 TRACE CONTEXT
