@@ -5,70 +5,121 @@
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction, EmbedBuilder } from "discord.js";
 
+import { renderEventPanel } from "@/systems/events/views/eventPanel"; // ← pokażesz mi potem jeśli path inny
+import { renderPointsPanel } from "@/systems/points/views/pointsPanel";
+import { renderAbsencePanel } from "@/systems/absence/views/absencePanel";
+
 // =====================================
 // 🔹 REGISTER
 // =====================================
 
 export function registerModeratorHubActions() {
-  // Lista placeholderów dla większości przycisków
-  const placeholderMenus = [
-    { action: "moderator.openEventMenu", label: "Event Menu" },
-    { action: "moderator.openPointsMenu", label: "Points Menu" },
-    { action: "moderator.openAbsenceMenu", label: "Absence Menu" },
-    { action: "moderator.openQuickAddMenu", label: "QuickAdd Menu" },
-    { action: "moderator.openTranslateMenu", label: "Translate Menu" },
-  ];
-
-  // 🔹 Rejestracja placeholderów
-  for (const menu of placeholderMenus) {
-    registerUIAction(menu.action, {
-      system: "moderator",
-      handler: async (interaction: Interaction) => {
-        if (!interaction.isButton()) return;
-
-        console.log(`[MODERATOR HUB] Clicked placeholder: ${menu.label}`);
-
-        await interaction.update({
-          content: `📌 Placeholder for **${menu.label}** menu`,
-          components: [], // brak przycisków w placeholderze
-        });
-      },
-    });
-  }
-
-  // 🔹 Rejestracja Help (pełny embed)
-  registerUIAction("moderator.openHelpMenu", {
+  registerUIAction("moderator.open", {
     system: "moderator",
-    handler: async (interaction: Interaction) => {
+
+    handler: async (interaction: Interaction, _ctx, payload) => {
       if (!interaction.isButton()) return;
 
-      const embed = new EmbedBuilder()
-        .setTitle("Moderator Panel Guide")
-        .setColor(0x1E90FF)
-        .addFields(
-          {
-            name: "🟢 Event Menu",
-            value: "Opens Event Panel: create events, manage participants, cancel events, download lists."
-          },
-          {
-            name: "⭐ Points Menu",
-            value: "Not implemented yet."
-          },
-          {
-            name: "🕒 Absence Menu",
-            value: "Manage absences: add/remove, see current absences, automatic notifications."
-          },
-          {
-            name: "📝 Translate Menu",
-            value: "Not implemented yet."
-          },
-          {
-            name: "❓ Help",
-            value: "Shows this description."
-          }
-        );
+      const target = payload?.target;
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      // =====================================
+      // 🔹 EVENTS
+      // =====================================
+
+      if (target === "events") {
+        const panel = renderEventPanel();
+
+        await interaction.update({
+          content: panel.content,
+          components: panel.components,
+        });
+
+        return;
+      }
+
+      // =====================================
+      // 🔹 POINTS
+      // =====================================
+
+      if (target === "points") {
+        const panel = renderPointsPanel();
+
+        await interaction.update({
+          content: panel.content,
+          components: panel.components,
+        });
+
+        return;
+      }
+
+      // =====================================
+      // 🔹 ABSENCE
+      // =====================================
+
+      if (target === "absence") {
+        const panel = renderAbsencePanel();
+
+        await interaction.update({
+          content: panel.content,
+          components: panel.components,
+        });
+
+        return;
+      }
+
+      // =====================================
+      // 🔹 QUICKADD (placeholder)
+      // =====================================
+
+      if (target === "quickadd") {
+        await interaction.update({
+          content: "📌 QuickAdd Panel (coming soon)",
+          components: [],
+        });
+
+        return;
+      }
+
+      // =====================================
+      // 🔹 HELP
+      // =====================================
+
+      if (target === "help") {
+        const embed = new EmbedBuilder()
+          .setTitle("Moderator Panel Guide")
+          .setColor(0x1E90FF)
+          .addFields(
+            {
+              name: "🟢 Event Menu",
+              value:
+                "Create events, manage participants, cancel events, download lists.",
+            },
+            {
+              name: "⭐ Points Menu",
+              value: "Manage points and rankings.",
+            },
+            {
+              name: "🕒 Absence Menu",
+              value:
+                "Manage absences: add/remove, see current absences, automatic notifications.",
+            },
+            {
+              name: "⚡ QuickAdd",
+              value: "Fast data input system (OCR, parser).",
+            },
+            {
+              name: "❓ Help",
+              value: "Shows this description.",
+            }
+          );
+
+        await interaction.reply({
+          embeds: [embed],
+          ephemeral: true,
+        });
+
+        return;
+      }
     },
   });
 }
