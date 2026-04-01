@@ -2,12 +2,12 @@
 // 📁 src/systems/devpanel/index.ts
 // =====================================
 
-// 🔹 ACTIONS
-import "./actions/devpanel.toggle.action";
+import { registerDevpanelActions } from "./actions/devpanel.toggle.action";
 
-// 🔹 COMMANDS
-import "./commands/devpanel.command";
-import "./commands/devpanel.slash";
+// =====================================
+// 🚀 INIT
+// =====================================
 
-// 🔹 VIEWS (opcjonalnie)
-import "./views/devpanel.view";
+export async function init() {
+  registerDevpanelActions();
+}
