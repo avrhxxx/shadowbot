@@ -2,16 +2,32 @@
 // 📁 src/systems/translation/index.ts
 // =====================================
 
+import { client } from "@/index";
+import { createLogger } from "@/foundation/logger";
+import type { TraceContext } from "@/trace";
+
+// 🔹 LISTENER
+import { initTranslationListener } from "./listeners/translation.listener";
+
 // 🔹 ACTIONS
 import "./actions/translation.actions";
-
-// 🔹 LISTENERS
-import "./listeners/translation.listener";
 
 // =====================================
 // 🔹 INIT (dla runtimeLoader)
 // =====================================
 
-export async function init() {
-  // nic nie robimy – samo importowanie rejestruje actions + listener
+export async function init(ctx: TraceContext) {
+  const log = createLogger(ctx);
+  const flow = log.flow("init");
+
+  flow.start();
+
+  try {
+    // 🔥 PODPINAMY LISTENER DO CLIENTA
+    initTranslationListener(client, ctx);
+
+    flow.success();
+  } catch (err) {
+    flow.fail(err);
+  }
 }
