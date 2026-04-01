@@ -18,20 +18,30 @@ export async function renderModeratorHub(): Promise<ViewResult> {
     { name: "points", label: "Points Menu", action: "moderator.openPointsMenu" },
     { name: "absence", label: "Absence Menu", action: "moderator.openAbsenceMenu" },
     { name: "quickadd", label: "QuickAdd Menu", action: "moderator.openQuickAddMenu" },
-    { name: "help", label: "Help", action: "moderator.openHelpMenu" },
   ];
 
+  // 🔹 Generujemy tylko włączone systemy
   for (const sys of systems) {
-    const enabled = sys.name === "help" ? true : await isSystemEnabled(sys.name);
+    const enabled = await isSystemEnabled(sys.name);
+    if (!enabled) continue; // pomijamy jeśli system wyłączony
 
     buttons.push({
       type: 2, // button
       label: sys.label,
-      style: sys.name === "help" ? 3 : 1, // Help = Success, reszta Primary
+      style: 1, // Primary
       custom_id: sys.action,
-      disabled: !enabled, // wyłączony jeśli system nieaktywny
+      disabled: false,
     });
   }
+
+  // 🔹 Dodajemy zawsze dostępny przycisk Help
+  buttons.push({
+    type: 2,
+    label: "Help",
+    style: 3, // Success
+    custom_id: "moderator.openHelpMenu",
+    disabled: false,
+  });
 
   return {
     content: `📌 **Moderator Panel**\n\nSelect an option:`,
