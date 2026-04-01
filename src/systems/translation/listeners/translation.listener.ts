@@ -60,7 +60,7 @@ export function initTranslationListener(
       });
 
       // =====================================
-      // 🎯 SEND PUBLIC PANEL (FIXED)
+      // 🎯 SEND PUBLIC PANEL (✅ FINAL FIX)
       // =====================================
 
       await message.channel.send({
@@ -73,13 +73,7 @@ export function initTranslationListener(
                 type: 2,
                 label: "Translate",
                 style: 1,
-                // ✅ FIX: krótkie custom_id
-                custom_id: JSON.stringify({
-                  action: "translation.open",
-                  payload: {
-                    messageId: message.id,
-                  },
-                }),
+                custom_id: `translation.open|messageId=${message.id}`,
               },
             ],
           },
