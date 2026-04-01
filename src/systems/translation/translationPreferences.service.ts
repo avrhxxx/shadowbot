@@ -2,7 +2,7 @@
 // 📁 src/systems/translation/translationPreferences.service.ts
 // =====================================
 
-import { SheetRepository } from "@/integrations/google";
+import { GoogleRepository } from "@/integrations/google";
 import { TRANSLATE_SHEET } from "@/integrations/google/googleSchema";
 import { LANGUAGES } from "./translationConfig";
 
@@ -11,7 +11,7 @@ import { LANGUAGES } from "./translationConfig";
 // =====================================
 
 type TranslateRow = {
-  id?: string;
+  id: string; // 🔥 REQUIRED (GoogleRepository)
   guildId: string;
   key: string; // userId
   lang: string;
@@ -21,7 +21,9 @@ type TranslateRow = {
 // 🔧 REPO
 // =====================================
 
-const repo = new SheetRepository<TranslateRow>(TRANSLATE_SHEET);
+const repo = new GoogleRepository<TranslateRow>(
+  TRANSLATE_SHEET
+);
 
 // =====================================
 // 🔍 GET USER LANGUAGE
@@ -85,6 +87,7 @@ export async function setUserLanguage(
   // =============================
 
   await repo.create({
+    id: `${guildId}_${userId}`, // 🔥 KLUCZ (unikalny)
     guildId,
     key: userId,
     lang,
