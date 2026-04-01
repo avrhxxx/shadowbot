@@ -17,10 +17,22 @@ import { LANGUAGES } from "../translationConfig";
 // 🔹 HELPERS
 // =====================================
 
-function buildLanguageButtons(
-  messageId: string,
-  content: string
-) {
+async function fetchMessageContent(
+  interaction: any,
+  messageId: string
+): Promise<string | null> {
+  try {
+    const channel = interaction.channel;
+    if (!channel) return null;
+
+    const message = await channel.messages.fetch(messageId);
+    return message?.content ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildLanguageButtons(messageId: string) {
   const rows: any[] = [];
 
   for (let i = 0; i < LANGUAGES.length; i += 5) {
@@ -37,7 +49,6 @@ function buildLanguageButtons(
           action: "translation.select",
           payload: {
             messageId,
-            content,
             lang: lang.code,
           },
         }),
@@ -49,7 +60,7 @@ function buildLanguageButtons(
 }
 
 // =====================================
-// 🔹 ACTION: OPEN (Translate)
+// 🔹 ACTION: OPEN
 // =====================================
 
 registerUIAction("translation.open", {
@@ -64,9 +75,19 @@ registerUIAction("translation.open", {
     flow.start();
 
     try {
-      const { messageId, content } = payload || {};
-      if (!messageId || !content) {
+      const { messageId } = payload || {};
+      if (!messageId) {
         flow.fail(new Error("invalid_payload"));
+        return;
+      }
+
+      const content = await fetchMessageContent(
+        interaction,
+        messageId
+      );
+
+      if (!content) {
+        flow.fail(new Error("message_not_found"));
         return;
       }
 
@@ -81,11 +102,8 @@ registerUIAction("translation.open", {
       // =============================
       // AUTO TRANSLATE
       // =============================
-      if (savedLang) {
-        flow.stepDebug("auto_translate", {
-          meta: { lang: savedLang },
-        });
 
+      if (savedLang) {
         const translated = await translateText(
           content,
           savedLang
@@ -104,7 +122,7 @@ registerUIAction("translation.open", {
                   style: 2,
                   custom_id: JSON.stringify({
                     action: "translation.change",
-                    payload: { messageId, content },
+                    payload: { messageId },
                   }),
                 },
               ],
@@ -117,17 +135,12 @@ registerUIAction("translation.open", {
       }
 
       // =============================
-      // FIRST TIME → SELECT LANGUAGE
+      // SELECT LANGUAGE
       // =============================
-
-      flow.stepDebug("select_language");
 
       await interaction.reply({
         content: "🌍 Choose your language:",
-        components: buildLanguageButtons(
-          messageId,
-          content
-        ),
+        components: buildLanguageButtons(messageId),
         ephemeral: true,
       });
 
@@ -139,7 +152,7 @@ registerUIAction("translation.open", {
 });
 
 // =====================================
-// 🔹 ACTION: SELECT LANGUAGE
+// 🔹 ACTION: SELECT
 // =====================================
 
 registerUIAction("translation.select", {
@@ -154,9 +167,19 @@ registerUIAction("translation.select", {
     flow.start();
 
     try {
-      const { lang, content } = payload || {};
-      if (!lang || !content) {
+      const { lang, messageId } = payload || {};
+      if (!lang || !messageId) {
         flow.fail(new Error("invalid_payload"));
+        return;
+      }
+
+      const content = await fetchMessageContent(
+        interaction,
+        messageId
+      );
+
+      if (!content) {
+        flow.fail(new Error("message_not_found"));
         return;
       }
 
@@ -182,7 +205,7 @@ registerUIAction("translation.select", {
                 style: 2,
                 custom_id: JSON.stringify({
                   action: "translation.change",
-                  payload: { content },
+                  payload: { messageId },
                 }),
               },
             ],
@@ -198,7 +221,7 @@ registerUIAction("translation.select", {
 });
 
 // =====================================
-// 🔹 ACTION: CHANGE LANGUAGE
+// 🔹 ACTION: CHANGE
 // =====================================
 
 registerUIAction("translation.change", {
@@ -213,18 +236,15 @@ registerUIAction("translation.change", {
     flow.start();
 
     try {
-      const { messageId, content } = payload || {};
-      if (!content) {
+      const { messageId } = payload || {};
+      if (!messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
       }
 
       await interaction.update({
         content: "🌍 Choose your language:",
-        components: buildLanguageButtons(
-          messageId,
-          content
-        ),
+        components: buildLanguageButtons(messageId),
       });
 
       flow.success();
