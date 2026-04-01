@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/ui/devpanel/devpanel.actions.ts
+// 📁 src/ui/devpanel/devpanel.toggle.action.ts
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
