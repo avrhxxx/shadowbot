@@ -9,113 +9,29 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 // =====================================
 
 export function registerModeratorHubActions() {
-  // =====================================
-  // 🔘 OPEN EVENT MENU
-  // =====================================
-  registerUIAction("moderator.openEventMenu", {
-    system: "moderator",
+  // Lista placeholderów dla każdego przycisku
+  const placeholderMenus = [
+    { action: "moderator.openEventMenu", label: "Event Menu" },
+    { action: "moderator.openPointsMenu", label: "Points Menu" },
+    { action: "moderator.openAbsenceMenu", label: "Absence Menu" },
+    { action: "moderator.openTranslateMenu", label: "Translate Menu" },
+    { action: "moderator.openHelpMenu", label: "Help" },
+  ];
 
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+  // 🔹 Rejestracja każdej akcji jako placeholder
+  for (const menu of placeholderMenus) {
+    registerUIAction(menu.action, {
+      system: "moderator",
+      handler: async (interaction) => {
+        if (!interaction.isButton()) return;
 
-      const { renderEventPanel } = await import(
-        "../views/moderatorEvent.view"
-      );
+        console.log(`[MODERATOR HUB] Clicked placeholder: ${menu.label}`);
 
-      const view = await renderEventPanel();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
-    },
-  });
-
-  // =====================================
-  // 🔘 OPEN POINTS MENU
-  // =====================================
-  registerUIAction("moderator.openPointsMenu", {
-    system: "moderator",
-
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      const { renderPointsPanel } = await import(
-        "../views/moderatorPoints.view"
-      );
-
-      const view = await renderPointsPanel();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
-    },
-  });
-
-  // =====================================
-  // 🔘 OPEN ABSENCE MENU
-  // =====================================
-  registerUIAction("moderator.openAbsenceMenu", {
-    system: "moderator",
-
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      const { renderAbsencePanel } = await import(
-        "../views/moderatorAbsence.view"
-      );
-
-      const view = await renderAbsencePanel();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
-    },
-  });
-
-  // =====================================
-  // 🔘 OPEN TRANSLATE MENU
-  // =====================================
-  registerUIAction("moderator.openTranslateMenu", {
-    system: "moderator",
-
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      const { renderTranslatePanel } = await import(
-        "../views/moderatorTranslate.view"
-      );
-
-      const view = await renderTranslatePanel();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
-    },
-  });
-
-  // =====================================
-  // 🔘 OPEN HELP MENU
-  // =====================================
-  registerUIAction("moderator.openHelpMenu", {
-    system: "moderator",
-
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      const { renderHelpPanel } = await import(
-        "../views/moderatorHelp.view"
-      );
-
-      const view = await renderHelpPanel();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
-    },
-  });
+        await interaction.update({
+          content: `📌 Placeholder for **${menu.label}** menu`,
+          components: [], // brak przycisków w placeholderze
+        });
+      },
+    });
+  }
 }
