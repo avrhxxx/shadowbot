@@ -19,7 +19,7 @@ import { ensureAllSheets } from "@/integrations/google";
 
 import { handleUIInteraction } from "@/ui/core/uiDiscordAdapter";
 
-// 🔥 DEV PANEL (✅ POPRAWIONE ŚCIEŻKI)
+// 🔥 DEV PANEL
 import { handleDevpanelCommand } from "@/systems/devpanel/commands/devpanel.command";
 import { devpanelSlash } from "@/systems/devpanel/commands/devpanel.slash";
 
@@ -37,9 +37,18 @@ if (!BOT_TOKEN) {
 // 🔹 CLIENT
 // =====================================
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
-  partials: [Partials.Channel],
+export const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessageReactions, // 🔥 POTRZEBNE DO TRANSLATION
+    GatewayIntentBits.GuildMessages,         // 🔥 POTRZEBNE DO MESSAGE
+    GatewayIntentBits.MessageContent,        // 🔥 jeśli używasz content
+  ],
+  partials: [
+    Partials.Channel,
+    Partials.Message,
+    Partials.Reaction,
+  ],
 });
 
 // =====================================
@@ -156,7 +165,7 @@ client.once("ready", async () => {
 
   // =============================
   // 🧠 RUNTIME
-  // =============================
+  // =================================
 
   const runtimeCtx = createRootContext({
     source: "system",
