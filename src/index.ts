@@ -19,9 +19,9 @@ import { ensureAllSheets } from "@/integrations/google";
 
 import { handleUIInteraction } from "@/ui/core/uiDiscordAdapter";
 
-// 🔥 DEV PANEL
-import { handleDevpanelCommand } from "@/ui/devpanel/devpanel.command";
-import { devpanelSlash } from "@/ui/devpanel/devpanel.slash";
+// 🔥 DEV PANEL (✅ POPRAWIONE ŚCIEŻKI)
+import { handleDevpanelCommand } from "@/systems/devpanel/commands/devpanel.command";
+import { devpanelSlash } from "@/systems/devpanel/commands/devpanel.slash";
 
 // =====================================
 // 🔐 ENV
