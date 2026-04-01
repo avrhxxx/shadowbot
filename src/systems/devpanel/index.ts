@@ -3,11 +3,11 @@
 // =====================================
 
 // 🔹 ACTIONS
-import "./actions/devpanel.actions";
+import "./actions/devpanel.toggle.action";
 
 // 🔹 COMMANDS
 import "./commands/devpanel.command";
 import "./commands/devpanel.slash";
 
-// 🔹 VIEWS (opcjonalnie lazy, ale na razie ok)
+// 🔹 VIEWS (opcjonalnie)
 import "./views/devpanel.view";
