@@ -43,6 +43,7 @@ function buildLanguageButtons(messageId: string) {
       components: slice.map((lang) => ({
         type: 2,
         label: lang.label,
+        emoji: { name: lang.emoji },
         style: 1,
         custom_id: `translation.select|messageId=${messageId}|lang=${lang.code}`,
       })),
@@ -50,11 +51,6 @@ function buildLanguageButtons(messageId: string) {
   }
 
   return rows;
-}
-
-function getLanguageCode(code: string) {
-  const lang = LANGUAGES.find((l) => l.code === code);
-  return lang?.label ?? code.toUpperCase();
 }
 
 // =====================================
@@ -90,18 +86,10 @@ registerUIAction("translation.open", {
       const savedLang = await getUserLanguage(guildId, userId);
 
       if (savedLang) {
-        const result = await translateText(content, savedLang);
-
-        // 🔹 SAFE ACCESS
-        const translated =
-          typeof result === "string" ? result : result.translated;
-        const detectedSource =
-          typeof result === "string" ? "auto" : result.detectedSource;
+        const translated = await translateText(content, savedLang);
 
         const replyContent = `
-Translation from ${getLanguageCode(
-          detectedSource
-        )} to ${getLanguageCode(savedLang)}
+Translation to (${savedLang.toUpperCase()})
 
 **Original:**
 > ${content}
@@ -118,8 +106,8 @@ Translation from ${getLanguageCode(
               type: 1,
               components: [
                 {
-                  label: "Change language",
                   type: 2,
+                  label: "Change language",
                   style: 2,
                   custom_id: `translation.change|messageId=${messageId}`,
                 },
@@ -179,17 +167,10 @@ registerUIAction("translation.select", {
 
       await setUserLanguage(guildId, userId, lang);
 
-      const result = await translateText(content, lang);
-
-      const translated =
-        typeof result === "string" ? result : result.translated;
-      const detectedSource =
-        typeof result === "string" ? "auto" : result.detectedSource;
+      const translated = await translateText(content, lang);
 
       const replyContent = `
-Translation from ${getLanguageCode(
-        detectedSource
-      )} to ${getLanguageCode(lang)}
+Translation to (${lang.toUpperCase()})
 
 **Original:**
 > ${content}
@@ -238,6 +219,7 @@ registerUIAction("translation.change", {
 
     try {
       const messageId = payload?.messageId;
+
       if (!messageId) {
         flow.fail(new Error("invalid_payload"));
         return;
