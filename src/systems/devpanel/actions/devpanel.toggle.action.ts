@@ -11,6 +11,10 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 // =====================================
 
 export function registerDevpanelActions() {
+  // =====================================
+  // 🔘 TOGGLE SYSTEM
+  // =====================================
+
   registerUIAction("devpanel.toggle", {
     system: "devpanel",
 
@@ -24,13 +28,59 @@ export function registerDevpanelActions() {
         "@/runtime/runtimeState"
       );
 
-      const { devpanelMainView } = await import(
+      const { devpanelSystemsView } = await import(
         "../views/devpanel.view"
       );
 
       const current = await isSystemEnabled(system);
 
       await setSystemEnabled(system, !current);
+
+      const view = await devpanelSystemsView();
+
+      await interaction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
+  // 📂 OPEN SYSTEMS VIEW
+  // =====================================
+
+  registerUIAction("devpanel.systems", {
+    system: "devpanel",
+
+    handler: async (interaction) => {
+      if (!interaction.isButton()) return;
+
+      const { devpanelSystemsView } = await import(
+        "../views/devpanel.view"
+      );
+
+      const view = await devpanelSystemsView();
+
+      await interaction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
+  // ⬅ BACK TO MAIN
+  // =====================================
+
+  registerUIAction("devpanel.back", {
+    system: "devpanel",
+
+    handler: async (interaction) => {
+      if (!interaction.isButton()) return;
+
+      const { devpanelMainView } = await import(
+        "../views/devpanel.view"
+      );
 
       const view = await devpanelMainView();
 
