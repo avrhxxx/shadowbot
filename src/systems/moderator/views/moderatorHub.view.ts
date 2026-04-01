@@ -2,8 +2,8 @@
 // 📁 src/systems/moderator/views/moderatorHub.view.ts
 // =====================================
 
-import { isSystemEnabled } from "@/runtime/runtimeState";
 import type { ViewResult } from "@/core/ui/uiEngine";
+import { isSystemEnabled } from "@/runtime/runtimeState";
 
 // =====================================
 // 🔹 HUB VIEW
@@ -12,7 +12,7 @@ import type { ViewResult } from "@/core/ui/uiEngine";
 export async function renderModeratorHub(): Promise<ViewResult> {
   const buttons: any[] = [];
 
-  // 🔹 Lista głównych systemów dla moderatora
+  // 🔹 Lista systemów dla moderatora
   const systems = [
     { name: "event", label: "Event Menu", action: "moderator.openEventMenu" },
     { name: "points", label: "Points Menu", action: "moderator.openPointsMenu" },
@@ -22,15 +22,14 @@ export async function renderModeratorHub(): Promise<ViewResult> {
   ];
 
   for (const sys of systems) {
-    // Help zawsze dostępny
     const enabled = sys.name === "help" ? true : await isSystemEnabled(sys.name);
 
     buttons.push({
       type: 2, // button
       label: sys.label,
-      style: sys.name === "help" ? 3 : 1, // Help = Success (3), reszta Primary (1)
+      style: sys.name === "help" ? 3 : 1, // Help = Success, reszta Primary
       custom_id: sys.action,
-      disabled: !enabled,
+      disabled: !enabled, // wyłączony jeśli system nieaktywny
     });
   }
 
