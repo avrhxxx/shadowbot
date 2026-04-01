@@ -50,6 +50,10 @@ export async function handleUIInteraction(
       button.customId
     );
 
+    flow.stepDebug("interaction.parsed", {
+      meta: { action, payload },
+    });
+
     // =====================================
     // 🚀 EXECUTE (🔥 przez router + runtime)
     // =====================================
@@ -68,6 +72,10 @@ export async function handleUIInteraction(
 
       return false;
     }
+
+    flow.stepDebug("action.executed", {
+      meta: { action },
+    });
 
     return true;
   } catch (err) {
