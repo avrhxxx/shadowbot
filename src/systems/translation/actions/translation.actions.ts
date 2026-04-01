@@ -43,7 +43,6 @@ function buildLanguageButtons(messageId: string) {
       components: slice.map((lang) => ({
         type: 2,
         label: lang.label,
-        emoji: { name: lang.emoji },
         style: 1,
         custom_id: `translation.select|messageId=${messageId}|lang=${lang.code}`,
       })),
@@ -53,7 +52,7 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
-function getLanguageEmoji(code: string) {
+function getLanguageFlag(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
   return lang?.emoji ?? "❓";
 }
@@ -91,14 +90,16 @@ registerUIAction("translation.open", {
       const savedLang = await getUserLanguage(guildId, userId);
 
       if (savedLang) {
-        // 🔹 TŁUMACZENIE
-        const { translated, detectedSource } = await translateText(content, savedLang);
+        const result = await translateText(content, savedLang);
+        // obsługa zwrotu jako string lub obiekt
+        const translated = typeof result === "string" ? result : result.translated;
+        const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
 
-        const sourceEmoji = getLanguageEmoji(detectedSource);
-        const targetEmoji = getLanguageEmoji(savedLang);
+        const sourceFlag = getLanguageFlag(detectedSource);
+        const targetFlag = getLanguageFlag(savedLang);
 
         const replyContent = `
-${sourceEmoji} → ${targetEmoji} Translation
+**Translation from ${detectedSource.toUpperCase()} ${sourceFlag} to ${savedLang.toUpperCase()} ${targetFlag}**
 
 **Original:**
 > ${content}
@@ -130,7 +131,7 @@ ${sourceEmoji} → ${targetEmoji} Translation
       }
 
       await interaction.reply({
-        content: "🌍 Choose your language:",
+        content: "Choose your language:",
         components: buildLanguageButtons(messageId),
         ephemeral: true,
       });
@@ -176,13 +177,15 @@ registerUIAction("translation.select", {
 
       await setUserLanguage(guildId, userId, lang);
 
-      const { translated, detectedSource } = await translateText(content, lang);
+      const result = await translateText(content, lang);
+      const translated = typeof result === "string" ? result : result.translated;
+      const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
 
-      const sourceEmoji = getLanguageEmoji(detectedSource);
-      const targetEmoji = getLanguageEmoji(lang);
+      const sourceFlag = getLanguageFlag(detectedSource);
+      const targetFlag = getLanguageFlag(lang);
 
       const replyContent = `
-${sourceEmoji} → ${targetEmoji} Translation
+**Translation from ${detectedSource.toUpperCase()} ${sourceFlag} to ${lang.toUpperCase()} ${targetFlag}**
 
 **Original:**
 > ${content}
@@ -237,7 +240,7 @@ registerUIAction("translation.change", {
       }
 
       await interaction.update({
-        content: "🌍 Choose your language:",
+        content: "Choose your language:",
         components: buildLanguageButtons(messageId),
       });
 
