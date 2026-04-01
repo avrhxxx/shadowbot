@@ -10,6 +10,7 @@ import type { SystemRegistryEntry } from "./runtimeTypes";
 
 export const SYSTEM_NAMES = [
   "test",
+  "devpanel",
   // "events",
   // "absence",
 ] as const;
