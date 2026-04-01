@@ -63,13 +63,13 @@ export function initTranslationListener(
       // =====================================
 
       const embed = new EmbedBuilder()
-        .setDescription(message.content)
+        .setDescription(`**Original message:**\n${message.content}`)
         .setAuthor({
           name: message.author?.username || "Unknown",
           iconURL: message.author?.displayAvatarURL(),
         })
         .setColor(0x00aaff)
-        .setTimestamp();
+        .setFooter({ text: "Translation available for 1 minute" });
 
       const sentMessage = await message.channel.send({
         embeds: [embed],
@@ -79,7 +79,7 @@ export function initTranslationListener(
             components: [
               {
                 type: 2,
-                label: "Translate",
+                label: "🌍 Translate",
                 style: 1,
                 custom_id: `translation.open|messageId=${message.id}`,
               },
