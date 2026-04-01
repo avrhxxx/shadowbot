@@ -14,26 +14,6 @@ import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
 // =====================================
-// 🔧 HELPERS
-// =====================================
-
-async function safeReply(
-  interaction: ButtonInteraction<CacheType>,
-  content: string
-) {
-  const payload = {
-    content,
-    ephemeral: true,
-  };
-
-  if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(payload);
-  }
-
-  return interaction.reply(payload);
-}
-
-// =====================================
 // 🧠 MAIN HANDLER
 // =====================================
 
