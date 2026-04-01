@@ -12,7 +12,7 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 
 registerUIAction(
   "devpanel.toggle",
-  async (interaction, ctx, payload) => {
+  async (interaction, _ctx, payload) => {
     if (!interaction.isButton()) return;
 
     const system = payload?.system;
