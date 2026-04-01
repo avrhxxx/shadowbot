@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/ui/devpanel/devpanel.command.ts
+// 📁 src/systems/devpanel/commands/devpanel.command.ts
 // =====================================
 
 import {
@@ -7,7 +7,7 @@ import {
   CacheType,
 } from "discord.js";
 
-import { devpanelMainView } from "./devpanel.view";
+import { devpanelMainView } from "../views/devpanel.view";
 
 // =====================================
 // 🚀 EXECUTE
