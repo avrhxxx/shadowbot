@@ -2,7 +2,7 @@
 // 📁 src/systems/translation/listeners/translation.listener.ts
 // =====================================
 
-import { Client } from "discord.js";
+import { Client, EmbedBuilder } from "discord.js";
 
 import { createChildContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
@@ -27,8 +27,7 @@ export function initTranslationListener(
         await reaction.message.fetch();
 
       if (
-        reaction.emoji.name !==
-        TRANSLATION_TRIGGER_EMOJI
+        reaction.emoji.name !== TRANSLATION_TRIGGER_EMOJI
       )
         return;
 
@@ -60,11 +59,21 @@ export function initTranslationListener(
       });
 
       // =====================================
-      // 🎯 SEND PUBLIC PANEL (✅ FINAL FIX)
+      // 🎯 EMBED + BUTTON
       // =====================================
 
-      await message.channel.send({
-        content: `🌍 Translation`,
+      const embed = new EmbedBuilder()
+        .setTitle("🌍 Translation")
+        .setDescription(message.content)
+        .setAuthor({
+          name: message.author?.username || "Unknown",
+          iconURL: message.author?.displayAvatarURL(),
+        })
+        .setColor(0x00aaff)
+        .setTimestamp();
+
+      const sentMessage = await message.channel.send({
+        embeds: [embed],
         components: [
           {
             type: 1,
@@ -79,6 +88,14 @@ export function initTranslationListener(
           },
         ],
       });
+
+      // =====================================
+      // ⏱ AUTO DELETE
+      // =====================================
+
+      setTimeout(() => {
+        sentMessage.delete().catch(() => {});
+      }, 20_000); // 20 sekund
 
       flow.success();
     } catch (err) {
