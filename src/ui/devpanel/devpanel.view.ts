@@ -9,42 +9,68 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 // 🔹 TYPES
 // =====================================
 
-type ViewResult = {
+type Button = {
+  label: string;
+  style?: "primary" | "secondary" | "danger";
+  customId: string;
+};
+
+type View = {
   content: string;
   components: any[];
 };
 
 // =====================================
-// 🧠 VIEW: MAIN
+// 🧠 MAIN VIEW
 // =====================================
 
-export async function devpanelMainView(): Promise<ViewResult> {
-  const rows: any[] = [];
+export async function devpanelMainView(): Promise<View> {
+  const systems = SYSTEM_REGISTRY;
 
-  const lines: string[] = [];
+  const buttons: Button[] = [];
 
-  for (const system of SYSTEM_REGISTRY) {
+  for (const system of systems) {
     const enabled = await isSystemEnabled(system.name);
 
-    const status = enabled ? "🟢 ENABLED" : "🔴 DISABLED";
-
-    lines.push(`**${system.name}** → ${status}`);
-
-    rows.push({
-      type: 1,
-      components: [
-        {
-          type: 2,
-          style: enabled ? 4 : 3, // danger / success
-          label: enabled ? "Disable" : "Enable",
-          custom_id: `devpanel.toggle:${system.name}`,
-        },
-      ],
+    buttons.push({
+      label: `${system.name} → ${
+        enabled ? "🟢 ON" : "🔴 OFF"
+      }`,
+      style: enabled ? "primary" : "secondary",
+      customId: JSON.stringify({
+        action: "devpanel.toggle",
+        payload: { system: system.name },
+      }),
     });
   }
 
   return {
-    content: `# 🛠️ Dev Panel\n\n${lines.join("\n")}`,
-    components: rows,
+    content: "🧠 **Dev Panel — System Control**",
+    components: [
+      {
+        type: 1,
+        components: buttons.map((b) => ({
+          type: 2,
+          label: b.label,
+          style: mapStyle(b.style),
+          custom_id: b.customId,
+        })),
+      },
+    ],
   };
+}
+
+// =====================================
+// 🔧 STYLE MAP
+// =====================================
+
+function mapStyle(style?: string) {
+  switch (style) {
+    case "secondary":
+      return 2;
+    case "danger":
+      return 4;
+    default:
+      return 1;
+  }
 }
