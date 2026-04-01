@@ -7,35 +7,37 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { isSystemEnabled } from "@/runtime/runtimeState";
 
 // =====================================
-// 🔹 ACTION
+// 🔹 REGISTER
 // =====================================
 
-registerUIAction("devpanel.toggle", {
-  system: "devpanel",
+export function registerDevpanelActions() {
+  registerUIAction("devpanel.toggle", {
+    system: "devpanel",
 
-  handler: async (interaction, _ctx, payload) => {
-    if (!interaction.isButton()) return;
+    handler: async (interaction, _ctx, payload) => {
+      if (!interaction.isButton()) return;
 
-    const system = payload?.system;
-    if (!system) return;
+      const system = payload?.system;
+      if (!system) return;
 
-    const { setSystemEnabled } = await import(
-      "@/runtime/runtimeState"
-    );
+      const { setSystemEnabled } = await import(
+        "@/runtime/runtimeState"
+      );
 
-    const { devpanelMainView } = await import(
-      "../views/devpanel.view"
-    );
+      const { devpanelMainView } = await import(
+        "../views/devpanel.view"
+      );
 
-    const current = await isSystemEnabled(system);
+      const current = await isSystemEnabled(system);
 
-    await setSystemEnabled(system, !current);
+      await setSystemEnabled(system, !current);
 
-    const view = await devpanelMainView();
+      const view = await devpanelMainView();
 
-    await interaction.update({
-      content: view.content,
-      components: view.components,
-    });
-  },
-});
+      await interaction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+}
