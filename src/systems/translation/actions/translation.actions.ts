@@ -14,15 +14,6 @@ import { translateText } from "../translation.service";
 import { LANGUAGES } from "../translationConfig";
 
 // =====================================
-// 🔹 TYPES
-// =====================================
-
-type TranslationResult = {
-  translated: string;
-  detectedSource: string;
-};
-
-// =====================================
 // 🔹 HELPERS
 // =====================================
 
@@ -62,9 +53,9 @@ function buildLanguageButtons(messageId: string) {
   return rows;
 }
 
-function getLanguageLabel(code: string) {
+function getLanguageEmoji(code: string) {
   const lang = LANGUAGES.find((l) => l.code === code);
-  return lang?.label ?? code.toUpperCase();
+  return lang?.emoji ?? "❓";
 }
 
 // =====================================
@@ -101,13 +92,24 @@ registerUIAction("translation.open", {
 
       if (savedLang) {
         // 🔹 TŁUMACZENIE
-        const result = await translateText(content, savedLang) as TranslationResult;
+        const result = await translateText(content, savedLang);
 
-        const translated = typeof result === "string" ? result : result.translated;
-        const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
+        let translated: string;
+        let detectedSource: string;
+
+        if (typeof result === "string") {
+          translated = result;
+          detectedSource = "auto";
+        } else {
+          translated = result.translated;
+          detectedSource = result.detectedSource;
+        }
+
+        const sourceEmoji = getLanguageEmoji(detectedSource);
+        const targetEmoji = getLanguageEmoji(savedLang);
 
         const replyContent = `
-Translation from ${getLanguageLabel(detectedSource)} to ${getLanguageLabel(savedLang)}
+${sourceEmoji} from ${detectedSource.toUpperCase()} to ${savedLang.toUpperCase()} Translation
 
 **Original:**
 > ${content}
@@ -124,8 +126,8 @@ Translation from ${getLanguageLabel(detectedSource)} to ${getLanguageLabel(saved
               type: 1,
               components: [
                 {
-                  label: "Change language",
                   type: 2,
+                  label: "Change language",
                   style: 2,
                   custom_id: `translation.change|messageId=${messageId}`,
                 },
@@ -185,13 +187,24 @@ registerUIAction("translation.select", {
 
       await setUserLanguage(guildId, userId, lang);
 
-      const result = await translateText(content, lang) as TranslationResult;
+      const result = await translateText(content, lang);
 
-      const translated = typeof result === "string" ? result : result.translated;
-      const detectedSource = typeof result === "string" ? "auto" : result.detectedSource;
+      let translated: string;
+      let detectedSource: string;
+
+      if (typeof result === "string") {
+        translated = result;
+        detectedSource = "auto";
+      } else {
+        translated = result.translated;
+        detectedSource = result.detectedSource;
+      }
+
+      const sourceEmoji = getLanguageEmoji(detectedSource);
+      const targetEmoji = getLanguageEmoji(lang);
 
       const replyContent = `
-Translation from ${getLanguageLabel(detectedSource)} to ${getLanguageLabel(lang)}
+${sourceEmoji} from ${detectedSource.toUpperCase()} to ${lang.toUpperCase()} Translation
 
 **Original:**
 > ${content}
