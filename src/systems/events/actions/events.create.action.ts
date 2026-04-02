@@ -104,7 +104,8 @@ registerUIAction("events.create", {
             ],
           });
         } else {
-          await proceedToDaySelect(interaction, eventType, eventType);
+          // dla standardowych eventów: pokaż przyciski wyboru dnia
+          await renderDaySelection(interaction, eventType, eventType);
         }
         flow.success();
         return;
@@ -115,7 +116,39 @@ registerUIAction("events.create", {
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
 
-        await proceedToDaySelect(interaction, payload.type, eventName);
+        // po wpisaniu nazwy, pokazujemy wybór dnia
+        await renderDaySelection(interaction, payload.type, eventName);
+        flow.success();
+        return;
+      }
+
+      // 🔹 Step: day selection
+      if (interaction.isButton?.() && payload?.step === "day") {
+        const eventName = payload.name;
+        const eventType = payload.type;
+        const eventDay = payload.day;
+        if (!eventName || !eventType || !eventDay) throw new Error("missing_day_payload");
+
+        // modal godziny pojawia się dopiero po kliknięciu w dzień
+        await interaction.showModal?.({
+          custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${eventDay}`,
+          title: `Select Hour for ${eventName}`,
+          components: [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 4,
+                  custom_id: "event_hour",
+                  style: 1,
+                  label: "Hour (HH:mm)",
+                  min_length: 4,
+                  max_length: 5,
+                },
+              ],
+            },
+          ],
+        });
         flow.success();
         return;
       }
@@ -145,7 +178,7 @@ registerUIAction("events.create", {
 // =====================================
 // 🔹 HELPERS
 // =====================================
-async function proceedToDaySelect(interaction: any, eventType: string, eventName: string) {
+async function renderDaySelection(interaction: any, eventType: string, eventName: string) {
   const days = getFutureDays(7);
 
   const rows: any[] = [];
@@ -156,7 +189,7 @@ async function proceedToDaySelect(interaction: any, eventType: string, eventName
         type: 2,
         label: formatDayLabel(d),
         style: 1,
-        custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${d.value}`,
+        custom_id: `events.create|step=day|type=${eventType}|name=${eventName}|day=${d.value}`,
       })),
     });
   }
@@ -169,28 +202,6 @@ async function proceedToDaySelect(interaction: any, eventType: string, eventName
     ],
   });
 
-  // 🔹 Dla standardowych eventów - po kliknięciu dnia wyskakuje modal z godziną
-  await interaction.showModal?.({
-    custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${days[0].value}`,
-    title: `Select Hour for ${eventName}`,
-    components: [
-      {
-        type: 1,
-        components: [
-          {
-            type: 4,
-            custom_id: "event_hour",
-            style: 1,
-            label: "Hour (HH:mm)",
-            min_length: 4,
-            max_length: 5,
-          },
-        ],
-      },
-    ],
-  });
-
-  // 🔹 Aktualizacja komponentów wyboru dnia
   await interaction.update?.({
     content: `Select day for event **${eventName}**:`,
     components: rows,
