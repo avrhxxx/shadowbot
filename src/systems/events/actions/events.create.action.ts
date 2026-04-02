@@ -149,14 +149,13 @@ registerUIAction("events.create", {
         if (!parsedDate) throw new Error("invalid_date_format");
         parsedDate = adjustFutureYear(parsedDate);
 
-        // 🔹 Formatuj datę do wyświetlenia (UTC)
         const formattedDate = formatEventUTC(parsedDate.day, parsedDate.month, parsedDate.hour, parsedDate.minute, parsedDate.year);
 
         await interaction.reply?.({
           content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
           components: [
             { type: 1, components: [
-              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|date=${parsedDate.day}-${parsedDate.month}-${parsedDate.year}|hour=${parsedDate.hour}-${parsedDate.minute}` },
+              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${parsedDate.day}-${parsedDate.month}-${parsedDate.year}|hour=${parsedDate.hour}-${parsedDate.minute}` },
               { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|name=${eventName}` },
             ] },
           ],
@@ -180,13 +179,17 @@ registerUIAction("events.create", {
 
       // 🔹 Step: hour input dla standardowych eventów
       if (interaction.isModalSubmit?.() && payload?.step === "hour") {
-        const eventName = payload.name; const eventDay = payload.day; 
+        const eventName = payload.name;
+        const eventDay = payload.day;
         const hourInput = interaction.fields.getTextInputValue("event_hour");
+
         const [day, month] = eventDay.split("-").map(Number);
         const [hour, minute] = hourInput.split(":").map(Number);
 
-        // Dodaj aktualny rok
-        const year = new Date().getUTCFullYear();
+        // Ustal pełny rok uwzględniając przyszłą datę
+        let year = new Date().getUTCFullYear();
+        const eventCheck = new Date(Date.UTC(year, month - 1, day, hour, minute));
+        if (eventCheck < new Date()) year += 1;
 
         const formattedDate = formatEventUTC(day, month, hour, minute, year);
 
@@ -194,7 +197,7 @@ registerUIAction("events.create", {
           content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
           components: [
             { type: 1, components: [
-              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${eventDay}|hour=${hourInput}` },
+              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${day}-${month}-${year}|hour=${hour}-${minute}` },
               { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|name=${eventName}` },
             ] },
           ],
