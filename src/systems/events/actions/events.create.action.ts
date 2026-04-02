@@ -57,13 +57,10 @@ registerUIAction("events.create", {
 
       // 🔹 Step: type
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
-        const eventType = payload.type;
-        if (!eventType) throw new Error("event_type_missing");
-
-        if (["custom", "birthdays"].includes(eventType)) {
+        if (["custom", "birthdays"].includes(payload.type)) {
           if ("showModal" in interaction) {
             await interaction.showModal({
-              custom_id: `events.create|step=name|type=${eventType}`,
+              custom_id: `events.create|step=name|type=${payload.type}`,
               title: "Enter Event Name",
               components: [
                 {
@@ -83,7 +80,7 @@ registerUIAction("events.create", {
             });
           }
         } else {
-          await proceedToDaySelect(interaction, eventType, eventType);
+          await proceedToDaySelect(interaction, payload.type, payload.type);
         }
         flow.success();
         return;
@@ -91,18 +88,16 @@ registerUIAction("events.create", {
 
       // 🔹 Step: name (modal)
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
-        const eventType = payload.type;
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
 
-        await proceedToDaySelect(interaction, eventType, eventName);
+        await proceedToDaySelect(interaction, payload.type, eventName);
         flow.success();
         return;
       }
 
       // 🔹 Step: day (kliknięcie przycisku daty)
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
-        const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day; // YYYY-MM-DD
 
@@ -111,7 +106,7 @@ registerUIAction("events.create", {
         // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
         if ("showModal" in interaction) {
           await interaction.showModal({
-            custom_id: `events.create|step=hour|name=${eventName}|day=${dayValue}`,
+            custom_id: `events.create|step=hour|type=${payload.type}|name=${eventName}|day=${dayValue}`,
             title: `Set Time for ${eventName}`,
             components: [
               {
@@ -135,34 +130,6 @@ registerUIAction("events.create", {
         return;
       }
 
-      // 🔹 Step: hour (modal submit)
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && interaction.customId.startsWith("events.create|step=hour")) {
-        // custom_id = "events.create|step=hour|name=EventName|day=YYYY-MM-DD"
-        const parts = interaction.customId.split("|");
-        const eventNamePart = parts.find(p => p.startsWith("name="));
-        const dayPart = parts.find(p => p.startsWith("day="));
-
-        const eventName = eventNamePart?.split("=")[1];
-        const dayValue = dayPart?.split("=")[1];
-        const eventHour = interaction.fields.getTextInputValue("event_hour");
-
-        if (!eventName || !dayValue || !eventHour) {
-          if ("reply" in interaction) {
-            await interaction.reply({ content: `❌ Missing data`, ephemeral: true });
-          }
-          return;
-        }
-
-        if ("reply" in interaction) {
-          await interaction.reply({
-            content: `✅ Event **${eventName}** scheduled on ${formatDayLabel(dayValue)} at ${eventHour} UTC.`,
-            ephemeral: true,
-          });
-        }
-        flow.success();
-        return;
-      }
-
       flow.fail(new Error("unknown_interaction_type"));
     } catch (err) {
       flow.fail(err);
@@ -178,7 +145,7 @@ registerUIAction("events.create", {
 // =====================================
 
 function formatDayLabel(value: string) {
-  const [, month, day] = value.split("-").map(Number);
+  const [year, month, day] = value.split("-").map(Number);
   return `${day} ${MONTH_NAMES[month - 1]}`;
 }
 
@@ -187,11 +154,11 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(8, true); // tydzień do przodu + dzisiaj
-  const days = allDays.slice(0, 8); // tylko 8 dni (dzisiaj + 7 kolejnych)
+  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const days = allDays.slice(0, 7); // tydzień do przodu, zaczynając od dzisiaj
 
   const rows: any[] = [];
-  for (let i = 0; i < days.length; i += 4) { // dwa rzędy po 4 przyciski
+  for (let i = 0; i < days.length; i += 4) { // 2 rzędy po 4 przyciski
     rows.push({
       type: 1,
       components: days.slice(i, i + 4).map((d) => ({
