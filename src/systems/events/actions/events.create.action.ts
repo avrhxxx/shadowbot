@@ -5,6 +5,7 @@
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
+import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // =====================================
 // 🔹 MONTH NAMES
@@ -22,7 +23,6 @@ function formatDayLabel(d: { value: string }) {
   return `${day} ${MONTH_NAMES[month - 1]}`;
 }
 
-// Snake case → Capitalized Words
 function formatEventName(name: string) {
   return name
     .split("_")
@@ -41,7 +41,7 @@ function parseDateInput(input: string) {
   // DD/MM/YYYY lub DD-MM-YYYY
   const dmySep = cleaned.match(/^(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?$/);
   if (dmySep) {
-    let year = dmySep[3] ? parseInt(dmySep[3]) : new Date().getFullYear();
+    let year = dmySep[3] ? parseInt(dmySep[3]) : new Date().getUTCFullYear();
     if (year < 100) year += 2000;
     return { day: parseInt(dmySep[1]), month: parseInt(dmySep[2]), year, hour: 0, minute: 0 };
   }
@@ -51,7 +51,7 @@ function parseDateInput(input: string) {
   if (dmyText) {
     const monthIndex = MONTH_NAMES.findIndex(m => m.toLowerCase().startsWith(dmyText[2].toLowerCase()));
     if (monthIndex === -1) return null;
-    let year = dmyText[3] ? parseInt(dmyText[3]) : new Date().getFullYear();
+    let year = dmyText[3] ? parseInt(dmyText[3]) : new Date().getUTCFullYear();
     if (year < 100) year += 2000;
     return {
       day: parseInt(dmyText[1]),
@@ -65,24 +65,16 @@ function parseDateInput(input: string) {
   return null;
 }
 
-// 🔹 Format Date Label for modal confirmation
-function formatDateLabel(day: number, month: number, year: number, hour?: number, minute?: number) {
-  let label = `${day} ${MONTH_NAMES[month - 1]} ${year}`;
-  if (hour !== undefined && minute !== undefined) label += ` ${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`;
-  return label;
-}
-
 // 🔹 Adjust year if date passed
 function adjustFutureYear(parsed: { day: number, month: number, year: number, hour: number, minute: number }) {
   const now = new Date();
-  const dt = new Date(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute);
-  if (dt < now) dt.setFullYear(dt.getFullYear() + 1);
-  return { ...parsed, year: dt.getFullYear() };
+  const dt = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute));
+  if (dt < now) dt.setUTCFullYear(dt.getUTCFullYear() + 1);
+  return { ...parsed, year: dt.getUTCFullYear() };
 }
 
 // 🔹 Dummy function to send notification (implement yourself)
 async function sendEventNotification(payload: any) {
-  // Tutaj implementujesz wysyłkę powiadomienia do kanałów / użytkowników
   console.log("Sending notification for event:", payload);
 }
 
@@ -156,9 +148,11 @@ registerUIAction("events.create", {
         let parsedDate = parseDateInput(`${eventDateRaw} ${eventHourRaw}`);
         if (!parsedDate) throw new Error("invalid_date_format");
         parsedDate = adjustFutureYear(parsedDate);
-        const formattedDate = formatDateLabel(parsedDate.day, parsedDate.month, parsedDate.year, parsedDate.hour, parsedDate.minute);
 
-        // 🔹 Final confirmation with Yes/No buttons
+        // 🔹 UTC date & formatted label
+        const eventDateUTC = getEventDateUTC(parsedDate.day, parsedDate.month, parsedDate.hour, parsedDate.minute, parsedDate.year);
+        const formattedDate = formatEventUTC(parsedDate.day, parsedDate.month, parsedDate.hour, parsedDate.minute, parsedDate.year);
+
         await interaction.reply?.({
           content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
           components: [
@@ -188,9 +182,13 @@ registerUIAction("events.create", {
       // 🔹 Step: hour input dla standardowych eventów
       if (interaction.isModalSubmit?.() && payload?.step === "hour") {
         const eventName = payload.name; const eventDay = payload.day; const hourInput = interaction.fields.getTextInputValue("event_hour");
+        const [day, month] = eventDay.split("-").map(Number);
+        const [hour, minute] = hourInput.split(":").map(Number);
+
+        const eventDateUTC = getEventDateUTC(day, month, hour, minute);
 
         await interaction.reply?.({
-          content: `✅ Event **${eventName}** scheduled on **${formatDayLabel({ value: eventDay })}** at **${hourInput}**.\nDo you want to send a notification?`,
+          content: `✅ Event **${eventName}** scheduled on **${formatEventUTC(day, month, hour, minute)}**.\nDo you want to send a notification?`,
           components: [
             { type: 1, components: [
               { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${eventDay}|hour=${hourInput}` },
