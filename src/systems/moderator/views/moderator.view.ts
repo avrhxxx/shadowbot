@@ -1,58 +1,72 @@
 // =====================================
-// 📁 src/systems/moderator/views/moderatorHub.view.ts
+// 📁 src/systems/moderator/views/moderator.view.ts
 // =====================================
 
-import type { ViewResult } from "@/core/ui/uiEngine";
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 
 // =====================================
-// 🔹 HUB VIEW
+// 🔹 TYPES
 // =====================================
 
-export async function renderModeratorHub(): Promise<ViewResult> {
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+type View = {
+  content: string;
+  components: any[];
+};
 
-  const systems = [
+type ModeratorSystem = {
+  name: string;
+  label: string;
+};
+
+// =====================================
+// 🧠 MAIN VIEW
+// =====================================
+
+export async function renderModeratorHub(): Promise<View> {
+  const systems: ModeratorSystem[] = [
     { name: "events", label: "Event Menu" },
     { name: "points", label: "Points Menu" },
     { name: "absence", label: "Absence Menu" },
     { name: "quickadd", label: "QuickAdd Menu" },
   ];
 
-  const buttons: ButtonBuilder[] = [];
+  const buttons: any[] = [];
 
   for (const sys of systems) {
     const enabled = await isSystemEnabled(sys.name);
     if (!enabled) continue;
 
-    buttons.push(
-      new ButtonBuilder()
-        .setCustomId(`moderator.open|target=${sys.name}`)
-        .setLabel(sys.label)
-        .setStyle(ButtonStyle.Primary)
-    );
+    buttons.push({
+      type: 2, // button
+      label: sys.label,
+      style: 1, // primary
+      custom_id: `moderator.open|target=${sys.name}`,
+    });
   }
 
   // 🔹 HELP (zawsze)
-  buttons.push(
-    new ButtonBuilder()
-      .setCustomId(`moderator.open|target=help`)
-      .setLabel("Help")
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  // 🔹 podział na rzędy (max 5)
-  for (let i = 0; i < buttons.length; i += 5) {
-    rows.push(
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        buttons.slice(i, i + 5)
-      )
-    );
-  }
+  buttons.push({
+    type: 2,
+    label: "Help",
+    style: 2, // secondary
+    custom_id: `moderator.open|target=help`,
+  });
 
   return {
     content: `📌 **Moderator Panel**\n\nSelect an option:`,
-    components: rows,
+    components: [
+      {
+        type: 1, // action row
+        components: buttons.slice(0, 5), // max 5 per row
+      },
+      ...(buttons.length > 5
+        ? [
+            {
+              type: 1,
+              components: buttons.slice(5, 10),
+            },
+          ]
+        : []),
+    ],
   };
 }
