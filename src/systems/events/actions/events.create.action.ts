@@ -6,6 +6,12 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
+import { v4 as uuidv4 } from "uuid";
+
+// =====================================
+// 🔹 TEMP STORE
+// =====================================
+const tempEventStore = new Map<string, any>();
 
 // =====================================
 // 🔹 MONTH NAMES
@@ -30,15 +36,12 @@ function formatEventName(name: string) {
     .join(" ");
 }
 
-// 🔹 Universal Date Parser (for modal input)
 function parseDateInput(input: string) {
   const cleaned = input.trim();
 
-  // YYYYMMDD
   const ymd = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (ymd) return { day: parseInt(ymd[3]), month: parseInt(ymd[2]), year: parseInt(ymd[1]), hour: 0, minute: 0 };
 
-  // DD/MM/YYYY lub DD-MM-YYYY
   const dmySep = cleaned.match(/^(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?$/);
   if (dmySep) {
     let year = dmySep[3] ? parseInt(dmySep[3]) : new Date().getUTCFullYear();
@@ -46,7 +49,6 @@ function parseDateInput(input: string) {
     return { day: parseInt(dmySep[1]), month: parseInt(dmySep[2]), year, hour: 0, minute: 0 };
   }
 
-  // DD MMM (optional YYYY) HH:mm
   const dmyText = cleaned.match(/^(\d{1,2})\s*([A-Za-z]{3,})\s*(\d{2,4})?\s*(\d{1,2}):?(\d{2})?$/);
   if (dmyText) {
     const monthIndex = MONTH_NAMES.findIndex(m => m.toLowerCase().startsWith(dmyText[2].toLowerCase()));
@@ -65,7 +67,6 @@ function parseDateInput(input: string) {
   return null;
 }
 
-// 🔹 Adjust year if date passed
 function adjustFutureYear(parsed: { day: number, month: number, year: number, hour: number, minute: number }) {
   const now = new Date();
   const dt = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute));
@@ -73,7 +74,6 @@ function adjustFutureYear(parsed: { day: number, month: number, year: number, ho
   return { ...parsed, year: dt.getUTCFullYear() };
 }
 
-// 🔹 Dummy function to send notification (implement yourself)
 async function sendEventNotification(payload: any) {
   console.log("Sending notification for event:", payload);
 }
@@ -90,7 +90,9 @@ registerUIAction("events.create", {
     flow.start();
 
     try {
-      // 🔹 Step: start - wybór typu eventu
+      // ------------------------
+      // Step: start
+      // ------------------------
       if (interaction.isButton?.() && payload?.step === "start") {
         const typeOptions = [
           { label: "Reservoir Raid", value: "reservoir_raid" },
@@ -118,7 +120,9 @@ registerUIAction("events.create", {
         flow.success(); return;
       }
 
-      // 🔹 Step: type
+      // ------------------------
+      // Step: type
+      // ------------------------
       if (interaction.isButton?.() && payload?.step === "type") {
         const eventType = payload.type; if (!eventType) throw new Error("event_type_missing");
 
@@ -138,7 +142,9 @@ registerUIAction("events.create", {
         flow.success(); return;
       }
 
-      // 🔹 Step: modal submit dla Custom/Birthday
+      // ------------------------
+      // Step: modal submit dla Custom/Birthday
+      // ------------------------
       if (interaction.isModalSubmit?.() && payload?.step === "modal") {
         const eventName = interaction.fields.getTextInputValue("event_name");
         const eventDateRaw = interaction.fields.getTextInputValue("event_date");
@@ -149,14 +155,25 @@ registerUIAction("events.create", {
         if (!parsedDate) throw new Error("invalid_date_format");
         parsedDate = adjustFutureYear(parsedDate);
 
+        const tempId = uuidv4();
+        tempEventStore.set(tempId, {
+          name: eventName,
+          type: payload.type,
+          day: parsedDate.day,
+          month: parsedDate.month,
+          year: parsedDate.year,
+          hour: parsedDate.hour,
+          minute: parsedDate.minute,
+        });
+
         const formattedDate = formatEventUTC(parsedDate.day, parsedDate.month, parsedDate.hour, parsedDate.minute, parsedDate.year);
 
         await interaction.reply?.({
           content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
           components: [
             { type: 1, components: [
-              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${parsedDate.day}-${parsedDate.month}-${parsedDate.year}|hour=${parsedDate.hour}-${parsedDate.minute}` },
-              { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|name=${eventName}` },
+              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|temp=${tempId}` },
+              { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|temp=${tempId}` },
             ] },
           ],
           ephemeral: true,
@@ -164,41 +181,55 @@ registerUIAction("events.create", {
         flow.success(); return;
       }
 
-      // 🔹 Step: day selection dla standardowych eventów
+      // ------------------------
+      // Step: day selection dla standardowych eventów
+      // ------------------------
       if (interaction.isButton?.() && payload?.step === "day") {
         const eventName = payload.name; const eventType = payload.type; const eventDay = payload.day;
         if (!eventName || !eventType || !eventDay) throw new Error("missing_day_payload");
 
+        const tempId = uuidv4();
+        tempEventStore.set(tempId, { name: eventName, type: eventType, day: eventDay });
+
         await interaction.showModal?.({
-          custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${eventDay}`,
+          custom_id: `events.create|step=hour|temp=${tempId}`,
           title: `Select Hour for ${eventName}`,
           components: [{ type: 1, components: [{ type: 4, custom_id: "event_hour", style: 1, label: "Hour (HH:mm)", min_length: 4, max_length: 5 }] }],
         });
         flow.success(); return;
       }
 
-      // 🔹 Step: hour input dla standardowych eventów
+      // ------------------------
+      // Step: hour input dla standardowych eventów
+      // ------------------------
       if (interaction.isModalSubmit?.() && payload?.step === "hour") {
-        const eventName = payload.name;
-        const eventDay = payload.day;
-        const hourInput = interaction.fields.getTextInputValue("event_hour");
+        const tempId = payload.temp;
+        const tempData = tempEventStore.get(tempId);
+        if (!tempData) throw new Error("missing_temp_data");
 
-        const [day, month] = eventDay.split("-").map(Number);
+        const hourInput = interaction.fields.getTextInputValue("event_hour");
         const [hour, minute] = hourInput.split(":").map(Number);
 
-        // Ustal pełny rok uwzględniając przyszłą datę
         let year = new Date().getUTCFullYear();
+        let [day, month] = tempData.day.includes("-") ? tempData.day.split("-").map(Number) : [parseInt(tempData.day), new Date().getUTCMonth()+1];
         const eventCheck = new Date(Date.UTC(year, month - 1, day, hour, minute));
         if (eventCheck < new Date()) year += 1;
+
+        tempData.hour = hour;
+        tempData.minute = minute;
+        tempData.day = day;
+        tempData.month = month;
+        tempData.year = year;
+        tempEventStore.set(tempId, tempData);
 
         const formattedDate = formatEventUTC(day, month, hour, minute, year);
 
         await interaction.reply?.({
-          content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
+          content: `✅ Event **${tempData.name}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
           components: [
             { type: 1, components: [
-              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|type=${payload.type}|name=${eventName}|day=${day}-${month}-${year}|hour=${hour}-${minute}` },
-              { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|name=${eventName}` },
+              { type: 2, label: "Yes", style: 3, custom_id: `events.create|step=notify|temp=${tempId}` },
+              { type: 2, label: "No", style: 2, custom_id: `events.create|step=cancel|temp=${tempId}` },
             ] },
           ],
           ephemeral: true,
@@ -206,21 +237,27 @@ registerUIAction("events.create", {
         flow.success(); return;
       }
 
-      // 🔹 Step: notify / cancel dla finalnego potwierdzenia
+      // ------------------------
+      // Step: notify / cancel dla finalnego potwierdzenia
+      // ------------------------
       if (interaction.isButton?.() && ["notify","cancel"].includes(payload?.step)) {
-        const eventName = payload.name;
+        const tempId = payload.temp;
+        const tempData = tempEventStore.get(tempId);
+        if (!tempData) throw new Error("missing_temp_data");
+
         if (payload.step === "notify") {
-          await sendEventNotification(payload);
+          await sendEventNotification(tempData);
           await interaction.update?.({
-            content: `✅ Event **${eventName}** created and notification sent!`,
+            content: `✅ Event **${tempData.name}** created and notification sent!`,
             components: [],
           });
         } else {
           await interaction.update?.({
-            content: `❌ Event **${eventName}** created without notification.`,
+            content: `❌ Event **${tempData.name}** created without notification.`,
             components: [],
           });
         }
+        tempEventStore.delete(tempId);
         flow.success(); return;
       }
 
