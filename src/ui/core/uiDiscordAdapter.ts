@@ -6,6 +6,7 @@ import {
   Interaction,
   ButtonInteraction,
   CacheType,
+  ModalSubmitInteraction,
 } from "discord.js";
 
 import {
@@ -29,55 +30,83 @@ export async function handleUIInteraction(
 
   try {
     // =====================================
-    // 🔘 ONLY BUTTONS (na razie)
+    // 🔘 BUTTON INTERACTIONS
     // =====================================
+    if (interaction.isButton()) {
+      const button = interaction as ButtonInteraction;
 
-    if (!interaction.isButton()) {
-      return false;
-    }
+      flow.stepDebug("interaction.received", {
+        meta: { id: button.customId },
+      });
 
-    const button = interaction as ButtonInteraction;
+      const { action, payload } = parseCustomId(button.customId);
 
-    flow.stepDebug("interaction.received", {
-      meta: { id: button.customId },
-    });
+      flow.stepDebug("interaction.parsed", {
+        meta: { action, payload },
+      });
 
-    // =====================================
-    // 🔍 PARSE ID
-    // =====================================
+      const handled = await executeUIAction(
+        action,
+        button,
+        ctx,
+        payload
+      );
 
-    const { action, payload } = parseCustomId(
-      button.customId
-    );
+      if (!handled) {
+        flow.stepWarn("action.not_found", {
+          meta: { action },
+        });
+        return false;
+      }
 
-    flow.stepDebug("interaction.parsed", {
-      meta: { action, payload },
-    });
-
-    // =====================================
-    // 🚀 EXECUTE (🔥 przez router + runtime)
-    // =====================================
-
-    const handled = await executeUIAction(
-      action,
-      button,
-      ctx,
-      payload
-    );
-
-    if (!handled) {
-      flow.stepWarn("action.not_found", {
+      flow.stepDebug("action.executed", {
         meta: { action },
       });
 
-      return false;
+      return true;
     }
 
-    flow.stepDebug("action.executed", {
-      meta: { action },
-    });
+    // =====================================
+    // 🔘 MODAL SUBMIT INTERACTIONS
+    // =====================================
+    if (interaction.isModalSubmit()) {
+      const modal = interaction as ModalSubmitInteraction;
 
-    return true;
+      flow.stepDebug("interaction.received_modal", {
+        meta: { id: modal.customId },
+      });
+
+      const { action, payload } = parseCustomId(modal.customId);
+
+      flow.stepDebug("interaction.parsed_modal", {
+        meta: { action, payload },
+      });
+
+      const handled = await executeUIAction(
+        action,
+        modal,
+        ctx,
+        payload
+      );
+
+      if (!handled) {
+        flow.stepWarn("modal.action.not_found", {
+          meta: { action },
+        });
+        return false;
+      }
+
+      flow.stepDebug("modal.action.executed", {
+        meta: { action },
+      });
+
+      return true;
+    }
+
+    // =====================================
+    // 🔘 OTHER INTERACTIONS (IGNORED)
+    // =====================================
+    return false;
   } catch (err) {
     flow.fail(err);
 
