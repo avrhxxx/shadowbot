@@ -2,7 +2,6 @@
 // 📁 src/systems/events/actions/events.create.action.ts
 // =====================================
 
-import type { Interaction } from "discord.js";
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
@@ -18,11 +17,12 @@ function formatEventName(type: string) {
     .join(" ");
 }
 
-// Dummy functions to simulate next steps
-async function proceedToDaySelect(interaction: Interaction, type: string, name: string) {
-  // tutaj normalnie wyświetlasz kolejny widok / krok
+// Dummy function to simulate next step
+async function proceedToDaySelect(interaction: any, type: string, name: string) {
   if ("reply" in interaction) {
-    await interaction.reply({ content: `Next step: pick day for "${name}"`, ephemeral: true }).catch(() => null);
+    await interaction
+      .reply({ content: `Next step: pick day for "${name}"`, ephemeral: true })
+      .catch(() => null);
   }
 }
 
@@ -32,7 +32,8 @@ async function proceedToDaySelect(interaction: Interaction, type: string, name: 
 
 registerUIAction("events.create", {
   system: "events",
-  handler: async (interaction: Interaction, ctx: TraceContext, payload: any) => {
+
+  handler: async (interaction: any, ctx: TraceContext, payload: any) => {
     const log = createLogger(ctx);
     const flow = log.flow("events.create");
     flow.start();
@@ -43,7 +44,6 @@ registerUIAction("events.create", {
       // ======================
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
         flow.stepDebug("step.start");
-        // tutaj możesz np. renderować typ eventu
         flow.success();
         return;
       }
@@ -57,29 +57,26 @@ registerUIAction("events.create", {
 
         const eventName = formatEventName(typeValue);
 
-        // Jeśli potrzebny modal dla nazwy
-        if (["custom", "birthdays"].includes(typeValue)) {
-          if ("showModal" in interaction) {
-            await interaction.showModal({
-              custom_id: `events.create|step=name|type=${typeValue}`,
-              title: "Enter Event Name",
-              components: [
-                {
-                  type: 1,
-                  components: [
-                    {
-                      type: 4,
-                      custom_id: "event_name",
-                      style: 1,
-                      label: "Event Name",
-                      min_length: 3,
-                      max_length: 100,
-                    },
-                  ],
-                },
-              ],
-            });
-          }
+        if (["custom", "birthdays"].includes(typeValue) && "showModal" in interaction) {
+          await interaction.showModal({
+            custom_id: `events.create|step=name|type=${typeValue}`,
+            title: "Enter Event Name",
+            components: [
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_name",
+                    style: 1,
+                    label: "Event Name",
+                    min_length: 3,
+                    max_length: 100,
+                  },
+                ],
+              },
+            ],
+          });
         } else {
           await proceedToDaySelect(interaction, typeValue, eventName);
         }
@@ -113,7 +110,6 @@ registerUIAction("events.create", {
 
         if (!typeValue || !eventName || !day) throw new Error("missing_day_payload");
 
-        // następny krok: godzina / modal
         if ("showModal" in interaction) {
           await interaction.showModal({
             custom_id: `events.create|step=hour|type=${typeValue}|name=${eventName}|day=${day}`,
@@ -153,7 +149,6 @@ registerUIAction("events.create", {
         const hour = interaction.fields.getTextInputValue("event_hour");
         if (!hour) throw new Error("hour_missing");
 
-        // finalizacja eventu
         if ("reply" in interaction) {
           await interaction.reply({
             content: `✅ Event created: ${eventName} (${typeValue}) on ${day} at ${hour}`,
