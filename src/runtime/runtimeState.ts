@@ -90,7 +90,7 @@ async function refresh() {
 
     flow.success({ stats: { count: data.length } });
   } catch (err) {
-    flow.fail(err);
+    flow.fail(err as Error);
   }
 }
 
@@ -130,7 +130,7 @@ export async function setSystemEnabled(system: SystemName, enabled: boolean): Pr
 
     flow.success({ meta: { system }, result: { enabled } });
   } catch (err) {
-    flow.fail(err, { meta: { system } });
+    flow.fail(err as Error, { meta: { system } });
   }
 }
 
@@ -139,7 +139,7 @@ export async function setSystemEnabled(system: SystemName, enabled: boolean): Pr
 // =====================================
 
 export function startFlagsWorker() {
-  log.info("flags.worker", "Starting system flags worker...");
+  log.info({ system: "flags.worker", message: "Starting system flags worker..." });
 
   // od razu refresh przy starcie
   refresh();
@@ -148,7 +148,7 @@ export function startFlagsWorker() {
     try {
       await refresh();
     } catch (err) {
-      log.error("flags.worker", "Failed to refresh system flags", err);
+      log.error({ system: "flags.worker", message: "Failed to refresh system flags", error: err as Error });
     }
   }, REFRESH_INTERVAL_MS);
 }
