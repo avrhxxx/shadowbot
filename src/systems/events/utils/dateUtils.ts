@@ -1,3 +1,4 @@
+// src/systems/events/utils/dateUtils.ts
 export function getFutureDays(daysAhead = 14) {
   const days: { label: string; value: string }[] = [];
   for (let i = 1; i <= daysAhead; i++) {
