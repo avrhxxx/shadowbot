@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/systems/moderator/actions/moderator.actions.ts
+// =====================================
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
 
