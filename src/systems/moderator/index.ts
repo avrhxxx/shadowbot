@@ -2,21 +2,17 @@
 // 📁 src/systems/moderator/index.ts
 // =====================================
 
-import { registerModeratorActions } from "./actions/moderator.actions";
-import { registerModeratorHubActions } from "./actions/moderatorHub.actions";
-import { registerModeratorViews } from "./views/moderator.views";
+import { registerModeratorHubActions } from "./actions/moderator.actions";
+import { renderModeratorHub } from "./views/moderator.view";
 
 // =====================================
 // 🚀 INIT SYSTEM
 // =====================================
 
-export async function init(ctx: any) {
-  // Rejestrujemy ogólne akcje moderatora
-  registerModeratorActions();
-
-  // Rejestrujemy akcje przycisków Hub (placeholdery)
+export async function init(_ctx: any) {
+  // Rejestrujemy akcje przycisków Hub (moderator.open)
   registerModeratorHubActions();
 
-  // Rejestrujemy widoki (hub, event panel itd.)
-  registerModeratorViews();
+  // Możemy tu później dodać więcej widoków, jeśli będą potrzebne
+  // np. renderEventPanel, renderPointsPanel itd.
 }
