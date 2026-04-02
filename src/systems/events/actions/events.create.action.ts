@@ -4,7 +4,7 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
+import type { Interaction } from "discord.js";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -60,6 +60,8 @@ registerUIAction("events.create", {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
 
+        const eventName = formatEventName(eventType);
+
         if (["custom", "birthdays"].includes(eventType)) {
           if ("showModal" in interaction) {
             await interaction.showModal({
@@ -83,7 +85,7 @@ registerUIAction("events.create", {
             });
           }
         } else {
-          await proceedToDaySelect(interaction, eventType, eventType);
+          await proceedToDaySelect(interaction, eventType, eventName);
         }
         flow.success();
         return;
@@ -92,8 +94,10 @@ registerUIAction("events.create", {
       // 🔹 Step: name (modal)
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
         const eventType = payload.type;
-        const eventName = interaction.fields.getTextInputValue("event_name");
-        if (!eventName) throw new Error("event_name_missing");
+        const eventNameInput = interaction.fields.getTextInputValue("event_name");
+        if (!eventNameInput) throw new Error("event_name_missing");
+
+        const eventName = formatEventName(eventType, eventNameInput);
 
         await proceedToDaySelect(interaction, eventType, eventName);
         flow.success();
@@ -150,17 +154,30 @@ registerUIAction("events.create", {
 // =====================================
 
 function formatDayLabel(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
+  const [_year, month, day] = value.split("-").map(Number);
   return `${day} ${MONTH_NAMES[month - 1]}`;
 }
 
+/**
+ * Zamienia eventType na ładną nazwę do UI.
+ * Jeśli podamy drugi argument (customName), zwraca go zamiast standardowego.
+ */
+function formatEventName(eventType: string, customName?: string) {
+  if (customName) return customName;
+
+  return eventType
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 async function proceedToDaySelect(
-  interaction: ButtonInteraction | ModalSubmitInteraction | Interaction,
+  interaction: Interaction,
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
-  const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + 7 następnych
+  const allDays = getFutureDays(7, true); // dzisiaj + 7 następnych dni
+  const days = allDays.slice(0, 8); // 8 przycisków
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 4) {
