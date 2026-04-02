@@ -76,7 +76,6 @@ registerUIAction("events.create", {
           });
         }
 
-        // 🔹 Dodanie przycisku Back na ekranie wyboru typu eventu
         rows.push({
           type: 1,
           components: [
@@ -98,11 +97,11 @@ registerUIAction("events.create", {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
 
-        // Birthday i Custom: od razu modal z datą
+        // Birthday i Custom: modal z nazwą, datą i godziną
         if (["custom", "birthdays"].includes(eventType)) {
           await interaction.showModal?.({
-            custom_id: `events.create|step=name|type=${eventType}`,
-            title: "Enter Event Name & Date",
+            custom_id: `events.create|step=modal|type=${eventType}`,
+            title: "Enter Event Details",
             components: [
               {
                 type: 1,
@@ -124,43 +123,51 @@ registerUIAction("events.create", {
                     type: 4,
                     custom_id: "event_date",
                     style: 1,
-                    label: "Event Date (YYYY-MM-DD)",
-                    placeholder: "Select a date within next 6 months",
-                    min_length: 10,
-                    max_length: 10,
+                    label: "Event Date (any format, e.g., 20260402 or 2 Apr 2026)",
+                    min_length: 4,
+                    max_length: 20,
+                  },
+                ],
+              },
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_hour",
+                    style: 1,
+                    label: "Hour (HH:mm)",
+                    min_length: 4,
+                    max_length: 5,
                   },
                 ],
               },
             ],
           });
         } else {
-          // Standardowe eventy: pokaż przyciski wyboru dnia
           await renderDaySelection(interaction, eventType, formatEventName(eventType));
         }
         flow.success();
         return;
       }
 
-      // 🔹 Step: name (modal)
-      if (interaction.isModalSubmit?.() && payload?.step === "name") {
+      // 🔹 Step: modal submit dla Custom/Birthday
+      if (interaction.isModalSubmit?.() && payload?.step === "modal") {
         const eventName = interaction.fields.getTextInputValue("event_name");
         const eventDate = interaction.fields.getTextInputValue("event_date");
+        const eventHour = interaction.fields.getTextInputValue("event_hour");
 
-        if (!eventName) throw new Error("event_name_missing");
+        if (!eventName || !eventDate || !eventHour) throw new Error("missing_modal_fields");
 
-        if (["custom", "birthdays"].includes(payload.type) && eventDate) {
-          await interaction.reply?.({
-            content: `✅ Event **${eventName}** scheduled on **${eventDate}**.`,
-            ephemeral: true,
-          });
-        } else {
-          await renderDaySelection(interaction, payload.type, formatEventName(eventName));
-        }
+        await interaction.reply?.({
+          content: `✅ Event **${eventName}** scheduled on **${eventDate}** at **${eventHour}**.`,
+          ephemeral: true,
+        });
         flow.success();
         return;
       }
 
-      // 🔹 Step: day selection
+      // 🔹 Step: day selection dla standardowych eventów
       if (interaction.isButton?.() && payload?.step === "day") {
         const eventName = payload.name;
         const eventType = payload.type;
@@ -190,7 +197,7 @@ registerUIAction("events.create", {
         return;
       }
 
-      // 🔹 Step: hour input (modal)
+      // 🔹 Step: hour input dla standardowych eventów
       if (interaction.isModalSubmit?.() && payload?.step === "hour") {
         const eventName = payload.name;
         const eventDay = payload.day;
@@ -231,7 +238,6 @@ async function renderDaySelection(interaction: any, eventType: string, eventName
     });
   }
 
-  // 🔹 Back button do wyboru typu eventu
   rows.push({
     type: 1,
     components: [
