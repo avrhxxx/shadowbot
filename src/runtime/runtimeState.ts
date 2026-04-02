@@ -3,7 +3,7 @@
 // =====================================
 
 import { GoogleRepository } from "@/integrations/google/googleRepository.js";
-import { SYSTEM_FLAGS_SHEET, EVENTS_SHEET } from "@/integrations/google/googleSchema.js";
+import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
@@ -22,30 +22,17 @@ type SystemFlag = {
   reason?: string;
 };
 
-type EventRow = {
-  id: string;
-  name: string;
-  description?: string;
-  date?: string;
-  status?: string;
-};
-
 // =====================================
 // 🔹 REPO
 // =====================================
 
 const flagsRepo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
-const eventsRepo = new GoogleRepository<EventRow>(EVENTS_SHEET);
 
 // =====================================
 // 🔹 LOGGER
 // =====================================
 
-const ctx = createRootContext({
-  source: "system",
-  system: "runtime",
-});
-
+const ctx = createRootContext({ source: "system", system: "runtime" });
 const log = createLogger(ctx);
 
 // =====================================
@@ -54,8 +41,8 @@ const log = createLogger(ctx);
 
 let cache: Map<string, boolean> = new Map();
 let lastFetch = 0;
-
-const TTL = 30_000;
+const TTL = 30_000; // cache TTL dla normalnych odczytów
+const REFRESH_INTERVAL_MS = 15_000; // worker refresh co 15s
 
 // =====================================
 // 🧠 SEED SYSTEM FLAGS
@@ -63,7 +50,6 @@ const TTL = 30_000;
 
 async function seedIfEmpty() {
   const existing = await flagsRepo.findAll();
-
   if (existing.length > 0) return;
 
   const flow = log.flow("flags.seed");
@@ -88,38 +74,6 @@ async function seedIfEmpty() {
 }
 
 // =====================================
-// 🔄 SYNC EVENTS TO SHEET
-// =====================================
-
-async function syncEventsToSheet() {
-  const flow = log.flow("events.sync");
-  flow.start();
-
-  try {
-    const events = SYSTEM_REGISTRY.filter((s) => s.type === "event");
-
-    if (events.length === 0) {
-      flow.stepInfo("no_events", { count: 0 });
-      return;
-    }
-
-    const rows: EventRow[] = events.map((e) => ({
-      id: e.name,
-      name: e.label || e.name,
-      description: e.description || "",
-      date: e.date || "",
-      status: e.enabled ? "active" : "disabled",
-    }));
-
-    await eventsRepo.createMany(rows);
-
-    flow.success({ stats: { synced: rows.length } });
-  } catch (err) {
-    flow.fail(err);
-  }
-}
-
-// =====================================
 // 🔄 REFRESH FLAGS
 // =====================================
 
@@ -131,12 +85,8 @@ async function refresh() {
     await seedIfEmpty();
 
     const data = await flagsRepo.findAll();
-
     cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
-
-    // 🔥 SYNC EVENTS
-    await syncEventsToSheet();
 
     flow.success({ stats: { count: data.length } });
   } catch (err) {
@@ -145,19 +95,12 @@ async function refresh() {
 }
 
 // =====================================
-// 🔍 ENSURE
+// 🔍 ENSURE CACHE
 // =====================================
 
 async function ensure() {
-  const flow = log.flow("flags.ensure");
-
   const expired = Date.now() - lastFetch > TTL;
-
-  flow.stepDebug("cache.check", { decision: { condition: "ttl_expired", result: expired } });
-
-  if (expired) {
-    await refresh();
-  }
+  if (expired) await refresh();
 }
 
 // =====================================
@@ -165,18 +108,10 @@ async function ensure() {
 // =====================================
 
 export async function isSystemEnabled(system: SystemName): Promise<boolean> {
-  const flow = log.flow("flags.check");
-
   await ensure();
-
   const global = cache.get("global");
   const local = cache.get(system);
-
-  const result = global === false || local === false ? false : true;
-
-  flow.stepInfo("decision", { meta: { system }, decision: { condition: "flags", result } });
-
-  return result;
+  return global === false || local === false ? false : true;
 }
 
 // =====================================
@@ -190,11 +125,30 @@ export async function setSystemEnabled(system: SystemName, enabled: boolean): Pr
   try {
     await flagsRepo.updateById(system, { enabled: String(enabled) });
 
-    // 🔥 odśwież cache natychmiast
+    // 🔥 odśwież cache od razu
     cache.set(system, enabled);
 
     flow.success({ meta: { system }, result: { enabled } });
   } catch (err) {
     flow.fail(err, { meta: { system } });
   }
+}
+
+// =====================================
+// 🔄 WORKER (AUTO REFRESH)
+// =====================================
+
+export function startFlagsWorker() {
+  log.info("flags.worker", "Starting system flags worker...");
+
+  // od razu refresh przy starcie
+  refresh();
+
+  setInterval(async () => {
+    try {
+      await refresh();
+    } catch (err) {
+      log.error("flags.worker", "Failed to refresh system flags", err);
+    }
+  }, REFRESH_INTERVAL_MS);
 }
