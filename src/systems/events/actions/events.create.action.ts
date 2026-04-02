@@ -4,7 +4,15 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
+import {
+  ButtonInteraction,
+  ModalSubmitInteraction,
+  Interaction,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+} from "discord.js";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -57,33 +65,29 @@ registerUIAction("events.create", {
 
       // 🔹 Step: type
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
-        const eventTypeValue = payload.type;
-        if (!eventTypeValue) throw new Error("event_type_missing");
+        const eventType = payload.type;
+        if (!eventType) throw new Error("event_type_missing");
 
-        if (["custom", "birthdays"].includes(eventTypeValue)) {
+        if (["custom", "birthdays"].includes(eventType)) {
           if ("showModal" in interaction) {
-            await interaction.showModal({
-              custom_id: `events.create|step=name|type=${eventTypeValue}`,
-              title: "Enter Event Name",
-              components: [
-                {
-                  type: 1,
-                  components: [
-                    {
-                      type: 4,
-                      custom_id: "event_name",
-                      style: 1,
-                      label: "Event Name",
-                      min_length: 3,
-                      max_length: 100,
-                    },
-                  ],
-                },
-              ],
-            });
+            const modal = new ModalBuilder()
+              .setCustomId(`events.create|step=name|type=${eventType}`)
+              .setTitle("Enter Event Name")
+              .setComponents(
+                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                  new TextInputBuilder()
+                    .setCustomId("event_name")
+                    .setLabel("Event Name")
+                    .setStyle(TextInputStyle.Short)
+                    .setMinLength(3)
+                    .setMaxLength(100)
+                )
+              );
+
+            await interaction.showModal(modal);
           }
         } else {
-          await proceedToDaySelect(interaction, eventTypeValue, eventTypeValue);
+          await proceedToDaySelect(interaction, eventType, eventType);
         }
         flow.success();
         return;
@@ -91,18 +95,18 @@ registerUIAction("events.create", {
 
       // 🔹 Step: name (modal)
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
-        const eventTypeValue = payload.type;
+        const eventType = payload.type;
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
 
-        await proceedToDaySelect(interaction, eventTypeValue, eventName);
+        await proceedToDaySelect(interaction, eventType, eventName);
         flow.success();
         return;
       }
 
       // 🔹 Step: day (kliknięcie przycisku daty)
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
-        const eventTypeValue = payload.type;
+        const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day; // YYYY-MM-DD
 
@@ -110,26 +114,22 @@ registerUIAction("events.create", {
 
         // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
         if ("showModal" in interaction) {
-          await interaction.showModal({
-            custom_id: `events.create|step=hour|type=${eventTypeValue}|name=${eventName}|day=${dayValue}`,
-            title: `Set Time for ${eventName}`,
-            components: [
-              {
-                type: 1,
-                components: [
-                  {
-                    type: 4,
-                    custom_id: "event_hour",
-                    style: 1,
-                    label: "Hour (HHMM, UTC)",
-                    placeholder: "e.g. 1830",
-                    min_length: 3,
-                    max_length: 4,
-                  },
-                ],
-              },
-            ],
-          });
+          const modal = new ModalBuilder()
+            .setCustomId(`events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`)
+            .setTitle(`Set Time for ${eventName}`)
+            .setComponents(
+              new ActionRowBuilder<TextInputBuilder>().addComponents(
+                new TextInputBuilder()
+                  .setCustomId("event_hour")
+                  .setLabel("Hour (HHMM, UTC)")
+                  .setPlaceholder("e.g. 1830")
+                  .setStyle(TextInputStyle.Short)
+                  .setMinLength(3)
+                  .setMaxLength(4)
+              )
+            );
+
+          await interaction.showModal(modal);
         }
         flow.success();
         return;
@@ -156,14 +156,11 @@ function formatDayLabel(value: string) {
 
 async function proceedToDaySelect(
   interaction: ButtonInteraction | ModalSubmitInteraction | Interaction,
-  eventTypeValue: string,
+  eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni z funkcji
-  const today = new Date();
-  const todayValue = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-  const next7 = allDays.slice(0, 7); // następne 7 dni
-  const days = [ { label: "Today", value: todayValue }, ...next7 ]; // dzisiaj + 7 kolejnych
+  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + następne 7 dni
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 4) {
@@ -173,7 +170,7 @@ async function proceedToDaySelect(
         type: 2,
         label: formatDayLabel(d.value),
         style: 1,
-        custom_id: `events.create|step=day|type=${eventTypeValue}|name=${eventName}|day=${d.value}`,
+        custom_id: `events.create|step=day|type=${eventType}|name=${eventName}|day=${d.value}`,
       })),
     });
   }
