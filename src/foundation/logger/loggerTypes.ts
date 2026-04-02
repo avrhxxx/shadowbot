@@ -1,3 +1,5 @@
+// src/foundation/logger/loggerTypes.ts
+
 export type LogLevel =
   | "debug"
   | "info"
