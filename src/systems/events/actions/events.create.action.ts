@@ -159,14 +159,14 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
-  const days = allDays.slice(0, 7); // tylko tydzień do przodu, zaczynając od dzisiaj
-
+  const allDays = getFutureDays(7, true); // tydzień włącznie z dzisiaj
   const rows: any[] = [];
-  for (let i = 0; i < days.length; i += 5) {
+
+  // po 4 przyciski w rzędzie
+  for (let i = 0; i < allDays.length; i += 4) {
     rows.push({
       type: 1,
-      components: days.slice(i, i + 5).map((d) => ({
+      components: allDays.slice(i, i + 4).map((d) => ({
         type: 2,
         label: formatDayLabel(d.value),
         style: 1,
