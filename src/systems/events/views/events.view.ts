@@ -1,16 +1,12 @@
+
 // =====================================
 // 📁 src/systems/events/views/events.view.ts
 // =====================================
 
-import type { ViewResult } from "@/core/ui/uiEngine";
-
-// =====================================
-// 🔹 VIEW
-// =====================================
-
-export function renderEventsView(): ViewResult {
+export function renderEventsView() {
   return {
     content: "📌 **Event Panel**",
+
     components: [
       {
         type: 1,
