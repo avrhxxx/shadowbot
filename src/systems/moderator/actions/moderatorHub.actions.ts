@@ -5,9 +5,11 @@
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction, EmbedBuilder } from "discord.js";
 
-import { renderEventPanel } from "@/systems/events/views/eventPanel"; // ← pokażesz mi potem jeśli path inny
-import { renderPointsPanel } from "@/systems/points/views/pointsPanel";
-import { renderAbsencePanel } from "@/systems/absence/views/absencePanel";
+import { renderModeratorHub } from "../views/moderatorHub.view";
+
+import { renderEventsView } from "@/systems/events/views/events.view";
+import { renderPointsView } from "@/systems/points/views/points.view";
+import { renderAbsenceView } from "@/systems/absence/views/absence.view";
 
 // =====================================
 // 🔹 REGISTER
@@ -23,17 +25,28 @@ export function registerModeratorHubActions() {
       const target = payload?.target;
 
       // =====================================
+      // 🔹 HUB
+      // =====================================
+
+      if (target === "hub") {
+        const view = await renderModeratorHub();
+
+        await interaction.reply({
+          ...view,
+          ephemeral: true,
+        });
+
+        return;
+      }
+
+      // =====================================
       // 🔹 EVENTS
       // =====================================
 
       if (target === "events") {
-        const panel = renderEventPanel();
+        const view = renderEventsView();
 
-        await interaction.update({
-          content: panel.content,
-          components: panel.components,
-        });
-
+        await interaction.update(view);
         return;
       }
 
@@ -42,13 +55,9 @@ export function registerModeratorHubActions() {
       // =====================================
 
       if (target === "points") {
-        const panel = renderPointsPanel();
+        const view = renderPointsView();
 
-        await interaction.update({
-          content: panel.content,
-          components: panel.components,
-        });
-
+        await interaction.update(view);
         return;
       }
 
@@ -57,13 +66,9 @@ export function registerModeratorHubActions() {
       // =====================================
 
       if (target === "absence") {
-        const panel = renderAbsencePanel();
+        const view = renderAbsenceView();
 
-        await interaction.update({
-          content: panel.content,
-          components: panel.components,
-        });
-
+        await interaction.update(view);
         return;
       }
 
@@ -73,7 +78,7 @@ export function registerModeratorHubActions() {
 
       if (target === "quickadd") {
         await interaction.update({
-          content: "📌 QuickAdd Panel (coming soon)",
+          content: "⚡ QuickAdd Panel (coming soon)",
           components: [],
         });
 
@@ -91,8 +96,7 @@ export function registerModeratorHubActions() {
           .addFields(
             {
               name: "🟢 Event Menu",
-              value:
-                "Create events, manage participants, cancel events, download lists.",
+              value: "Create events, manage participants, cancel events.",
             },
             {
               name: "⭐ Points Menu",
@@ -100,8 +104,7 @@ export function registerModeratorHubActions() {
             },
             {
               name: "🕒 Absence Menu",
-              value:
-                "Manage absences: add/remove, see current absences, automatic notifications.",
+              value: "Manage absences and schedules.",
             },
             {
               name: "⚡ QuickAdd",
