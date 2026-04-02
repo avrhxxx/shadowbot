@@ -102,7 +102,6 @@ registerUIAction("events.create", {
 
       // 🔹 Step: day (kliknięcie przycisku daty)
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
-        const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day; // YYYY-MM-DD
 
@@ -111,7 +110,7 @@ registerUIAction("events.create", {
         // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
         if ("showModal" in interaction) {
           await interaction.showModal({
-            custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
+            custom_id: `events.create|step=hour|name=${eventName}|day=${dayValue}`,
             title: `Set Time for ${eventName}`,
             components: [
               {
@@ -137,7 +136,6 @@ registerUIAction("events.create", {
 
       // 🔹 Step: hour (modal po wybraniu daty)
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
-        const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day;
         const eventHour = interaction.fields.getTextInputValue("event_hour");
@@ -179,12 +177,11 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(7, true); // 7 dni włącznie z dzisiaj
-  const days = allDays.slice(0, 7); // tylko tydzień do przodu
+  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const days = allDays.slice(0, 7); // tylko tydzień do przodu, zaczynając od dzisiaj
 
   const rows: any[] = [];
-  // dwa rzędy po 4 przyciski
-  for (let i = 0; i < days.length; i += 4) {
+  for (let i = 0; i < days.length; i += 4) { // dwa rzędy po 4 przyciski
     rows.push({
       type: 1,
       components: days.slice(i, i + 4).map((d) => ({
