@@ -2,7 +2,6 @@
 // 📁 src/systems/events/views/events.view.ts
 // =====================================
 
-import { renderModeratorHub } from "@/systems/moderator/views/moderator.view";
 
 export async function renderEventsView() {
   const content = "📌 **Event Panel**";
