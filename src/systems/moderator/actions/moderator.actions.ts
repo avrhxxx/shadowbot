@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/systems/moderator/actions/moderator.actions.ts
-// =====================================
-
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
 
@@ -25,7 +21,11 @@ export function registerModeratorHubActions() {
   // 🔘 OPEN PANEL / NAVIGATE
   registerUIAction("moderator.open", {
     system: "moderator",
-    handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
+    handler: async (
+      interaction: Interaction,
+      _ctx,
+      payload: ModeratorPayload
+    ) => {
       if (!interaction.isButton()) return;
 
       const target = payload?.target;
@@ -39,7 +39,6 @@ export function registerModeratorHubActions() {
 
       if (target && target in viewMap) {
         const view = await viewMap[target]();
-
         await interaction.update({
           content: view.content,
           components: view.components,
