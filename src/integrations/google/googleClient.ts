@@ -83,9 +83,8 @@ const sheetsClient = google.sheets({
 // 🌐 TRANSLATE CLIENT
 // =====================================
 
-const translateClient = new TranslationServiceClient({
-  auth: googleAuth,
-});
+// ❌ Usuń auth, TS tego nie wymaga w nowej wersji
+const translateClient = new TranslationServiceClient();
 
 // =====================================
 // 🔄 EXPORTS
