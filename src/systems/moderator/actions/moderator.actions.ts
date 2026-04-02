@@ -3,13 +3,15 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { isSystemEnabled } from "@/runtime/runtimeState";
+import { Interaction } from "discord.js";
 
-// 🔹 IMPORT VIEWS
-import { renderModeratorHub } from "@/systems/moderator/views/moderator.view";
-import { renderEventsView } from "@/systems/events/views/events.view";
-import { renderPointsView } from "@/systems/points/views/points.view";
-import { renderAbsenceView } from "@/systems/absence/views/absence.view";
+import {
+  renderModeratorHub,
+  renderEventsView,
+  renderPointsView,
+  renderAbsenceView,
+  ViewResult,
+} from "../views/moderator.view";
 
 type ModeratorPayload = {
   target?: "hub" | "events" | "points" | "absence" | "quickadd" | "help";
@@ -19,25 +21,22 @@ type ModeratorPayload = {
 // 🔹 REGISTER ACTIONS
 // =====================================
 
-export function registerModeratorActions() {
-  // 🔹 OPEN PANEL / SUBPANELS
+export function registerModeratorHubActions() {
+  // 🔘 OPEN PANEL / NAVIGATE
   registerUIAction("moderator.open", {
     system: "moderator",
-
-    handler: async (interaction, _ctx, payload: ModeratorPayload) => {
+    handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
       if (!interaction.isButton()) return;
 
       const target = payload?.target;
 
-      // 🔹 VIEW MAP
-      const viewMap: Record<string, () => Promise<any>> = {
+      const viewMap: Record<string, () => Promise<ViewResult>> = {
         hub: () => renderModeratorHub(),
         events: () => renderEventsView(),
         points: () => renderPointsView(),
         absence: () => renderAbsenceView(),
       };
 
-      // 🔹 HANDLE TARGETS
       if (target && target in viewMap) {
         const view = await viewMap[target]();
 
@@ -45,11 +44,10 @@ export function registerModeratorActions() {
           content: view.content,
           components: view.components,
         });
-
         return;
       }
 
-      // 🔹 QUICKADD (placeholder)
+      // 🔹 QUICKADD
       if (target === "quickadd") {
         await interaction.update({
           content: "⚡ QuickAdd Panel (coming soon)",
@@ -58,9 +56,9 @@ export function registerModeratorActions() {
         return;
       }
 
-      // 🔹 HELP (plain view)
+      // 🔹 HELP
       if (target === "help") {
-        const helpContent = `
+        const content = `
 📌 **Moderator Panel Guide**
 
 🟢 Event Menu → Create events, manage participants, cancel events.
@@ -68,12 +66,13 @@ export function registerModeratorActions() {
 🕒 Absence Menu → Manage absences and schedules.
 ⚡ QuickAdd → Fast data input system (OCR, parser).
 ❓ Help → Shows this description.
-        `;
+        `.trim();
 
         await interaction.update({
-          content: helpContent,
+          content,
           components: [],
         });
+        return;
       }
     },
   });
