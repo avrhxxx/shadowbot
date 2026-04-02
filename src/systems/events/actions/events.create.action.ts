@@ -100,6 +100,41 @@ registerUIAction("events.create", {
         return;
       }
 
+      // 🔹 Step: day (kliknięcie przycisku daty)
+      if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
+        const eventType = payload.type;
+        const eventName = payload.name;
+        const dayValue = payload.day; // YYYY-MM-DD
+
+        if (!dayValue) throw new Error("day_value_missing");
+
+        // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
+        if ("showModal" in interaction) {
+          await interaction.showModal({
+            custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
+            title: `Set Time for ${eventName}`,
+            components: [
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_hour",
+                    style: 1,
+                    label: "Hour (HHMM, UTC)",
+                    placeholder: "e.g. 1830",
+                    min_length: 3,
+                    max_length: 4,
+                  },
+                ],
+              },
+            ],
+          });
+        }
+        flow.success();
+        return;
+      }
+
       flow.fail(new Error("unknown_interaction_type"));
     } catch (err) {
       flow.fail(err);
@@ -124,7 +159,7 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const days = getFutureDays(14); // zwraca YYYY-MM-DD w value, label w formacie np. 16/4
+  const days = getFutureDays(7, true); // 7 dni włącznie z dzisiaj, wartość YYYY-MM-DD
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 5) {
