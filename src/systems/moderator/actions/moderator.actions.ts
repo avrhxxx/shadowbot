@@ -71,9 +71,22 @@ export function registerModeratorHubActions() {
 ❓ Help → Shows this description.
         `.trim();
 
+        // 🔹 dodany Back do hubu
         await interaction.update({
           content,
-          components: [],
+          components: [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 2,
+                  label: "⬅ Back",
+                  style: 2,
+                  custom_id: "moderator.open|target=hub",
+                },
+              ],
+            },
+          ],
         });
         return;
       }
