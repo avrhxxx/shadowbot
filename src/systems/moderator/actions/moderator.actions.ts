@@ -3,8 +3,9 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { Interaction, EmbedBuilder } from "discord.js";
+import { isSystemEnabled } from "@/runtime/runtimeState";
 
+// 🔹 IMPORT VIEWS
 import { renderModeratorHub } from "@/systems/moderator/views/moderator.view";
 import { renderEventsView } from "@/systems/events/views/events.view";
 import { renderPointsView } from "@/systems/points/views/points.view";
@@ -14,32 +15,36 @@ type ModeratorPayload = {
   target?: "hub" | "events" | "points" | "absence" | "quickadd" | "help";
 };
 
-export function registerModeratorHubActions() {
+// =====================================
+// 🔹 REGISTER ACTIONS
+// =====================================
+
+export function registerModeratorActions() {
+  // 🔹 OPEN PANEL / SUBPANELS
   registerUIAction("moderator.open", {
     system: "moderator",
 
-    handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
+    handler: async (interaction, _ctx, payload: ModeratorPayload) => {
       if (!interaction.isButton()) return;
 
       const target = payload?.target;
 
-      // 🔹 MAPA TARGET → RENDER VIEW
+      // 🔹 VIEW MAP
       const viewMap: Record<string, () => Promise<any>> = {
         hub: () => renderModeratorHub(),
-        events: async () => await renderEventsView(),
-        points: async () => await renderPointsView(),
-        absence: async () => await renderAbsenceView(),
+        events: () => renderEventsView(),
+        points: () => renderPointsView(),
+        absence: () => renderAbsenceView(),
       };
 
-      // 🔹 HANDLE VIEW TARGETS
+      // 🔹 HANDLE TARGETS
       if (target && target in viewMap) {
         const view = await viewMap[target]();
 
-        if (target === "hub") {
-          await interaction.reply({ ...view, ephemeral: true });
-        } else {
-          await interaction.update(view);
-        }
+        await interaction.update({
+          content: view.content,
+          components: view.components,
+        });
 
         return;
       }
@@ -53,40 +58,22 @@ export function registerModeratorHubActions() {
         return;
       }
 
-      // 🔹 HELP
+      // 🔹 HELP (plain view)
       if (target === "help") {
-        const embed = new EmbedBuilder()
-          .setTitle("Moderator Panel Guide")
-          .setColor(0x1E90FF)
-          .addFields(
-            {
-              name: "🟢 Event Menu",
-              value: "Create events, manage participants, cancel events.",
-            },
-            {
-              name: "⭐ Points Menu",
-              value: "Manage points and rankings.",
-            },
-            {
-              name: "🕒 Absence Menu",
-              value: "Manage absences and schedules.",
-            },
-            {
-              name: "⚡ QuickAdd",
-              value: "Fast data input system (OCR, parser).",
-            },
-            {
-              name: "❓ Help",
-              value: "Shows this description.",
-            }
-          );
+        const helpContent = `
+📌 **Moderator Panel Guide**
 
-        await interaction.reply({
-          embeds: [embed],
-          ephemeral: true,
+🟢 Event Menu → Create events, manage participants, cancel events.
+⭐ Points Menu → Manage points and rankings.
+🕒 Absence Menu → Manage absences and schedules.
+⚡ QuickAdd → Fast data input system (OCR, parser).
+❓ Help → Shows this description.
+        `;
+
+        await interaction.update({
+          content: helpContent,
+          components: [],
         });
-
-        return;
       }
     },
   });
