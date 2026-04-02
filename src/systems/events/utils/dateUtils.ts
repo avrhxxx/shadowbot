@@ -1,6 +1,5 @@
-// src/systems/events/utils/dateUtils.ts
 export function getFutureDays(daysAhead = 14) {
-  const days = [];
+  const days: { label: string; value: string }[] = [];
   for (let i = 1; i <= daysAhead; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
