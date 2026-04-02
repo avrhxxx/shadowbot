@@ -3,7 +3,7 @@
 // =====================================
 
 import { GoogleRepository } from "@/integrations/google/googleRepository.js";
-import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
+import { SYSTEM_FLAGS_SHEET, EVENTS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
@@ -22,11 +22,20 @@ type SystemFlag = {
   reason?: string;
 };
 
+type EventRow = {
+  id: string;
+  name: string;
+  description?: string;
+  date?: string;
+  status?: string;
+};
+
 // =====================================
 // 🔹 REPO
 // =====================================
 
-const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
+const flagsRepo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
+const eventsRepo = new GoogleRepository<EventRow>(EVENTS_SHEET);
 
 // =====================================
 // 🔹 LOGGER
@@ -53,12 +62,11 @@ const TTL = 30_000;
 // =====================================
 
 async function seedIfEmpty() {
-  const existing = await repo.findAll();
+  const existing = await flagsRepo.findAll();
 
   if (existing.length > 0) return;
 
   const flow = log.flow("flags.seed");
-
   flow.start();
 
   try {
@@ -68,42 +76,69 @@ async function seedIfEmpty() {
       enabled: "true",
     }));
 
-    await repo.createMany([
+    await flagsRepo.createMany([
       { id: "global", system: "global", enabled: "true" },
       ...systems,
     ]);
 
-    flow.success({
-      stats: { systems: systems.length },
-    });
+    flow.success({ stats: { systems: systems.length } });
   } catch (err) {
     flow.fail(err);
   }
 }
 
 // =====================================
-// 🔄 REFRESH
+// 🔄 SYNC EVENTS TO SHEET
+// =====================================
+
+async function syncEventsToSheet() {
+  const flow = log.flow("events.sync");
+  flow.start();
+
+  try {
+    const events = SYSTEM_REGISTRY.filter((s) => s.type === "event");
+
+    if (events.length === 0) {
+      flow.stepInfo("no_events", { count: 0 });
+      return;
+    }
+
+    const rows: EventRow[] = events.map((e) => ({
+      id: e.name,
+      name: e.label || e.name,
+      description: e.description || "",
+      date: e.date || "",
+      status: e.enabled ? "active" : "disabled",
+    }));
+
+    await eventsRepo.createMany(rows);
+
+    flow.success({ stats: { synced: rows.length } });
+  } catch (err) {
+    flow.fail(err);
+  }
+}
+
+// =====================================
+// 🔄 REFRESH FLAGS
 // =====================================
 
 async function refresh() {
   const flow = log.flow("flags.refresh");
-
   flow.start();
 
   try {
     await seedIfEmpty();
 
-    const data = await repo.findAll();
+    const data = await flagsRepo.findAll();
 
-    cache = new Map(
-      data.map((d) => [d.system, d.enabled === "true"])
-    );
-
+    cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
 
-    flow.success({
-      stats: { count: data.length },
-    });
+    // 🔥 SYNC EVENTS
+    await syncEventsToSheet();
+
+    flow.success({ stats: { count: data.length } });
   } catch (err) {
     flow.fail(err);
   }
@@ -118,12 +153,7 @@ async function ensure() {
 
   const expired = Date.now() - lastFetch > TTL;
 
-  flow.stepDebug("cache.check", {
-    decision: {
-      condition: "ttl_expired",
-      result: expired,
-    },
-  });
+  flow.stepDebug("cache.check", { decision: { condition: "ttl_expired", result: expired } });
 
   if (expired) {
     await refresh();
@@ -131,12 +161,10 @@ async function ensure() {
 }
 
 // =====================================
-// 🔍 CHECK
+// 🔍 CHECK FLAG
 // =====================================
 
-export async function isSystemEnabled(
-  system: SystemName
-): Promise<boolean> {
+export async function isSystemEnabled(system: SystemName): Promise<boolean> {
   const flow = log.flow("flags.check");
 
   await ensure();
@@ -144,50 +172,29 @@ export async function isSystemEnabled(
   const global = cache.get("global");
   const local = cache.get(system);
 
-  const result =
-    global === false || local === false ? false : true;
+  const result = global === false || local === false ? false : true;
 
-  flow.stepInfo("decision", {
-    meta: { system },
-    decision: {
-      condition: "flags",
-      result,
-    },
-  });
+  flow.stepInfo("decision", { meta: { system }, decision: { condition: "flags", result } });
 
   return result;
 }
 
 // =====================================
-// ✏️ SET FLAG (🔥 NOWE)
+// ✏️ SET FLAG
 // =====================================
 
-export async function setSystemEnabled(
-  system: SystemName,
-  enabled: boolean
-): Promise<void> {
+export async function setSystemEnabled(system: SystemName, enabled: boolean): Promise<void> {
   const flow = log.flow("flags.set");
-
-  flow.start({
-    meta: { system },
-    input: { enabled },
-  });
+  flow.start({ meta: { system }, input: { enabled } });
 
   try {
-    await repo.updateById(system, {
-      enabled: String(enabled),
-    });
+    await flagsRepo.updateById(system, { enabled: String(enabled) });
 
-    // 🔥 ważne: odśwież cache natychmiast
+    // 🔥 odśwież cache natychmiast
     cache.set(system, enabled);
 
-    flow.success({
-      meta: { system },
-      result: { enabled },
-    });
+    flow.success({ meta: { system }, result: { enabled } });
   } catch (err) {
-    flow.fail(err, {
-      meta: { system },
-    });
+    flow.fail(err, { meta: { system } });
   }
 }
