@@ -48,37 +48,37 @@ let lastFetch = 0;
 const TTL = 30_000;
 
 // =====================================
-// 🧠 SEED SYSTEM FLAGS
+// 🧠 SEED MISSING SYSTEM FLAGS
 // =====================================
 
-async function seedIfEmpty() {
+async function seedMissing() {
   const existing = await repo.findAll();
+  const existingNames = new Set(existing.map((s) => s.system));
 
-  if (existing.length > 0) return;
+  const missing = SYSTEM_REGISTRY.filter((s) => !existingNames.has(s.name));
 
-  const flow = log.flow("flags.seed");
-  flow.start();
+  if (missing.length === 0) return;
+
+  const flow = log.flow("flags.seed_missing");
+  flow.start({ meta: { missing: missing.map((s) => s.name) } });
 
   try {
-    const systems = SYSTEM_REGISTRY.map((s) => ({
+    const toCreate = missing.map((s) => ({
       id: s.name,
       system: s.name,
       enabled: "true",
     }));
 
-    await repo.createMany([
-      { id: "global", system: "global", enabled: "true" },
-      ...systems,
-    ]);
+    await repo.createMany(toCreate);
 
-    flow.success({ stats: { systems: systems.length } });
+    flow.success({ stats: { created: toCreate.length } });
   } catch (err) {
     flow.fail(err);
   }
 }
 
 // =====================================
-// 🔄 REFRESH
+// 🔄 REFRESH CACHE
 // =====================================
 
 async function refresh() {
@@ -86,12 +86,19 @@ async function refresh() {
   flow.start();
 
   try {
-    await seedIfEmpty();
+    await seedMissing();
 
     const data = await repo.findAll();
 
     cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
+
+    // 🔹 DEBUG: pokaż wszystkie systemy i ich aktualny stan
+    const stateLog = Array.from(cache.entries())
+      .map(([sys, enabled]) => `${sys}: ${enabled ? "ON" : "OFF"}`)
+      .join(", ");
+
+    flow.stepInfo("cache_state", { state: stateLog });
 
     flow.success({ stats: { count: data.length } });
   } catch (err) {
@@ -100,7 +107,7 @@ async function refresh() {
 }
 
 // =====================================
-// 🔍 ENSURE
+// 🔍 ENSURE CACHE
 // =====================================
 
 async function ensure() {
@@ -151,7 +158,7 @@ export async function setSystemEnabled(
 // 🕹 WORKER
 // =====================================
 
-function startFlagsWorker(intervalMs = 15_000) {
+function startFlagsWorker(intervalMs = 60_000) { // <- wydłużony interwał do 1 min
   const flow = log.flow("flags.worker");
   flow.stepInfo("start");
 
