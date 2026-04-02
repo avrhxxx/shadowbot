@@ -17,12 +17,13 @@ function formatEventName(type: string) {
     .join(" ");
 }
 
-// Dummy function to simulate next step
+// Dummy functions to simulate next steps
 async function proceedToDaySelect(interaction: any, type: string, name: string) {
   if ("reply" in interaction) {
-    await interaction
-      .reply({ content: `Next step: pick day for "${name}"`, ephemeral: true })
-      .catch(() => null);
+    await interaction.reply({
+      content: `Next step: pick day for "${name}"`,
+      ephemeral: true,
+    }).catch(() => null);
   }
 }
 
@@ -42,7 +43,7 @@ registerUIAction("events.create", {
       // ======================
       // 🔘 BUTTON: START STEP
       // ======================
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
+      if (interaction.isButton?.() && payload?.step === "start") {
         flow.stepDebug("step.start");
         flow.success();
         return;
@@ -51,32 +52,34 @@ registerUIAction("events.create", {
       // ======================
       // 🔘 BUTTON: TYPE STEP
       // ======================
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
+      if (interaction.isButton?.() && payload?.step === "type") {
         const typeValue = payload?.type;
         if (!typeValue) throw new Error("event_type_missing");
 
         const eventName = formatEventName(typeValue);
 
-        if (["custom", "birthdays"].includes(typeValue) && "showModal" in interaction) {
-          await interaction.showModal({
-            custom_id: `events.create|step=name|type=${typeValue}`,
-            title: "Enter Event Name",
-            components: [
-              {
-                type: 1,
-                components: [
-                  {
-                    type: 4,
-                    custom_id: "event_name",
-                    style: 1,
-                    label: "Event Name",
-                    min_length: 3,
-                    max_length: 100,
-                  },
-                ],
-              },
-            ],
-          });
+        if (["custom", "birthdays"].includes(typeValue)) {
+          if (interaction.showModal) {
+            await interaction.showModal({
+              custom_id: `events.create|step=name|type=${typeValue}`,
+              title: "Enter Event Name",
+              components: [
+                {
+                  type: 1,
+                  components: [
+                    {
+                      type: 4,
+                      custom_id: "event_name",
+                      style: 1,
+                      label: "Event Name",
+                      min_length: 3,
+                      max_length: 100,
+                    },
+                  ],
+                },
+              ],
+            });
+          }
         } else {
           await proceedToDaySelect(interaction, typeValue, eventName);
         }
@@ -88,11 +91,11 @@ registerUIAction("events.create", {
       // ======================
       // 🔘 MODAL: NAME STEP
       // ======================
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
+      if (interaction.isModalSubmit?.() && payload?.step === "name") {
         const typeValue = payload?.type;
         if (!typeValue) throw new Error("event_type_missing");
 
-        const eventName = interaction.fields.getTextInputValue("event_name");
+        const eventName = interaction.fields?.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
 
         await proceedToDaySelect(interaction, typeValue, eventName);
@@ -103,14 +106,14 @@ registerUIAction("events.create", {
       // ======================
       // 🔘 BUTTON: DAY STEP
       // ======================
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
+      if (interaction.isButton?.() && payload?.step === "day") {
         const typeValue = payload?.type;
         const eventName = payload?.name;
         const day = payload?.day;
 
         if (!typeValue || !eventName || !day) throw new Error("missing_day_payload");
 
-        if ("showModal" in interaction) {
+        if (interaction.showModal) {
           await interaction.showModal({
             custom_id: `events.create|step=hour|type=${typeValue}|name=${eventName}|day=${day}`,
             title: `Select Hour for ${eventName}`,
@@ -139,14 +142,14 @@ registerUIAction("events.create", {
       // ======================
       // 🔘 MODAL: HOUR STEP
       // ======================
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
+      if (interaction.isModalSubmit?.() && payload?.step === "hour") {
         const typeValue = payload?.type;
         const eventName = payload?.name;
         const day = payload?.day;
 
         if (!typeValue || !eventName || !day) throw new Error("missing_hour_payload");
 
-        const hour = interaction.fields.getTextInputValue("event_hour");
+        const hour = interaction.fields?.getTextInputValue("event_hour");
         if (!hour) throw new Error("hour_missing");
 
         if ("reply" in interaction) {
