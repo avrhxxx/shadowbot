@@ -22,6 +22,17 @@ const MONTH_NAMES = [
 ];
 
 // =====================================
+// 🔹 PREFILL STANDARD EVENT NAMES
+// =====================================
+const PREFILL_STANDARD_NAMES: Record<string, string> = {
+  arcadian_conquest: "Arcadian Conquest",
+  city_contest: "City Contest",
+  reservoir_raid: "Reservoir Raid",
+  ghoulion_pursuit: "Ghoulion Pursuit",
+  kvk: "KvK",
+};
+
+// =====================================
 // 🔹 FORMATTER HELPERS
 // =====================================
 function formatDayLabel(d: { value: string }) {
@@ -38,7 +49,6 @@ function formatEventName(name: string) {
 
 function parseDateInput(input: string) {
   const cleaned = input.trim();
-
   const ymd = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (ymd) return { day: parseInt(ymd[3]), month: parseInt(ymd[2]), year: parseInt(ymd[1]), hour: 0, minute: 0 };
 
@@ -127,6 +137,7 @@ registerUIAction("events.create", {
         const eventType = payload.type; if (!eventType) throw new Error("event_type_missing");
 
         if (["custom","birthdays"].includes(eventType)) {
+          // pozostawiamy modal dla Custom/Birthday
           await interaction.showModal?.({
             custom_id: `events.create|step=modal|type=${eventType}`,
             title: "Enter Event Details",
@@ -137,7 +148,23 @@ registerUIAction("events.create", {
             ],
           });
         } else {
-          await renderDaySelection(interaction, eventType, formatEventName(eventType));
+          // dla standardowych eventów używamy starego formatu daty i prefill nazwy
+          const tempId = uuidv4();
+          const now = new Date();
+          const defaultDay = now.getUTCDate();
+          const defaultMonth = now.getUTCMonth() + 1;
+
+          tempEventStore.set(tempId, {
+            id: tempId,
+            name: PREFILL_STANDARD_NAMES[eventType] || formatEventName(eventType),
+            type: eventType,
+            day: `${defaultDay}-${defaultMonth}`,
+            hour: 0,
+            minute: 0,
+            year: now.getUTCFullYear(),
+          });
+
+          await renderDaySelection(interaction, eventType, tempEventStore.get(tempId).name);
         }
         flow.success(); return;
       }
@@ -189,7 +216,8 @@ registerUIAction("events.create", {
         if (!eventName || !eventType || !eventDay) throw new Error("missing_day_payload");
 
         const tempId = uuidv4();
-        tempEventStore.set(tempId, { name: eventName, type: eventType, day: eventDay });
+        const [day, month] = eventDay.includes("-") ? eventDay.split("-").map(Number) : [parseInt(eventDay), new Date().getUTCMonth()+1];
+        tempEventStore.set(tempId, { name: eventName, type: eventType, day, month, year: new Date().getUTCFullYear(), hour: 0, minute: 0 });
 
         await interaction.showModal?.({
           custom_id: `events.create|step=hour|temp=${tempId}`,
@@ -200,7 +228,7 @@ registerUIAction("events.create", {
       }
 
       // ------------------------
-      // Step: hour input dla standardowych eventów
+      // Step: hour input dla wszystkich eventów
       // ------------------------
       if (interaction.isModalSubmit?.() && payload?.step === "hour") {
         const tempId = payload.temp;
@@ -210,19 +238,16 @@ registerUIAction("events.create", {
         const hourInput = interaction.fields.getTextInputValue("event_hour");
         const [hour, minute] = hourInput.split(":").map(Number);
 
-        let year = new Date().getUTCFullYear();
-        let [day, month] = tempData.day.includes("-") ? tempData.day.split("-").map(Number) : [parseInt(tempData.day), new Date().getUTCMonth()+1];
-        const eventCheck = new Date(Date.UTC(year, month - 1, day, hour, minute));
+        let year = tempData.year;
+        const eventCheck = new Date(Date.UTC(year, tempData.month - 1, tempData.day, hour, minute));
         if (eventCheck < new Date()) year += 1;
 
         tempData.hour = hour;
         tempData.minute = minute;
-        tempData.day = day;
-        tempData.month = month;
         tempData.year = year;
         tempEventStore.set(tempId, tempData);
 
-        const formattedDate = formatEventUTC(day, month, hour, minute, year);
+        const formattedDate = formatEventUTC(tempData.day, tempData.month, hour, minute, year);
 
         await interaction.reply?.({
           content: `✅ Event **${tempData.name}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
