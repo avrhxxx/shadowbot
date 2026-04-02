@@ -39,7 +39,7 @@ export async function devpanelMainView(): Promise<View> {
 }
 
 // =====================================
-// 🧠 SYSTEMS VIEW
+// 🧠 SYSTEMS VIEW (dynamiczne rzędy)
 // =====================================
 
 export async function devpanelSystemsView(): Promise<View> {
@@ -51,7 +51,6 @@ export async function devpanelSystemsView(): Promise<View> {
     if (system.name === "devpanel") continue;
 
     const enabled = await isSystemEnabled(system.name);
-
     const status = enabled ? "🟢 ON" : "🔴 OFF";
 
     lines.push(`**${system.name}** → ${status}`);
@@ -64,25 +63,30 @@ export async function devpanelSystemsView(): Promise<View> {
     });
   }
 
-  return {
-    content: `⚙️ **Dev Panel → Systems**\n\n${lines.join("\n")}`,
+  // 🔹 PODZIEL BUTTONY NA RZĘDY PO 5
+  const rows: any[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push({
+      type: 1,
+      components: buttons.slice(i, i + 5),
+    });
+  }
 
+  // 🔹 DODAJ RZĄD "Back" NA DOLE
+  rows.push({
+    type: 1,
     components: [
       {
-        type: 1,
-        components: buttons,
-      },
-      {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "⬅ Back",
-            style: 2,
-            custom_id: "devpanel.back",
-          },
-        ],
+        type: 2,
+        label: "⬅ Back",
+        style: 2,
+        custom_id: "devpanel.back",
       },
     ],
+  });
+
+  return {
+    content: `⚙️ **Dev Panel → Systems**\n\n${lines.join("\n")}`,
+    components: rows,
   };
 }
