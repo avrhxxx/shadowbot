@@ -1,71 +1,67 @@
+// =====================================
 // 📁 src/systems/events/actions/events.create.action.ts
+// =====================================
 
+import type { Interaction } from "discord.js";
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
-import { getFutureDays } from "../utils/dateUtils";
-
-import type { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
+import type { TraceContext } from "@/trace";
 
 // =====================================
-// 🔹 REGISTER CREATE EVENT ACTION
+// 🔹 HELPERS
+// =====================================
+
+function formatEventName(type: string) {
+  return type
+    .split("_")
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// Dummy functions to simulate next steps
+async function proceedToDaySelect(interaction: Interaction, type: string, name: string) {
+  // tutaj normalnie wyświetlasz kolejny widok / krok
+  if ("reply" in interaction) {
+    await interaction.reply({ content: `Next step: pick day for "${name}"`, ephemeral: true }).catch(() => null);
+  }
+}
+
+// =====================================
+// 🔹 REGISTER ACTION
 // =====================================
 
 registerUIAction("events.create", {
   system: "events",
-
-  handler: async (interaction: ButtonInteraction | ModalSubmitInteraction, ctx, payload: any) => {
+  handler: async (interaction: Interaction, ctx: TraceContext, payload: any) => {
     const log = createLogger(ctx);
     const flow = log.flow("events.create");
     flow.start();
 
     try {
-      // 🔹 Step: start - wybór typu eventu
+      // ======================
+      // 🔘 BUTTON: START STEP
+      // ======================
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
-        const typeOptions = [
-          { label: "Reservoir Raid", value: "reservoir_raid" },
-          { label: "Arcadian Conquest", value: "arcadian_conquest" },
-          { label: "City Contest", value: "city_contest" },
-          { label: "Ghoulion Pursuit", value: "ghoulion_pursuit" },
-          { label: "Birthday", value: "birthdays" },
-          { label: "Custom", value: "custom" },
-        ];
-
-        const rows = [];
-        for (let i = 0; i < typeOptions.length; i += 5) {
-          rows.push({
-            type: 1,
-            components: typeOptions.slice(i, i + 5).map((opt) => ({
-              type: 2,
-              label: opt.label,
-              style: 1,
-              custom_id: `events.create|step=type|type=${opt.value}`,
-            })),
-          });
-        }
-
-        if ("reply" in interaction) {
-          await interaction.reply({ content: "Select event type:", components: rows, ephemeral: true });
-        }
+        flow.stepDebug("step.start");
+        // tutaj możesz np. renderować typ eventu
         flow.success();
         return;
       }
 
-      // 🔹 Step: type
+      // ======================
+      // 🔘 BUTTON: TYPE STEP
+      // ======================
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
-        const eventType = payload.type;
-        if (!eventType) throw new Error("event_type_missing");
+        const typeValue = payload?.type;
+        if (!typeValue) throw new Error("event_type_missing");
 
-        const eventName = formatEventName(eventType);
+        const eventName = formatEventName(typeValue);
 
-        if (["custom", "birthdays"].includes(eventType)) {
+        // Jeśli potrzebny modal dla nazwy
+        if (["custom", "birthdays"].includes(typeValue)) {
           if ("showModal" in interaction) {
             await interaction.showModal({
-              custom_id: `events.create|step=name|type=${eventType}`,
+              custom_id: `events.create|step=name|type=${typeValue}`,
               title: "Enter Event Name",
               components: [
                 {
@@ -85,36 +81,43 @@ registerUIAction("events.create", {
             });
           }
         } else {
-          await proceedToDaySelect(interaction, eventType, eventName);
+          await proceedToDaySelect(interaction, typeValue, eventName);
         }
+
         flow.success();
         return;
       }
 
-      // 🔹 Step: name (modal)
+      // ======================
+      // 🔘 MODAL: NAME STEP
+      // ======================
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
-        const eventType = payload.type;
+        const typeValue = payload?.type;
+        if (!typeValue) throw new Error("event_type_missing");
+
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
 
-        await proceedToDaySelect(interaction, eventType, eventName);
+        await proceedToDaySelect(interaction, typeValue, eventName);
         flow.success();
         return;
       }
 
-      // 🔹 Step: day (kliknięcie przycisku daty)
+      // ======================
+      // 🔘 BUTTON: DAY STEP
+      // ======================
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
-        const eventType = payload.type;
-        const eventName = payload.name;
-        const dayValue = payload.day; // YYYY-MM-DD
+        const typeValue = payload?.type;
+        const eventName = payload?.name;
+        const day = payload?.day;
 
-        if (!dayValue) throw new Error("day_value_missing");
+        if (!typeValue || !eventName || !day) throw new Error("missing_day_payload");
 
-        // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
+        // następny krok: godzina / modal
         if ("showModal" in interaction) {
           await interaction.showModal({
-            custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
-            title: `Set Time for ${eventName}`,
+            custom_id: `events.create|step=hour|type=${typeValue}|name=${eventName}|day=${day}`,
+            title: `Select Hour for ${eventName}`,
             components: [
               {
                 type: 1,
@@ -123,41 +126,52 @@ registerUIAction("events.create", {
                     type: 4,
                     custom_id: "event_hour",
                     style: 1,
-                    label: "Hour (HHMM, UTC)",
-                    placeholder: "e.g. 1830",
-                    min_length: 3,
-                    max_length: 4,
+                    label: "Hour (HH:mm)",
+                    min_length: 4,
+                    max_length: 5,
                   },
                 ],
               },
             ],
           });
         }
+
         flow.success();
         return;
       }
 
-      // 🔹 Step: hour (modal)
+      // ======================
+      // 🔘 MODAL: HOUR STEP
+      // ======================
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
-        const eventType = payload.type;
-        const eventName = payload.name;
-        const dayValue = payload.day;
+        const typeValue = payload?.type;
+        const eventName = payload?.name;
+        const day = payload?.day;
 
-        const hourValue = interaction.fields.getTextInputValue("event_hour");
-        if (!hourValue) throw new Error("event_hour_missing");
+        if (!typeValue || !eventName || !day) throw new Error("missing_hour_payload");
 
-        // Tutaj w przyszłości można zapisać event do bazy lub innego systemu
+        const hour = interaction.fields.getTextInputValue("event_hour");
+        if (!hour) throw new Error("hour_missing");
+
+        // finalizacja eventu
         if ("reply" in interaction) {
           await interaction.reply({
-            content: `✅ Event **${eventName}** scheduled on **${dayValue}** at **${hourValue} UTC**`,
+            content: `✅ Event created: ${eventName} (${typeValue}) on ${day} at ${hour}`,
             ephemeral: true,
-          });
+          }).catch(() => null);
         }
+
         flow.success();
         return;
       }
 
-      flow.fail(new Error("unknown_interaction_type"));
+      // ======================
+      // 🔘 NIEOBSŁUGIWANE
+      // ======================
+      flow.stepWarn("unknown_interaction_type");
+      if ("reply" in interaction) {
+        await interaction.reply({ content: "⚠️ Unknown interaction", ephemeral: true }).catch(() => null);
+      }
     } catch (err) {
       flow.fail(err);
       if ("reply" in interaction) {
@@ -166,56 +180,3 @@ registerUIAction("events.create", {
     }
   },
 });
-
-// =====================================
-// 🔹 HELPERS
-// =====================================
-
-function formatEventName(value: string) {
-  return value
-    .split("_")
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function formatDayLabel(value: string) {
-  const [, month, day] = value.split("-").map(Number);
-  return `${day} ${MONTH_NAMES[month - 1]}`;
-}
-
-async function proceedToDaySelect(
-  interaction: ButtonInteraction | ModalSubmitInteraction,
-  eventType: string,
-  eventName: string
-) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
-  const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + 7 następnych
-
-  const rows: any[] = [];
-  for (let i = 0; i < days.length; i += 4) {
-    rows.push({
-      type: 1,
-      components: days.slice(i, i + 4).map((d) => ({
-        type: 2,
-        label: formatDayLabel(d.value),
-        style: 1,
-        custom_id: `events.create|step=day|type=${eventType}|name=${eventName}|day=${d.value}`,
-      })),
-    });
-  }
-
-  // 🔹 Back button
-  rows.push({
-    type: 1,
-    components: [
-      { type: 2, label: "⬅ Back", style: 2, custom_id: "moderator.open|target=hub" },
-    ],
-  });
-
-  if ("update" in interaction) {
-    await interaction.update({
-      content: `Select day for event **${eventName}**:`,
-      components: rows,
-    });
-  }
-}
