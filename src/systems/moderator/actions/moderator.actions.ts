@@ -1,11 +1,11 @@
 // =====================================
-// 📁 src/systems/moderator/actions/moderatorHub.actions.ts
+// 📁 src/systems/moderator/actions/moderator.actions.ts
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction, EmbedBuilder } from "discord.js";
 
-import { renderModeratorHub } from "../views/moderatorHub.view";
+import { renderModeratorHub } from "@/systems/moderator/views/moderator.view";
 import { renderEventsView } from "@/systems/events/views/events.view";
 import { renderPointsView } from "@/systems/points/views/points.view";
 import { renderAbsenceView } from "@/systems/absence/views/absence.view";
