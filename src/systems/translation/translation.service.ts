@@ -9,7 +9,6 @@ import {
 
 import { LRUCache } from "lru-cache";
 import { google } from "googleapis";
-import { googleAuth } from "@/integrations/google/googleClient";
 
 // =====================================
 // 🔧 CACHE
@@ -137,7 +136,7 @@ async function tryGoogleCloud(
     const projectId = process.env.GOOGLE_PROJECT_ID!;
     const location = "global";
 
-    const [response] = await translate.projects.translateText({
+    const response = await translate.projects.translateText({
       parent: `projects/${projectId}/locations/${location}`,
       requestBody: {
         contents: [text],
@@ -146,7 +145,7 @@ async function tryGoogleCloud(
       },
     });
 
-    const translated = response.translations?.[0]?.translatedText;
+    const translated = response.data.translations?.[0]?.translatedText;
     if (translated) return translated;
   } catch (err) {
     console.error("Google Cloud translate failed:", err);
