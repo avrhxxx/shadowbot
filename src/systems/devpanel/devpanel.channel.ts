@@ -1,14 +1,17 @@
-// =====================================
-// 📁 src/systems/devpanel/devpanel.channel.ts
-// =====================================
-
 import { TextChannel, Guild, Message } from "discord.js";
 import { devpanelMainView } from "./views/devpanel.view";
 import { GoogleRepository } from "@/integrations/google/googleRepository";
-import { DEVPANEL_CONFIG_SHEET } from "@/integrations/google/googleSchema";
+import { DEV_PANEL_CONFIG_SHEET } from "@/integrations/google/googleSchema";
 
-// 🔹 Repo dla DevPanel Config
-const devpanelRepo = new GoogleRepository(DEVPANEL_CONFIG_SHEET);
+// Typ konfiguracji DevPanel
+export interface DevPanelConfig {
+  id: string;
+  guildId: string;
+  hubMessageId?: string;
+  lastUpdated?: string;
+}
+
+const devpanelRepo = new GoogleRepository<DevPanelConfig>(DEV_PANEL_CONFIG_SHEET);
 
 // 🔹 Tworzy lub pobiera kanał Dev Panel
 export async function setupDevPanelChannel(guild: Guild): Promise<TextChannel> {
@@ -27,47 +30,58 @@ export async function setupDevPanelChannel(guild: Guild): Promise<TextChannel> {
   return channel;
 }
 
-// 🔹 Renderuje lub aktualizuje Dev Panel w kanale
-export async function renderDevPanelInChannel(channel: TextChannel, guildId: string) {
+// 🔹 Renderuje Dev Panel w kanale, aktualizując istniejącą wiadomość
+export async function renderDevPanelInChannel(channel: TextChannel) {
+  const config = (await devpanelRepo.findAll({ guildId: channel.guild.id }))[0];
   const view = await devpanelMainView();
-
-  // Sprawdzamy w Google Sheets czy istnieje hubMessageId
-  let config = await devpanelRepo.findAll({ guildId });
-  let hubMessageId = config[0]?.hubMessageId;
 
   let message: Message | null = null;
 
-  if (hubMessageId) {
+  if (config?.hubMessageId) {
     try {
-      message = await channel.messages.fetch(hubMessageId);
+      message = await channel.messages.fetch(config.hubMessageId);
       await message.edit({
         content: view.content,
         components: view.components,
       });
     } catch {
-      // Jeśli wiadomość nie istnieje lub nie można pobrać → wyślij nową
-      hubMessageId = undefined;
+      // Wiadomość nie istnieje lub została usunięta
+      message = await channel.send({
+        content: view.content,
+        components: view.components,
+      });
     }
-  }
 
-  if (!hubMessageId) {
+    // Aktualizacja hubMessageId w repozytorium, jeśli nowa wiadomość została wysłana
+    if (!config) {
+      await devpanelRepo.create({
+        id: channel.guild.id,
+        guildId: channel.guild.id,
+        hubMessageId: message.id,
+        lastUpdated: new Date().toISOString(),
+      });
+    } else if (message.id !== config.hubMessageId) {
+      await devpanelRepo.updateById(config.id, {
+        hubMessageId: message.id,
+        lastUpdated: new Date().toISOString(),
+      });
+    }
+  } else {
+    // Nie ma hubMessageId w config -> wysyłamy nową wiadomość
     message = await channel.send({
       content: view.content,
       components: view.components,
     });
 
-    // Zapisz/aktualizuj hubMessageId w Google Sheets
-    if (config[0]) {
-      await devpanelRepo.updateById(config[0].id, {
+    if (config) {
+      await devpanelRepo.updateById(config.id, {
         hubMessageId: message.id,
-        channelId: channel.id,
         lastUpdated: new Date().toISOString(),
       });
     } else {
       await devpanelRepo.create({
-        id: `${guildId}-devpanel`,
-        guildId,
-        channelId: channel.id,
+        id: channel.guild.id,
+        guildId: channel.guild.id,
         hubMessageId: message.id,
         lastUpdated: new Date().toISOString(),
       });
@@ -75,8 +89,8 @@ export async function renderDevPanelInChannel(channel: TextChannel, guildId: str
   }
 }
 
-// 🔹 Pomocnicza funkcja do inicjalizacji na serwerze
+// 🔹 Pomocnicza funkcja do inicjalizacji Dev Panel
 export async function initDevPanelForGuild(guild: Guild) {
   const channel = await setupDevPanelChannel(guild);
-  await renderDevPanelInChannel(channel, guild.id);
+  await renderDevPanelInChannel(channel);
 }
