@@ -1,4 +1,9 @@
-import { registerEventActions } from "./actions/events.create.action"; // wszystkie akcje events
+// =====================================
+// 📁 src/systems/events/index.ts
+// =====================================
+
+// 🔹 rejestrujemy wszystkie akcje (side-effect)
+import "./actions/events.create.action";
 
 // 🔹 eksport widoków
 export * from "./views/events.view";
@@ -6,7 +11,7 @@ export * from "./views/events.view";
 // =====================================
 // 🚀 INIT SYSTEM
 // =====================================
+
 export async function init() {
-  // rejestrujemy wszystkie akcje events
-  registerEventActions();
+  // nic nie trzeba robić — akcje rejestrują się same przez import
 }
