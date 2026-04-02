@@ -1,9 +1,14 @@
 // 📁 src/systems/events/utils/dateUtils.ts
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 export function getFutureDays(daysAhead = 7, includeToday = true) {
   const days: { label: string; value: string }[] = [];
   const today = new Date();
 
-  // jeśli includeToday, zaczynamy od dzisiaj, inaczej od jutra
   const startOffset = includeToday ? 0 : 1;
 
   for (let i = startOffset; i < daysAhead + startOffset; i++) {
@@ -11,20 +16,16 @@ export function getFutureDays(daysAhead = 7, includeToday = true) {
     d.setDate(today.getDate() + i);
 
     const day = d.getDate();
-    const month = d.getMonth() + 1; // 0-indexed
+    const month = d.getMonth(); // 0-indexed
     const year = d.getFullYear();
 
     days.push({
-      label: `${day} ${MONTH_NAMES[d.getMonth()]}`, // pełna nazwa miesiąca
-      value: `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`,
+      label: `${day} ${MONTH_NAMES[month]}`, // pełna nazwa miesiąca
+      value: `${year}-${(month + 1).toString().padStart(2, "0")}-${day
+        .toString()
+        .padStart(2, "0")}`,
     });
   }
 
   return days;
 }
-
-// pełne nazwy miesięcy
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
