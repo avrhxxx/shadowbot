@@ -158,10 +158,11 @@ registerUIAction("events.create", {
             id: tempId,
             name: PREFILL_STANDARD_NAMES[eventType] || formatEventName(eventType),
             type: eventType,
-            day: `${defaultDay}-${defaultMonth}`,
+            day: defaultDay,
+            month: defaultMonth,
+            year: now.getUTCFullYear(),
             hour: 0,
             minute: 0,
-            year: now.getUTCFullYear(),
           });
 
           await renderDaySelection(interaction, eventType, tempEventStore.get(tempId).name);
@@ -238,16 +239,14 @@ registerUIAction("events.create", {
         const hourInput = interaction.fields.getTextInputValue("event_hour");
         const [hour, minute] = hourInput.split(":").map(Number);
 
-        let year = tempData.year;
-        const eventCheck = new Date(Date.UTC(year, tempData.month - 1, tempData.day, hour, minute));
-        if (eventCheck < new Date()) year += 1;
-
+        // automatyczne przesunięcie roku jeśli przeszła data
+        const adjusted = adjustFutureYear({ ...tempData, hour, minute });
         tempData.hour = hour;
         tempData.minute = minute;
-        tempData.year = year;
+        tempData.year = adjusted.year;
         tempEventStore.set(tempId, tempData);
 
-        const formattedDate = formatEventUTC(tempData.day, tempData.month, hour, minute, year);
+        const formattedDate = formatEventUTC(tempData.day, tempData.month, hour, minute, tempData.year);
 
         await interaction.reply?.({
           content: `✅ Event **${tempData.name}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
