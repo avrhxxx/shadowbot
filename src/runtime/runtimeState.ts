@@ -7,6 +7,8 @@ import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
+
+import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
 import type { SystemName } from "./runtimeTypes";
 
 // =====================================
@@ -30,7 +32,11 @@ const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 // 🔹 LOGGER
 // =====================================
 
-const ctx = createRootContext({ source: "system", system: "runtime" });
+const ctx = createRootContext({
+  source: "system",
+  system: "runtime",
+});
+
 const log = createLogger(ctx);
 
 // =====================================
@@ -39,7 +45,7 @@ const log = createLogger(ctx);
 
 let cache: Map<string, boolean> = new Map();
 let lastFetch = 0;
-const TTL = 30_000; // 30 sekund
+const TTL = 30_000;
 
 // =====================================
 // 🧠 SEED SYSTEM FLAGS
@@ -47,17 +53,25 @@ const TTL = 30_000; // 30 sekund
 
 async function seedIfEmpty() {
   const existing = await repo.findAll();
+
   if (existing.length > 0) return;
 
   const flow = log.flow("flags.seed");
   flow.start();
 
   try {
+    const systems = SYSTEM_REGISTRY.map((s) => ({
+      id: s.name,
+      system: s.name,
+      enabled: "true",
+    }));
+
     await repo.createMany([
       { id: "global", system: "global", enabled: "true" },
+      ...systems,
     ]);
 
-    flow.success({ stats: { created: 1 } });
+    flow.success({ stats: { systems: systems.length } });
   } catch (err) {
     flow.fail(err);
   }
@@ -75,6 +89,7 @@ async function refresh() {
     await seedIfEmpty();
 
     const data = await repo.findAll();
+
     cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
 
@@ -90,7 +105,10 @@ async function refresh() {
 
 async function ensure() {
   const expired = Date.now() - lastFetch > TTL;
-  if (expired) await refresh();
+
+  if (expired) {
+    await refresh();
+  }
 }
 
 // =====================================
@@ -103,26 +121,26 @@ export async function isSystemEnabled(system: SystemName): Promise<boolean> {
   const global = cache.get("global");
   const local = cache.get(system);
 
-  const result = global !== false && local !== false;
-  log.flow("flags.check").stepInfo("decision", {
-    meta: { system },
-    decision: { condition: "flags", result },
-  });
-
-  return result;
+  return global !== false && local !== false;
 }
 
 // =====================================
 // ✏️ SET FLAG
 // =====================================
 
-export async function setSystemEnabled(system: SystemName, enabled: boolean) {
+export async function setSystemEnabled(
+  system: SystemName,
+  enabled: boolean
+): Promise<void> {
   const flow = log.flow("flags.set");
   flow.start({ meta: { system }, input: { enabled } });
 
   try {
     await repo.updateById(system, { enabled: String(enabled) });
+
+    // odśwież cache natychmiast
     cache.set(system, enabled);
+
     flow.success({ meta: { system }, result: { enabled } });
   } catch (err) {
     flow.fail(err, { meta: { system } });
@@ -138,7 +156,7 @@ function startFlagsWorker(intervalMs = 15_000) {
   flow.stepInfo("start");
 
   setInterval(async () => {
-    const step = flow.flowId ? `refresh.${Date.now()}` : "refresh";
+    const step = "refresh";
     try {
       await refresh();
       flow.stepInfo(step, { stats: { cacheSize: cache.size } });
