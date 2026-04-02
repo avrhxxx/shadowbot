@@ -9,11 +9,13 @@ import type { SystemRegistryEntry } from "./runtimeTypes";
 // =====================================
 
 export const SYSTEM_NAMES = [
-  "test",
   "devpanel",
   "translation",
-  // "events",
-  // "absence",
+  "events",
+  "points",
+  "absence",
+  "quickadd",
+  "moderator", // <- dodany
 ] as const;
 
 // 🔥 FIX: fallback do string
