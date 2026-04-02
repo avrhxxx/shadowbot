@@ -4,15 +4,7 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import {
-  ButtonInteraction,
-  ModalSubmitInteraction,
-  Interaction,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder,
-} from "discord.js";
+import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -70,21 +62,25 @@ registerUIAction("events.create", {
 
         if (["custom", "birthdays"].includes(eventType)) {
           if ("showModal" in interaction) {
-            const modal = new ModalBuilder()
-              .setCustomId(`events.create|step=name|type=${eventType}`)
-              .setTitle("Enter Event Name")
-              .setComponents(
-                new ActionRowBuilder<TextInputBuilder>().addComponents(
-                  new TextInputBuilder()
-                    .setCustomId("event_name")
-                    .setLabel("Event Name")
-                    .setStyle(TextInputStyle.Short)
-                    .setMinLength(3)
-                    .setMaxLength(100)
-                )
-              );
-
-            await interaction.showModal(modal);
+            await interaction.showModal({
+              custom_id: `events.create|step=name|type=${eventType}`,
+              title: "Enter Event Name",
+              components: [
+                {
+                  type: 1,
+                  components: [
+                    {
+                      type: 4,
+                      custom_id: "event_name",
+                      style: 1,
+                      label: "Event Name",
+                      min_length: 3,
+                      max_length: 100,
+                    },
+                  ],
+                },
+              ],
+            });
           }
         } else {
           await proceedToDaySelect(interaction, eventType, eventType);
@@ -114,22 +110,26 @@ registerUIAction("events.create", {
 
         // Po kliknięciu przycisku daty: pokazujemy modal do wpisania godziny
         if ("showModal" in interaction) {
-          const modal = new ModalBuilder()
-            .setCustomId(`events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`)
-            .setTitle(`Set Time for ${eventName}`)
-            .setComponents(
-              new ActionRowBuilder<TextInputBuilder>().addComponents(
-                new TextInputBuilder()
-                  .setCustomId("event_hour")
-                  .setLabel("Hour (HHMM, UTC)")
-                  .setPlaceholder("e.g. 1830")
-                  .setStyle(TextInputStyle.Short)
-                  .setMinLength(3)
-                  .setMaxLength(4)
-              )
-            );
-
-          await interaction.showModal(modal);
+          await interaction.showModal({
+            custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
+            title: `Set Time for ${eventName}`,
+            components: [
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_hour",
+                    style: 1,
+                    label: "Hour (HHMM, UTC)",
+                    placeholder: "e.g. 1830",
+                    min_length: 3,
+                    max_length: 4,
+                  },
+                ],
+              },
+            ],
+          });
         }
         flow.success();
         return;
@@ -150,7 +150,7 @@ registerUIAction("events.create", {
 // =====================================
 
 function formatDayLabel(value: string) {
-  const [_year, month, day] = value.split("-").map(Number);
+  const [year, month, day] = value.split("-").map(Number);
   return `${day} ${MONTH_NAMES[month - 1]}`;
 }
 
@@ -160,7 +160,7 @@ async function proceedToDaySelect(
   eventName: string
 ) {
   const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
-  const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + następne 7 dni
+  const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + 7 następnych
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 4) {
