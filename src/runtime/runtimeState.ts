@@ -7,8 +7,6 @@ import { SYSTEM_FLAGS_SHEET } from "@/integrations/google/googleSchema.js";
 
 import { createRootContext } from "@/trace";
 import { createLogger } from "@/foundation/logger";
-
-import { SYSTEM_REGISTRY } from "./runtimeRegistry.js";
 import type { SystemName } from "./runtimeTypes";
 
 // =====================================
@@ -26,7 +24,7 @@ type SystemFlag = {
 // 🔹 REPO
 // =====================================
 
-const flagsRepo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
+const repo = new GoogleRepository<SystemFlag>(SYSTEM_FLAGS_SHEET);
 
 // =====================================
 // 🔹 LOGGER
@@ -41,40 +39,32 @@ const log = createLogger(ctx);
 
 let cache: Map<string, boolean> = new Map();
 let lastFetch = 0;
-const TTL = 30_000; // cache TTL dla normalnych odczytów
-const REFRESH_INTERVAL_MS = 15_000; // worker refresh co 15s
+const TTL = 30_000; // 30 sekund
 
 // =====================================
 // 🧠 SEED SYSTEM FLAGS
 // =====================================
 
 async function seedIfEmpty() {
-  const existing = await flagsRepo.findAll();
+  const existing = await repo.findAll();
   if (existing.length > 0) return;
 
   const flow = log.flow("flags.seed");
   flow.start();
 
   try {
-    const systems = SYSTEM_REGISTRY.map((s) => ({
-      id: s.name,
-      system: s.name,
-      enabled: "true",
-    }));
-
-    await flagsRepo.createMany([
+    await repo.createMany([
       { id: "global", system: "global", enabled: "true" },
-      ...systems,
     ]);
 
-    flow.success({ stats: { systems: systems.length } });
+    flow.success({ stats: { created: 1 } });
   } catch (err) {
     flow.fail(err);
   }
 }
 
 // =====================================
-// 🔄 REFRESH FLAGS
+// 🔄 REFRESH
 // =====================================
 
 async function refresh() {
@@ -84,18 +74,18 @@ async function refresh() {
   try {
     await seedIfEmpty();
 
-    const data = await flagsRepo.findAll();
+    const data = await repo.findAll();
     cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
 
     flow.success({ stats: { count: data.length } });
   } catch (err) {
-    flow.fail(err as Error);
+    flow.fail(err);
   }
 }
 
 // =====================================
-// 🔍 ENSURE CACHE
+// 🔍 ENSURE
 // =====================================
 
 async function ensure() {
@@ -109,46 +99,54 @@ async function ensure() {
 
 export async function isSystemEnabled(system: SystemName): Promise<boolean> {
   await ensure();
+
   const global = cache.get("global");
   const local = cache.get(system);
-  return global === false || local === false ? false : true;
+
+  const result = global !== false && local !== false;
+  log.flow("flags.check").stepInfo("decision", {
+    meta: { system },
+    decision: { condition: "flags", result },
+  });
+
+  return result;
 }
 
 // =====================================
 // ✏️ SET FLAG
 // =====================================
 
-export async function setSystemEnabled(system: SystemName, enabled: boolean): Promise<void> {
+export async function setSystemEnabled(system: SystemName, enabled: boolean) {
   const flow = log.flow("flags.set");
   flow.start({ meta: { system }, input: { enabled } });
 
   try {
-    await flagsRepo.updateById(system, { enabled: String(enabled) });
-
-    // 🔥 odśwież cache od razu
+    await repo.updateById(system, { enabled: String(enabled) });
     cache.set(system, enabled);
-
     flow.success({ meta: { system }, result: { enabled } });
   } catch (err) {
-    flow.fail(err as Error, { meta: { system } });
+    flow.fail(err, { meta: { system } });
   }
 }
 
 // =====================================
-// 🔄 WORKER (AUTO REFRESH)
+// 🕹 WORKER
 // =====================================
 
-export function startFlagsWorker() {
-  log.info({ system: "flags.worker", message: "Starting system flags worker..." });
-
-  // od razu refresh przy starcie
-  refresh();
+function startFlagsWorker(intervalMs = 15_000) {
+  const flow = log.flow("flags.worker");
+  flow.stepInfo("start");
 
   setInterval(async () => {
+    const step = flow.flowId ? `refresh.${Date.now()}` : "refresh";
     try {
       await refresh();
+      flow.stepInfo(step, { stats: { cacheSize: cache.size } });
     } catch (err) {
-      log.error({ system: "flags.worker", message: "Failed to refresh system flags", error: err as Error });
+      flow.stepError(step, err);
     }
-  }, REFRESH_INTERVAL_MS);
+  }, intervalMs);
 }
+
+// uruchamiamy worker od razu
+startFlagsWorker();
