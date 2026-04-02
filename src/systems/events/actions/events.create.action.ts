@@ -135,6 +135,26 @@ registerUIAction("events.create", {
         return;
       }
 
+      // 🔹 Step: hour (modal po wybraniu daty)
+      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
+        const eventType = payload.type;
+        const eventName = payload.name;
+        const dayValue = payload.day;
+        const eventHour = interaction.fields.getTextInputValue("event_hour");
+
+        if (!eventHour) throw new Error("hour_missing");
+
+        if ("reply" in interaction) {
+          await interaction.reply({
+            content: `✅ Event **${eventName}** scheduled on ${formatDayLabel(dayValue)} at ${eventHour} UTC.`,
+            ephemeral: true,
+          });
+        }
+
+        flow.success();
+        return;
+      }
+
       flow.fail(new Error("unknown_interaction_type"));
     } catch (err) {
       flow.fail(err);
@@ -159,14 +179,15 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(7, true); // tydzień włącznie z dzisiaj
-  const rows: any[] = [];
+  const allDays = getFutureDays(7, true); // 7 dni włącznie z dzisiaj
+  const days = allDays.slice(0, 7); // tylko tydzień do przodu
 
-  // po 4 przyciski w rzędzie
-  for (let i = 0; i < allDays.length; i += 4) {
+  const rows: any[] = [];
+  // dwa rzędy po 4 przyciski
+  for (let i = 0; i < days.length; i += 4) {
     rows.push({
       type: 1,
-      components: allDays.slice(i, i + 4).map((d) => ({
+      components: days.slice(i, i + 4).map((d) => ({
         type: 2,
         label: formatDayLabel(d.value),
         style: 1,
