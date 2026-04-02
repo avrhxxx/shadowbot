@@ -4,11 +4,12 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import type {
-  ButtonInteraction,
-  ModalSubmitInteraction,
-  Interaction,
-} from "discord.js";
+import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 // =====================================
 // 🔹 REGISTER CREATE EVENT ACTION
@@ -31,7 +32,7 @@ registerUIAction("events.create", {
           { label: "Reservoir Raid", value: "reservoir_raid" },
           { label: "Arcadian Conquest", value: "arcadian_conquest" },
           { label: "City Contest", value: "city_contest" },
-          { label: "Ghoulion Pursuit", value: "ghoulion_pursuit" }, // poprawione
+          { label: "Ghoulion Pursuit", value: "ghoulion_pursuit" },
         ];
 
         const rows = [];
@@ -113,18 +114,17 @@ registerUIAction("events.create", {
 // 🔹 HELPERS
 // =====================================
 
-// Miesiące w pełnej nazwie
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
+function formatDayLabel(value: string) {
+  const [, month, day] = value.split("-").map(Number); // ignorujemy year
+  return `${day} ${MONTH_NAMES[month - 1]}`;
+}
 
 async function proceedToDaySelect(
   interaction: ButtonInteraction | ModalSubmitInteraction | Interaction,
   eventType: string,
   eventName: string
 ) {
-  const days = getFutureDays(14);
+  const days = getFutureDays(14); // zwraca YYYY-MM-DD w value, label w formacie np. 16/4
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 5) {
@@ -132,7 +132,7 @@ async function proceedToDaySelect(
       type: 1,
       components: days.slice(i, i + 5).map((d) => ({
         type: 2,
-        label: formatDayLabel(d.value), // pełna nazwa miesiąca
+        label: formatDayLabel(d.value),
         style: 1,
         custom_id: `events.create|step=day|type=${eventType}|name=${eventName}|day=${d.value}`,
       })),
@@ -153,10 +153,4 @@ async function proceedToDaySelect(
       components: rows,
     });
   }
-}
-
-// Formatter dla pełnej nazwy miesiąca
-function formatDayLabel(value: string) {
-  const [year, month, day] = value.split("-").map(Number); // oczekujemy format YYYY-MM-DD
-  return `${day} ${MONTH_NAMES[month - 1]}`;
 }
