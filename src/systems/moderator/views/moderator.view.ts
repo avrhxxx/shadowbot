@@ -3,6 +3,7 @@
 // =====================================
 
 import { isSystemEnabled } from "@/runtime/runtimeState";
+import { renderEventsView as eventsView } from "@/systems/events/views/events.view";
 
 // =====================================
 // 🔹 TYPES
@@ -64,10 +65,7 @@ export async function renderModeratorHub(): Promise<ViewResult> {
 // =====================================
 
 export async function renderEventsView(): Promise<ViewResult> {
-  return {
-    content: "🟢 **Events Panel** (placeholder content)",
-    components: [],
-  };
+  return await eventsView(); // 🔹 podmieniamy placeholder na prawdziwy EventsView
 }
 
 export async function renderPointsView(): Promise<ViewResult> {
