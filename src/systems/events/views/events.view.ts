@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/systems/events/views/events.view.ts
-// =====================================
-
 import type { ViewResult } from "@/systems/moderator/views/moderator.view";
 
 // ==========================
@@ -29,15 +25,8 @@ export async function renderEventsMain(): Promise<ViewResult> {
     { type: 2, label: "Cancel Event", style: 4, custom_id: "events.action|type=cancel" },
     { type: 2, label: "Guide", style: 3, custom_id: "events.action|type=help" },
     { type: 2, label: "Settings", style: 2, custom_id: "events.action|type=settings" },
+    { type: 2, label: "⬅ Back", style: 2, custom_id: "moderator.open|target=hub" },
   ];
-
-  // 🔹 Back button
-  buttons.push({
-    type: 2,
-    label: "⬅ Back",
-    style: 2,
-    custom_id: "moderator.open|target=hub",
-  });
 
   return { content, components: createRows(buttons) };
 }
@@ -46,9 +35,8 @@ export async function renderEventsMain(): Promise<ViewResult> {
 // 🧠 CREATE EVENT VIEW
 // ==========================
 export async function renderCreateEventView(): Promise<ViewResult> {
-  const content = "📝 **Create Event**\nSelect event type and date, then submit.";
+  const content = "📝 **Create Event**\nSelect event type and day.";
 
-  // 🔹 Event types (birthday and custom require manual name entry)
   const eventTypes = [
     { label: "Birthday", value: "birthdays" },
     { label: "Custom", value: "custom" },
@@ -59,13 +47,12 @@ export async function renderCreateEventView(): Promise<ViewResult> {
   ];
 
   const typeSelect = {
-    type: 3, // StringSelectMenu
+    type: 3,
     custom_id: "events.create|step=type",
     placeholder: "Select event type",
     options: eventTypes,
   };
 
-  // 🔹 Date select (user can pick day wprzód np. +7 dni)
   const dayOptions = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i + 1);
@@ -82,7 +69,6 @@ export async function renderCreateEventView(): Promise<ViewResult> {
     options: dayOptions,
   };
 
-  // 🔹 Buttons
   const buttons: any[] = [
     { type: 2, label: "Submit Event", style: 1, custom_id: "events.action|type=createSubmit" },
     { type: 2, label: "Cancel", style: 4, custom_id: "events.back" },
@@ -107,9 +93,7 @@ export async function renderEventsListView(events: any[] = []): Promise<ViewResu
         .join("\n")}`
     : "📅 **Events List**\n\nNo events found.";
 
-  const buttons: any[] = [
-    { type: 2, label: "Back", style: 2, custom_id: "events.back" },
-  ];
+  const buttons: any[] = [{ type: 2, label: "Back", style: 2, custom_id: "events.back" }];
 
   return { content, components: createRows(buttons) };
 }
@@ -118,7 +102,7 @@ export async function renderEventsListView(events: any[] = []): Promise<ViewResu
 // 🧠 MANUAL REMINDER VIEW
 // ==========================
 export async function renderManualReminderView(): Promise<ViewResult> {
-  const content = "⏰ **Manual Reminder**\nSelect an event to send reminder for.";
+  const content = "⏰ **Manual Reminder**";
 
   const buttons: any[] = [
     { type: 2, label: "Send Reminder", style: 1, custom_id: "events.action|type=sendReminder" },
@@ -129,23 +113,21 @@ export async function renderManualReminderView(): Promise<ViewResult> {
 }
 
 // ==========================
-// 🧠 SHOW ALL / PARTICIPANTS VIEW
+// 🧠 SHOW ALL VIEW
 // ==========================
 export async function renderShowAllView(events: any[] = []): Promise<ViewResult> {
   const content = events.length
     ? `📋 **All Events / Participants**\n\n${events
         .map(
           (e) =>
-            `**${e.name}** — ${e.day}/${e.month} ${e.hour}:${e.minute} UTC\nParticipants:\n${
+            `**${e.name}** — ${e.day}/${e.month} ${e.hour}:${e.minute} UTC\nParticipants: ${
               e.participants?.length ? e.participants.join(", ") : "None"
-            }\nAbsent:\n${e.absent?.length ? e.absent.join(", ") : "None"}`
+            }\nAbsent: ${e.absent?.length ? e.absent.join(", ") : "None"}`
         )
         .join("\n\n--------------------\n\n")}`
     : "📋 **All Events / Participants**\n\nNo events found.";
 
-  const buttons: any[] = [
-    { type: 2, label: "Back", style: 2, custom_id: "events.back" },
-  ];
+  const buttons: any[] = [{ type: 2, label: "Back", style: 2, custom_id: "events.back" }];
 
   return { content, components: createRows(buttons) };
 }
@@ -154,21 +136,10 @@ export async function renderShowAllView(events: any[] = []): Promise<ViewResult>
 // 🧠 SETTINGS VIEW
 // ==========================
 export async function renderSettingsView(channels: { label: string; value: string }[] = []): Promise<ViewResult> {
-  const content = "⚙️ **Event Settings**\nSelect channels for notifications and downloads.";
+  const content = "⚙️ **Event Settings**";
 
-  const notificationSelect = {
-    type: 3, // StringSelectMenu
-    custom_id: "event_settings_notification",
-    placeholder: "Select notification channel",
-    options: channels,
-  };
-
-  const downloadSelect = {
-    type: 3,
-    custom_id: "event_settings_download",
-    placeholder: "Select download channel",
-    options: channels,
-  };
+  const notificationSelect = { type: 3, custom_id: "event_settings_notification", placeholder: "Select notification channel", options: channels };
+  const downloadSelect = { type: 3, custom_id: "event_settings_download", placeholder: "Select download channel", options: channels };
 
   const rows = [
     { type: 1, components: [notificationSelect] },
