@@ -1,3 +1,7 @@
+// ==========================
+// 📂 src/systems/devpanel/devpanel.channel.ts
+// ==========================
+
 import { TextChannel, Guild, Message } from "discord.js";
 import { devpanelMainView } from "./views/devpanel.view";
 import { GoogleRepository } from "@/integrations/google/googleRepository";
@@ -11,7 +15,8 @@ export interface DevPanelConfig {
   lastUpdated?: string;
 }
 
-const devpanelRepo = new GoogleRepository<DevPanelConfig>(DEV_PANEL_CONFIG_SHEET);
+// 🔹 Używamy poprawnej nazwy importu
+const devpanelRepo = new GoogleRepository<DevPanelConfig>(DEVPANEL_CONFIG_SHEET);
 
 // 🔹 Tworzy lub pobiera kanał Dev Panel
 export async function setupDevPanelChannel(guild: Guild): Promise<TextChannel> {
