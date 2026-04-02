@@ -1,14 +1,10 @@
-// src/systems/events/actions/events.create.action.ts
+// 📁 src/systems/events/actions/events.create.action.ts
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import type {
-  ButtonInteraction,
-  ModalSubmitInteraction,
-  Interaction,
-} from "discord.js";
+import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
 
 // =====================================
 // 🔹 REGISTER CREATE EVENT ACTION
@@ -23,7 +19,7 @@ registerUIAction("events.create", {
     flow.start();
 
     try {
-      // 🔹 Krok 1: start - wybór typu eventu
+      // 🔹 Step: start - wybór typu eventu
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
         const typeOptions = [
           { label: "Custom", value: "custom" },
@@ -54,7 +50,7 @@ registerUIAction("events.create", {
         return;
       }
 
-      // 🔹 Krok 2: po wybraniu typu eventu
+      // 🔹 Step: type
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
@@ -82,18 +78,16 @@ registerUIAction("events.create", {
             });
           }
         } else {
-          // Standard event → nazwa = typ
           await proceedToDaySelect(interaction, eventType, eventType);
         }
         flow.success();
         return;
       }
 
-      // 🔹 Krok 3: modal z nazwą eventu
+      // 🔹 Step: name (modal)
       if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
         const eventType = payload.type;
         const eventName = interaction.fields.getTextInputValue("event_name");
-
         if (!eventName) throw new Error("event_name_missing");
 
         await proceedToDaySelect(interaction, eventType, eventName);
@@ -139,12 +133,7 @@ async function proceedToDaySelect(
   rows.push({
     type: 1,
     components: [
-      {
-        type: 2,
-        label: "⬅ Back",
-        style: 2,
-        custom_id: "events.open|target=hub",
-      },
+      { type: 2, label: "⬅ Back", style: 2, custom_id: "moderator.open|target=hub" },
     ],
   });
 
