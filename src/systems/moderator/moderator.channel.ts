@@ -1,14 +1,21 @@
-// =====================================
-// 📁 src/systems/moderator/moderator.channel.ts
-// =====================================
-
 import { TextChannel, Guild, Message } from "discord.js";
 import { renderModeratorHub } from "./views/moderator.view";
 import { GoogleRepository } from "@/integrations/google/googleRepository";
 import { MODERATOR_CONFIG_SHEET } from "@/integrations/google/googleSchema";
 
-// 🔹 Repo dla Moderator Config
-const moderatorRepo = new GoogleRepository(MODERATOR_CONFIG_SHEET);
+// Typ konfiguracji Moderator
+export interface ModeratorConfig {
+  id: string;
+  guildId: string;
+  hubMessageId?: string;
+  modChannelId?: string;
+  updateChannelId?: string;
+  dateEmbedId?: string;
+  version?: string;
+  lastUpdated?: string;
+}
+
+const moderatorRepo = new GoogleRepository<ModeratorConfig>(MODERATOR_CONFIG_SHEET);
 
 // 🔹 Tworzy lub pobiera kanał Moderator Panel
 export async function setupModeratorChannel(guild: Guild): Promise<TextChannel> {
@@ -27,47 +34,55 @@ export async function setupModeratorChannel(guild: Guild): Promise<TextChannel> 
   return channel;
 }
 
-// 🔹 Renderuje lub aktualizuje Moderator Panel w kanale
-export async function renderModeratorPanelInChannel(channel: TextChannel, guildId: string) {
+// 🔹 Renderuje Moderator Panel w kanale, aktualizując istniejącą wiadomość
+export async function renderModeratorPanelInChannel(channel: TextChannel) {
+  const config = (await moderatorRepo.findAll({ guildId: channel.guild.id }))[0];
   const view = await renderModeratorHub();
-
-  // Sprawdzamy w Google Sheets czy istnieje hubMessageId
-  let config = await moderatorRepo.findAll({ guildId });
-  let hubMessageId = config[0]?.hubMessageId;
 
   let message: Message | null = null;
 
-  if (hubMessageId) {
+  if (config?.hubMessageId) {
     try {
-      message = await channel.messages.fetch(hubMessageId);
+      message = await channel.messages.fetch(config.hubMessageId);
       await message.edit({
         content: view.content,
         components: view.components,
       });
     } catch {
-      // Jeśli wiadomość nie istnieje lub nie można pobrać → wyślij nową
-      hubMessageId = undefined;
+      message = await channel.send({
+        content: view.content,
+        components: view.components,
+      });
     }
-  }
 
-  if (!hubMessageId) {
+    if (!config) {
+      await moderatorRepo.create({
+        id: channel.guild.id,
+        guildId: channel.guild.id,
+        hubMessageId: message.id,
+        lastUpdated: new Date().toISOString(),
+      });
+    } else if (message.id !== config.hubMessageId) {
+      await moderatorRepo.updateById(config.id, {
+        hubMessageId: message.id,
+        lastUpdated: new Date().toISOString(),
+      });
+    }
+  } else {
     message = await channel.send({
       content: view.content,
       components: view.components,
     });
 
-    // Zapisz/aktualizuj hubMessageId w Google Sheets
-    if (config[0]) {
-      await moderatorRepo.updateById(config[0].id, {
+    if (config) {
+      await moderatorRepo.updateById(config.id, {
         hubMessageId: message.id,
-        updateChannelId: channel.id,
         lastUpdated: new Date().toISOString(),
       });
     } else {
       await moderatorRepo.create({
-        id: `${guildId}-moderator`,
-        guildId,
-        updateChannelId: channel.id,
+        id: channel.guild.id,
+        guildId: channel.guild.id,
         hubMessageId: message.id,
         lastUpdated: new Date().toISOString(),
       });
@@ -75,8 +90,8 @@ export async function renderModeratorPanelInChannel(channel: TextChannel, guildI
   }
 }
 
-// 🔹 Pomocnicza funkcja do inicjalizacji na serwerze
+// 🔹 Pomocnicza funkcja do inicjalizacji Moderator Panel
 export async function initModeratorPanelForGuild(guild: Guild) {
   const channel = await setupModeratorChannel(guild);
-  await renderModeratorPanelInChannel(channel, guild.id);
+  await renderModeratorPanelInChannel(channel);
 }
