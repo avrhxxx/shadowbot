@@ -52,7 +52,7 @@ export async function renderEventsView() {
     },
   ];
 
-  // 🔹 przycisk Back na końcu
+  // 🔹 Dodaj przycisk Back na końcu
   buttons.push({
     type: 2,
     label: "⬅ Back",
@@ -60,7 +60,7 @@ export async function renderEventsView() {
     custom_id: "moderator.open|target=hub",
   });
 
-  // 🔹 podział na rzędy max 5 przycisków
+  // 🔹 Podział przycisków na rzędy po max 5
   const rows: any[] = [];
   for (let i = 0; i < buttons.length; i += 5) {
     rows.push({ type: 1, components: buttons.slice(i, i + 5) });
