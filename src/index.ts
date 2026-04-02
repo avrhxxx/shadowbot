@@ -23,6 +23,10 @@ import { handleUIInteraction } from "@/ui/core/uiDiscordAdapter";
 import { handleDevpanelCommand } from "@/systems/devpanel/commands/devpanel.command";
 import { devpanelSlash } from "@/systems/devpanel/commands/devpanel.slash";
 
+// 🔹 MODERATOR
+import { handleModeratorCommand } from "@/systems/moderator/commands/moderator.command";
+import { moderatorSlash } from "@/systems/moderator/commands/moderator.slash";
+
 // =====================================
 // 🔐 ENV
 // =====================================
@@ -40,9 +44,9 @@ if (!BOT_TOKEN) {
 export const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessageReactions, // 🔥 POTRZEBNE DO TRANSLATION
-    GatewayIntentBits.GuildMessages,         // 🔥 POTRZEBNE DO MESSAGE
-    GatewayIntentBits.MessageContent,        // 🔥 jeśli używasz content
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
   partials: [
     Partials.Channel,
@@ -93,11 +97,7 @@ client.on("interactionCreate", async (interaction) => {
   // 🔘 UI (BUTTONS)
   // =============================
 
-  const handled = await handleUIInteraction(
-    interaction,
-    ctx
-  );
-
+  const handled = await handleUIInteraction(interaction, ctx);
   if (handled) return;
 
   // =============================
@@ -107,6 +107,11 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "devpanel") {
       await handleDevpanelCommand(interaction);
+      return;
+    }
+
+    if (interaction.commandName === "moderator") {
+      await handleModeratorCommand(interaction);
       return;
     }
   }
@@ -124,16 +129,16 @@ client.once("ready", async () => {
   });
 
   // =============================
-  // 🧠 REGISTER COMMANDS (DEV)
+  // 🧠 REGISTER COMMANDS (DEV + MODERATOR)
   // =============================
 
   const commandsFlow = appLog.flow("commands");
-
   commandsFlow.start();
 
   try {
     await client.application?.commands.set([
       devpanelSlash.toJSON(),
+      moderatorSlash.toJSON(),
     ]);
 
     commandsFlow.success();
