@@ -1,7 +1,7 @@
 import { TextChannel, Guild, Message } from "discord.js";
 import { devpanelMainView } from "./views/devpanel.view";
 import { GoogleRepository } from "@/integrations/google/googleRepository";
-import { DEV_PANEL_CONFIG_SHEET } from "@/integrations/google/googleSchema";
+import { DEVPANEL_CONFIG_SHEET } from "@/integrations/google/googleSchema";
 
 // Typ konfiguracji DevPanel
 export interface DevPanelConfig {
