@@ -8,65 +8,78 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 // 🔹 TYPES
 // =====================================
 
-type View = {
+export type ViewResult = {
   content: string;
   components: any[];
 };
 
-type ModeratorSystem = {
-  name: string;
-  label: string;
-};
-
 // =====================================
-// 🧠 MAIN VIEW
+// 🧠 HUB VIEW
 // =====================================
 
-export async function renderModeratorHub(): Promise<View> {
-  const systems: ModeratorSystem[] = [
+export async function renderModeratorHub(): Promise<ViewResult> {
+  const buttons: any[] = [];
+
+  const systems = [
     { name: "events", label: "Event Menu" },
     { name: "points", label: "Points Menu" },
     { name: "absence", label: "Absence Menu" },
     { name: "quickadd", label: "QuickAdd Menu" },
   ];
 
-  const buttons: any[] = [];
-
   for (const sys of systems) {
     const enabled = await isSystemEnabled(sys.name);
     if (!enabled) continue;
 
     buttons.push({
-      type: 2, // button
+      type: 2,
       label: sys.label,
-      style: 1, // primary
+      style: 1, // Primary
       custom_id: `moderator.open|target=${sys.name}`,
     });
   }
 
-  // 🔹 HELP (zawsze)
+  // 🔹 HELP
   buttons.push({
     type: 2,
     label: "Help",
-    style: 2, // secondary
+    style: 2, // Secondary
     custom_id: `moderator.open|target=help`,
   });
 
+  // 🔹 podział na rzędy (max 5 przycisków)
+  const rows: any[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push({ type: 1, components: buttons.slice(i, i + 5) });
+  }
+
   return {
     content: `📌 **Moderator Panel**\n\nSelect an option:`,
-    components: [
-      {
-        type: 1, // action row
-        components: buttons.slice(0, 5), // max 5 per row
-      },
-      ...(buttons.length > 5
-        ? [
-            {
-              type: 1,
-              components: buttons.slice(5, 10),
-            },
-          ]
-        : []),
-    ],
+    components: rows,
+  };
+}
+
+// =====================================
+// 🧠 EVENTS, POINTS, ABSENCE VIEWS
+// =====================================
+
+export async function renderEventsView(): Promise<ViewResult> {
+  return {
+    content: "🟢 **Events Panel** (placeholder content)",
+    components: [],
+  };
+}
+
+export async function renderPointsView(): Promise<ViewResult> {
+  return {
+    content: "⭐ **Points Panel** (placeholder content)",
+    components: [],
+  };
+}
+
+export async function renderAbsenceView(): Promise<ViewResult> {
+  return {
+    content: "🕒 **Absence Panel** (placeholder content)",
+    components: [],
   };
 }
