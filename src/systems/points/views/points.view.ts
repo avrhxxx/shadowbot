@@ -2,15 +2,10 @@
 // 📁 src/systems/points/views/points.view.ts
 // =====================================
 
-import type { ViewResult } from "@/core/ui/uiEngine";
-
-// =====================================
-// 🔹 VIEW
-// =====================================
-
-export function renderPointsView(): ViewResult {
+export function renderPointsView() {
   return {
     content: "⭐ **Points Panel**",
+
     components: [
       {
         type: 1,
