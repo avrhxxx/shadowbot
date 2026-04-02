@@ -1,3 +1,4 @@
+// src/integrations/discord/discordClient.ts
 import { Client } from "discord.js";
 
 let client: Client | null = null;
