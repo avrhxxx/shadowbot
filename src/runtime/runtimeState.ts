@@ -48,30 +48,35 @@ let lastFetch = 0;
 const TTL = 30_000;
 
 // =====================================
-// 🧠 SEED MISSING SYSTEM FLAGS
+// 🧠 SEED SYSTEM FLAGS (tylko brakujące)
 // =====================================
 
-async function seedMissing() {
+async function seedIfMissing() {
   const existing = await repo.findAll();
-  const existingNames = new Set(existing.map((s) => s.system));
+  const existingNames = new Set(existing.map((e) => e.system));
 
-  const missing = SYSTEM_REGISTRY.filter((s) => !existingNames.has(s.name));
+  const missingSystems = SYSTEM_REGISTRY.filter(
+    (s) => !existingNames.has(s.name)
+  );
 
-  if (missing.length === 0) return;
+  if (missingSystems.length === 0) return;
 
-  const flow = log.flow("flags.seed_missing");
-  flow.start({ meta: { missing: missing.map((s) => s.name) } });
+  const flow = log.flow("flags.seed");
+  flow.start();
 
   try {
-    const toCreate = missing.map((s) => ({
+    const toCreate = missingSystems.map((s) => ({
       id: s.name,
       system: s.name,
       enabled: "true",
     }));
 
-    await repo.createMany(toCreate);
-
-    flow.success({ stats: { created: toCreate.length } });
+    if (toCreate.length > 0) {
+      await repo.createMany(toCreate);
+      flow.success({ stats: { systemsAdded: toCreate.length } });
+    } else {
+      flow.success({ stats: { systemsAdded: 0 } });
+    }
   } catch (err) {
     flow.fail(err);
   }
@@ -86,19 +91,17 @@ async function refresh() {
   flow.start();
 
   try {
-    await seedMissing();
+    await seedIfMissing();
 
     const data = await repo.findAll();
-
     cache = new Map(data.map((d) => [d.system, d.enabled === "true"]));
     lastFetch = Date.now();
 
-    // 🔹 DEBUG: pokaż wszystkie systemy i ich aktualny stan
-    const stateLog = Array.from(cache.entries())
-      .map(([sys, enabled]) => `${sys}: ${enabled ? "ON" : "OFF"}`)
-      .join(", ");
+    // 🔹 pokaż stan cache w logach (poprawnie)
+    const stateLog: Record<string, boolean> = {};
+    cache.forEach((v, k) => (stateLog[k] = v));
 
-    flow.stepInfo("cache_state", { state: stateLog });
+    flow.stepInfo("cache_state", { meta: { cacheState: stateLog } });
 
     flow.success({ stats: { count: data.length } });
   } catch (err) {
@@ -158,7 +161,7 @@ export async function setSystemEnabled(
 // 🕹 WORKER
 // =====================================
 
-function startFlagsWorker(intervalMs = 60_000) { // <- wydłużony interwał do 1 min
+function startFlagsWorker(intervalMs = 60_000) {
   const flow = log.flow("flags.worker");
   flow.stepInfo("start");
 
@@ -166,7 +169,7 @@ function startFlagsWorker(intervalMs = 60_000) { // <- wydłużony interwał do 
     const step = "refresh";
     try {
       await refresh();
-      flow.stepInfo(step, { stats: { cacheSize: cache.size } });
+      flow.stepInfo(step, { meta: { cacheSize: cache.size } });
     } catch (err) {
       flow.stepError(step, err);
     }
