@@ -6,10 +6,7 @@ import { getFutureDays } from "../utils/dateUtils";
 
 import type { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
 
-// =====================================
-// 🔹 MONTH NAMES
-// =====================================
-
+// Pełne nazwy miesięcy
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
@@ -29,9 +26,7 @@ registerUIAction("events.create", {
 
     try {
       // 🔹 Step: start - wybór typu eventu
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
-        flow.stepDebug("events.create.start");
-
+      if (interaction.isButton?.() && payload?.step === "start") {
         const typeOptions = [
           { label: "Reservoir Raid", value: "reservoir_raid" },
           { label: "Arcadian Conquest", value: "arcadian_conquest" },
@@ -47,29 +42,32 @@ registerUIAction("events.create", {
             type: 1,
             components: typeOptions.slice(i, i + 5).map((opt) => ({
               type: 2,
-              label: formatEventLabel(opt.value),
+              label: opt.label,
               style: 1,
               custom_id: `events.create|step=type|type=${opt.value}`,
             })),
           });
         }
 
-        if ("reply" in interaction) {
-          await interaction.reply({ content: "Select event type:", components: rows, ephemeral: true });
+        if (interaction.reply) {
+          await interaction.reply({
+            content: "Select event type:",
+            components: rows,
+            ephemeral: true,
+          });
         }
+
         flow.success();
         return;
       }
 
       // 🔹 Step: type
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
+      if (interaction.isButton?.() && payload?.step === "type") {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
 
-        flow.stepDebug("events.create.type_selected", { meta: { eventType } });
-
         if (["custom", "birthdays"].includes(eventType)) {
-          if ("showModal" in interaction) {
+          if (interaction.showModal) {
             await interaction.showModal({
               custom_id: `events.create|step=name|type=${eventType}`,
               title: "Enter Event Name",
@@ -91,7 +89,7 @@ registerUIAction("events.create", {
             });
           }
         } else {
-          await proceedToDaySelect(interaction, eventType, formatEventLabel(eventType));
+          await proceedToDaySelect(interaction, eventType, formatEventName(eventType));
         }
 
         flow.success();
@@ -99,12 +97,10 @@ registerUIAction("events.create", {
       }
 
       // 🔹 Step: name (modal)
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
+      if (interaction.isModalSubmit?.() && payload?.step === "name") {
         const eventType = payload.type;
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
-
-        flow.stepDebug("events.create.name_entered", { meta: { eventType, eventName } });
 
         await proceedToDaySelect(interaction, eventType, eventName);
         flow.success();
@@ -112,15 +108,14 @@ registerUIAction("events.create", {
       }
 
       // 🔹 Step: day (kliknięcie przycisku daty)
-      if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
+      if (interaction.isButton?.() && payload?.step === "day") {
         const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day; // YYYY-MM-DD
+
         if (!dayValue) throw new Error("day_value_missing");
 
-        flow.stepDebug("events.create.day_selected", { meta: { eventType, eventName, dayValue } });
-
-        if ("showModal" in interaction) {
+        if (interaction.showModal) {
           await interaction.showModal({
             custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
             title: `Set Time for ${eventName}`,
@@ -147,34 +142,10 @@ registerUIAction("events.create", {
         return;
       }
 
-      // 🔹 Step: hour (modal submit)
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
-        const eventType = payload.type;
-        const eventName = payload.name;
-        const eventDay = payload.day;
-
-        const eventHour = interaction.fields.getTextInputValue("event_hour");
-        if (!eventHour) throw new Error("event_hour_missing");
-
-        flow.stepDebug("events.create.hour_set", {
-          meta: { eventType, eventName, eventDay, eventHour },
-        });
-
-        if ("reply" in interaction) {
-          await interaction.reply({
-            content: `✅ Event **${eventName}** scheduled on **${eventDay}** at **${eventHour} UTC**`,
-            ephemeral: true,
-          });
-        }
-
-        flow.success();
-        return;
-      }
-
       flow.fail(new Error("unknown_interaction_type"));
     } catch (err) {
       flow.fail(err);
-      if ("reply" in interaction) {
+      if (interaction.reply) {
         await interaction.reply({ content: `❌ Failed: ${err}`, ephemeral: true }).catch(() => null);
       }
     }
@@ -185,25 +156,27 @@ registerUIAction("events.create", {
 // 🔹 HELPERS
 // =====================================
 
-function formatDayLabel(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return `${day} ${MONTH_NAMES[month - 1]}`;
-}
-
-function formatEventLabel(value: string) {
-  // Zamienia reservoir_raid → Reservoir Raid
+// Formatter dla przycisku: "reservoir_raid" → "Reservoir Raid"
+function formatEventName(value: string) {
   return value
     .split("_")
-    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
+// Formatter dla przycisku daty: "YYYY-MM-DD" → "DD MonthName"
+function formatDayLabel(value: string) {
+  const [, month, day] = value.split("-").map(Number); // ignorujemy year
+  return `${day} ${MONTH_NAMES[month - 1]}`;
+}
+
+// Przygotowanie przycisków dni
 async function proceedToDaySelect(
   interaction: ButtonInteraction | ModalSubmitInteraction | any,
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const allDays = getFutureDays(); // wszystkie dni
   const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + 7 następnych
 
   const rows: any[] = [];
@@ -227,7 +200,7 @@ async function proceedToDaySelect(
     ],
   });
 
-  if ("update" in interaction) {
+  if (interaction.update) {
     await interaction.update({
       content: `Select day for event **${eventName}**:`,
       components: rows,
