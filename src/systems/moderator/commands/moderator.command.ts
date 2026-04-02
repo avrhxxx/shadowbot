@@ -1,4 +1,6 @@
-// src/systems/moderator/commands/moderator.command.ts
+// =====================================
+// 📁 src/systems/moderator/commands/moderator.command.ts
+// =====================================
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
 import { renderModeratorHub } from "../views/moderator.view";
