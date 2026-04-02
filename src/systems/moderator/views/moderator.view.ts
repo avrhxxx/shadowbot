@@ -3,7 +3,7 @@
 // =====================================
 
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { renderEventsListView as eventsView } from "@/systems/events/views/events.view"; // 🔹 poprawiony import
+import { renderEventsMain as eventsView } from "@/systems/events/views/events.view"; // ✅ FIX
 
 // =====================================
 // 🔹 TYPES
@@ -65,7 +65,7 @@ export async function renderModeratorHub(): Promise<ViewResult> {
 // =====================================
 
 export async function renderEventsView(): Promise<ViewResult> {
-  return await eventsView(); // 🔹 teraz poprawnie wywołuje renderEventsListView
+  return await eventsView(); // ✅ teraz pokazuje MAIN panel events
 }
 
 export async function renderPointsView(): Promise<ViewResult> {
