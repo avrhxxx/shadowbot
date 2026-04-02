@@ -46,14 +46,55 @@ export async function renderEventsMain(): Promise<ViewResult> {
 // 🧠 CREATE EVENT VIEW
 // ==========================
 export async function renderCreateEventView(): Promise<ViewResult> {
-  const content = "📝 **Create Event**\nFill in the details or cancel.";
+  const content = "📝 **Create Event**\nSelect event type and date, then submit.";
 
+  // 🔹 Event types (birthday and custom require manual name entry)
+  const eventTypes = [
+    { label: "Birthday", value: "birthdays" },
+    { label: "Custom", value: "custom" },
+    { label: "Reservoir Raid", value: "reservoir_raid" },
+    { label: "Arcadian Conquest", value: "arcadian_conquest" },
+    { label: "City Contest", value: "city_contest" },
+    { label: "Gohoolion Pursuit", value: "gohoolion_pursuit" },
+  ];
+
+  const typeSelect = {
+    type: 3, // StringSelectMenu
+    custom_id: "events.create|step=type",
+    placeholder: "Select event type",
+    options: eventTypes,
+  };
+
+  // 🔹 Date select (user can pick day wprzód np. +7 dni)
+  const dayOptions = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i + 1);
+    return {
+      label: `${d.getDate()}/${d.getMonth() + 1}`,
+      value: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+    };
+  });
+
+  const daySelect = {
+    type: 3,
+    custom_id: "events.create|step=day",
+    placeholder: "Select event day",
+    options: dayOptions,
+  };
+
+  // 🔹 Buttons
   const buttons: any[] = [
     { type: 2, label: "Submit Event", style: 1, custom_id: "events.action|type=createSubmit" },
     { type: 2, label: "Cancel", style: 4, custom_id: "events.back" },
   ];
 
-  return { content, components: createRows(buttons) };
+  const rows = [
+    { type: 1, components: [typeSelect] },
+    { type: 1, components: [daySelect] },
+    ...createRows(buttons),
+  ];
+
+  return { content, components: rows };
 }
 
 // ==========================
@@ -61,7 +102,9 @@ export async function renderCreateEventView(): Promise<ViewResult> {
 // ==========================
 export async function renderEventsListView(events: any[] = []): Promise<ViewResult> {
   const content = events.length
-    ? `📅 **Events List**\n\n${events.map((e) => `• ${e.name} — ${e.day}/${e.month} ${e.hour}:${e.minute} UTC`).join("\n")}`
+    ? `📅 **Events List**\n\n${events
+        .map((e) => `• ${e.name} — ${e.day}/${e.month} ${e.hour}:${e.minute} UTC`)
+        .join("\n")}`
     : "📅 **Events List**\n\nNo events found.";
 
   const buttons: any[] = [
