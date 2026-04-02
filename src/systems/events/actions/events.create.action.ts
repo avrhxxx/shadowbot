@@ -150,7 +150,7 @@ registerUIAction("events.create", {
 // =====================================
 
 function formatDayLabel(value: string) {
-  const [, month, day] = value.split("-").map(Number); // ignorujemy year
+  const [, month, day] = value.split("-").map(Number);
   return `${day} ${MONTH_NAMES[month - 1]}`;
 }
 
@@ -159,7 +159,8 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const days = getFutureDays(7, true); // 7 dni włącznie z dzisiaj, wartość YYYY-MM-DD
+  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const days = allDays.slice(0, 7); // tylko tydzień do przodu, zaczynając od dzisiaj
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 5) {
