@@ -102,6 +102,7 @@ registerUIAction("events.create", {
 
       // 🔹 Step: day (kliknięcie przycisku daty)
       if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
+        const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day; // YYYY-MM-DD
 
@@ -134,13 +135,23 @@ registerUIAction("events.create", {
         return;
       }
 
-      // 🔹 Step: hour (modal po wybraniu daty)
-      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
-        const eventName = payload.name;
-        const dayValue = payload.day;
+      // 🔹 Step: hour (modal submit)
+      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && interaction.customId.startsWith("events.create|step=hour")) {
+        // custom_id = "events.create|step=hour|name=EventName|day=YYYY-MM-DD"
+        const parts = interaction.customId.split("|");
+        const eventNamePart = parts.find(p => p.startsWith("name="));
+        const dayPart = parts.find(p => p.startsWith("day="));
+
+        const eventName = eventNamePart?.split("=")[1];
+        const dayValue = dayPart?.split("=")[1];
         const eventHour = interaction.fields.getTextInputValue("event_hour");
 
-        if (!eventHour) throw new Error("hour_missing");
+        if (!eventName || !dayValue || !eventHour) {
+          if ("reply" in interaction) {
+            await interaction.reply({ content: `❌ Missing data`, ephemeral: true });
+          }
+          return;
+        }
 
         if ("reply" in interaction) {
           await interaction.reply({
@@ -148,7 +159,6 @@ registerUIAction("events.create", {
             ephemeral: true,
           });
         }
-
         flow.success();
         return;
       }
@@ -177,8 +187,8 @@ async function proceedToDaySelect(
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
-  const days = allDays.slice(0, 7); // tylko tydzień do przodu, zaczynając od dzisiaj
+  const allDays = getFutureDays(8, true); // tydzień do przodu + dzisiaj
+  const days = allDays.slice(0, 8); // tylko 8 dni (dzisiaj + 7 kolejnych)
 
   const rows: any[] = [];
   for (let i = 0; i < days.length; i += 4) { // dwa rzędy po 4 przyciski
