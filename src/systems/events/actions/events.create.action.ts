@@ -185,7 +185,10 @@ registerUIAction("events.create", {
         const [day, month] = eventDay.split("-").map(Number);
         const [hour, minute] = hourInput.split(":").map(Number);
 
-        const formattedDate = formatEventUTC(day, month, hour, minute);
+        // Dodaj aktualny rok
+        const year = new Date().getUTCFullYear();
+
+        const formattedDate = formatEventUTC(day, month, hour, minute, year);
 
         await interaction.reply?.({
           content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.\nDo you want to send a notification?`,
