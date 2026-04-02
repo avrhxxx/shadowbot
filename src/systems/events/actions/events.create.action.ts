@@ -40,6 +40,43 @@ function formatEventName(name: string) {
     .join(" ");
 }
 
+// 🔹 Universal Date Parser (for modal input)
+function parseDateInput(input: string) {
+  const cleaned = input.trim();
+
+  // YYYYMMDD
+  const ymd = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (ymd) return { day: parseInt(ymd[3]), month: parseInt(ymd[2]), hour: 0, minute: 0 };
+
+  // DD MMM YYYY HH:mm (optional)
+  const dmy = cleaned.match(/^(\d{1,2})\s*([A-Za-z]{3,})\s*(\d{4})?\s*(\d{1,2}):?(\d{2})?$/);
+  if (dmy) {
+    const monthIndex = MONTH_NAMES.findIndex(
+      (m) => m.toLowerCase().startsWith(dmy[2].toLowerCase())
+    );
+    if (monthIndex === -1) return null;
+    return {
+      day: parseInt(dmy[1]),
+      month: monthIndex + 1,
+      hour: dmy[4] ? parseInt(dmy[4]) : 0,
+      minute: dmy[5] ? parseInt(dmy[5]) : 0,
+    };
+  }
+
+  // DD/MM or DD-MM
+  const simple = cleaned.match(/^(\d{1,2})[.\-/](\d{1,2})$/);
+  if (simple) return { day: parseInt(simple[1]), month: parseInt(simple[2]), hour: 0, minute: 0 };
+
+  return null;
+}
+
+// 🔹 Format Date Label for modal confirmation
+function formatDateLabel(day: number, month: number, hour?: number, minute?: number) {
+  let label = `${day} ${MONTH_NAMES[month - 1]}`;
+  if (hour !== undefined && minute !== undefined) label += ` ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  return label;
+}
+
 // =====================================
 // 🔹 REGISTER CREATE EVENT ACTION
 // =====================================
@@ -59,6 +96,7 @@ registerUIAction("events.create", {
           { label: "Arcadian Conquest", value: "arcadian_conquest" },
           { label: "City Contest", value: "city_contest" },
           { label: "Ghoulion Pursuit", value: "ghoulion_pursuit" },
+          { label: "KvK", value: "kvk" }, // <-- Dodany brakujący event
           { label: "Birthday", value: "birthdays" },
           { label: "Custom", value: "custom" },
         ];
@@ -154,13 +192,18 @@ registerUIAction("events.create", {
       // 🔹 Step: modal submit dla Custom/Birthday
       if (interaction.isModalSubmit?.() && payload?.step === "modal") {
         const eventName = interaction.fields.getTextInputValue("event_name");
-        const eventDate = interaction.fields.getTextInputValue("event_date");
-        const eventHour = interaction.fields.getTextInputValue("event_hour");
+        const eventDateRaw = interaction.fields.getTextInputValue("event_date");
+        const eventHourRaw = interaction.fields.getTextInputValue("event_hour");
 
-        if (!eventName || !eventDate || !eventHour) throw new Error("missing_modal_fields");
+        if (!eventName || !eventDateRaw || !eventHourRaw) throw new Error("missing_modal_fields");
+
+        const parsedDate = parseDateInput(`${eventDateRaw} ${eventHourRaw}`.trim());
+        if (!parsedDate) throw new Error("invalid_date_format");
+
+        const formattedDate = formatDateLabel(parsedDate.day, parsedDate.month, parsedDate.hour, parsedDate.minute);
 
         await interaction.reply?.({
-          content: `✅ Event **${eventName}** scheduled on **${eventDate}** at **${eventHour}**.`,
+          content: `✅ Event **${eventName}** scheduled on **${formattedDate}**.`,
           ephemeral: true,
         });
         flow.success();
