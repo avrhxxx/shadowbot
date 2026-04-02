@@ -25,11 +25,19 @@ const MONTH_NAMES = [
 ];
 
 // =====================================
-// 🔹 FORMATTER HELPER
+// 🔹 FORMATTER HELPERS
 // =====================================
 function formatDayLabel(d: { value: string }) {
-  const [, month, day] = d.value.split("-").map(Number); // pomijamy year
+  const [, month, day] = d.value.split("-").map(Number);
   return `${day} ${MONTH_NAMES[month - 1]}`;
+}
+
+// Snake case → Capitalized Words, np. reservoir_raid → Reservoir Raid
+function formatEventName(name: string) {
+  return name
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 // =====================================
@@ -68,6 +76,14 @@ registerUIAction("events.create", {
           });
         }
 
+        // 🔹 Dodanie przycisku Back na ekranie wyboru typu eventu
+        rows.push({
+          type: 1,
+          components: [
+            { type: 2, label: "⬅ Back", style: 2, custom_id: "moderator.open|target=hub" },
+          ],
+        });
+
         await interaction.reply?.({
           content: "Select event type:",
           components: rows,
@@ -82,11 +98,11 @@ registerUIAction("events.create", {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
 
+        // Birthday i Custom: od razu modal z datą
         if (["custom", "birthdays"].includes(eventType)) {
-          // modal do wpisania nazwy eventu
           await interaction.showModal?.({
             custom_id: `events.create|step=name|type=${eventType}`,
-            title: "Enter Event Name",
+            title: "Enter Event Name & Date",
             components: [
               {
                 type: 1,
@@ -101,11 +117,25 @@ registerUIAction("events.create", {
                   },
                 ],
               },
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_date",
+                    style: 1,
+                    label: "Event Date (YYYY-MM-DD)",
+                    placeholder: "Select a date within next 6 months",
+                    min_length: 10,
+                    max_length: 10,
+                  },
+                ],
+              },
             ],
           });
         } else {
-          // dla standardowych eventów: pokaż przyciski wyboru dnia
-          await renderDaySelection(interaction, eventType, eventType);
+          // Standardowe eventy: pokaż przyciski wyboru dnia
+          await renderDaySelection(interaction, eventType, formatEventName(eventType));
         }
         flow.success();
         return;
@@ -114,10 +144,18 @@ registerUIAction("events.create", {
       // 🔹 Step: name (modal)
       if (interaction.isModalSubmit?.() && payload?.step === "name") {
         const eventName = interaction.fields.getTextInputValue("event_name");
+        const eventDate = interaction.fields.getTextInputValue("event_date");
+
         if (!eventName) throw new Error("event_name_missing");
 
-        // po wpisaniu nazwy, pokazujemy wybór dnia
-        await renderDaySelection(interaction, payload.type, eventName);
+        if (["custom", "birthdays"].includes(payload.type) && eventDate) {
+          await interaction.reply?.({
+            content: `✅ Event **${eventName}** scheduled on **${eventDate}**.`,
+            ephemeral: true,
+          });
+        } else {
+          await renderDaySelection(interaction, payload.type, formatEventName(eventName));
+        }
         flow.success();
         return;
       }
@@ -129,7 +167,6 @@ registerUIAction("events.create", {
         const eventDay = payload.day;
         if (!eventName || !eventType || !eventDay) throw new Error("missing_day_payload");
 
-        // modal godziny pojawia się dopiero po kliknięciu w dzień
         await interaction.showModal?.({
           custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${eventDay}`,
           title: `Select Hour for ${eventName}`,
@@ -194,11 +231,11 @@ async function renderDaySelection(interaction: any, eventType: string, eventName
     });
   }
 
-  // 🔹 Back button
+  // 🔹 Back button do wyboru typu eventu
   rows.push({
     type: 1,
     components: [
-      { type: 2, label: "⬅ Back", style: 2, custom_id: "moderator.open|target=hub" },
+      { type: 2, label: "⬅ Back", style: 2, custom_id: "events.create|step=start" },
     ],
   });
 
