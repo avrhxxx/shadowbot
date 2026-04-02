@@ -1,21 +1,32 @@
-// =====================================
 // 📁 src/systems/events/actions/events.create.action.ts
-// =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { createLogger } from "@/foundation/logger";
 import { getFutureDays } from "../utils/dateUtils";
 
-import type { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
+import type { ButtonInteraction, ModalSubmitInteraction, Interaction } from "discord.js";
 
 // =====================================
-// 🔹 MONTH NAMES
+// 🔹 MONTH NAMES & HELPERS
 // =====================================
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
+
+function formatDayLabel(value: string) {
+  const [, month, day] = value.split("-").map(Number);
+  return `${day} ${MONTH_NAMES[month - 1]}`;
+}
+
+function formatEventName(raw: string) {
+  // reservoir_raid → Reservoir Raid
+  return raw
+    .split("_")
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
 // =====================================
 // 🔹 REGISTER CREATE EVENT ACTION
@@ -24,14 +35,14 @@ const MONTH_NAMES = [
 registerUIAction("events.create", {
   system: "events",
 
-  handler: async (interaction: ButtonInteraction | ModalSubmitInteraction, ctx, payload: any) => {
+  handler: async (interaction: Interaction, ctx, payload: any) => {
     const log = createLogger(ctx);
     const flow = log.flow("events.create");
     flow.start();
 
     try {
       // 🔹 Step: start - wybór typu eventu
-      if (interaction.isButton() && payload?.step === "start") {
+      if ("isButton" in interaction && interaction.isButton() && payload?.step === "start") {
         const typeOptions = [
           { label: "Reservoir Raid", value: "reservoir_raid" },
           { label: "Arcadian Conquest", value: "arcadian_conquest" },
@@ -54,40 +65,44 @@ registerUIAction("events.create", {
           });
         }
 
-        await interaction.reply({ content: "Select event type:", components: rows, ephemeral: true });
+        if ("reply" in interaction) {
+          await interaction.reply({ content: "Select event type:", components: rows, ephemeral: true });
+        }
+
         flow.success();
         return;
       }
 
       // 🔹 Step: type
-      if (interaction.isButton() && payload?.step === "type") {
+      if ("isButton" in interaction && interaction.isButton() && payload?.step === "type") {
         const eventType = payload.type;
         if (!eventType) throw new Error("event_type_missing");
 
-        const eventLabel = formatEventLabel(eventType);
-
         if (["custom", "birthdays"].includes(eventType)) {
-          await interaction.showModal({
-            custom_id: `events.create|step=name|type=${eventType}`,
-            title: "Enter Event Name",
-            components: [
-              {
-                type: 1,
-                components: [
-                  {
-                    type: 4,
-                    custom_id: "event_name",
-                    style: 1,
-                    label: "Event Name",
-                    min_length: 3,
-                    max_length: 100,
-                  },
-                ],
-              },
-            ],
-          });
+          if ("showModal" in interaction) {
+            await interaction.showModal({
+              custom_id: `events.create|step=name|type=${eventType}`,
+              title: "Enter Event Name",
+              components: [
+                {
+                  type: 1,
+                  components: [
+                    {
+                      type: 4,
+                      custom_id: "event_name",
+                      style: 1,
+                      label: "Event Name",
+                      min_length: 3,
+                      max_length: 100,
+                    },
+                  ],
+                },
+              ],
+            });
+          }
         } else {
-          await proceedToDaySelect(interaction, eventType, eventLabel);
+          const eventName = formatEventName(eventType);
+          await proceedToDaySelect(interaction, eventType, eventName);
         }
 
         flow.success();
@@ -95,7 +110,7 @@ registerUIAction("events.create", {
       }
 
       // 🔹 Step: name (modal)
-      if (interaction.isModalSubmit() && payload?.step === "name") {
+      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "name") {
         const eventType = payload.type;
         const eventName = interaction.fields.getTextInputValue("event_name");
         if (!eventName) throw new Error("event_name_missing");
@@ -106,55 +121,54 @@ registerUIAction("events.create", {
       }
 
       // 🔹 Step: day (kliknięcie przycisku daty)
-      if (interaction.isButton() && payload?.step === "day") {
+      if ("isButton" in interaction && interaction.isButton() && payload?.step === "day") {
         const eventType = payload.type;
         const eventName = payload.name;
-        const dayValue = payload.day; // YYYY-MM-DD
+        const dayValue = payload.day;
+
         if (!dayValue) throw new Error("day_value_missing");
 
-        // Pokaż modal do wpisania godziny
-        await interaction.showModal({
-          custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
-          title: `Set Time for ${eventName}`,
-          components: [
-            {
-              type: 1,
-              components: [
-                {
-                  type: 4,
-                  custom_id: "event_hour",
-                  style: 1,
-                  label: "Hour (HHMM, UTC)",
-                  placeholder: "e.g. 1830",
-                  min_length: 3,
-                  max_length: 4,
-                },
-              ],
-            },
-          ],
-        });
+        // 🔹 pokaz modal do wpisania godziny
+        if ("showModal" in interaction) {
+          await interaction.showModal({
+            custom_id: `events.create|step=hour|type=${eventType}|name=${eventName}|day=${dayValue}`,
+            title: `Set Time for ${eventName}`,
+            components: [
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4,
+                    custom_id: "event_hour",
+                    style: 1,
+                    label: "Hour (HHMM, UTC)",
+                    placeholder: "e.g. 1830",
+                    min_length: 3,
+                    max_length: 4,
+                  },
+                ],
+              },
+            ],
+          });
+        }
 
         flow.success();
         return;
       }
 
-      // 🔹 Step: hour (modal)
-      if (interaction.isModalSubmit() && payload?.step === "hour") {
+      // 🔹 Step: hour (modal submit)
+      if ("isModalSubmit" in interaction && interaction.isModalSubmit() && payload?.step === "hour") {
         const eventType = payload.type;
         const eventName = payload.name;
         const dayValue = payload.day;
+        const hour = interaction.fields.getTextInputValue("event_hour");
 
-        const eventHour = interaction.fields.getTextInputValue("event_hour");
-        if (!eventHour) throw new Error("event_hour_missing");
+        if (!hour) throw new Error("hour_missing");
 
-        flow.stepDebug("event.hour_received", {
-          meta: { eventType, eventName, dayValue, eventHour },
-        });
-
-        await interaction.reply({
-          content: `✅ Event **${eventName}** scheduled for ${dayValue} at ${eventHour} UTC.`,
-          ephemeral: true,
-        });
+        // 🔹 Tutaj można dalej zapisać event w DB lub wysłać potwierdzenie
+        if ("reply" in interaction) {
+          await interaction.reply({ content: `✅ Event **${eventName}** scheduled on **${dayValue}** at **${hour} UTC**`, ephemeral: true });
+        }
 
         flow.success();
         return;
@@ -163,7 +177,7 @@ registerUIAction("events.create", {
       flow.fail(new Error("unknown_interaction_type"));
     } catch (err) {
       flow.fail(err);
-      if (interaction.reply) {
+      if ("reply" in interaction) {
         await interaction.reply({ content: `❌ Failed: ${err}`, ephemeral: true }).catch(() => null);
       }
     }
@@ -174,24 +188,12 @@ registerUIAction("events.create", {
 // 🔹 HELPERS
 // =====================================
 
-function formatEventLabel(value: string) {
-  return value
-    .split("_")
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function formatDayLabel(value: string) {
-  const [, month, day] = value.split("-").map(Number);
-  return `${day} ${MONTH_NAMES[month - 1]}`;
-}
-
 async function proceedToDaySelect(
-  interaction: ButtonInteraction | ModalSubmitInteraction,
+  interaction: ButtonInteraction | ModalSubmitInteraction | Interaction,
   eventType: string,
   eventName: string
 ) {
-  const allDays = getFutureDays(); // wszystkie dni jakie daje funkcja
+  const allDays = getFutureDays();
   const days = allDays.slice(0, 8); // 8 przycisków: dzisiaj + 7 następnych
 
   const rows: any[] = [];
@@ -219,12 +221,6 @@ async function proceedToDaySelect(
     await interaction.update({
       content: `Select day for event **${eventName}**:`,
       components: rows,
-    });
-  } else if ("reply" in interaction) {
-    await interaction.reply({
-      content: `Select day for event **${eventName}**:`,
-      components: rows,
-      ephemeral: true,
     });
   }
 }
