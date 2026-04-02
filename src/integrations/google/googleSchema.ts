@@ -53,6 +53,21 @@ export const MODERATOR_CONFIG_SHEET = {
 } as const satisfies SheetDefinition;
 
 // =====================================
+// 🔹 DEVPANEL
+// =====================================
+
+export const DEVPANEL_CONFIG_SHEET = {
+  name: "devpanel_config",
+  headers: [
+    "id",
+    "guildId",
+    "channelId",
+    "hubMessageId",
+    "lastUpdated",
+  ],
+} as const satisfies SheetDefinition;
+
+// =====================================
 // 🔹 EVENTS
 // =====================================
 
@@ -205,6 +220,7 @@ export const ALL_SHEETS = [
   SYSTEM_FLAGS_SHEET,
 
   MODERATOR_CONFIG_SHEET,
+  DEVPANEL_CONFIG_SHEET, // 🔹 dodany DevPanel
 
   EVENTS_SHEET,
   EVENTS_CONFIG_SHEET,
