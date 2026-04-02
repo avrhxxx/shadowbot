@@ -123,7 +123,7 @@ registerUIAction("events.create", {
                     type: 4,
                     custom_id: "event_date",
                     style: 1,
-                    label: "Event Date (any format, e.g., 20260402 or 2 Apr 2026)",
+                    label: "Event Date (YYYYMMDD / DD MMM)",
                     min_length: 4,
                     max_length: 20,
                   },
