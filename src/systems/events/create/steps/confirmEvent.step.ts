@@ -3,8 +3,6 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { ButtonInteraction } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
@@ -14,18 +12,19 @@ import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 export function registerConfirmEventStep() {
   registerUIAction("events.create.confirm", {
     system: "events",
-    handler: async (interaction: ButtonInteraction, ctx: TraceContext) => {
+    handler: async (interaction) => {
       if (!interaction.isButton()) return;
 
       // ----------------------------
       // Pobieramy parametry z custom_id
       // day, month, hours, minutes
       // ----------------------------
-      const [params] = interaction.customId.split("|").slice(1);
-      const day = Number(params.split("&")[0].split("=")[1]);
-      const month = Number(params.split("&")[1].split("=")[1]);
-      const hours = Number(params.split("&")[2].split("=")[1]);
-      const minutes = Number(params.split("&")[3].split("=")[1]);
+      const paramsString = interaction.customId.split("|")[1] || "";
+      const paramsArray = paramsString.split("&");
+      const day = Number(paramsArray[0]?.split("=")[1]);
+      const month = Number(paramsArray[1]?.split("=")[1]);
+      const hours = Number(paramsArray[2]?.split("=")[1]);
+      const minutes = Number(paramsArray[3]?.split("=")[1]);
 
       // ----------------------------
       // Tworzymy datę UTC
