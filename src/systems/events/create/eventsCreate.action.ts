@@ -1,3 +1,5 @@
+
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
 
