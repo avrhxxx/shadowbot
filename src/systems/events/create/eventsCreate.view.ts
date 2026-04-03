@@ -10,7 +10,7 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async () => {
       // -------------------------------
       // WIDOK CREATE EVENT (bez importów)
       // -------------------------------
@@ -60,18 +60,13 @@ export function registerEventsCreateActions() {
         ],
       };
 
-      const view = {
+      // -------------------------------
+      // Zwracamy obiekt widoku zamiast używać interaction.update()
+      // -------------------------------
+      return {
         content: "📌 **Create Event**\n\nSelect an event type:",
         components: [standardRow, otherRow, backRow],
       };
-
-      // -------------------------------
-      // Aktualizacja interfejsu
-      // -------------------------------
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
     },
   });
 }
