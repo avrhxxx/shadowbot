@@ -1,7 +1,3 @@
-// =====================================
-// 📁 src/systems/events/views/events.main.view.ts
-// =====================================
-
 import { ViewResult } from "@/systems/moderator/views/moderator.view";
 
 // =====================================
@@ -12,13 +8,13 @@ export async function renderEventsMain(): Promise<ViewResult> {
   const buttons: any[] = [];
 
   const actions = [
-    { action: "create", label: "Create Event", style: 1 },        // Primary
-    { action: "list", label: "Events List", style: 1 },          // Primary
+    { action: "create", label: "Create Event", style: 1 },           // Primary
+    { action: "list", label: "Events List", style: 1 },             // Primary
     { action: "manualReminder", label: "Manual Reminder", style: 1 }, // Primary
-    { action: "showAll", label: "Show All", style: 1 },          // Primary
-    { action: "cancel", label: "Cancel Event", style: 4 },       // Danger
-    { action: "settings", label: "Settings", style: 2 },         // Secondary
-    { action: "help", label: "Guide", style: 3 },               // Success
+    { action: "showAll", label: "Show All", style: 1 },             // Primary
+    { action: "cancel", label: "Cancel Event", style: 4 },          // Danger
+    { action: "settings", label: "Settings", style: 2 },            // Secondary
+    { action: "help", label: "Guide", style: 3 },                   // Success
   ];
 
   for (const act of actions) {
@@ -26,7 +22,7 @@ export async function renderEventsMain(): Promise<ViewResult> {
       type: 2,
       label: act.label,
       style: act.style,
-      custom_id: `events.main|action=${act.action}`, // nowy silnik, flow-based
+      custom_id: `events.main|action=${act.action}`, // flow-based
     });
   }
 
@@ -35,7 +31,7 @@ export async function renderEventsMain(): Promise<ViewResult> {
     type: 2,
     label: "Back",
     style: 2, // Secondary
-    custom_id: `moderator.open|target=hub`,
+    custom_id: `events.main|action=back`,
   });
 
   // 🔹 Podział na rzędy max 5 przycisków
