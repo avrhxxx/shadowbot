@@ -10,7 +10,7 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async () => {
+    handler: async (interaction) => {
       // -------------------------------
       // WIDOK CREATE EVENT (bez importów)
       // -------------------------------
@@ -33,7 +33,7 @@ export function registerEventsCreateActions() {
         components: STANDARD_EVENT_TYPES.map((t) => ({
           type: 2,
           label: t.label,
-          style: 1, // primary
+          style: 1,
           custom_id: `events.create.selectType|target=${t.value}`,
         })),
       };
@@ -43,7 +43,7 @@ export function registerEventsCreateActions() {
         components: OTHER_EVENT_TYPES.map((t) => ({
           type: 2,
           label: t.label,
-          style: 1, // primary
+          style: 1,
           custom_id: `events.create.selectType|target=${t.value}`,
         })),
       };
@@ -54,19 +54,17 @@ export function registerEventsCreateActions() {
           {
             type: 2,
             label: "⬅ Back",
-            style: 2, // secondary
+            style: 2,
             custom_id: "events.main.back",
           },
         ],
       };
 
-      // -------------------------------
-      // Zwracamy obiekt widoku zamiast używać interaction.update()
-      // -------------------------------
-      return {
+      // ✅ KLUCZ: update zamiast return
+      await interaction.update({
         content: "📌 **Create Event**\n\nSelect an event type:",
         components: [standardRow, otherRow, backRow],
-      };
+      });
     },
   });
 }
