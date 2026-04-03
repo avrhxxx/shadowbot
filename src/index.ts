@@ -26,6 +26,9 @@ import { handleModeratorCommand } from "@/systems/moderator/commands/moderator.c
 import { moderatorSlash } from "@/systems/moderator/commands/moderator.slash";
 import { initModeratorPanelForGuild } from "@/systems/moderator/moderator.channel";
 
+// 🔹 EVENTS
+import { registerEventsMainActions } from "@/systems/events/main/events.main.action";
+
 // =====================================
 // 🔐 ENV
 // =====================================
@@ -174,6 +177,17 @@ client.once("ready", async () => {
     await initModeratorPanelForGuild(guild);
   } catch (err) {
     discordFlow.stepInfo("ready", { meta: { msg: "Failed to init panels", err } });
+  }
+
+  // =============================
+  // 🔹 INIT EVENTS SYSTEM
+  // =============================
+
+  try {
+    await registerEventsMainActions();
+    discordFlow.stepInfo("ready", { meta: { msg: "Events system initialized" } });
+  } catch (err) {
+    discordFlow.stepInfo("ready", { meta: { msg: "Failed to init events system", err } });
   }
 });
 
