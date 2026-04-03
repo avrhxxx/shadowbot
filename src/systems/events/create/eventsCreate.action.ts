@@ -10,11 +10,8 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction) => {
-      // Sprawdzenie przycisku nie jest obowiązkowe, bo flow UIAction jest już filtrowany
-      // if (!interaction.isButton()) return;
-
-      // Lazy import widoku
+    handler: async (interaction: any) => {
+      // Lazy import widoku wewnątrz handlera
       const { eventsCreateView } = await import("./eventsCreate.view");
       const view = await eventsCreateView();
 
