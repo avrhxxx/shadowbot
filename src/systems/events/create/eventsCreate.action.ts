@@ -3,8 +3,7 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { ButtonInteraction } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
+import type { Interaction } from "discord.js";
 
 // ----------------------------
 // REGISTER MAIN CREATE BUTTON
@@ -12,7 +11,7 @@ import type { TraceContext } from "@/core/trace/TraceContext";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction: ButtonInteraction, ctx: TraceContext) => {
+    handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
 
       // Lazy import widoku
