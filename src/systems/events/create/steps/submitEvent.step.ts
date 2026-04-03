@@ -3,7 +3,7 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
+import { formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
 // REGISTER STEP: SUBMIT EVENT (LOGIC + UI)
@@ -11,7 +11,7 @@ import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 export function registerSubmitEventStep() {
   registerUIAction("events.create.submit", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: any) => {
       if (!interaction.isModalSubmit()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
@@ -21,8 +21,6 @@ export function registerSubmitEventStep() {
       const minutes = Number(params.split("&")[3].split("=")[1]);
       const notify = params.includes("notify=true"); // sprawdzamy notify
 
-      // Tworzymy datę UTC
-      const eventDate = getEventDateUTC(day, month, hours, minutes);
       const formatted = formatEventUTC(day, month, hours, minutes);
 
       // Demo podsumowanie
