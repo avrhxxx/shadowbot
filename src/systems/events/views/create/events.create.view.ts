@@ -1,6 +1,9 @@
-// src/systems/events/views/create/events.create.view.ts
-import { getTempEvent } from "../../store/create/events.create.store";
+// =====================================
+// 📁 src/systems/events/views/create/events.create.view.ts
+// =====================================
+
 import { formatEventUTC } from "../../../shared/utils/timeUtils";
+import type { TempEvent } from "../../store/create/events.create.store";
 
 // === DAY BUTTONS ===
 export function renderDayButtonsView(userId: string) {
@@ -45,7 +48,7 @@ export function renderModalView(tempId: string) {
 }
 
 // === CONFIRM VIEW ===
-export function renderConfirmView(temp) {
+export function renderConfirmView(temp: TempEvent) {
   return {
     content: `✅ Event **${temp.name}** scheduled on ${formatEventUTC(temp.day, temp.month, temp.hour, temp.minute)} UTC`,
     components: [
