@@ -43,7 +43,7 @@ export async function handleCreateFlow(interaction: ButtonInteraction, payload: 
 }
 
 // === START STEP ===
-async function handleStartStep(interaction: ButtonInteraction, payload: Payload) {
+async function handleStartStep(interaction: ButtonInteraction) {
   if (!interaction.isButton()) return;
 
   const components = EVENT_TYPES.map((type) => ({
@@ -68,13 +68,16 @@ async function handleStartStep(interaction: ButtonInteraction, payload: Payload)
 }
 
 // === DAY STEP ===
-async function handleDayStep(interaction: ButtonInteraction, payload: Payload) {
+async function handleDayStep(_: ButtonInteraction, payload: Payload) {
+  // renderujemy przyciski dni dla wybranego typu eventu
   return renderDayButtonsView(payload.userId!);
 }
 
 // === MODAL STEP ===
-async function handleModalStep(interaction: ButtonInteraction, payload: Payload) {
-  return renderModalView(payload.tempId!); // tylko jeden argument
+async function handleModalStep(_: ButtonInteraction, payload: Payload) {
+  // tutaj w nowym flow dla standardowych eventów będzie modal z godzinami i minutami UTC
+  // dla birthay/custom pozostaje normalny modal
+  return renderModalView(payload.tempId!);
 }
 
 // === CONFIRM STEP ===
