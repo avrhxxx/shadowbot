@@ -1,5 +1,5 @@
 // =====================================
-// 📁 src/ui/devpanel/devpanel.slash.ts
+// 📁 src/systems/devpanel/commands/devpanel.slash.ts
 // =====================================
 
 import { SlashCommandBuilder } from "discord.js";
