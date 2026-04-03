@@ -4,29 +4,18 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 
-// 🔹 Importujemy step-y
-import { registerBirthdayFormStep } from "@/systems/events/create/steps/birthdayForm.step";
-import { registerCustomEventFormStep } from "@/systems/events/create/steps/customEventForm.step";
-import { registerSelectDayStep } from "@/systems/events/create/steps/selectDay.step";
-import { registerSelectTimeStep } from "@/systems/events/create/steps/selectTime.step";
-import { registerConfirmEventStep } from "@/systems/events/create/steps/confirmEvent.step";
-import { registerSubmitEventStep } from "@/systems/events/create/steps/submitEvent.step";
+// 🔹 Importujemy całą logikę create feature
+import { initEventsCreateFeature } from "@/systems/events/create/eventsCreate.index";
 
 // =====================================
 // 🚀 REGISTER MAIN ACTIONS
 // =====================================
 
 export function registerEventsMainActions() {
-
   // =====================================
-  // 🔹 REGISTER ALL STEPS
+  // 🔹 INIT CREATE FEATURE (wszystkie step-y)
   // =====================================
-  registerBirthdayFormStep();
-  registerCustomEventFormStep();
-  registerSelectDayStep();
-  registerSelectTimeStep();
-  registerConfirmEventStep();
-  registerSubmitEventStep();
+  initEventsCreateFeature();
 
   // =====================================
   // 🔹 CREATE (podłączony do startu flow)
@@ -37,7 +26,9 @@ export function registerEventsMainActions() {
       if (!interaction.isButton()) return;
 
       // 🔹 Lazy import start view selectDay
-      const { selectDayStepView } = await import("@/systems/events/create/steps/selectDay.step.view");
+      const { selectDayStepView } = await import(
+        "@/systems/events/create/steps/selectDay.step.view"
+      );
       const view = await selectDayStepView();
 
       await interaction.update({
@@ -54,11 +45,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "📋 Events List (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "📋 Events List (coming soon)", ephemeral: true });
     },
   });
 
@@ -69,11 +56,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "⏰ Manual Reminder (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "⏰ Manual Reminder (coming soon)", ephemeral: true });
     },
   });
 
@@ -84,11 +67,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "📊 Show All (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "📊 Show All (coming soon)", ephemeral: true });
     },
   });
 
@@ -99,11 +78,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "❌ Cancel Event (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "❌ Cancel Event (coming soon)", ephemeral: true });
     },
   });
 
@@ -114,11 +89,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "📖 Guide (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "📖 Guide (coming soon)", ephemeral: true });
     },
   });
 
@@ -129,11 +100,7 @@ export function registerEventsMainActions() {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      await interaction.reply({
-        content: "⚙️ Settings (coming soon)",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "⚙️ Settings (coming soon)", ephemeral: true });
     },
   });
 
@@ -144,8 +111,6 @@ export function registerEventsMainActions() {
     system: "moderator",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
-
-      // 🔹 delegujemy kliknięcie do moderator hub
       await interaction.client.emit("ui.router.interaction.received", {
         id: "moderator.open|target=hub",
         user: interaction.user,
