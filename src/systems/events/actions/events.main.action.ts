@@ -1,3 +1,4 @@
+// src/systems/events/actions/events.main.action.ts
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
 
