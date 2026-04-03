@@ -1,22 +1,15 @@
-// =====================================
-// 📁 src/systems/events/actions/events.main.action.ts
-// =====================================
-
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
 
 import { renderEventsMain } from "../views/events.main.view";
-
-// 🔹 Tymczasowe stuby, żeby build przeszedł
-export async function handleCreateFlow() {}
-export async function handleListFlow() {}
-export async function handleManualReminderFlow() {}
-export async function handleCancelFlow() {}
-export async function handleSettingsFlow() {}
-export async function handleHelpFlow(interaction: Interaction, _ctx: any, _payload: any) {}
+import { handleCreateFlow } from "../create/events.create.action";
+import { handleListFlow } from "../list/events.list.action";
+import { handleManualReminderFlow } from "../reminder/reminder.action";
+import { handleCancelFlow } from "../manage/cancel.action";
+import { handleSettingsFlow } from "../settings/settings.action";
 
 type EventsPayload = {
-  action?: "create" | "list" | "manualReminder" | "cancel" | "settings" | "help" | "back";
+  action?: "create" | "list" | "manualReminder" | "cancel" | "settings" | "help" | "back" | "showAll";
 };
 
 export function registerEventsMainActions() {
@@ -27,7 +20,7 @@ export function registerEventsMainActions() {
 
       const action = payload?.action;
 
-      // 🔹 kliknięto przycisk Back → wróć do moderator hub
+      // 🔹 Back → wróć do moderator hub
       if (action === "back") {
         await interaction.update({
           content: "📌 Returning to Moderator Panel...",
@@ -48,13 +41,38 @@ export function registerEventsMainActions() {
         return;
       }
 
-      // 🔹 kliknięto Help
+      // 🔹 Help → wbudowany w main action
       if (action === "help") {
-        await handleHelpFlow(interaction, _ctx, payload);
+        await interaction.update({
+          content: `
+📌 **Events Panel Guide**
+
+🟢 Create Event → Create a new event.
+🟢 Events List → View all events.
+🟢 Manual Reminder → Send a manual reminder.
+🟢 Show All → Show all events.
+🔴 Cancel Event → Cancel a planned event.
+⚙ Settings → Configure event options.
+❓ Guide → Show this help panel.
+          `.trim(),
+          components: [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 2,
+                  label: "⬅ Back",
+                  style: 2,
+                  custom_id: "events.main|action=back",
+                },
+              ],
+            },
+          ],
+        });
         return;
       }
 
-      // 🔹 kliknięto konkretną akcję events → delegacja do feature flow
+      // 🔹 Delegacja do feature flow
       const flowMap: Record<string, (i: Interaction, c: any, p: EventsPayload) => Promise<void>> = {
         create: handleCreateFlow,
         list: handleListFlow,
@@ -68,7 +86,7 @@ export function registerEventsMainActions() {
         return;
       }
 
-      // 🔹 brak action → render main events panel
+      // 🔹 Brak action → render main events panel
       const view = await renderEventsMain();
       await interaction.update({
         content: view.content,
