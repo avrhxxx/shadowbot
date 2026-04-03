@@ -8,7 +8,8 @@ import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
-// REGISTER STEP: BIRTHDAY FORM (LOGIC HANDLER)
+// REGISTER STEP: BIRTHDAY FORM
+// Logika i UI w jednym pliku stepu
 // ----------------------------
 export function registerBirthdayFormStep() {
   registerUIAction("events.create.birthdayForm.submit", {
@@ -16,7 +17,9 @@ export function registerBirthdayFormStep() {
     handler: async (interaction: ModalSubmitInteraction, ctx: TraceContext) => {
       if (!interaction.isModalSubmit()) return;
 
-      // Pobieramy wartości z modala
+      // ----------------------------
+      // Pobieramy dane z formularza
+      // ----------------------------
       const day = Number(interaction.fields.getTextInputValue("day"));
       const month = Number(interaction.fields.getTextInputValue("month"));
       const hours = Number(interaction.fields.getTextInputValue("hours"));
@@ -24,22 +27,28 @@ export function registerBirthdayFormStep() {
       const name = interaction.fields.getTextInputValue("name");
       const notify = interaction.fields.getTextInputValue("notify") === "yes";
 
+      // ----------------------------
       // Tworzymy datę UTC
+      // ----------------------------
       const eventDate = getEventDateUTC(day, month, hours, minutes);
 
-      // Formatujemy do wyświetlenia
+      // ----------------------------
+      // Formatujemy datę do wyświetlenia
+      // ----------------------------
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      // Podsumowanie (demo / placeholder)
+      // ----------------------------
+      // Wyświetlamy podsumowanie
+      // ----------------------------
       await interaction.reply({
         content: `🎉 Birthday Event for **${name}** set on **${formatted}**${notify ? " (notification enabled)" : ""}`,
         ephemeral: true,
       });
 
-      // Tu można dodać dalsze akcje:
-      // - zapis do store / bazy
-      // - wywołanie powiadomień
-      // - przypisanie typu eventu
+      // ----------------------------
+      // 🔹 Tu można w przyszłości triggerować kolejne stepy
+      // np. registerConfirmEventStep() albo zapis do store
+      // ----------------------------
     },
   });
 }
