@@ -8,7 +8,7 @@ import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
-// REGISTER STEP: SUBMIT EVENT
+// REGISTER STEP: SUBMIT EVENT (LOGIC + UI)
 // ----------------------------
 export function registerSubmitEventStep() {
   registerUIAction("events.create.submit", {
@@ -16,30 +16,27 @@ export function registerSubmitEventStep() {
     handler: async (interaction: ModalSubmitInteraction, ctx: TraceContext) => {
       if (!interaction.isModalSubmit()) return;
 
-      // Pobieramy parametry z custom_id modala
       const [params] = interaction.customId.split("|").slice(1);
       const day = Number(params.split("&")[0].split("=")[1]);
       const month = Number(params.split("&")[1].split("=")[1]);
-
-      // Pobieramy hours/minutes z modala
-      const hours = Number(interaction.fields.getTextInputValue("hours"));
-      const minutes = Number(interaction.fields.getTextInputValue("minutes"));
+      const hours = Number(params.split("&")[2].split("=")[1]);
+      const minutes = Number(params.split("&")[3].split("=")[1]);
+      const notify = params.includes("notify=true"); // sprawdzamy notify
 
       // Tworzymy datę UTC
       const eventDate = getEventDateUTC(day, month, hours, minutes);
-
-      // Formatujemy do wyświetlenia
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      // Tutaj w praktyce tworzymy event w systemie / store
-      // Dla demo wyświetlamy podsumowanie
+      // Demo podsumowanie
       await interaction.reply({
-        content: `✅ Event created for **${formatted}**`,
+        content: `✅ Event created for **${formatted}**${notify ? " (notification sent)" : ""}`,
         ephemeral: true,
       });
 
-      // W tym miejscu można też triggerować dalsze kroki,
-      // np. zapis do bazy, przypisanie typu eventu, powiadomienia itd.
+      // 🔹 Tutaj można triggerować dalsze akcje:
+      // - zapis do store / bazy
+      // - wywołanie powiadomień
+      // - przypisanie typu eventu
     },
   });
 }
