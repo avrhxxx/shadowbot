@@ -22,10 +22,8 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.create", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
-
-      // 🔹 Lazy import start view selectDay
+    handler: async (interaction: any) => {
+      // Lazy import start view selectDay
       const { selectDayStepView } = await import(
         "@/systems/events/create/steps/selectDay.step.view"
       );
@@ -43,8 +41,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.list", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "📋 Events List (coming soon)", ephemeral: true });
     },
   });
@@ -54,8 +51,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.reminder", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "⏰ Manual Reminder (coming soon)", ephemeral: true });
     },
   });
@@ -65,8 +61,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.show_all", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "📊 Show All (coming soon)", ephemeral: true });
     },
   });
@@ -76,8 +71,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.cancel", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "❌ Cancel Event (coming soon)", ephemeral: true });
     },
   });
@@ -87,8 +81,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.guide", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "📖 Guide (coming soon)", ephemeral: true });
     },
   });
@@ -98,8 +91,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("events.main.settings", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.reply({ content: "⚙️ Settings (coming soon)", ephemeral: true });
     },
   });
@@ -109,8 +101,7 @@ export function registerEventsMainActions() {
   // =====================================
   registerUIAction("moderator.open|target=hub", {
     system: "moderator",
-    handler: async (interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any) => {
       await interaction.client.emit("ui.router.interaction.received", {
         id: "moderator.open|target=hub",
         user: interaction.user,
