@@ -3,8 +3,6 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { ButtonInteraction, ModalSubmitInteraction } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
@@ -15,14 +13,14 @@ export function registerSelectTimeStep() {
   // Handler dla przycisku wyboru dnia
   registerUIAction("events.create.selectTime", {
     system: "events",
-    handler: async (interaction: ButtonInteraction, ctx: TraceContext) => {
+    handler: async (interaction) => {
       if (!interaction.isButton()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
       const day = Number(params.split("&")[0].split("=")[1]);
       const month = Number(params.split("&")[1].split("=")[1]);
 
-      // Tworzymy modal bez importu z zewnątrz
+      // Tworzymy modal
       const modal = {
         title: `Set time for ${day}/${month} UTC`,
         custom_id: `events.create.selectTime.submit|day=${day}&month=${month}`,
@@ -60,7 +58,7 @@ export function registerSelectTimeStep() {
   // Handler submit modala
   registerUIAction("events.create.selectTime.submit", {
     system: "events",
-    handler: async (interaction: ModalSubmitInteraction, ctx: TraceContext) => {
+    handler: async (interaction) => {
       if (!interaction.isModalSubmit()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
