@@ -3,8 +3,6 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { ButtonInteraction } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
 import { formatButtonDate } from "@/shared/utils/timeUtils";
 
 // -------------------------------
@@ -19,7 +17,7 @@ const DAYS_TO_SHOW = 8;
 export function registerSelectDayStep() {
   registerUIAction("events.create.selectDay", {
     system: "events",
-    handler: async (interaction: ButtonInteraction, ctx: TraceContext) => {
+    handler: async (interaction) => {
       if (!interaction.isButton()) return;
 
       // ----------------------------
