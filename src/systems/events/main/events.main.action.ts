@@ -4,6 +4,14 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 
+// 🔹 Importujemy step-y
+import { registerBirthdayFormStep } from "@/systems/events/create/steps/birthdayForm.step";
+import { registerCustomEventFormStep } from "@/systems/events/create/steps/customEventForm.step";
+import { registerSelectDayStep } from "@/systems/events/create/steps/selectDay.step";
+import { registerSelectTimeStep } from "@/systems/events/create/steps/selectTime.step";
+import { registerConfirmEventStep } from "@/systems/events/create/steps/confirmEvent.step";
+import { registerSubmitEventStep } from "@/systems/events/create/steps/submitEvent.step";
+
 // =====================================
 // 🚀 REGISTER MAIN ACTIONS
 // =====================================
@@ -11,16 +19,30 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 export function registerEventsMainActions() {
 
   // =====================================
-  // 🔹 CREATE (placeholder)
+  // 🔹 REGISTER ALL STEPS
+  // =====================================
+  registerBirthdayFormStep();
+  registerCustomEventFormStep();
+  registerSelectDayStep();
+  registerSelectTimeStep();
+  registerConfirmEventStep();
+  registerSubmitEventStep();
+
+  // =====================================
+  // 🔹 CREATE (podłączony do startu flow)
   // =====================================
   registerUIAction("events.main.create", {
     system: "events",
     handler: async (interaction) => {
       if (!interaction.isButton()) return;
 
-      await interaction.reply({
-        content: "🛠️ Create Event (coming soon)",
-        ephemeral: true,
+      // 🔹 Lazy import start view selectDay
+      const { selectDayStepView } = await import("@/systems/events/create/steps/selectDay.step.view");
+      const view = await selectDayStepView();
+
+      await interaction.update({
+        content: view.content,
+        components: view.components,
       });
     },
   });
