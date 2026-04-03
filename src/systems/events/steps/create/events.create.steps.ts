@@ -1,12 +1,22 @@
-// src/systems/events/steps/create/events.create.steps.ts
+// =====================================
+// 📁 src/systems/events/steps/create/events.create.steps.ts
+// =====================================
 
-import { getTempEvent, createTempEvent, deleteTempEvent } from "../../../store/create/events.create.store";
-import { renderDayButtonsView, renderModalView, renderConfirmView, renderNotifyView } from "../../../views/create/events.create.view";
-import { getEventDateUTC } from "../../../shared/utils/timeUtils";
+import type { Interaction } from "discord.js";
+import { getTempEvent, deleteTempEvent } from "../../../store/create/events.create.store"; // createTempEvent jest nieużywane
+import { renderDayButtonsView, renderModalView, renderConfirmView /* , renderNotifyView */ } from "../../../views/create/events.create.view"; // renderNotifyView nieużywane
+// getEventDateUTC nieużywane
 import { sendNotification, saveEventToDB } from "../../../core/event.service";
 
+type Payload = {
+  step?: string;
+  tempId?: string;
+  userId?: string;
+  notify?: "yes" | "no";
+};
+
 // wszystkie kroki flow
-export const steps = {
+export const steps: Record<string, (interaction: Interaction, ctx: any, payload: Payload) => Promise<any>> = {
   start: handleStartStep,
   day: handleDayStep,
   modal: handleModalStep,
@@ -14,7 +24,7 @@ export const steps = {
   notify: handleNotifyStep,
 };
 
-export async function handleCreateFlow(interaction, ctx, payload) {
+export async function handleCreateFlow(interaction: Interaction, ctx: any, payload: Payload) {
   const step = payload?.step || "start";
   const handler = steps[step];
   if (!handler) throw new Error("unknown_step");
@@ -22,38 +32,34 @@ export async function handleCreateFlow(interaction, ctx, payload) {
 }
 
 // === START STEP ===
-async function handleStartStep(interaction, ctx, payload) {
+async function handleStartStep(interaction: Interaction, ctx: any, payload: Payload) {
   // np. wybór eventu (standard/custom)
   // tutaj możemy od razu pokazać listę standardowych eventów do wyboru
   // zwracamy widok z przyciskami eventów
+  return; // placeholder
 }
 
 // === DAY STEP ===
-async function handleDayStep(interaction, ctx, payload) {
-  // wyświetlamy przyciski z dniami: today + next 7 days
-  return renderDayButtonsView(payload.userId);
+async function handleDayStep(interaction: Interaction, ctx: any, payload: Payload) {
+  return renderDayButtonsView(payload.userId!);
 }
 
 // === MODAL STEP ===
-async function handleModalStep(interaction, ctx, payload) {
-  // po kliknięciu dnia: pokaz modal na hour/minute UTC
-  return renderModalView(payload.tempId);
+async function handleModalStep(interaction: Interaction, ctx: any, payload: Payload) {
+  return renderModalView(payload.tempId!);
 }
 
 // === CONFIRM STEP ===
-async function handleConfirmStep(interaction, ctx, payload) {
-  const temp = getTempEvent(payload.tempId, interaction.user.id);
-  
-  // wyświetlamy pełną datę + event name
+async function handleConfirmStep(interaction: Interaction, ctx: any, payload: Payload) {
+  const temp = getTempEvent(payload.tempId!, interaction.user.id);
   return renderConfirmView(temp);
 }
 
 // === NOTIFY STEP ===
-async function handleNotifyStep(interaction, ctx, payload) {
+async function handleNotifyStep(interaction: Interaction, ctx: any, payload: Payload) {
   const { tempId, notify } = payload;
-  const temp = getTempEvent(tempId, interaction.user.id);
+  const temp = getTempEvent(tempId!, interaction.user.id);
 
-  // zapis eventu do DB
   await saveEventToDB(temp);
 
   if (notify === "yes") {
@@ -69,5 +75,5 @@ async function handleNotifyStep(interaction, ctx, payload) {
     });
   }
 
-  deleteTempEvent(tempId);
+  deleteTempEvent(tempId!);
 }
