@@ -27,7 +27,7 @@ type Payload = {
 };
 
 // wszystkie kroki flow
-export const steps: Record<string, (interaction: ButtonInteraction, ctx: any, payload: Payload) => Promise<any>> = {
+export const steps: Record<string, (interaction: ButtonInteraction, payload: Payload) => Promise<any>> = {
   start: handleStartStep,
   day: handleDayStep,
   modal: handleModalStep,
@@ -35,18 +35,17 @@ export const steps: Record<string, (interaction: ButtonInteraction, ctx: any, pa
   notify: handleNotifyStep,
 };
 
-export async function handleCreateFlow(interaction: ButtonInteraction, ctx: any, payload: Payload) {
+export async function handleCreateFlow(interaction: ButtonInteraction, payload: Payload) {
   const step = payload?.step || "start";
   const handler = steps[step];
   if (!handler) throw new Error("unknown_step");
-  return handler(interaction, ctx, payload);
+  return handler(interaction, payload);
 }
 
 // === START STEP ===
-async function handleStartStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
+async function handleStartStep(interaction: ButtonInteraction, payload: Payload) {
   if (!interaction.isButton()) return;
 
-  // renderowanie przycisków dla typów eventów w nowym systemie
   const components = EVENT_TYPES.map((type) => ({
     type: 2, // Button
     label: type.label,
@@ -54,7 +53,6 @@ async function handleStartStep(interaction: ButtonInteraction, ctx: any, payload
     custom_id: `events.main|action=create_step&eventType=${type.value}`
   }));
 
-  // grupowanie przycisków w rzędy po 5
   const actionRows: any[] = [];
   for (let i = 0; i < components.length; i += 5) {
     actionRows.push({
@@ -70,42 +68,23 @@ async function handleStartStep(interaction: ButtonInteraction, ctx: any, payload
 }
 
 // === DAY STEP ===
-async function handleDayStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
+async function handleDayStep(interaction: ButtonInteraction, payload: Payload) {
   return renderDayButtonsView(payload.userId!);
 }
 
 // === MODAL STEP ===
-async function handleModalStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
-  const { tempId, eventType } = payload;
-  const standardTypes = ["arcadian_conquest","city_contest","reservoir_raid","ghoulion_pursuit","kvk"];
-
-  // dla standardowych eventów → tylko Hour UTC + Minute UTC
-  if (eventType && standardTypes.includes(eventType)) {
-    return renderModalView(tempId!, { hourUTC: true, minuteUTC: true });
-  }
-
-  // dla birthdays → nickname + data
-  if (eventType === "birthdays") {
-    return renderModalView(tempId!, { nickname: true, fullDate: true });
-  }
-
-  // dla custom → nazwa + pełna data
-  if (eventType === "custom") {
-    return renderModalView(tempId!, { name: true, fullDate: true });
-  }
-
-  // fallback
-  return renderModalView(tempId!);
+async function handleModalStep(interaction: ButtonInteraction, payload: Payload) {
+  return renderModalView(payload.tempId!); // tylko jeden argument
 }
 
 // === CONFIRM STEP ===
-async function handleConfirmStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
+async function handleConfirmStep(interaction: ButtonInteraction, payload: Payload) {
   const temp = getTempEvent(payload.tempId!, interaction.user.id);
   return renderConfirmView(temp);
 }
 
 // === NOTIFY STEP ===
-async function handleNotifyStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
+async function handleNotifyStep(interaction: ButtonInteraction, payload: Payload) {
   const { tempId, notify } = payload;
   const temp = getTempEvent(tempId!, interaction.user.id);
 
