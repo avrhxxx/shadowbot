@@ -114,4 +114,23 @@ export function registerEventsMainActions() {
       });
     },
   });
+
+  // =====================================
+  // 🔹 BACK TO MODERATOR HUB
+  // =====================================
+  registerUIAction("moderator.open|target=hub", {
+    system: "moderator",
+    handler: async (interaction) => {
+      if (!interaction.isButton()) return;
+
+      // 🔹 delegujemy kliknięcie do moderator hub
+      await interaction.client.emit("ui.router.interaction.received", {
+        id: "moderator.open|target=hub",
+        user: interaction.user,
+        channel: interaction.channel,
+        message: interaction.message,
+        interaction,
+      });
+    },
+  });
 }
