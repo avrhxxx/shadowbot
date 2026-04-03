@@ -15,11 +15,11 @@ export function registerEventsCreateActions() {
       const { eventsCreateView } = await import("./eventsCreate.view");
       const view = await eventsCreateView();
 
-      // Zwracamy zawartość jako odpowiedź UIAction
-      return {
+      // 🔹 Aktualizacja interfejsu – nic nie zwracamy
+      await interaction.update({
         content: view.content,
         components: view.components,
-      };
+      });
     },
   });
 }
