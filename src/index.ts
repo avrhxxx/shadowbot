@@ -9,10 +9,7 @@ import {
 } from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
-import {
-  createAppContext,
-  createRootContext,
-} from "@/trace";
+import { createAppContext, createRootContext } from "@/trace";
 
 import { loadAllSystems } from "@/runtime/runtimeLoader";
 import { ensureAllSheets } from "@/integrations/google";
@@ -28,6 +25,9 @@ import { initDevPanelForGuild } from "@/systems/devpanel/devpanel.channel";
 import { handleModeratorCommand } from "@/systems/moderator/commands/moderator.command";
 import { moderatorSlash } from "@/systems/moderator/commands/moderator.slash";
 import { initModeratorPanelForGuild } from "@/systems/moderator/moderator.channel";
+
+// 🔹 EVENTS
+import { initEventsForGuild } from "@/systems/events/events.channel";
 
 // =====================================
 // 🔐 ENV
@@ -163,7 +163,7 @@ client.once("ready", async () => {
   }
 
   // =============================
-  // 🔹 INIT DEV PANEL + MODERATOR PANEL
+  // 🔹 INIT DEV PANEL + MODERATOR PANEL + EVENTS
   // =============================
 
   const guild = client.guilds.cache.get(GUILD_ID);
@@ -175,6 +175,7 @@ client.once("ready", async () => {
   try {
     await initDevPanelForGuild(guild);
     await initModeratorPanelForGuild(guild);
+    await initEventsForGuild(guild);
   } catch (err) {
     discordFlow.stepInfo("ready", { meta: { msg: "Failed to init panels", err } });
   }
