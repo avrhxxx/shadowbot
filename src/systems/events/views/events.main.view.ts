@@ -1,3 +1,5 @@
+
+// src/systems/events/views/events.main.view.ts
 import { ViewResult } from "@/systems/moderator/views/moderator.view";
 
 // =====================================
