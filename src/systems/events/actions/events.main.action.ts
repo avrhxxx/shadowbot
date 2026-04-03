@@ -6,7 +6,10 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
 
 import { renderEventsMain } from "../views/events.main.view";
-import { handleCreateFlow } from "../create/events.create.action"; // 🔹 import flow create
+
+// 🔹 Bezpośredni import flow create
+// Poprawiono ścieżkę na względną względem lokalizacji pliku
+import { handleCreateFlow } from "../steps/create/events.create.steps";
 
 // 🔹 Placeholder imports na przyszłość (jeszcze nie istnieją)
 // import { handleListFlow } from "../list/events.list.action";
@@ -24,7 +27,7 @@ type EventsPayload = {
 export function registerEventsMainActions() {
   registerUIAction("events.main", {
     system: "events",
-    handler: async (interaction: Interaction, _ctx, payload: EventsPayload) => {
+    handler: async (interaction: Interaction, _ctx: any, payload: EventsPayload) => {
       if (!interaction.isButton()) return;
 
       const action = payload?.action;
