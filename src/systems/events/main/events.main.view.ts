@@ -68,6 +68,17 @@ export async function eventsMainView(): Promise<View> {
           },
         ],
       },
+      {
+        type: 1, // row 3: Back to Moderator Hub
+        components: [
+          {
+            type: 2,
+            label: "⬅ Back",
+            style: 2,
+            custom_id: "moderator.open|target=hub",
+          },
+        ],
+      },
     ],
   };
 }
