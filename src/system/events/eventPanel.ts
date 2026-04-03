@@ -1,3 +1,4 @@
+// src/system/events/eventPanel.ts
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageCreateOptions } from "discord.js";
 import { IDS } from "../eventsHandlers";
 
