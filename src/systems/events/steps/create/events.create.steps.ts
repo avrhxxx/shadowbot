@@ -3,15 +3,26 @@
 // =====================================
 
 import type { ButtonInteraction } from "discord.js";
-import { getTempEvent, deleteTempEvent } from "../../store/create/events.create.store"; // createTempEvent jest nieużywane
-import { renderDayButtonsView, renderModalView, renderConfirmView /* , renderNotifyView */ } from "../../views/create/events.create.view"; // renderNotifyView nieużywane
-// getEventDateUTC nieużywane
+import { getTempEvent, deleteTempEvent } from "../../store/create/events.create.store";
+import { renderDayButtonsView, renderModalView, renderConfirmView } from "../../views/create/events.create.view";
 import { sendNotification, saveEventToDB } from "../../core/event.service";
+
+// 🔹 Lista typów eventów (przeniesiona ze starego silnika)
+const EVENT_TYPES = [
+  { label: "Arcadian Conquest", value: "arcadian_conquest", prefillName: "Arcadian Conquest" },
+  { label: "City Contest", value: "city_contest", prefillName: "City Contest" },
+  { label: "Reservoir Raid", value: "reservoir_raid", prefillName: "Reservoir Raid" },
+  { label: "Ghoulion Pursuit", value: "ghoulion_pursuit", prefillName: "Ghoulion Pursuit" },
+  { label: "KvK", value: "kvk", prefillName: "KvK" },
+  { label: "Birthdays", value: "birthdays" },
+  { label: "Custom", value: "custom" }
+];
 
 type Payload = {
   step?: string;
   tempId?: string;
   userId?: string;
+  eventType?: string;
   notify?: "yes" | "no";
 };
 
@@ -33,10 +44,29 @@ export async function handleCreateFlow(interaction: ButtonInteraction, ctx: any,
 
 // === START STEP ===
 async function handleStartStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
-  // np. wybór eventu (standard/custom)
-  // tutaj możemy od razu pokazać listę standardowych eventów do wyboru
-  // zwracamy widok z przyciskami eventów
-  return; // placeholder
+  if (!interaction.isButton()) return;
+
+  // renderowanie przycisków dla typów eventów w nowym systemie
+  const components = EVENT_TYPES.map((type) => ({
+    type: 2, // Button
+    label: type.label,
+    style: 1, // Primary
+    custom_id: `events.main|action=create_step&eventType=${type.value}`
+  }));
+
+  // grupowanie przycisków w rzędy po 5
+  const actionRows: any[] = [];
+  for (let i = 0; i < components.length; i += 5) {
+    actionRows.push({
+      type: 1, // ActionRow
+      components: components.slice(i, i + 5)
+    });
+  }
+
+  await interaction.update({
+    content: "📌 Select the type of event you want to create:",
+    components: actionRows
+  });
 }
 
 // === DAY STEP ===
