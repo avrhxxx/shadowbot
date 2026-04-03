@@ -1,5 +1,5 @@
 // =====================================
-// 🔹 LOCATION: src/systems/events/create/steps/confirmEvent.step.ts
+// 📁 src/systems/events/create/steps/confirmEvent.step.ts
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
@@ -9,6 +9,7 @@ import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
 // REGISTER STEP: CONFIRM EVENT
+// Logika + UI w jednym pliku stepu
 // ----------------------------
 export function registerConfirmEventStep() {
   registerUIAction("events.create.confirm", {
@@ -16,18 +17,25 @@ export function registerConfirmEventStep() {
     handler: async (interaction: ButtonInteraction, ctx: TraceContext) => {
       if (!interaction.isButton()) return;
 
-      // Pobieramy parametry z custom_id (day, month, hours, minutes)
+      // ----------------------------
+      // Pobieramy parametry z custom_id
+      // day, month, hours, minutes
+      // ----------------------------
       const [params] = interaction.customId.split("|").slice(1);
       const day = Number(params.split("&")[0].split("=")[1]);
       const month = Number(params.split("&")[1].split("=")[1]);
       const hours = Number(params.split("&")[2].split("=")[1]);
       const minutes = Number(params.split("&")[3].split("=")[1]);
 
+      // ----------------------------
       // Tworzymy datę UTC
+      // ----------------------------
       const eventDate = getEventDateUTC(day, month, hours, minutes);
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      // Wyświetlamy przyciski potwierdzenia
+      // ----------------------------
+      // Wyświetlamy UI z przyciskami potwierdzenia
+      // ----------------------------
       await interaction.update({
         content: `✅ You are about to create the event for **${formatted}**.\nDo you want to notify the channel?`,
         components: [
@@ -37,7 +45,7 @@ export function registerConfirmEventStep() {
               {
                 type: 2,
                 label: "Yes, create & notify",
-                style: 3, // green
+                style: 3, // success / green
                 custom_id: `events.create.submit|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true`,
               },
               {
@@ -56,6 +64,12 @@ export function registerConfirmEventStep() {
           },
         ],
       });
+
+      // ----------------------------
+      // 🔹 W tym miejscu możemy triggerować kolejne stepy:
+      // - submitEventStep() przy kliknięciu submit
+      // - back do selectTimeStep() przy back
+      // ----------------------------
     },
   });
 }
