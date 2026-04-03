@@ -13,7 +13,7 @@ export function registerSelectTimeStep() {
   // Handler dla przycisku wyboru dnia
   registerUIAction("events.create.selectTime", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: any) => {
       if (!interaction.isButton()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
@@ -58,7 +58,7 @@ export function registerSelectTimeStep() {
   // Handler submit modala
   registerUIAction("events.create.selectTime.submit", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: any) => {
       if (!interaction.isModalSubmit()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
@@ -68,8 +68,6 @@ export function registerSelectTimeStep() {
       const hours = Number(interaction.fields.getTextInputValue("hours"));
       const minutes = Number(interaction.fields.getTextInputValue("minutes"));
 
-      // Tworzymy datę UTC
-      const eventDate = getEventDateUTC(day, month, hours, minutes);
       const formatted = formatEventUTC(day, month, hours, minutes);
 
       // Wyświetlamy podsumowanie
