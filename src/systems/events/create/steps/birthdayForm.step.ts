@@ -8,7 +8,7 @@ import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
-// REGISTER STEP: BIRTHDAY FORM
+// REGISTER STEP: BIRTHDAY FORM (LOGIC HANDLER)
 // ----------------------------
 export function registerBirthdayFormStep() {
   registerUIAction("events.create.birthdayForm.submit", {
@@ -16,7 +16,7 @@ export function registerBirthdayFormStep() {
     handler: async (interaction: ModalSubmitInteraction, ctx: TraceContext) => {
       if (!interaction.isModalSubmit()) return;
 
-      // Pobieramy dane z formularza
+      // Pobieramy wartości z modala
       const day = Number(interaction.fields.getTextInputValue("day"));
       const month = Number(interaction.fields.getTextInputValue("month"));
       const hours = Number(interaction.fields.getTextInputValue("hours"));
@@ -30,13 +30,13 @@ export function registerBirthdayFormStep() {
       // Formatujemy do wyświetlenia
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      // Demo: podsumowanie
+      // Podsumowanie (demo / placeholder)
       await interaction.reply({
         content: `🎉 Birthday Event for **${name}** set on **${formatted}**${notify ? " (notification enabled)" : ""}`,
         ephemeral: true,
       });
 
-      // Tu możemy triggerować dalsze akcje:
+      // Tu można dodać dalsze akcje:
       // - zapis do store / bazy
       // - wywołanie powiadomień
       // - przypisanie typu eventu
