@@ -10,15 +10,16 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction: any) => {
-      // Lazy import widoku wewnątrz handlera
+    handler: async (interaction) => {
+      // Lazy import widoku bezpośrednio w handlerze
       const { eventsCreateView } = await import("./eventsCreate.view");
       const view = await eventsCreateView();
 
-      await interaction.update({
+      // Zwracamy zawartość jako odpowiedź UIAction
+      return {
         content: view.content,
         components: view.components,
-      });
+      };
     },
   });
 }
