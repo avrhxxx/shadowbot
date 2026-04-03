@@ -3,8 +3,6 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { ModalSubmitInteraction } from "discord.js";
-import type { TraceContext } from "@/core/trace/TraceContext";
 import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
@@ -13,7 +11,7 @@ import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 export function registerSubmitEventStep() {
   registerUIAction("events.create.submit", {
     system: "events",
-    handler: async (interaction: ModalSubmitInteraction, ctx: TraceContext) => {
+    handler: async (interaction) => {
       if (!interaction.isModalSubmit()) return;
 
       const [params] = interaction.customId.split("|").slice(1);
