@@ -3,7 +3,7 @@
 // =====================================
 
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { renderEventsMain } from "@/systems/events/views/events.main.view"; // ✅ nowy styl silnika
+import { eventsMainView } from "@/systems/events/main/events.main.view"; // ✅ nowy styl silnika
 
 // =====================================
 // 🔹 TYPES
@@ -65,7 +65,7 @@ export async function renderModeratorHub(): Promise<ViewResult> {
 // =====================================
 
 export async function renderEventsView(): Promise<ViewResult> {
-  return await renderEventsMain(); // ✅ użycie nowego main view
+  return await eventsMainView(); // ✅ użycie nowego main view
 }
 
 export async function renderPointsView(): Promise<ViewResult> {
