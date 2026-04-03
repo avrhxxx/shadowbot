@@ -3,7 +3,6 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import type { Interaction } from "discord.js";
 
 // ----------------------------
 // REGISTER MAIN CREATE BUTTON
@@ -11,8 +10,9 @@ import type { Interaction } from "discord.js";
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction) => {
+      // Sprawdzenie przycisku nie jest obowiązkowe, bo flow UIAction jest już filtrowany
+      // if (!interaction.isButton()) return;
 
       // Lazy import widoku
       const { eventsCreateView } = await import("./eventsCreate.view");
