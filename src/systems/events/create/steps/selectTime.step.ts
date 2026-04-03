@@ -9,6 +9,7 @@ import { getEventDateUTC, formatEventUTC } from "@/shared/utils/timeUtils";
 
 // ----------------------------
 // REGISTER STEP: SELECT TIME
+// Logika + UI w jednym pliku
 // ----------------------------
 export function registerSelectTimeStep() {
   // Handler dla przycisku wyboru dnia
@@ -21,9 +22,38 @@ export function registerSelectTimeStep() {
       const day = Number(params.split("&")[0].split("=")[1]);
       const month = Number(params.split("&")[1].split("=")[1]);
 
-      // Lazy import widoku
-      const { selectTimeView } = await import("../stepsViews/selectTime.view");
-      await interaction.showModal(selectTimeView(day, month));
+      // Tworzymy modal bez importu z zewnątrz
+      const modal = {
+        title: `Set time for ${day}/${month} UTC`,
+        custom_id: `events.create.selectTime.submit|day=${day}&month=${month}`,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 4, // TextInput
+                custom_id: "hours",
+                label: "Hours (0-23, UTC)",
+                style: 1, // short
+                min_length: 1,
+                max_length: 2,
+                required: true,
+              },
+              {
+                type: 4,
+                custom_id: "minutes",
+                label: "Minutes (0-59, UTC)",
+                style: 1, // short
+                min_length: 1,
+                max_length: 2,
+                required: true,
+              },
+            ],
+          },
+        ],
+      };
+
+      await interaction.showModal(modal);
     },
   });
 
@@ -50,7 +80,7 @@ export function registerSelectTimeStep() {
         ephemeral: true,
       });
 
-      // Tutaj możemy triggerować kolejny step np. confirmEvent
+      // 🔹 Tutaj można od razu triggerować kolejny step np. confirmEvent
     },
   });
 }
