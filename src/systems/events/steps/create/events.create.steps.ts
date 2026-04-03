@@ -76,7 +76,26 @@ async function handleDayStep(interaction: ButtonInteraction, ctx: any, payload: 
 
 // === MODAL STEP ===
 async function handleModalStep(interaction: ButtonInteraction, ctx: any, payload: Payload) {
-  return renderModalView(payload.tempId!);
+  const { tempId, eventType } = payload;
+  const standardTypes = ["arcadian_conquest","city_contest","reservoir_raid","ghoulion_pursuit","kvk"];
+
+  // dla standardowych eventów → tylko Hour UTC + Minute UTC
+  if (eventType && standardTypes.includes(eventType)) {
+    return renderModalView(tempId!, { hourUTC: true, minuteUTC: true });
+  }
+
+  // dla birthdays → nickname + data
+  if (eventType === "birthdays") {
+    return renderModalView(tempId!, { nickname: true, fullDate: true });
+  }
+
+  // dla custom → nazwa + pełna data
+  if (eventType === "custom") {
+    return renderModalView(tempId!, { name: true, fullDate: true });
+  }
+
+  // fallback
+  return renderModalView(tempId!);
 }
 
 // === CONFIRM STEP ===
