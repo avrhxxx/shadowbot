@@ -4,17 +4,20 @@
 
 import type { View } from "@/shared/types";
 
+// -------------------------------
+// MAPA EVENTÓW ZE SKRÓTAMI (custom_id)
+// -------------------------------
 const STANDARD_EVENT_TYPES = [
-  { label: "Arcadian Conquest", value: "arcadian_conquest" },
-  { label: "City Contest", value: "city_contest" },
-  { label: "Reservoir Raid", value: "reservoir_raid" },
-  { label: "Ghoulion Pursuit", value: "ghoulion_pursuit" },
-  { label: "KvK", value: "kvk" }
+  { label: "Arcadian Conquest", value: "AC" },
+  { label: "City Contest", value: "CC" },
+  { label: "Reservoir Raid", value: "RR" },
+  { label: "Ghoulion Pursuit", value: "GP" },
+  { label: "KvK", value: "KVK" }
 ];
 
 const OTHER_EVENT_TYPES = [
-  { label: "Birthday", value: "birthdays" },
-  { label: "Custom", value: "custom" }
+  { label: "Birthday", value: "BD" },
+  { label: "Custom", value: "C" }
 ];
 
 export async function eventsCreateView(): Promise<View> {
