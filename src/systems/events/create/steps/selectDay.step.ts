@@ -4,7 +4,6 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatButtonDate } from "@/shared/utils/timeUtils";
-import { Interaction } from "discord.js";
 
 const DAYS_TO_SHOW = 8;
 
@@ -16,13 +15,13 @@ export function selectDayView() {
   for (let i = 0; i < DAYS_TO_SHOW; i++) {
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
     const label = formatButtonDate(date.getUTCDate(), date.getUTCMonth() + 1);
-    const custom_id = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
+    const customId = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
 
     buttons.push({
       type: 2,
       label,
       style: 1,
-      custom_id,
+      custom_id: customId,
     });
   }
 
@@ -46,11 +45,11 @@ export function selectDayView() {
 export function registerSelectDayStep() {
   registerUIAction("events.create.selectDay", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      if (!interaction.isButton()) return;
-
+    handler: async (interaction, ctx) => {
+      // render widoku poprzez UI Engine
       const view = selectDayView();
-      await interaction.update({
+
+      await interaction.update?.({
         content: view.content,
         components: view.components,
       });
