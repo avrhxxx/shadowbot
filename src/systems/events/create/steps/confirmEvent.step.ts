@@ -4,7 +4,6 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
-import { Interaction, ButtonInteraction } from "discord.js";
 
 // =====================================
 // 🧠 VIEW
@@ -65,26 +64,16 @@ export function confirmEventView(params: {
 export function registerConfirmEventStep() {
   registerUIAction("events.create.confirmEvent", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      if (!interaction.isButton()) return;
-
-      const button = interaction as ButtonInteraction;
-
-      const paramsString = button.customId.split("|")[1] || "";
-      const params = paramsString.split("&").reduce((acc, cur) => {
-        const [k, v] = cur.split("=");
-        acc[k] = v;
-        return acc;
-      }, {} as Record<string, string>);
-
-      const day = Number(params.day);
-      const month = Number(params.month);
-      const hours = Number(params.hours);
-      const minutes = Number(params.minutes);
+    handler: async (interaction, ctx, payload) => {
+      // 🔹 Pobieramy parametry z payload, które UI Router już sparsował
+      const day = Number(payload?.day ?? 1);
+      const month = Number(payload?.month ?? 1);
+      const hours = Number(payload?.hours ?? 12);
+      const minutes = Number(payload?.minutes ?? 0);
 
       const view = confirmEventView({ day, month, hours, minutes });
 
-      await button.update({
+      await interaction.update({
         content: view.content,
         components: view.components,
       });
