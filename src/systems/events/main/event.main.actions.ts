@@ -5,12 +5,20 @@
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { renderView } from "@/ui/core/uiEngine";
 import { eventMainPanel } from "./event.main.view";
+import { nanoid } from "nanoid";
+
+// 🔹 Minimalny TraceContext placeholder
+const createMinimalTraceContext = () => ({
+  traceId: nanoid(),
+  correlationId: nanoid(),
+  source: "events.main.action",
+});
 
 export function registerEventMainActions() {
   registerUIAction("events.main", {
     system: "events",
     handler: async (interaction, _ctx, payload: any) => {
-      if (!interaction.isButton()) return;
+      if (!interaction.isButton?.()) return;
 
       const target = payload?.target;
 
@@ -48,7 +56,7 @@ export function registerEventMainActions() {
 
         default:
           // 🔹 wróć do głównego widoku
-          const view = await renderView(interaction, eventMainPanel.id);
+          const view = await renderView(createMinimalTraceContext(), eventMainPanel.id);
           await interaction.update({ content: view.content, components: view.components });
       }
     },
