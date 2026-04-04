@@ -11,10 +11,12 @@ import { renderView } from "@/core/ui/uiEngine";
 // =====================================
 
 export async function handleDevpanelCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  const view = await renderView(interaction, devpanelMainView.id);
+  // używamy pustego kontekstu, bo interaction nie jest TraceContext
+  const view = await renderView({}, devpanelMainView.id);
+
   await interaction.reply({
     content: view.content,
-    components: view.buttons,
+    components: view.components, // poprawka z buttons -> components
     ephemeral: true,
   });
 }
