@@ -1,7 +1,6 @@
 // =====================================
 // 📁 src/ui/core/uiRouter.ts
 // =====================================
-
 import type { Interaction } from "discord.js";
 import type { TraceContext } from "@/trace";
 
@@ -34,10 +33,7 @@ const registry: Registry = new Map();
 // 🔹 REGISTER
 // =====================================
 
-export function registerUIAction(
-  id: string,
-  def: UIActionDefinition
-) {
+export function registerUIAction(id: string, def: UIActionDefinition) {
   registry.set(id, def);
 }
 
@@ -57,10 +53,7 @@ export async function executeUIAction(
 
   const enabled = await isSystemEnabled(action.system);
 
-  if (!enabled) {
-    // system OFF → blokujemy akcję
-    return true;
-  }
+  if (!enabled) return true; // system OFF → blokujemy akcję
 
   await action.handler(interaction, ctx, payload);
 
@@ -75,22 +68,15 @@ export function parseCustomId(customId: string): {
   action: string;
   payload?: Record<string, string>;
 } {
-  // 🔹 FORMAT: action|key=value|key=value
-
   const [action, ...parts] = customId.split("|");
 
-  if (parts.length === 0) {
-    return { action };
-  }
+  if (parts.length === 0) return { action };
 
   const payload: Record<string, string> = {};
 
   for (const part of parts) {
     const [key, value] = part.split("=");
-
-    if (key && value) {
-      payload[key] = value;
-    }
+    if (key && value) payload[key] = value;
   }
 
   return { action, payload };
