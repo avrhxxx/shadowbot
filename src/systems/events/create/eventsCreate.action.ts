@@ -4,26 +4,30 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
-import { Interaction } from "discord.js";
+import { ButtonInteraction, Interaction } from "discord.js";
 
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
     handler: async (interaction: Interaction) => {
-      // Sprawdzamy, czy to faktycznie button
+      // 🔹 Akceptujemy tylko ButtonInteraction
       if (!interaction.isButton()) return;
 
-      // Discord.js wymaga mutowalnej tablicy, więc kopiujemy components
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      // Discord.js wymaga mutowalnej tablicy komponentów
       const view = eventsCreateView();
       const mutableComponents = view.components.map(row => ({
         ...row,
-        components: row.components.map(btn => ({ ...btn }))
+        components: row.components.map(btn => ({ ...btn })),
       }));
 
-      await interaction.update({
+      await buttonInteraction.update({
         content: view.content,
         components: mutableComponents,
       });
+
+      console.log("✅ Create Event button clicked by", interaction.user.id);
     },
   });
 }
