@@ -4,92 +4,41 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
+import { renderView } from "@/core/ui/uiEngine";
 
 import {
-  renderModeratorHub,
-  renderEventsView,
-  renderPointsView,
-  renderAbsenceView,
-  ViewResult,
+  moderatorHubView,
+  moderatorEventsView,
+  moderatorPointsView,
+  moderatorAbsenceView,
+  moderatorHelpView,
 } from "../views/moderator.view";
 
-type ModeratorPayload = {
-  target?: "hub" | "events" | "points" | "absence" | "quickadd" | "help";
-};
+type ModeratorPayload = { target?: string };
 
 // =====================================
 // 🔹 REGISTER ACTIONS
 // =====================================
 
 export function registerModeratorHubActions() {
-  // 🔘 OPEN PANEL / NAVIGATE
   registerUIAction("moderator.open", {
     system: "moderator",
-    handler: async (
-      interaction: Interaction,
-      _ctx,
-      payload: ModeratorPayload
-    ) => {
+    handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
       if (!interaction.isButton()) return;
 
       const target = payload?.target;
 
-      const viewMap: Record<string, () => Promise<ViewResult>> = {
-        hub: () => renderModeratorHub(),
-        events: () => renderEventsView(),
-        points: () => renderPointsView(),
-        absence: () => renderAbsenceView(),
+      const viewMap: Record<string, () => Promise<any>> = {
+        hub: () => renderView(interaction, moderatorHubView.id),
+        events: () => renderView(interaction, moderatorEventsView.id),
+        points: () => renderView(interaction, moderatorPointsView.id),
+        absence: () => renderView(interaction, moderatorAbsenceView.id),
+        help: () => renderView(interaction, moderatorHelpView.id),
       };
 
-      if (target && target in viewMap) {
-        const view = await viewMap[target]();
-        await interaction.update({
-          content: view.content,
-          components: view.components,
-        });
-        return;
-      }
+      const view = target && target in viewMap ? await viewMap[target]() : await renderView(interaction, moderatorHubView.id);
 
-      // 🔹 QUICKADD
-      if (target === "quickadd") {
-        await interaction.update({
-          content: "⚡ QuickAdd Panel (coming soon)",
-          components: [],
-        });
-        return;
-      }
-
-      // 🔹 HELP
-      if (target === "help") {
-        const content = `
-📌 **Moderator Panel Guide**
-
-🟢 Event Menu → Create events, manage participants, cancel events.
-⭐ Points Menu → Manage points and rankings.
-🕒 Absence Menu → Manage absences and schedules.
-⚡ QuickAdd → Fast data input system (OCR, parser).
-❓ Help → Shows this description.
-        `.trim();
-
-        // 🔹 dodany Back do hubu
-        await interaction.update({
-          content,
-          components: [
-            {
-              type: 1,
-              components: [
-                {
-                  type: 2,
-                  label: "⬅ Back",
-                  style: 2,
-                  custom_id: "moderator.open|target=hub",
-                },
-              ],
-            },
-          ],
-        });
-        return;
-      }
+      await interaction.update({ content: view.content, components: view.buttons });
     },
   });
 }
