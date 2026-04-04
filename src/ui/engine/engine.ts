@@ -7,7 +7,7 @@
  * Core UI Engine:
  * - render view
  * - map buttons -> discord components
- * - central place dla całego UI flow
+ * - generuje interaction (customId + store + TTL)
  *
  * ❗ INTERNAL ONLY
  */
@@ -18,6 +18,7 @@ import type { TraceContext } from "@/trace";
 
 import type { View, ViewResult, Button } from "../types/uiTypes";
 import { uiStore } from "../store/uiStore";
+import { withTTL } from "../store/ttl";
 
 // =====================================
 // 🔹 INTERNAL STORE (VIEWS)
@@ -41,14 +42,20 @@ function mapStyle(style?: Button["style"]): number {
   }
 }
 
-function createCustomId(action: string, state?: any) {
+// 🔥 KLUCZOWA FUNKCJA
+function createCustomId(action: string, state?: any, ttl?: number) {
   const id = nanoid();
 
-  uiStore.set(id, {
-    action,
-    state,
-    createdAt: Date.now(),
-  });
+  uiStore.set(
+    id,
+    withTTL(
+      {
+        action,
+        state,
+      },
+      ttl
+    )
+  );
 
   return id;
 }
@@ -63,7 +70,11 @@ function mapButtons(buttons: Button[] = []) {
         type: 2,
         label: btn.label,
         style: mapStyle(btn.style),
-        custom_id: createCustomId(btn.action, btn.state),
+        custom_id: createCustomId(
+          btn.action,
+          btn.state,
+          btn.ttl // 🔥 teraz możesz sterować TTL z buttona
+        ),
         disabled: btn.disabled ?? false,
       })),
     });
