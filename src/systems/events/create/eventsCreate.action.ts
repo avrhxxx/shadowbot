@@ -6,6 +6,13 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
 import { StepsMap } from "./steps";
 
+// 🔹 Typ kontekstu UI z potrzebnymi metodami
+interface UIContext {
+  renderView: (view: any, payload?: any) => Promise<void>;
+  showModal: (modal: any, payload?: any) => Promise<void>;
+  navigate: (destination: string, options?: Record<string, any>) => Promise<void>;
+}
+
 /**
  * 🔹 Rejestruje wszystkie akcje flow tworzenia eventu
  */
@@ -15,7 +22,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (ctx) => {
+    handler: async (ctx: UIContext) => {
       const view = eventsCreateView();
       await ctx.renderView(view);
     },
@@ -26,7 +33,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.selectType", {
     system: "events",
-    handler: async (ctx, _unused, payload) => {
+    handler: async (ctx: UIContext, _unused, payload: any) => {
       const target = payload?.target;
       let nextStepId: keyof typeof StepsMap;
 
@@ -37,13 +44,11 @@ export function registerEventsCreateActions() {
       const stepEntry = StepsMap[nextStepId];
       if (!stepEntry || !stepEntry.view) return;
 
-      // 🔹 Modal
       if (nextStepId === "customEventForm" || nextStepId === "birthdayForm") {
-        await ctx.showModal(stepEntry.view());
+        await ctx.showModal(stepEntry.view(payload), payload);
       } else {
-        // 🔹 Zwykły widok
-        const view = stepEntry.view();
-        await ctx.renderView(view);
+        const view = stepEntry.view(payload);
+        await ctx.renderView(view, payload);
       }
     },
   });
@@ -58,13 +63,12 @@ export function registerEventsCreateActions() {
     const actionId = `events.create.${key}`;
     registerUIAction(actionId, {
       system: "events",
-      handler: async (ctx) => {
-        // 🔹 Jeśli krok jest modalem
+      handler: async (ctx: UIContext, _unused, payload: any) => {
         if (key === "birthdayForm" || key === "customEventForm") {
-          await ctx.showModal(stepEntry.view());
+          await ctx.showModal(stepEntry.view(payload), payload);
         } else {
-          const view = stepEntry.view();
-          await ctx.renderView(view);
+          const view = stepEntry.view(payload);
+          await ctx.renderView(view, payload);
         }
       },
     });
@@ -75,7 +79,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.backToMain", {
     system: "events",
-    handler: async (ctx, _unused, payload) => {
+    handler: async (ctx: UIContext, _unused, payload: any) => {
       await ctx.navigate("events.main.create", {
         user: payload?.user,
         channel: payload?.channel,
