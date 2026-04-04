@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/ui/core/uiDiscordAdapter.ts
+// =====================================
+
 import type {
   Interaction as BaseInteraction,
   ButtonInteraction as BaseButtonInteraction,
