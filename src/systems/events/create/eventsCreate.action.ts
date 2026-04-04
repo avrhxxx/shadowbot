@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/systems/events/create/eventsCreate.action.ts
+// =====================================
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import {
   eventsCreateView,
@@ -8,6 +12,8 @@ import {
   submitEventView,
   confirmEventView,
 } from "./eventsCreate.view";
+
+import { formatEventUTC } from "@/shared/utils/timeUtils";
 
 interface UIContext {
   renderView: (view: any, payload?: any) => Promise<void>;
@@ -45,7 +51,7 @@ export function registerEventsCreateActions() {
       const hours = Number(payload?.hours ?? 12);
       const minutes = Number(payload?.minutes ?? 0);
       const nickname = payload?.nickname ?? "User";
-      const formatted = `${nickname} on ${day}/${month} ${hours}:${minutes} UTC`;
+      const formatted = `${nickname} on ${formatEventUTC(day, month, hours, minutes)}`;
 
       await ctx.renderView({
         content: `🎉 Birthday Event for **${nickname}** set on **${formatted}**`,
@@ -63,7 +69,7 @@ export function registerEventsCreateActions() {
       const month = Number(payload?.month ?? 1);
       const hours = Number(payload?.hours ?? 12);
       const minutes = Number(payload?.minutes ?? 0);
-      const formatted = `${name} on ${day}/${month} ${hours}:${minutes} UTC`;
+      const formatted = `${formatEventUTC(day, month, hours, minutes)}`;
 
       await ctx.renderView({
         content: `📝 Event: **${name}**\n📅 Date: **${formatted}**`,
@@ -94,12 +100,13 @@ export function registerEventsCreateActions() {
   // SELECT TIME SUBMIT
   registerUIAction("events.create.selectTime.submit", {
     system: "events",
-    handler: async (ctx: UIContext, payload: any) => {
+    handler: async (ctx: UIContext, _unused, payload: any) => {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const eventName = payload?.eventName ?? "Event";
       const hours = Number(payload?.hours);
       const minutes = Number(payload?.minutes);
+
       await ctx.renderView({
         content: `⏰ **${eventName}** time set for **${formatEventUTC(day, month, hours, minutes)}**`,
         buttons: [
@@ -113,7 +120,7 @@ export function registerEventsCreateActions() {
   // SUBMIT EVENT
   registerUIAction("events.create.submit", {
     system: "events",
-    handler: async (ctx: UIContext, payload: any) => {
+    handler: async (ctx: UIContext, _unused, payload: any) => {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const hours = Number(payload?.hours);
@@ -127,7 +134,7 @@ export function registerEventsCreateActions() {
   // CONFIRM EVENT
   registerUIAction("events.create.confirm", {
     system: "events",
-    handler: async (ctx: UIContext, payload: any) => {
+    handler: async (ctx: UIContext, _unused, payload: any) => {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const hours = Number(payload?.hours);
