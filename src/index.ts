@@ -27,7 +27,9 @@ import { moderatorSlash } from "@/systems/moderator/commands/moderator.slash";
 import { initModeratorPanelForGuild } from "@/systems/moderator/moderator.channel";
 
 // 🔹 EVENTS
-import { registerEventsMainActions } from "@/systems/events/main/events.main.action";
+import { registerEventMainActions } from "@/systems/events/main/event.main.actions";
+import { handleEventMainCommand } from "@/systems/events/main/event.main.command";
+import { eventMainSlash } from "@/systems/events/main/event.main.slash";
 
 // =====================================
 // 🔐 ENV
@@ -102,6 +104,10 @@ client.on("interactionCreate", async (interaction) => {
       await handleModeratorCommand(interaction);
       return;
     }
+    if (interaction.commandName === "events") {
+      await handleEventMainCommand(interaction);
+      return;
+    }
   }
 });
 
@@ -114,7 +120,7 @@ client.once("ready", async () => {
   discordFlow.stepInfo("ready", { meta: { user: client.user?.tag } });
 
   // =============================
-  // 🧠 REGISTER COMMANDS (DEV + MODERATOR)
+  // 🧠 REGISTER COMMANDS (DEV + MODERATOR + EVENTS)
   // =============================
 
   const commandsFlow = appLog.flow("commands");
@@ -123,6 +129,7 @@ client.once("ready", async () => {
     await client.application?.commands.set([
       devpanelSlash.toJSON(),
       moderatorSlash.toJSON(),
+      eventMainSlash.toJSON(),
     ]);
     commandsFlow.success();
   } catch (err) {
@@ -184,7 +191,7 @@ client.once("ready", async () => {
   // =============================
 
   try {
-    await registerEventsMainActions();
+    await registerEventMainActions();
     discordFlow.stepInfo("ready", { meta: { msg: "Events system initialized" } });
   } catch (err) {
     discordFlow.stepInfo("ready", { meta: { msg: "Failed to init events system", err } });
