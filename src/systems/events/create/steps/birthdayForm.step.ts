@@ -19,13 +19,13 @@ export function birthdayFormView() {
             type: 2,
             label: "Set Date (DD/MM)",
             style: 1,
-            custom_id: "events.create.birthdayForm.setDate",
+            action: "events.create.birthdayForm.setDate",
           },
           {
             type: 2,
             label: "Set Time (HH:MM)",
             style: 1,
-            custom_id: "events.create.birthdayForm.setTime",
+            action: "events.create.birthdayForm.setTime",
           },
         ],
       },
@@ -36,7 +36,7 @@ export function birthdayFormView() {
             type: 2,
             label: "Submit",
             style: 3,
-            custom_id: "events.create.birthdayForm.submit",
+            action: "events.create.birthdayForm.submit",
           },
         ],
       },
@@ -47,7 +47,7 @@ export function birthdayFormView() {
             type: 2,
             label: "⬅ Back",
             style: 2,
-            custom_id: "events.create.backToMain",
+            action: "events.create.backToMain",
           },
         ],
       },
@@ -62,34 +62,33 @@ export function registerBirthdayFormStep() {
   // 🔹 OPEN FORM
   registerUIAction("events.create.birthdayForm", {
     system: "events",
-    handler: async (interaction, ctx) => {
+    handler: async (ctx, payload) => {
       const view = birthdayFormView();
 
-      // UI Router już daje nam interaction.update
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
+      // renderujemy widok przez UI Engine, nie Discord
+      await ctx.renderView(view, payload);
     },
   });
 
   // 🔹 SUBMIT
   registerUIAction("events.create.birthdayForm.submit", {
     system: "events",
-    handler: async (interaction, ctx) => {
+    handler: async (ctx, payload) => {
       // 🔴 Placeholder – później będzie dynamiczny state
-      const day = 1;
-      const month = 1;
-      const hours = 12;
-      const minutes = 0;
-      const name = "User";
+      const day = payload?.day || 1;
+      const month = payload?.month || 1;
+      const hours = payload?.hours || 12;
+      const minutes = payload?.minutes || 0;
+      const name = payload?.name || "User";
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await interaction.update({
+      const view = {
         content: `🎉 Birthday Event for **${name}** set on **${formatted}**`,
         components: [],
-      });
+      };
+
+      await ctx.renderView(view, payload);
     },
   });
 }
