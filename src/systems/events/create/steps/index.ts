@@ -18,7 +18,7 @@ export { birthdayFormView } from "./birthdayForm.step";
 export { customEventFormView } from "./customEventForm.step";
 export { confirmEventView } from "./confirmEvent.step";
 
-// 🔹 Mapa do łatwego użycia
+// 🔹 Mapa kroków do łatwego użycia w flow
 export const StepsMap = {
   selectDay: {
     step: registerSelectDayStep,
@@ -26,16 +26,17 @@ export const StepsMap = {
   },
   selectTime: {
     step: registerSelectTimeStep,
-    view: (params: { day: number; month: number }) => selectTimeView(params.day, params.month),
+    view: (params: { day: number; month: number; eventName?: string }) =>
+      selectTimeView(params.day, params.month, params.eventName ?? "Event"),
   },
   submitEvent: {
     step: registerSubmitEventStep,
-    view: (params: { day: number; month: number; hours: number; minutes: number }) =>
-      submitEventView(params.day, params.month, params.hours, params.minutes),
+    view: (params: { day: number; month: number; hours: number; minutes: number; eventName?: string }) =>
+      submitEventView(params.day, params.month, params.hours, params.minutes, params.eventName ?? "Event"),
   },
   birthdayForm: {
     step: registerBirthdayFormStep,
-    view: () => birthdayFormView(),
+    view: () => birthdayFormModal(), // uwaga: używamy modal, więc view = birthdayFormModal
   },
   customEventForm: {
     step: registerCustomEventFormStep,
