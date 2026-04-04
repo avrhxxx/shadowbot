@@ -34,7 +34,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.selectType", {
     system: "events",
-    handler: async (ctx, _ctx2, payload) => {
+    handler: async (ctx, _unused, payload) => {
       const target = payload?.target;
       let nextStepId: keyof typeof StepsMap;
 
@@ -83,7 +83,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.backToMain", {
     system: "events",
-    handler: async (ctx, _ctx2, payload) => {
+    handler: async (ctx, _unused, payload) => {
       // 🔹 Przechodzimy do głównego panelu poprzez UI Router
       await ctx.navigate("events.main.create", {
         user: payload?.user,
