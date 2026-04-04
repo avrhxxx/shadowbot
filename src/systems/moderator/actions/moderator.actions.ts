@@ -2,8 +2,7 @@
 // 📁 src/systems/moderator/actions/moderator.actions.ts
 // =====================================
 
-import { registerUIAction } from "@/ui/core/uiRouter";
-import { renderView } from "@/ui/core/uiEngine";
+import { interaction, view } from "@/ui/api";
 
 import {
   moderatorHubView,
@@ -15,51 +14,36 @@ import {
 
 type ModeratorPayload = { target?: string };
 
-// 🔹 Minimalny TraceContext do renderView
-const createMinimalTraceContext = () => ({
-  traceId: { __brand: "TraceId" } as any,
-  correlationId: { __brand: "CorrelationId" } as any,
-  source: "moderator.actions",
-});
+// 🔹 Mapa widoków powiązana z targetami
+const viewMap: Record<string, () => Promise<{ content: string; buttons: any[] }>> = {
+  hub: () => moderatorHubView.render(),
+  events: () => moderatorEventsView.render(),
+  points: () => moderatorPointsView.render(),
+  absence: () => moderatorAbsenceView.render(),
+  help: () => moderatorHelpView.render(),
+};
 
 // =====================================
 // 🔹 REGISTER ACTIONS
 // =====================================
 
 export function registerModeratorHubActions() {
-  registerUIAction("moderator.open", {
-    system: "moderator",
-    handler: async (interaction: any, _ctx, payload: ModeratorPayload) => {
-      try {
-        // Sprawdzenie, czy przychodzi właściwy typ akcji
-        if (!interaction.isButton?.()) return;
+  interaction.handle("moderator.open", async (ctx, payload: ModeratorPayload) => {
+    const target = payload?.target;
 
-        const target = payload?.target;
+    try {
+      const renderFn = target && target in viewMap ? viewMap[target] : viewMap["hub"];
+      const viewData = await renderFn();
 
-        // Mapa widoków powiązana z identyfikatorami z views
-        const viewMap: Record<string, () => Promise<{ content: string; components: any[] }>> = {
-          hub: () => renderView(createMinimalTraceContext(), moderatorHubView.id),
-          events: () => renderView(createMinimalTraceContext(), moderatorEventsView.id),
-          points: () => renderView(createMinimalTraceContext(), moderatorPointsView.id),
-          absence: () => renderView(createMinimalTraceContext(), moderatorAbsenceView.id),
-          help: () => renderView(createMinimalTraceContext(), moderatorHelpView.id),
-        };
+      // Aktualizacja widoku przez UI API
+      await view.update(viewData);
+    } catch (err) {
+      console.error("Moderator action failed:", err);
 
-        // Pobranie widoku docelowego lub domyślnego (hub)
-        const view = target && target in viewMap
-          ? await viewMap[target]()
-          : await renderView(createMinimalTraceContext(), moderatorHubView.id);
-
-        // Aktualizacja UI przez silnik
-        await interaction.update({
-          content: view.content,
-          components: view.components,
-        });
-      } catch (err) {
-        // 🔹 Centralny fallback error
-        console.error("Moderator action failed:", err);
-        await interaction.reply({ content: "⚠️ Something went wrong.", ephemeral: true });
-      }
-    },
+      await view.followUp({
+        content: "⚠️ Something went wrong.",
+        ephemeral: true,
+      });
+    }
   });
 }
