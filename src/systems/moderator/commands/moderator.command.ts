@@ -3,25 +3,15 @@
 // =====================================
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
-import { renderView } from "@/ui/core/uiEngine";
+import { view } from "@/ui/api";
 import { moderatorHubView } from "../views/moderator.view";
-import { nanoid } from "nanoid";
-
-// 🔹 Minimalny TraceContext placeholder
-const createMinimalTraceContext = () => ({
-  traceId: nanoid(),
-  correlationId: nanoid(),
-  source: "moderator.command",
-});
 
 export async function handleModeratorCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  // Render głównego widoku moderatora
-  const view = await renderView(createMinimalTraceContext(), moderatorHubView.id);
-
-  // Wyślij odpowiedź ephemeral
-  await interaction.reply({
-    content: view.content,
-    components: view.components,
-    ephemeral: true,
-  });
+  try {
+    // Pokaż główny widok moderatora
+    await view.show(moderatorHubView, { ephemeral: true }, { interaction });
+  } catch (err) {
+    console.error("Moderator command failed:", err);
+    await interaction.reply({ content: "⚠️ Something went wrong.", ephemeral: true });
+  }
 }
