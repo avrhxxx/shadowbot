@@ -44,6 +44,7 @@ export function registerSubmitEventStep() {
   registerUIAction("events.create.submit", {
     system: "events",
     handler: async (interaction, ctx, payload) => {
+      // Pobieramy dane z payload
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const hours = Number(payload?.hours);
@@ -52,7 +53,8 @@ export function registerSubmitEventStep() {
 
       const view = submitEventView(day, month, hours, minutes);
 
-      await interaction.update?.({
+      // 🔹 Zamiast interaction.update używamy UI Router
+      await interaction.send({
         content: view.content,
         components: view.components,
       });
