@@ -14,28 +14,27 @@
  * - NO formatting
  * - ONLY generation
  */
+// =====================================
+// 📁 src/foundation/ids/idGenerator.ts
+// =====================================
 
 import { nanoid } from "nanoid";
 import { ID_LENGTH } from "./idConfig";
 
-// =====================================
 // 🔹 CORE GENERATOR
-// =====================================
-
 export function generateId(): string {
   return nanoid(ID_LENGTH);
 }
 
-// =====================================
 // 🔹 TYPE-SAFE HELPERS
-// =====================================
-
 export const createTraceId = () => generateId();
 export const createCorrelationId = () => generateId();
 export const createFlowId = () => generateId();
 
-// (future ready)
 export const createSessionId = () => generateId();
 export const createInteractionId = () => generateId();
 export const createJobId = () => generateId();
 export const createExternalId = () => generateId();
+
+// 🔹 NEW: UIId
+export const createUIId = () => generateId();
