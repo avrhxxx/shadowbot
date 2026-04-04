@@ -4,72 +4,84 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
+import { Interaction, ModalSubmitInteraction, ButtonInteraction } from "discord.js";
 
+// =====================================
+// 🧠 VIEW
+// =====================================
+export function customEventFormView() {
+  return {
+    title: "📝 Custom Event",
+    customId: "events.create.customForm.submit",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            customId: "eventName",
+            style: 1,
+            label: "Event Name",
+            placeholder: "Enter event name",
+            required: true,
+          },
+          {
+            type: 4,
+            customId: "day",
+            style: 1,
+            label: "Day",
+            placeholder: "Enter day (1-31)",
+            required: true,
+          },
+          {
+            type: 4,
+            customId: "month",
+            style: 1,
+            label: "Month",
+            placeholder: "Enter month (1-12)",
+            required: true,
+          },
+          {
+            type: 4,
+            customId: "hours",
+            style: 1,
+            label: "Hours",
+            placeholder: "0-23",
+            required: true,
+          },
+          {
+            type: 4,
+            customId: "minutes",
+            style: 1,
+            label: "Minutes",
+            placeholder: "0-59",
+            required: true,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+// =====================================
+// 🚀 REGISTER STEP
+// =====================================
 export function registerCustomEventFormStep() {
   // 🔹 Otwarcie formularza Custom Event
   registerUIAction("events.create.customEventForm", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: ButtonInteraction) => {
       if (!interaction.isButton()) return;
 
-      await interaction.showModal({
-        title: "📝 Custom Event",
-        customId: "events.create.customForm.submit",
-        components: [
-          {
-            type: 1,
-            components: [
-              {
-                type: 4,
-                customId: "eventName",
-                style: 1,
-                label: "Event Name",
-                placeholder: "Enter event name",
-                required: true,
-              },
-              {
-                type: 4,
-                customId: "day",
-                style: 1,
-                label: "Day",
-                placeholder: "Enter day (1-31)",
-                required: true,
-              },
-              {
-                type: 4,
-                customId: "month",
-                style: 1,
-                label: "Month",
-                placeholder: "Enter month (1-12)",
-                required: true,
-              },
-              {
-                type: 4,
-                customId: "hours",
-                style: 1,
-                label: "Hours",
-                placeholder: "0-23",
-                required: true,
-              },
-              {
-                type: 4,
-                customId: "minutes",
-                style: 1,
-                label: "Minutes",
-                placeholder: "0-59",
-                required: true,
-              },
-            ],
-          },
-        ],
-      });
+      const modal = customEventFormView();
+      await interaction.showModal(modal);
     },
   });
 
   // 🔹 Submit formularza Custom Event
   registerUIAction("events.create.customForm.submit", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: ModalSubmitInteraction) => {
       if (!interaction.isModalSubmit()) return;
 
       const eventName = interaction.fields.getTextInputValue("eventName");
