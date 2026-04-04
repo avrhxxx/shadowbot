@@ -14,7 +14,7 @@ export const devpanelMainView: View = {
   id: "devpanel.main",
   render: async () => ({
     content: `⚙️ **Dev Panel**\n\nSelect category:`,
-    buttons: [
+    components: [
       createButton("Systems", "devpanel.systems"),
     ],
   }),
@@ -28,7 +28,7 @@ export const devpanelSystemsView: View = {
   id: "devpanel.systems",
   render: async () => {
     const lines: string[] = [];
-    const buttons = [];
+    const components = [];
 
     for (const system of SYSTEM_REGISTRY) {
       if (system.name === "devpanel") continue;
@@ -37,15 +37,15 @@ export const devpanelSystemsView: View = {
       const status = enabled ? "🟢 ON" : "🔴 OFF";
 
       lines.push(`**${system.name}** → ${status}`);
-      buttons.push(createButton(system.name, "devpanel.toggle", enabled ? "primary" : "secondary", { system: system.name }));
+      components.push(createButton(system.name, "devpanel.toggle", enabled ? "primary" : "secondary", { system: system.name }));
     }
 
     // Dodaj Back na dole
-    buttons.push(createBackButton("devpanel.main"));
+    components.push(createBackButton("devpanel.main"));
 
     return {
       content: `⚙️ **Dev Panel → Systems**\n\n${lines.join("\n")}`,
-      buttons,
+      components,
     };
   },
 };
