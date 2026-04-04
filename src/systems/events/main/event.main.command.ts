@@ -3,7 +3,7 @@
 // =====================================
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
-import { renderView } from "@/core/ui/uiEngine";
+import { renderView } from "@/ui/core/uiEngine";
 import { eventMainPanel } from "./event.main.view";
 
 export async function handleEventMainCommand(interaction: ChatInputCommandInteraction<CacheType>) {
