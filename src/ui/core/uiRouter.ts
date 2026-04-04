@@ -4,7 +4,6 @@
 
 import type { Interaction } from "discord.js";
 import type { TraceContext } from "@/trace";
-
 import { isSystemEnabled } from "@/runtime/runtimeState";
 
 // =====================================
@@ -14,14 +13,10 @@ import { isSystemEnabled } from "@/runtime/runtimeState";
 export type UIActionHandler = (
   interaction: Interaction,
   ctx: TraceContext,
-  payload?: any // opcjonalne
+  payload?: any
 ) => Promise<void>;
 
-export type UIActionDefinition = {
-  system: string;
-  handler: UIActionHandler;
-};
-
+export type UIActionDefinition = { system: string; handler: UIActionHandler };
 type Registry = Map<string, UIActionDefinition>;
 
 // =====================================
@@ -46,16 +41,15 @@ export async function executeUIAction(
   id: string,
   interaction: Interaction,
   ctx: TraceContext,
-  payload?: any // opcjonalne
+  payload?: any
 ): Promise<boolean> {
   const action = registry.get(id);
   if (!action) return false;
 
   const enabled = await isSystemEnabled(action.system);
-  if (!enabled) return true; // system OFF → blokujemy akcję
+  if (!enabled) return true;
 
   await action.handler(interaction, ctx, payload);
-
   return true;
 }
 
@@ -63,13 +57,8 @@ export async function executeUIAction(
 // 🔹 PARSE (🔥 FIXED FORMAT)
 // =====================================
 
-export function parseCustomId(customId: string): {
-  action: string;
-  payload?: Record<string, string>;
-} {
-  // FORMAT: action|key=value|key=value
+export function parseCustomId(customId: string): { action: string; payload?: Record<string, string> } {
   const [action, ...parts] = customId.split("|");
-
   if (parts.length === 0) return { action };
 
   const payload: Record<string, string> = {};
