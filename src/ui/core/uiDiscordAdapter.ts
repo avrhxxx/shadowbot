@@ -17,6 +17,10 @@ import {
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
+// =====================================
+// 🧠 MAIN HANDLER
+// =====================================
+
 export async function handleUIInteraction(
   interaction: Interaction<CacheType>,
   ctx: TraceContext
@@ -25,7 +29,9 @@ export async function handleUIInteraction(
   const flow = log.flow("ui.router");
 
   try {
+    // =====================================
     // 🔘 BUTTON INTERACTIONS
+    // =====================================
     if (interaction.isButton()) {
       const button = interaction as ButtonInteraction;
 
@@ -39,7 +45,12 @@ export async function handleUIInteraction(
         meta: { action, payload: payload ?? {} },
       });
 
-      const handled = await executeUIAction(action, button, ctx, payload);
+      const handled = await executeUIAction(
+        action,
+        button,
+        ctx,
+        payload
+      );
 
       if (!handled) {
         flow.stepWarn("action.not_found", {
@@ -48,11 +59,16 @@ export async function handleUIInteraction(
         return false;
       }
 
-      flow.stepDebug("action.executed", { meta: { action } });
+      flow.stepDebug("action.executed", {
+        meta: { action },
+      });
+
       return true;
     }
 
+    // =====================================
     // 🔘 MODAL SUBMIT INTERACTIONS
+    // =====================================
     if (interaction.isModalSubmit()) {
       const modal = interaction as ModalSubmitInteraction;
 
@@ -66,22 +82,30 @@ export async function handleUIInteraction(
         meta: { action, payload: payload ?? {} },
       });
 
-      const handled = await executeUIAction(action, modal, ctx, payload);
+      const handled = await executeUIAction(
+        action,
+        modal,
+        ctx,
+        payload
+      );
 
       if (!handled) {
-        flow.stepWarn("modal.action.not_found", { meta: { action } });
+        flow.stepWarn("modal.action.not_found", {
+          meta: { action },
+        });
         return false;
       }
 
-      flow.stepDebug("modal.action.executed", { meta: { action } });
+      flow.stepDebug("modal.action.executed", {
+        meta: { action },
+      });
+
       return true;
     }
 
-    // 🔘 OTHER INTERACTIONS → currently ignored, could extend later
-    flow.stepDebug("interaction.ignored", {
-      meta: { type: interaction.type },
-    });
-
+    // =====================================
+    // 🔘 OTHER INTERACTIONS (IGNORED)
+    // =====================================
     return false;
   } catch (err) {
     flow.fail(err);
