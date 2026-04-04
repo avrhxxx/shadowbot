@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/systems/events/create/steps/index.ts
+// =====================================
+
 // 🔹 Steps
 export { registerSelectDayStep } from "./selectDay.step";
 export { registerSelectTimeStep } from "./selectTime.step";
@@ -11,6 +15,7 @@ export { selectDayView } from "./selectDay.step";
 export { selectTimeView } from "./selectTime.step";
 export { submitEventView } from "./submitEvent.step";
 export { birthdayFormView } from "./birthdayForm.step";
+export { customEventFormView } from "./customEventForm.step";
 export { confirmEventView } from "./confirmEvent.step";
 
 // 🔹 Mapa do łatwego użycia
@@ -33,7 +38,7 @@ export const StepsMap = {
   },
   customEventForm: {
     step: registerCustomEventFormStep,
-    view: null, // brak osobnej funkcji view – modal jest w step
+    view: customEventFormView, // teraz istnieje
   },
   confirmEvent: {
     step: registerConfirmEventStep,
