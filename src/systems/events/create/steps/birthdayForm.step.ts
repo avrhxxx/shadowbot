@@ -52,7 +52,7 @@ export function birthdayFormModal() {
         required: true,
       },
     ],
-    cancelAction: "events.create.backToMain", // opcjonalnie wraca do panelu
+    cancelAction: "events.create.backToMain", // wraca do panelu
   };
 }
 
@@ -63,18 +63,16 @@ export function registerBirthdayFormStep() {
   // 🔹 OPEN MODAL
   registerUIAction("events.create.birthdayForm", {
     system: "events",
-    handler: async (ctx, payload) => {
+    handler: async (ctx) => {
       const modal = birthdayFormModal();
-
-      // renderujemy modal przez nasz UI Engine
-      await ctx.showModal(modal, payload);
+      await ctx.showModal(modal);
     },
   });
 
   // 🔹 HANDLE MODAL SUBMIT
   registerUIAction("events.create.birthdayForm.submit", {
     system: "events",
-    handler: async (ctx, payload) => {
+    handler: async (ctx, _unused, payload) => {
       const day = Number(payload?.day || 1);
       const month = Number(payload?.month || 1);
       const hours = Number(payload?.hours || 12);
@@ -85,22 +83,16 @@ export function registerBirthdayFormStep() {
 
       const view = {
         content: `🎉 Birthday Event for **${nickname}** set on **${formatted}**`,
-        components: [
+        buttons: [
           {
-            type: 1,
-            components: [
-              {
-                type: 2,
-                label: "⬅ Back to Main",
-                style: 2,
-                action: "events.create.backToMain",
-              },
-            ],
+            label: "⬅ Back to Main",
+            action: "events.create.backToMain",
+            style: "secondary",
           },
         ],
       };
 
-      await ctx.renderView(view, payload);
+      await ctx.renderView("events.create.birthdayForm.result", view);
     },
   });
 }
