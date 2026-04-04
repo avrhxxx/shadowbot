@@ -4,7 +4,7 @@
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
 import { devpanelMainView } from "../views/devpanel.view";
-import { renderView } from "@/core/ui/uiEngine";
+import { renderView } from "@/ui/core/uiEngine"; // poprawiony import
 
 // =====================================
 // 🚀 EXECUTE
