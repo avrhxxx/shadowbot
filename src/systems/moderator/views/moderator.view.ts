@@ -13,7 +13,7 @@ import { eventMainView } from "@/systems/events/main/event.main.view";
 export const moderatorHubView: View = {
   id: "moderator.hub",
   render: async () => {
-    const buttons = [];
+    const components = [];
 
     const systems = [
       { name: "events", label: "Event Menu" },
@@ -26,13 +26,16 @@ export const moderatorHubView: View = {
       const enabled = await isSystemEnabled(sys.name);
       if (!enabled) continue;
 
-      buttons.push(createButton(sys.label, "moderator.open", "primary", { target: sys.name }));
+      components.push(createButton(sys.label, "moderator.open", "primary", { target: sys.name }));
     }
 
     // 🔹 HELP
-    buttons.push(createButton("Help", "moderator.open", "secondary", { target: "help" }));
+    components.push(createButton("Help", "moderator.open", "secondary", { target: "help" }));
 
-    return { content: "📌 **Moderator Panel**\n\nSelect an option:", buttons };
+    return {
+      content: "📌 **Moderator Panel**\n\nSelect an option:",
+      components,
+    };
   },
 };
 
@@ -49,7 +52,7 @@ export const moderatorPointsView: View = {
   id: "moderator.points",
   render: async () => ({
     content: "⭐ **Points Panel** (placeholder content)",
-    buttons: [createBackButton("moderator.hub")],
+    components: [createBackButton("moderator.hub")],
   }),
 };
 
@@ -57,7 +60,7 @@ export const moderatorAbsenceView: View = {
   id: "moderator.absence",
   render: async () => ({
     content: "🕒 **Absence Panel** (placeholder content)",
-    buttons: [createBackButton("moderator.hub")],
+    components: [createBackButton("moderator.hub")],
   }),
 };
 
@@ -73,6 +76,6 @@ export const moderatorHelpView: View = {
 ⚡ QuickAdd → Fast data input system (OCR, parser).
 ❓ Help → Shows this description.
 `.trim(),
-    buttons: [createBackButton("moderator.hub")],
+    components: [createBackButton("moderator.hub")],
   }),
 };
