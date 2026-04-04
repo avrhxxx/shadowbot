@@ -15,13 +15,13 @@ export function selectDayView() {
   for (let i = 0; i < DAYS_TO_SHOW; i++) {
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
     const label = formatButtonDate(date.getUTCDate(), date.getUTCMonth() + 1);
-    const customId = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
+    const action = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
 
     buttons.push({
       type: 2,
       label,
       style: 1,
-      custom_id: customId,
+      action,
     });
   }
 
@@ -32,7 +32,7 @@ export function selectDayView() {
 
   rows.push({
     type: 1,
-    components: [{ type: 2, label: "⬅ Back", style: 2, custom_id: "events.create.backToType" }],
+    components: [{ type: 2, label: "⬅ Back", style: 2, action: "events.create.backToType" }],
   });
 
   return {
@@ -45,14 +45,10 @@ export function selectDayView() {
 export function registerSelectDayStep() {
   registerUIAction("events.create.selectDay", {
     system: "events",
-    handler: async (interaction, ctx) => {
+    handler: async (ctx, payload) => {
       // render widoku poprzez UI Engine
       const view = selectDayView();
-
-      await interaction.update?.({
-        content: view.content,
-        components: view.components,
-      });
+      await ctx.renderView(view, payload);
     },
   });
 }
