@@ -8,43 +8,51 @@ import { Interaction } from "discord.js";
 
 const DAYS_TO_SHOW = 8;
 
+// 🔹 Funkcja generująca widok Select Day (do użycia w action)
+export function selectDayView() {
+  const today = new Date();
+  const buttons = [];
+
+  for (let i = 0; i < DAYS_TO_SHOW; i++) {
+    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
+    const label = formatButtonDate(date.getUTCDate(), date.getUTCMonth() + 1);
+    const custom_id = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
+
+    buttons.push({
+      type: 2,
+      label,
+      style: 1,
+      custom_id,
+    });
+  }
+
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push({ type: 1, components: buttons.slice(i, i + 5).map(btn => ({ ...btn })) });
+  }
+
+  rows.push({
+    type: 1,
+    components: [{ type: 2, label: "⬅ Back", style: 2, custom_id: "events.create.backToType" }],
+  });
+
+  return {
+    content: "📅 **Select a day for your event:**",
+    components: rows,
+  };
+}
+
+// 🔹 Rejestracja kroku Select Day
 export function registerSelectDayStep() {
   registerUIAction("events.create.selectDay", {
     system: "events",
     handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
 
-      const today = new Date();
-      const buttons = [];
-
-      for (let i = 0; i < DAYS_TO_SHOW; i++) {
-        const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
-        const label = formatButtonDate(date.getUTCDate(), date.getUTCMonth() + 1);
-        const custom_id = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
-
-        buttons.push({
-          type: 2,
-          label,
-          style: 1,
-          custom_id,
-        });
-      }
-
-      // 🔹 Mutowalne rzędy dla Discord.js
-      const rows = [];
-      for (let i = 0; i < buttons.length; i += 5) {
-        rows.push({ type: 1, components: buttons.slice(i, i + 5).map(btn => ({ ...btn })) });
-      }
-
-      // Dodajemy przycisk back
-      rows.push({
-        type: 1,
-        components: [{ type: 2, label: "⬅ Back", style: 2, custom_id: "events.create.backToType" }],
-      });
-
+      const view = selectDayView();
       await interaction.update({
-        content: "📅 **Select a day for your event:**",
-        components: rows,
+        content: view.content,
+        components: view.components,
       });
     },
   });
