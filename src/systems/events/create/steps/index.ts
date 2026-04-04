@@ -38,10 +38,12 @@ export const StepsMap = {
   },
   customEventForm: {
     step: registerCustomEventFormStep,
-    view: customEventFormView, // teraz istnieje
+    view: customEventFormView,
   },
   confirmEvent: {
     step: registerConfirmEventStep,
-    view: confirmEventView, // wymaga parametrów przy wywołaniu
+    // wrapper wymuszający przekazanie parametrów
+    view: (params: { day: number; month: number; hours: number; minutes: number }) =>
+      confirmEventView(params),
   },
 };
