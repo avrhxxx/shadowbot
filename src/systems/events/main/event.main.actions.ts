@@ -3,7 +3,7 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { renderView } from "@/core/ui/uiEngine";
+import { renderView } from "@/ui/core/uiEngine";
 import { eventMainPanel } from "./event.main.view";
 
 export function registerEventMainActions() {
