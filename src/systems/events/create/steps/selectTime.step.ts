@@ -4,20 +4,19 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
-import { Interaction, ModalSubmitInteraction, ButtonInteraction } from "discord.js";
 
 // 🔹 Funkcja generująca widok modala do wyboru czasu
 export function selectTimeView(day: number, month: number) {
   return {
     title: `Set time for ${day}/${month} UTC`,
-    custom_id: `events.create.selectTime.submit|day=${day}&month=${month}`,
+    customId: `events.create.selectTime.submit|day=${day}&month=${month}`,
     components: [
       {
         type: 1,
         components: [
           {
             type: 4,
-            custom_id: "hours",
+            customId: "hours",
             label: "Hours (0-23, UTC)",
             style: 1,
             min_length: 1,
@@ -26,7 +25,7 @@ export function selectTimeView(day: number, month: number) {
           },
           {
             type: 4,
-            custom_id: "minutes",
+            customId: "minutes",
             label: "Minutes (0-59, UTC)",
             style: 1,
             min_length: 1,
@@ -44,36 +43,28 @@ export function registerSelectTimeStep() {
   // Pokaż modal wyboru czasu
   registerUIAction("events.create.selectTime", {
     system: "events",
-    handler: async (interaction: ButtonInteraction) => {
-      if (!interaction.isButton()) return;
-
-      const paramsString = interaction.customId.split("|")[1] || "";
-      const [dayParam, monthParam] = paramsString.split("&");
-      const day = Number(dayParam.split("=")[1]);
-      const month = Number(monthParam.split("=")[1]);
+    handler: async (interaction, ctx, payload) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
 
       const modal = selectTimeView(day, month);
-      await interaction.showModal(modal);
+      await interaction.showModal?.(modal);
     },
   });
 
   // Obsługa submitu modala
   registerUIAction("events.create.selectTime.submit", {
     system: "events",
-    handler: async (interaction: ModalSubmitInteraction) => {
-      if (!interaction.isModalSubmit()) return;
-
-      const paramsString = interaction.customId.split("|")[1] || "";
-      const [dayParam, monthParam] = paramsString.split("&");
-      const day = Number(dayParam.split("=")[1]);
-      const month = Number(monthParam.split("=")[1]);
+    handler: async (interaction, ctx, payload) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
 
       const hours = Number(interaction.fields.getTextInputValue("hours"));
       const minutes = Number(interaction.fields.getTextInputValue("minutes"));
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await interaction.reply({
+      await interaction.reply?.({
         content: `⏰ Event time set for **${formatted}**`,
         ephemeral: true,
       });
