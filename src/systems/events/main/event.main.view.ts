@@ -17,9 +17,13 @@ export const eventMainPanel: View = {
       createButton("Settings", "events.main", "secondary", { target: "settings" }),
     ];
 
-    // 🔹 dodaj Back button do moderator hub
+    // 🔹 Back button do moderator hub
     buttons.push(createBackButton("moderator.hub"));
 
-    return { content: "📌 **Event Panel**\n\nSelect an option:", buttons };
+    return {
+      content: "📌 **Event Panel**\n\nSelect an option:",
+      buttons,        // <- teraz zgodnie z UI API, renderView mapuje je na components
+      ephemeral: true, // opcjonalnie możesz ustawić domyślnie ephemeral
+    };
   },
 };
