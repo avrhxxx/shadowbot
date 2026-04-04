@@ -6,11 +6,17 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
 
 // 🔹 Funkcja generująca widok submitu eventu z przyciskiem notify
-export function submitEventView(day: number, month: number, hours: number, minutes: number) {
+export function submitEventView(
+  day: number,
+  month: number,
+  hours: number,
+  minutes: number,
+  eventName: string
+) {
   const formatted = formatEventUTC(day, month, hours, minutes);
 
   return {
-    content: `✅ You are about to create the event for **${formatted}**.\nDo you want to notify the channel?`,
+    content: `✅ You are about to create the event **${eventName}** scheduled for **${formatted}**.\nDo you want to notify the channel?`,
     components: [
       {
         type: 1,
@@ -19,19 +25,19 @@ export function submitEventView(day: number, month: number, hours: number, minut
             type: 2,
             label: "Yes, create & notify",
             style: 3,
-            custom_id: `events.create.submit.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true`,
+            action: `events.create.submit.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true&eventName=${encodeURIComponent(eventName)}`,
           },
           {
             type: 2,
             label: "Yes, create without notification",
             style: 1,
-            custom_id: `events.create.submit.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=false`,
+            action: `events.create.submit.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=false&eventName=${encodeURIComponent(eventName)}`,
           },
           {
             type: 2,
             label: "⬅ Back",
             style: 2,
-            custom_id: `events.create.backToTime|day=${day}&month=${month}`,
+            action: `events.create.backToTime|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`,
           },
         ],
       },
@@ -43,21 +49,18 @@ export function submitEventView(day: number, month: number, hours: number, minut
 export function registerSubmitEventStep() {
   registerUIAction("events.create.submit", {
     system: "events",
-    handler: async (interaction, ctx, payload) => {
+    handler: async (ctx, payload) => {
       // Pobieramy dane z payload
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const hours = Number(payload?.hours);
       const minutes = Number(payload?.minutes);
-      const notify = payload?.notify === "true";
+      const eventName = payload?.eventName ?? "Event";
 
-      const view = submitEventView(day, month, hours, minutes);
+      const view = submitEventView(day, month, hours, minutes, eventName);
 
-      // 🔹 Zamiast interaction.update używamy UI Router
-      await interaction.send({
-        content: view.content,
-        components: view.components,
-      });
+      // 🔹 Renderujemy widok przez UI Engine / UI System
+      await ctx.renderView(view, payload);
     },
   });
 }
