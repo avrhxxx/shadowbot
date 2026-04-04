@@ -4,7 +4,10 @@
 
 import { SYSTEM_REGISTRY } from "@/runtime/runtimeRegistry";
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
+
+import { button } from "@/ui/api";
+import type { View } from "@/ui/types/uiTypes";
+import type { TraceContext } from "@/trace";
 
 // =====================================
 // 🧠 MAIN VIEW
@@ -12,10 +15,12 @@ import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
 
 export const devpanelMainView: View = {
   id: "devpanel.main",
-  render: async () => ({
+
+  render: async (_ctx: TraceContext) => ({
     content: `⚙️ **Dev Panel**\n\nSelect category:`,
-    components: [
-      createButton("Systems", "devpanel.systems"),
+
+    buttons: [
+      button.create("Systems", "devpanel.systems"),
     ],
   }),
 };
@@ -26,9 +31,10 @@ export const devpanelMainView: View = {
 
 export const devpanelSystemsView: View = {
   id: "devpanel.systems",
-  render: async () => {
+
+  render: async (_ctx: TraceContext) => {
     const lines: string[] = [];
-    const components = [];
+    const buttons = [];
 
     for (const system of SYSTEM_REGISTRY) {
       if (system.name === "devpanel") continue;
@@ -37,15 +43,23 @@ export const devpanelSystemsView: View = {
       const status = enabled ? "🟢 ON" : "🔴 OFF";
 
       lines.push(`**${system.name}** → ${status}`);
-      components.push(createButton(system.name, "devpanel.toggle", enabled ? "primary" : "secondary", { system: system.name }));
+
+      buttons.push(
+        button.create(
+          system.name,
+          "devpanel.toggle",
+          enabled ? "primary" : "secondary",
+          { system: system.name }
+        )
+      );
     }
 
-    // Dodaj Back na dole
-    components.push(createBackButton("devpanel.main"));
+    // 🔙 Back
+    buttons.push(button.back("devpanel.main"));
 
     return {
       content: `⚙️ **Dev Panel → Systems**\n\n${lines.join("\n")}`,
-      components,
+      buttons,
     };
   },
 };
