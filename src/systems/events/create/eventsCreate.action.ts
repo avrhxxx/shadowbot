@@ -1,12 +1,16 @@
+// =====================================
+// 📁 src/systems/events/create/eventsCreate.action.ts
+// =====================================
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
-import { Interaction } from "discord.js";
+import { ButtonInteraction } from "discord.js";
 
 export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      // Sprawdzamy, czy mamy button interaction
+    handler: async (interaction: ButtonInteraction) => {
+      // Sprawdzamy, czy to faktycznie button
       if (!interaction.isButton()) return;
 
       // Discord.js wymaga mutowalnej tablicy, więc kopiujemy components
