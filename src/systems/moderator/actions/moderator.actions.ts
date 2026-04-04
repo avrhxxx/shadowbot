@@ -3,7 +3,7 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { Interaction } from "discord.js";
+import { Interaction, ButtonInteraction } from "discord.js";
 import { renderView } from "@/ui/core/uiEngine";
 
 import {
@@ -15,6 +15,13 @@ import {
 } from "../views/moderator.view";
 
 type ModeratorPayload = { target?: string };
+
+// 🔹 minimalny TraceContext do renderView
+const createMinimalTraceContext = () => ({
+  traceId: "trace-" + Date.now(),
+  correlationId: "correlation-" + Date.now(),
+  source: "moderator.actions",
+});
 
 // =====================================
 // 🔹 REGISTER ACTIONS
@@ -29,16 +36,21 @@ export function registerModeratorHubActions() {
       const target = payload?.target;
 
       const viewMap: Record<string, () => Promise<any>> = {
-        hub: () => renderView(interaction, moderatorHubView.id),
-        events: () => renderView(interaction, moderatorEventsView.id),
-        points: () => renderView(interaction, moderatorPointsView.id),
-        absence: () => renderView(interaction, moderatorAbsenceView.id),
-        help: () => renderView(interaction, moderatorHelpView.id),
+        hub: () => renderView(createMinimalTraceContext(), moderatorHubView.id),
+        events: () => renderView(createMinimalTraceContext(), moderatorEventsView.id),
+        points: () => renderView(createMinimalTraceContext(), moderatorPointsView.id),
+        absence: () => renderView(createMinimalTraceContext(), moderatorAbsenceView.id),
+        help: () => renderView(createMinimalTraceContext(), moderatorHelpView.id),
       };
 
-      const view = target && target in viewMap ? await viewMap[target]() : await renderView(interaction, moderatorHubView.id);
+      const view = target && target in viewMap
+        ? await viewMap[target]()
+        : await renderView(createMinimalTraceContext(), moderatorHubView.id);
 
-      await interaction.update({ content: view.content, components: view.buttons });
+      await (interaction as ButtonInteraction).update({
+        content: view.content,
+        components: view.components,
+      });
     },
   });
 }
