@@ -59,8 +59,9 @@ export function registerSelectTimeStep() {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
 
-      const hours = Number(interaction.fields.getTextInputValue("hours"));
-      const minutes = Number(interaction.fields.getTextInputValue("minutes"));
+      // Pobieramy wartości z payload (UI Router) zamiast Discord fields
+      const hours = Number(payload?.hours);
+      const minutes = Number(payload?.minutes);
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
