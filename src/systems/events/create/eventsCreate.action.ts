@@ -15,14 +15,14 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.start", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (ctx) => {
       const view = eventsCreateView();
       const mutableComponents = view.components.map(row => ({
         ...row,
         components: row.components.map(btn => ({ ...btn })),
       }));
 
-      await interaction.update?.({
+      await ctx.renderView({
         content: view.content,
         components: mutableComponents,
       });
@@ -34,7 +34,7 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.selectType", {
     system: "events",
-    handler: async (interaction, ctx, payload) => {
+    handler: async (ctx, _ctx2, payload) => {
       const target = payload?.target;
       let nextStepId: keyof typeof StepsMap;
 
@@ -46,11 +46,11 @@ export function registerEventsCreateActions() {
 
       // 🔹 Modale (customEventForm) używamy showModal
       if (nextStepId === "customEventForm" && stepEntry.view) {
-        await interaction.showModal?.(stepEntry.view());
+        await ctx.showModal(stepEntry.view());
       } else if (stepEntry.view) {
         // 🔹 Zwykłe widoki
         const view = stepEntry.view();
-        await interaction.update?.({
+        await ctx.renderView({
           content: view.content,
           components: view.components,
         });
@@ -68,9 +68,9 @@ export function registerEventsCreateActions() {
     const actionId = `events.create.${key}`;
     registerUIAction(actionId, {
       system: "events",
-      handler: async (interaction) => {
+      handler: async (ctx) => {
         const view = stepEntry.view();
-        await interaction.update?.({
+        await ctx.renderView({
           content: view.content,
           components: view.components,
         });
@@ -83,13 +83,12 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.backToMain", {
     system: "events",
-    handler: async (interaction) => {
-      await interaction.client.emit("ui.router.interaction.received", {
-        id: "events.main.create",
-        user: payload?.user || interaction.user,
-        channel: payload?.channel || interaction.channel,
-        message: payload?.message || interaction.message,
-        interaction,
+    handler: async (ctx, _ctx2, payload) => {
+      // 🔹 Przechodzimy do głównego panelu poprzez UI Router
+      await ctx.navigate("events.main.create", {
+        user: payload?.user,
+        channel: payload?.channel,
+        message: payload?.message,
       });
     },
   });
