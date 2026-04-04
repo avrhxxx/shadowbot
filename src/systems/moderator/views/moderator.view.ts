@@ -3,14 +3,14 @@
 // =====================================
 
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
+import { view, button } from "@/ui/api";
 import { eventMainView } from "@/systems/events/main/event.main.view";
 
 // =====================================
 // 🧠 HUB VIEW
 // =====================================
 
-export const moderatorHubView: View = {
+export const moderatorHubView = view.create({
   id: "moderator.hub",
   render: async () => {
     const components = [];
@@ -26,45 +26,47 @@ export const moderatorHubView: View = {
       const enabled = await isSystemEnabled(sys.name);
       if (!enabled) continue;
 
-      components.push(createButton(sys.label, "moderator.open", "primary", { target: sys.name }));
+      components.push(
+        button.create(sys.label, "moderator.open", "primary", { target: sys.name })
+      );
     }
 
     // 🔹 HELP
-    components.push(createButton("Help", "moderator.open", "secondary", { target: "help" }));
+    components.push(button.create("Help", "moderator.open", "secondary", { target: "help" }));
 
     return {
       content: "📌 **Moderator Panel**\n\nSelect an option:",
-      components,
+      buttons: components,
     };
   },
-};
+});
 
 // =====================================
 // 🧠 OTHER VIEWS
 // =====================================
 
-export const moderatorEventsView: View = {
+export const moderatorEventsView = view.create({
   id: "moderator.events",
   render: async () => eventMainView(),
-};
+});
 
-export const moderatorPointsView: View = {
+export const moderatorPointsView = view.create({
   id: "moderator.points",
   render: async () => ({
     content: "⭐ **Points Panel** (placeholder content)",
-    components: [createBackButton("moderator.hub")],
+    buttons: [button.back("moderator.hub")],
   }),
-};
+});
 
-export const moderatorAbsenceView: View = {
+export const moderatorAbsenceView = view.create({
   id: "moderator.absence",
   render: async () => ({
     content: "🕒 **Absence Panel** (placeholder content)",
-    components: [createBackButton("moderator.hub")],
+    buttons: [button.back("moderator.hub")],
   }),
-};
+});
 
-export const moderatorHelpView: View = {
+export const moderatorHelpView = view.create({
   id: "moderator.help",
   render: async () => ({
     content: `
@@ -76,6 +78,6 @@ export const moderatorHelpView: View = {
 ⚡ QuickAdd → Fast data input system (OCR, parser).
 ❓ Help → Shows this description.
 `.trim(),
-    components: [createBackButton("moderator.hub")],
+    buttons: [button.back("moderator.hub")],
   }),
-};
+});
