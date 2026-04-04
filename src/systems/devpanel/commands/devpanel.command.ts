@@ -1,22 +1,21 @@
-// =====================================
-// 📁 src/systems/devpanel/commands/devpanel.command.ts
-// =====================================
-
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
 import { devpanelMainView } from "../views/devpanel.view";
-import { renderView } from "@/ui/core/uiEngine"; // poprawiony import
+import { renderView } from "@/ui/core/uiEngine";
+import { nanoid } from "nanoid";
 
-// =====================================
-// 🚀 EXECUTE
-// =====================================
+// Minimalny placeholder TraceContext
+const minimalTraceContext = {
+  traceId: nanoid(),
+  correlationId: nanoid(),
+  source: "devpanel.command",
+};
 
 export async function handleDevpanelCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  // używamy pustego kontekstu, bo interaction nie jest TraceContext
-  const view = await renderView({}, devpanelMainView.id);
+  const view = await renderView(minimalTraceContext, devpanelMainView.id);
 
   await interaction.reply({
     content: view.content,
-    components: view.components, // poprawka z buttons -> components
+    components: view.components,
     ephemeral: true,
   });
 }
