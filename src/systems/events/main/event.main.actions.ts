@@ -49,7 +49,7 @@ export function registerEventMainActions() {
         default:
           // 🔹 wróć do głównego widoku
           const view = await renderView(interaction, eventMainPanel.id);
-          await interaction.update({ content: view.content, components: view.buttons });
+          await interaction.update({ content: view.content, components: view.components });
       }
     },
   });
