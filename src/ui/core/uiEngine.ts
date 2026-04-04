@@ -3,7 +3,6 @@
 // =====================================
 
 import { nanoid } from "nanoid";
-
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
@@ -55,7 +54,6 @@ type StoreEntry = {
 };
 
 const store = new Map<string, StoreEntry>();
-
 const TTL = 1000 * 60 * 5; // 5 min
 
 // =====================================
@@ -109,16 +107,12 @@ export async function renderView(
   const log = createLogger(ctx);
   const flow = log.flow("ui.render");
 
-  flow.start({
-    meta: { viewId },
-  });
+  flow.start({ meta: { viewId } });
 
   const view = views.get(viewId);
 
   if (!view) {
-    flow.fail(new Error("view_not_found"), {
-      meta: { viewId },
-    });
+    flow.fail(new Error("view_not_found"), { meta: { viewId } });
     throw new Error(`View not found: ${viewId}`);
   }
 
@@ -132,16 +126,9 @@ export async function renderView(
         customId: createCustomId(btn.action, btn.state),
       })) ?? [];
 
-    flow.success({
-      stats: {
-        buttons: buttons.length,
-      },
-    });
+    flow.success({ stats: { buttons: buttons.length } });
 
-    return {
-      content: result.content,
-      buttons,
-    };
+    return { content: result.content, buttons };
   } catch (err) {
     flow.fail(err);
     throw err;
@@ -159,60 +146,34 @@ export async function handleInteraction(
   const log = createLogger(ctx);
   const flow = log.flow("ui.interaction");
 
-  flow.start({
-    meta: { customId },
-  });
+  flow.start({ meta: { customId } });
 
   const entry = store.get(customId);
 
   if (!entry) {
     flow.stepWarn("not_found");
-    return {
-      type: "reply",
-      content: "⚠️ This interaction is no longer valid.",
-    };
+    return { type: "reply", content: "⚠️ This interaction is no longer valid." };
   }
 
   if (isExpired(entry)) {
     store.delete(customId);
-
     flow.stepWarn("expired");
-
-    return {
-      type: "reply",
-      content: "⏳ This interaction expired.",
-    };
+    return { type: "reply", content: "⏳ This interaction expired." };
   }
 
   const action = actions.get(entry.action);
 
   if (!action) {
-    flow.fail(new Error("action_not_found"), {
-      meta: { action: entry.action },
-    });
-
-    return {
-      type: "reply",
-      content: "❌ Action not found.",
-    };
+    flow.fail(new Error("action_not_found"), { meta: { action: entry.action } });
+    return { type: "reply", content: "❌ Action not found." };
   }
 
   try {
     const result = await action.execute(ctx, entry.state);
-
-    flow.success({
-      meta: { action: entry.action },
-    });
-
+    flow.success({ meta: { action: entry.action } });
     return result;
   } catch (err) {
-    flow.fail(err, {
-      meta: { action: entry.action },
-    });
-
-    return {
-      type: "reply",
-      content: "❌ Something went wrong.",
-    };
+    flow.fail(err, { meta: { action: entry.action } });
+    return { type: "reply", content: "❌ Something went wrong." };
   }
 }
