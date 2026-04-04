@@ -3,7 +3,8 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { eventMainView } from "./event.main.view";
+import { renderView } from "@/core/ui/uiEngine";
+import { eventMainPanel } from "./event.main.view";
 
 export function registerEventMainActions() {
   registerUIAction("events.main", {
@@ -47,8 +48,8 @@ export function registerEventMainActions() {
 
         default:
           // 🔹 wróć do głównego widoku
-          const view = await eventMainView();
-          await interaction.update({ content: view.content, components: view.components });
+          const view = await renderView(interaction, eventMainPanel.id);
+          await interaction.update({ content: view.content, components: view.buttons });
       }
     },
   });
