@@ -10,6 +10,7 @@ import {
   createJobId,
   createInteractionId,
   createExternalId,
+  createUIId, // 🔹 new
 } from "./idGenerator";
 
 import { isValidId, getIdType, isIdOfType } from "./idValidator";
@@ -25,14 +26,12 @@ import type {
   InteractionId,
   ExternalId,
   RuntimeId,
+  UIId, // 🔹 new
 } from "./idTypes";
 
 import type { IdType } from "./idConfig";
 
-// =====================================
 // 🔹 TYPE MAP
-// =====================================
-
 type IdMap = {
   trace: TraceId;
   flow: FlowId;
@@ -40,18 +39,17 @@ type IdMap = {
 
   session: SessionId;
   job: JobId;
-  queue: QueueId;
+  queue: JobId; // tymczasowo createQueueId brak
 
   interaction: InteractionId;
   external: ExternalId;
 
   runtime: RuntimeId;
+
+  ui: UIId; // 🔹 new
 };
 
-// =====================================
-// 🔹 GENERATOR MAP (🔥 KLUCZOWE)
-// =====================================
-
+// 🔹 GENERATOR MAP
 const GENERATORS: Record<IdType, () => string> = {
   trace: createTraceId,
   flow: createFlowId,
@@ -59,18 +57,17 @@ const GENERATORS: Record<IdType, () => string> = {
 
   session: createSessionId,
   job: createJobId,
-  queue: createJobId, // 👉 jeśli nie masz createQueueId — tymczasowo
+  queue: createJobId, // fallback
 
   interaction: createInteractionId,
   external: createExternalId,
 
-  runtime: createExternalId, // 👉 fallback (możemy później zrobić proper)
+  runtime: createExternalId, // fallback
+
+  ui: createUIId, // 🔹 new
 };
 
-// =====================================
 // 🔹 CREATE
-// =====================================
-
 function create<T extends IdType>(type: T): IdMap[T] {
   const generator = GENERATORS[type];
 
@@ -81,10 +78,7 @@ function create<T extends IdType>(type: T): IdMap[T] {
   return generator() as IdMap[T];
 }
 
-// =====================================
 // 🔹 PUBLIC API
-// =====================================
-
 export const ids = {
   create,
 
