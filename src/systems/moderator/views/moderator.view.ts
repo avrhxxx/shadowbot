@@ -3,7 +3,7 @@
 // =====================================
 
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { View, createButton, createBackButton } from "@/core/ui/uiEngine";
+import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
 import { eventMainView } from "@/systems/events/main/event.main.view";
 
 // =====================================
