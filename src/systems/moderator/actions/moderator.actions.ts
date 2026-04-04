@@ -4,7 +4,7 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction, ButtonInteraction } from "discord.js";
-import { renderView } from "@/ui/core/uiEngine";
+import { renderView, TraceContext } from "@/ui/core/uiEngine";
 
 import {
   moderatorHubView,
@@ -17,9 +17,9 @@ import {
 type ModeratorPayload = { target?: string };
 
 // 🔹 minimalny TraceContext do renderView
-const createMinimalTraceContext = () => ({
-  traceId: "trace-" + Date.now(),
-  correlationId: "correlation-" + Date.now(),
+const createMinimalTraceContext = (): TraceContext => ({
+  traceId: { __brand: "TraceId" } as any,
+  correlationId: { __brand: "CorrelationId" } as any,
   source: "moderator.actions",
 });
 
@@ -33,6 +33,7 @@ export function registerModeratorHubActions() {
     handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
       if (!interaction.isButton()) return;
 
+      const btnInteraction = interaction as ButtonInteraction;
       const target = payload?.target;
 
       const viewMap: Record<string, () => Promise<any>> = {
@@ -47,9 +48,9 @@ export function registerModeratorHubActions() {
         ? await viewMap[target]()
         : await renderView(createMinimalTraceContext(), moderatorHubView.id);
 
-      await (interaction as ButtonInteraction).update({
+      await btnInteraction.update({
         content: view.content,
-        components: view.components,
+        components: view.components, // wcześniej było view.buttons
       });
     },
   });
