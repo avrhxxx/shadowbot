@@ -10,11 +10,14 @@ export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
     handler: async (interaction: ButtonInteraction) => {
-      // Sprawdzamy, czy to faktycznie button interaction
+      // Sprawdzamy, czy to faktycznie button
       if (!interaction.isButton()) return;
 
-      // Wyświetlamy widok eventów
-      await interaction.update(eventsCreateView());
+      // Aktualizacja UI przyciskiem (update działa tylko dla ButtonInteraction)
+      await interaction.update({
+        content: eventsCreateView().content,
+        components: eventsCreateView().components,
+      });
     },
   });
 }
