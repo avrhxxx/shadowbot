@@ -6,52 +6,53 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
 
 // =====================================
-// 🧠 VIEW
+// 🧠 MODAL / VIEW
 // =====================================
-export function birthdayFormView() {
+export function birthdayFormModal() {
   return {
-    content: "🎉 **Birthday Event**\n\nConfigure your event:",
-    components: [
+    title: "🎉 Birthday Event",
+    fields: [
       {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "Set Date (DD/MM)",
-            style: 1,
-            action: "events.create.birthdayForm.setDate",
-          },
-          {
-            type: 2,
-            label: "Set Time (HH:MM)",
-            style: 1,
-            action: "events.create.birthdayForm.setTime",
-          },
-        ],
+        type: "text",
+        name: "nickname",
+        label: "Nickname",
+        placeholder: "Enter nickname for event",
+        required: true,
       },
       {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "Submit",
-            style: 3,
-            action: "events.create.birthdayForm.submit",
-          },
-        ],
+        type: "number",
+        name: "day",
+        label: "Day",
+        min: 1,
+        max: 31,
+        required: true,
       },
       {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "⬅ Back",
-            style: 2,
-            action: "events.create.backToMain",
-          },
-        ],
+        type: "number",
+        name: "month",
+        label: "Month",
+        min: 1,
+        max: 12,
+        required: true,
+      },
+      {
+        type: "number",
+        name: "hours",
+        label: "Hours",
+        min: 0,
+        max: 23,
+        required: true,
+      },
+      {
+        type: "number",
+        name: "minutes",
+        label: "Minutes",
+        min: 0,
+        max: 59,
+        required: true,
       },
     ],
+    cancelAction: "events.create.backToMain", // opcjonalnie wraca do panelu
   };
 }
 
@@ -59,33 +60,44 @@ export function birthdayFormView() {
 // 🚀 REGISTER STEP
 // =====================================
 export function registerBirthdayFormStep() {
-  // 🔹 OPEN FORM
+  // 🔹 OPEN MODAL
   registerUIAction("events.create.birthdayForm", {
     system: "events",
     handler: async (ctx, payload) => {
-      const view = birthdayFormView();
+      const modal = birthdayFormModal();
 
-      // renderujemy widok przez UI Engine, nie Discord
-      await ctx.renderView(view, payload);
+      // renderujemy modal przez nasz UI Engine
+      await ctx.showModal(modal, payload);
     },
   });
 
-  // 🔹 SUBMIT
+  // 🔹 HANDLE MODAL SUBMIT
   registerUIAction("events.create.birthdayForm.submit", {
     system: "events",
     handler: async (ctx, payload) => {
-      // 🔴 Placeholder – później będzie dynamiczny state
-      const day = payload?.day || 1;
-      const month = payload?.month || 1;
-      const hours = payload?.hours || 12;
-      const minutes = payload?.minutes || 0;
-      const name = payload?.name || "User";
+      const day = Number(payload?.day || 1);
+      const month = Number(payload?.month || 1);
+      const hours = Number(payload?.hours || 12);
+      const minutes = Number(payload?.minutes || 0);
+      const nickname = payload?.nickname || "User";
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
       const view = {
-        content: `🎉 Birthday Event for **${name}** set on **${formatted}**`,
-        components: [],
+        content: `🎉 Birthday Event for **${nickname}** set on **${formatted}**`,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                label: "⬅ Back to Main",
+                style: 2,
+                action: "events.create.backToMain",
+              },
+            ],
+          },
+        ],
       };
 
       await ctx.renderView(view, payload);
