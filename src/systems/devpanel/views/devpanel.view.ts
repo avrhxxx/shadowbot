@@ -1,8 +1,13 @@
+// =====================================
+// 📁 src/ui/devpanel/devpanel.view.ts
+// =====================================
+
 import { SYSTEM_REGISTRY } from "@/runtime/runtimeRegistry";
 import { isSystemEnabled } from "@/runtime/runtimeState";
 
-import { button, view } from "@/ui/api";
+import { button } from "@/ui/api";
 import type { View } from "@/ui/types/uiTypes";
+import type { TraceContext } from "@/trace";
 
 // =====================================
 // 🧠 MAIN VIEW
@@ -11,11 +16,11 @@ import type { View } from "@/ui/types/uiTypes";
 export const devpanelMainView: View = {
   id: "devpanel.main",
 
-  render: async () => ({
+  render: async (_ctx: TraceContext) => ({
     content: `⚙️ **Dev Panel**\n\nSelect category:`,
-    buttons: button.row([
-      button.create("Systems", "devpanel.systems"),
-    ]),
+    buttons: [
+      button.create("Systems", "devpanel.systems"), // przejście do systemów
+    ],
   }),
 };
 
@@ -26,30 +31,31 @@ export const devpanelMainView: View = {
 export const devpanelSystemsView: View = {
   id: "devpanel.systems",
 
-  render: async () => {
+  render: async (_ctx: TraceContext) => {
     const lines: string[] = [];
-    const buttonsList = [];
+    const buttons = [];
 
+    // generowanie listy systemów z przyciskami toggle
     for (const system of SYSTEM_REGISTRY) {
-      if (system.name === "devpanel") continue;
+      if (system.name === "devpanel") continue; // pomijamy sam devpanel
 
       const enabled = await isSystemEnabled(system.name);
       const status = enabled ? "🟢 ON" : "🔴 OFF";
 
       lines.push(`**${system.name}** → ${status}`);
 
-      buttonsList.push(
+      buttons.push(
         button.create(
-          system.name,
-          "devpanel.toggle",
-          enabled ? "primary" : "secondary",
-          { system: system.name }
+          system.name,           // label
+          "devpanel.toggle",     // action
+          enabled ? "primary" : "secondary", // style
+          { system: system.name } // state / payload
         )
       );
     }
 
-    // 🔙 Back button jako część rzędu
-    const buttons = button.row([...buttonsList, button.back("devpanel.main")]);
+    // 🔙 Back button
+    buttons.push(button.back("devpanel.main"));
 
     return {
       content: `⚙️ **Dev Panel → Systems**\n\n${lines.join("\n")}`,
