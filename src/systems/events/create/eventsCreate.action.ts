@@ -4,7 +4,7 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
-import { ButtonInteraction, Interaction } from "discord.js";
+import { Interaction, ButtonInteraction } from "discord.js";
 
 // 🔹 Funkcja rejestrująca wszystkie akcje dla flow tworzenia eventu
 export function registerEventsCreateActions() {
@@ -36,37 +36,38 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.selectType", {
     system: "events",
-    handler: async (interaction: ButtonInteraction) => {
+    handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
 
-      const target = interaction.customId.split("target=")[1];
+      const buttonInteraction = interaction as ButtonInteraction;
+      const target = buttonInteraction.customId.split("target=")[1];
 
       if (target === "BD") {
         // Birthday form
-        await interaction.client.emit("ui.router.interaction.received", {
+        await buttonInteraction.client.emit("ui.router.interaction.received", {
           id: "events.create.birthdayForm",
-          user: interaction.user,
-          channel: interaction.channel,
-          message: interaction.message,
-          interaction,
+          user: buttonInteraction.user,
+          channel: buttonInteraction.channel,
+          message: buttonInteraction.message,
+          interaction: buttonInteraction,
         });
       } else if (target === "C") {
         // Custom event form
-        await interaction.client.emit("ui.router.interaction.received", {
+        await buttonInteraction.client.emit("ui.router.interaction.received", {
           id: "events.create.customEventForm",
-          user: interaction.user,
-          channel: interaction.channel,
-          message: interaction.message,
-          interaction,
+          user: buttonInteraction.user,
+          channel: buttonInteraction.channel,
+          message: buttonInteraction.message,
+          interaction: buttonInteraction,
         });
       } else {
         // Standard event → next step: select day
-        await interaction.client.emit("ui.router.interaction.received", {
+        await buttonInteraction.client.emit("ui.router.interaction.received", {
           id: "events.create.selectDay",
-          user: interaction.user,
-          channel: interaction.channel,
-          message: interaction.message,
-          interaction,
+          user: buttonInteraction.user,
+          channel: buttonInteraction.channel,
+          message: buttonInteraction.message,
+          interaction: buttonInteraction,
         });
       }
     },
@@ -77,15 +78,17 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.backToMain", {
     system: "events",
-    handler: async (interaction: ButtonInteraction) => {
+    handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
 
-      await interaction.client.emit("ui.router.interaction.received", {
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      await buttonInteraction.client.emit("ui.router.interaction.received", {
         id: "events.main.create",
-        user: interaction.user,
-        channel: interaction.channel,
-        message: interaction.message,
-        interaction,
+        user: buttonInteraction.user,
+        channel: buttonInteraction.channel,
+        message: buttonInteraction.message,
+        interaction: buttonInteraction,
       });
     },
   });
