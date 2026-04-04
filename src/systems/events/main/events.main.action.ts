@@ -4,7 +4,7 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 
-// 🔹 Importujemy całą logikę create feature
+// 🔹 Importujemy całą logikę create feature (stepy zarejestrowane)
 import { initEventsCreateFeature } from "@/systems/events/create/eventsCreate.index";
 
 // =====================================
@@ -23,15 +23,13 @@ export function registerEventsMainActions() {
   registerUIAction("events.main.create", {
     system: "events",
     handler: async (interaction: any) => {
-      // Lazy import start view selectDay
-      const { selectDayStepView } = await import(
-        "@/systems/events/create/steps/selectDay.step.view"
-      );
-      const view = await selectDayStepView();
-
-      await interaction.update({
-        content: view.content,
-        components: view.components,
+      // Wywołujemy startowy step z feature bez importu view
+      await interaction.client.emit("ui.router.interaction.received", {
+        id: "events.create.selectDay",
+        user: interaction.user,
+        channel: interaction.channel,
+        message: interaction.message,
+        interaction,
       });
     },
   });
