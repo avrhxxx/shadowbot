@@ -26,8 +26,6 @@ export function registerEventsCreateActions() {
         content: view.content,
         components: mutableComponents,
       });
-
-      console.log("✅ Create Event button clicked by", interaction.user.id);
     },
   });
 }
