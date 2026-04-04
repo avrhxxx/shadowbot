@@ -4,6 +4,10 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
+import { selectDayView } from "./steps/selectDay.step";
+import { birthdayFormView } from "./steps/birthdayForm.step";
+import { customEventFormView } from "./steps/customEventForm.step";
+import { confirmEventView } from "./steps/confirmEvent.step";
 import { Interaction, ButtonInteraction } from "discord.js";
 
 // 🔹 Funkcja rejestrująca wszystkie akcje dla flow tworzenia eventu
@@ -74,13 +78,80 @@ export function registerEventsCreateActions() {
   });
 
   // =====================================
+  // SELECT DAY STEP
+  // =====================================
+  registerUIAction("events.create.selectDay", {
+    system: "events",
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      const view = selectDayView();
+      await buttonInteraction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
+  // BIRTHDAY FORM STEP
+  // =====================================
+  registerUIAction("events.create.birthdayForm", {
+    system: "events",
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      const view = birthdayFormView();
+      await buttonInteraction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
+  // CUSTOM EVENT FORM STEP
+  // =====================================
+  registerUIAction("events.create.customEventForm", {
+    system: "events",
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      const view = customEventFormView();
+      await buttonInteraction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
+  // CONFIRM EVENT STEP
+  // =====================================
+  registerUIAction("events.create.confirmEvent", {
+    system: "events",
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const buttonInteraction = interaction as ButtonInteraction;
+
+      const view = confirmEventView();
+      await buttonInteraction.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // =====================================
   // BACK TO EVENT PANEL (z każdego step)
   // =====================================
   registerUIAction("events.create.backToMain", {
     system: "events",
     handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
-
       const buttonInteraction = interaction as ButtonInteraction;
 
       await buttonInteraction.client.emit("ui.router.interaction.received", {
