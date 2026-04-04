@@ -2,13 +2,21 @@
 // 📁 src/ui/core/uiRouter.ts
 // =====================================
 
+import type { Interaction } from "discord.js";
 import type { TraceContext } from "@/trace";
+
+import { isSystemEnabled } from "@/runtime/runtimeState";
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
-export type UIContext = { renderView: Function; showModal: Function; navigate: Function };
+export type UIContext = {
+  renderView: (viewId: string, state?: any) => Promise<any>;
+  showModal?: (modal: any, payload?: any) => Promise<any>;
+  navigate?: (destination: string, options?: any) => Promise<void>;
+};
+
 export type UIActionHandler = (ctx: UIContext, payload?: any) => Promise<void>;
 export type UIActionDefinition = { system: string; handler: UIActionHandler };
 
@@ -29,6 +37,8 @@ export function registerUIAction(id: string, def: UIActionDefinition) {
 export async function executeUIAction(id: string, ctx: UIContext, payload?: any): Promise<boolean> {
   const action = registry.get(id);
   if (!action) return false;
+  const enabled = await isSystemEnabled(action.system);
+  if (!enabled) return true;
   await action.handler(ctx, payload);
   return true;
 }
