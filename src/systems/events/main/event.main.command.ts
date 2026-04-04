@@ -3,13 +3,14 @@
 // =====================================
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
-import { eventMainView } from "./event.main.view";
+import { renderView } from "@/core/ui/uiEngine";
+import { eventMainPanel } from "./event.main.view";
 
 export async function handleEventMainCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  const view = await eventMainView();
+  const view = await renderView(interaction, eventMainPanel.id);
   await interaction.reply({
     content: view.content,
-    components: view.components,
+    components: view.buttons,
     ephemeral: true,
   });
 }
