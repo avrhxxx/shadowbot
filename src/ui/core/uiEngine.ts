@@ -10,51 +10,42 @@ import type { TraceContext } from "@/trace";
 // 🔹 TYPES
 // =====================================
 
-type ViewResult = {
-  content?: string;
-  buttons?: Button[];
-};
-
-type Button = {
+export type Button = {
   label: string;
   action: string;
-  state?: any; // opcjonalne, żeby nie wywalało systemów
+  state?: any;
   style?: "primary" | "secondary" | "danger";
 };
 
-type View = {
-  id: string;
-  render: (
-    ctx: TraceContext,
-    state?: any // opcjonalne
-  ) => Promise<ViewResult> | ViewResult;
+export type ViewResult = {
+  content?: string;
+  buttons?: Button[];
+  embed?: any; // discord embed opcjonalny
+  ephemeral?: boolean;
 };
 
-type ActionResult =
+export type View = {
+  id: string;
+  render: (ctx: TraceContext, state?: any) => Promise<ViewResult> | ViewResult;
+};
+
+export type ActionResult =
   | { type: "view"; view: string; state?: any }
-  | { type: "reply"; content: string }
+  | { type: "reply"; content: string; ephemeral?: boolean }
   | { type: "none" };
 
-type Action = {
+export type Action = {
   id: string;
-  execute: (
-    ctx: TraceContext,
-    state?: any // opcjonalne
-  ) => Promise<ActionResult> | ActionResult;
+  execute: (ctx: TraceContext, state?: any) => Promise<ActionResult> | ActionResult;
 };
 
 // =====================================
 // 🔹 STORE (IN-MEMORY)
 // =====================================
 
-type StoreEntry = {
-  action: string;
-  state?: any; // opcjonalne
-  createdAt: number;
-};
-
+type StoreEntry = { action: string; state?: any; createdAt: number };
 const store = new Map<string, StoreEntry>();
-const TTL = 1000 * 60 * 5; // 5 min
+const TTL = 1000 * 60 * 5;
 
 // =====================================
 // 🔹 REGISTRIES
@@ -76,7 +67,7 @@ export function registerAction(action: Action) {
 }
 
 // =====================================
-// 🔹 INTERNAL
+// 🔹 INTERNAL HELPERS
 // =====================================
 
 function isExpired(entry: StoreEntry) {
@@ -85,32 +76,33 @@ function isExpired(entry: StoreEntry) {
 
 function createCustomId(action: string, state?: any) {
   const id = nanoid();
-
-  store.set(id, {
-    action,
-    state: state ?? {}, // opcjonalnie
-    createdAt: Date.now(),
-  });
-
+  store.set(id, { action, state: state ?? {}, createdAt: Date.now() });
   return id;
+}
+
+// helper do generowania standardowych buttonów
+export function createButton(label: string, action: string, style?: Button["style"], state?: any) {
+  return { label, action, style, state };
+}
+
+export function createBackButton(targetView: string) {
+  return createButton("⬅ Back", targetView, "secondary");
+}
+
+export function createGuideButton(targetAction: string) {
+  return createButton("Guide", targetAction, "secondary");
 }
 
 // =====================================
 // 🎨 RENDER VIEW
 // =====================================
 
-export async function renderView(
-  ctx: TraceContext,
-  viewId: string,
-  state?: any
-) {
+export async function renderView(ctx: TraceContext, viewId: string, state?: any) {
   const log = createLogger(ctx);
   const flow = log.flow("ui.render");
-
   flow.start({ meta: { viewId } });
 
   const view = views.get(viewId);
-
   if (!view) {
     flow.fail(new Error("view_not_found"), { meta: { viewId } });
     throw new Error(`View not found: ${viewId}`);
@@ -118,7 +110,6 @@ export async function renderView(
 
   try {
     const result = await view.render(ctx, state ?? {});
-
     const buttons =
       result.buttons?.map((btn) => ({
         label: btn.label,
@@ -127,8 +118,7 @@ export async function renderView(
       })) ?? [];
 
     flow.success({ stats: { buttons: buttons.length } });
-
-    return { content: result.content, buttons };
+    return { content: result.content, buttons, embed: result.embed, ephemeral: result.ephemeral };
   } catch (err) {
     flow.fail(err);
     throw err;
@@ -139,41 +129,26 @@ export async function renderView(
 // 🖱️ HANDLE INTERACTION
 // =====================================
 
-export async function handleInteraction(
-  ctx: TraceContext,
-  customId: string
-): Promise<ActionResult> {
+export async function handleInteraction(ctx: TraceContext, customId: string): Promise<ActionResult> {
   const log = createLogger(ctx);
   const flow = log.flow("ui.interaction");
-
   flow.start({ meta: { customId } });
 
   const entry = store.get(customId);
-
-  if (!entry) {
-    flow.stepWarn("not_found");
-    return { type: "reply", content: "⚠️ This interaction is no longer valid." };
-  }
+  if (!entry) return { type: "reply", content: "⚠️ This interaction is no longer valid." };
 
   if (isExpired(entry)) {
     store.delete(customId);
-    flow.stepWarn("expired");
     return { type: "reply", content: "⏳ This interaction expired." };
   }
 
   const action = actions.get(entry.action);
-
-  if (!action) {
-    flow.fail(new Error("action_not_found"), { meta: { action: entry.action } });
-    return { type: "reply", content: "❌ Action not found." };
-  }
+  if (!action) return { type: "reply", content: "❌ Action not found." };
 
   try {
     const result = await action.execute(ctx, entry.state ?? {});
-    flow.success({ meta: { action: entry.action } });
     return result;
   } catch (err) {
-    flow.fail(err, { meta: { action: entry.action } });
     return { type: "reply", content: "❌ Something went wrong." };
   }
 }
