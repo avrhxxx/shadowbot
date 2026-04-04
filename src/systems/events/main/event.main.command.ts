@@ -10,7 +10,7 @@ export async function handleEventMainCommand(interaction: ChatInputCommandIntera
   const view = await renderView(interaction, eventMainPanel.id);
   await interaction.reply({
     content: view.content,
-    components: view.buttons,
+    components: view.components,
     ephemeral: true,
   });
 }
