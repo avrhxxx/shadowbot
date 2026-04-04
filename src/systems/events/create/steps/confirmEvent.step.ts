@@ -27,13 +27,13 @@ export function confirmEventView(params: {
             type: 2,
             label: "📢 Create & Notify",
             style: 3,
-            custom_id: `events.create.submit|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true`,
+            action: `events.create.submit|notify=true&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
           },
           {
             type: 2,
             label: "✅ Create (silent)",
             style: 1,
-            custom_id: `events.create.submit|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=false`,
+            action: `events.create.submit|notify=false&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
           },
         ],
       },
@@ -44,13 +44,13 @@ export function confirmEventView(params: {
             type: 2,
             label: "⬅ Back",
             style: 2,
-            custom_id: `events.create.selectTime|day=${day}&month=${month}`,
+            action: `events.create.selectTime|day=${day}&month=${month}`,
           },
           {
             type: 2,
             label: "🏠 Menu",
             style: 2,
-            custom_id: "events.create.backToMain",
+            action: "events.create.backToMain",
           },
         ],
       },
@@ -64,7 +64,7 @@ export function confirmEventView(params: {
 export function registerConfirmEventStep() {
   registerUIAction("events.create.confirmEvent", {
     system: "events",
-    handler: async (interaction, ctx, payload) => {
+    handler: async (ctx, payload) => {
       // 🔹 Pobieramy parametry z payload, które UI Router już sparsował
       const day = Number(payload?.day ?? 1);
       const month = Number(payload?.month ?? 1);
@@ -73,10 +73,8 @@ export function registerConfirmEventStep() {
 
       const view = confirmEventView({ day, month, hours, minutes });
 
-      await interaction.update({
-        content: view.content,
-        components: view.components,
-      });
+      // 🔹 Renderujemy przez UI Router / Engine
+      await ctx.renderView(view, payload);
     },
   });
 }
