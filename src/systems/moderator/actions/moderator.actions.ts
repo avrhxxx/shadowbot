@@ -3,8 +3,7 @@
 // =====================================
 
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { Interaction, ButtonInteraction } from "discord.js";
-import { renderView, TraceContext } from "@/ui/core/uiEngine";
+import { renderView } from "@/ui/core/uiEngine";
 
 import {
   moderatorHubView,
@@ -17,7 +16,7 @@ import {
 type ModeratorPayload = { target?: string };
 
 // 🔹 minimalny TraceContext do renderView
-const createMinimalTraceContext = (): TraceContext => ({
+const createMinimalTraceContext = () => ({
   traceId: { __brand: "TraceId" } as any,
   correlationId: { __brand: "CorrelationId" } as any,
   source: "moderator.actions",
@@ -30,13 +29,14 @@ const createMinimalTraceContext = (): TraceContext => ({
 export function registerModeratorHubActions() {
   registerUIAction("moderator.open", {
     system: "moderator",
-    handler: async (interaction: Interaction, _ctx, payload: ModeratorPayload) => {
-      if (!interaction.isButton()) return;
+    handler: async (interaction: any, _ctx, payload: ModeratorPayload) => {
+      // Sprawdzenie, czy przychodzi właściwy typ akcji (silnik UI sam daje metody)
+      if (!interaction.isButton?.()) return;
 
-      const btnInteraction = interaction as ButtonInteraction;
       const target = payload?.target;
 
-      const viewMap: Record<string, () => Promise<any>> = {
+      // Mapa widoków powiązana z identyfikatorami zdefiniowanymi w views
+      const viewMap: Record<string, () => Promise<{ content: string; components: any[] }>> = {
         hub: () => renderView(createMinimalTraceContext(), moderatorHubView.id),
         events: () => renderView(createMinimalTraceContext(), moderatorEventsView.id),
         points: () => renderView(createMinimalTraceContext(), moderatorPointsView.id),
@@ -44,13 +44,15 @@ export function registerModeratorHubActions() {
         help: () => renderView(createMinimalTraceContext(), moderatorHelpView.id),
       };
 
+      // Pobranie widoku docelowego albo domyślnego
       const view = target && target in viewMap
         ? await viewMap[target]()
         : await renderView(createMinimalTraceContext(), moderatorHubView.id);
 
-      await btnInteraction.update({
+      // Aktualizacja komponentów w UI przez nasz silnik
+      await interaction.update({
         content: view.content,
-        components: view.components, // wcześniej było view.buttons
+        components: view.components,
       });
     },
   });
