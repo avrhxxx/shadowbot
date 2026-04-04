@@ -10,29 +10,22 @@ export function selectTimeView(day: number, month: number, eventName: string) {
   return {
     title: `⏰ Set time for **${eventName}** on ${day}/${month} UTC`,
     customId: `events.create.selectTime.submit|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`,
-    components: [
+    fields: [
       {
-        type: 1,
-        components: [
-          {
-            type: 4,
-            customId: "hours",
-            label: "Hours (0-23, UTC)",
-            style: 1,
-            min_length: 1,
-            max_length: 2,
-            required: true,
-          },
-          {
-            type: 4,
-            customId: "minutes",
-            label: "Minutes (0-59, UTC)",
-            style: 1,
-            min_length: 1,
-            max_length: 2,
-            required: true,
-          },
-        ],
+        type: "number",
+        name: "hours",
+        label: "Hours (0-23, UTC)",
+        min: 0,
+        max: 23,
+        required: true,
+      },
+      {
+        type: "number",
+        name: "minutes",
+        label: "Minutes (0-59, UTC)",
+        min: 0,
+        max: 59,
+        required: true,
       },
     ],
   };
@@ -60,36 +53,18 @@ export function registerSelectTimeStep() {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
       const eventName = payload?.eventName ?? "Event";
-
       const hours = Number(payload?.hours);
       const minutes = Number(payload?.minutes);
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      const view = {
-        content: `⏰ **${eventName}** time set for **${formatted}**`,
-        components: [
-          {
-            type: 1,
-            components: [
-              {
-                type: 2,
-                label: "⬅ Back",
-                style: 2,
-                action: `events.create.selectDay|eventName=${encodeURIComponent(eventName)}`,
-              },
-              {
-                type: 2,
-                label: "🏠 Menu",
-                style: 2,
-                action: "events.create.backToMain",
-              },
-            ],
-          },
-        ],
-      };
+      // 🔹 Przyciski po submit
+      const buttons = [
+        { label: "⬅ Back", action: `events.create.selectDay|eventName=${encodeURIComponent(eventName)}`, style: "secondary" },
+        { label: "🏠 Menu", action: "events.create.backToMain", style: "secondary" },
+      ];
 
-      await ctx.renderView(view, payload);
+      await ctx.renderView(`events.create.selectTime.result|${day}-${month}`, { content: `⏰ **${eventName}** time set for **${formatted}**`, buttons });
     },
   });
 }
