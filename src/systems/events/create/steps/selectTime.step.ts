@@ -6,10 +6,10 @@ import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
 
 // 🔹 Funkcja generująca widok modala do wyboru czasu
-export function selectTimeView(day: number, month: number) {
+export function selectTimeView(day: number, month: number, eventName: string) {
   return {
-    title: `Set time for ${day}/${month} UTC`,
-    customId: `events.create.selectTime.submit|day=${day}&month=${month}`,
+    title: `⏰ Set time for **${eventName}** on ${day}/${month} UTC`,
+    customId: `events.create.selectTime.submit|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`,
     components: [
       {
         type: 1,
@@ -43,32 +43,53 @@ export function registerSelectTimeStep() {
   // Pokaż modal wyboru czasu
   registerUIAction("events.create.selectTime", {
     system: "events",
-    handler: async (interaction, ctx, payload) => {
+    handler: async (ctx, payload) => {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
+      const eventName = payload?.eventName ?? "Event";
 
-      const modal = selectTimeView(day, month);
-      await interaction.showModal?.(modal);
+      const modal = selectTimeView(day, month, eventName);
+      await ctx.showModal?.(modal, payload);
     },
   });
 
   // Obsługa submitu modala
   registerUIAction("events.create.selectTime.submit", {
     system: "events",
-    handler: async (interaction, ctx, payload) => {
+    handler: async (ctx, payload) => {
       const day = Number(payload?.day);
       const month = Number(payload?.month);
+      const eventName = payload?.eventName ?? "Event";
 
-      // Pobieramy wartości z payload (UI Router) zamiast Discord fields
       const hours = Number(payload?.hours);
       const minutes = Number(payload?.minutes);
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await interaction.reply?.({
-        content: `⏰ Event time set for **${formatted}**`,
-        ephemeral: true,
-      });
+      const view = {
+        content: `⏰ **${eventName}** time set for **${formatted}**`,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                label: "⬅ Back",
+                style: 2,
+                action: `events.create.selectDay|eventName=${encodeURIComponent(eventName)}`,
+              },
+              {
+                type: 2,
+                label: "🏠 Menu",
+                style: 2,
+                action: "events.create.backToMain",
+              },
+            ],
+          },
+        ],
+      };
+
+      await ctx.renderView(view, payload);
     },
   });
 }
