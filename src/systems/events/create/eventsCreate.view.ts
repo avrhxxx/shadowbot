@@ -8,6 +8,30 @@ import { formatEventUTC, formatButtonDate } from "@/shared/utils/timeUtils";
 
 const DAYS_TO_SHOW = 8;
 
+interface Button {
+  label: string;
+  action: string;
+  style: "primary" | "secondary" | "danger";
+  state?: Record<string, any>;
+}
+
+interface ModalField {
+  type: "text" | "number";
+  name: string;
+  label: string;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  required?: boolean;
+}
+
+interface ModalView {
+  title: string;
+  fields: ModalField[];
+  cancelAction?: string;
+}
+
+// 🔹 Main Create Event View
 export function eventsCreateView(): (ctx: TraceContext, state?: any) => ViewResult {
   return (_ctx: TraceContext, _state?: any) => {
     const STANDARD_EVENT_TYPES = [
@@ -23,11 +47,11 @@ export function eventsCreateView(): (ctx: TraceContext, state?: any) => ViewResu
       { label: "Custom", value: "C" },
     ] as const;
 
-    const mapToButton = (t: { label: string; value: string }) => ({
+    const mapToButton = (t: { label: string; value: string }): Button => ({
       label: t.label,
       action: "events.create.selectType",
       state: { target: t.value },
-      style: "primary" as const,
+      style: "primary",
     });
 
     return {
@@ -40,9 +64,8 @@ export function eventsCreateView(): (ctx: TraceContext, state?: any) => ViewResu
   };
 }
 
-// 🔹 Widoki stepów
-
-export function birthdayFormModal() {
+// 🔹 Birthday Modal
+export function birthdayFormModal(): ModalView {
   return {
     title: "🎉 Birthday Event",
     fields: [
@@ -56,7 +79,8 @@ export function birthdayFormModal() {
   };
 }
 
-export function customEventFormView() {
+// 🔹 Custom Event Modal
+export function customEventFormView(): ModalView {
   return {
     title: "📝 Custom Event",
     fields: [
@@ -70,15 +94,19 @@ export function customEventFormView() {
   };
 }
 
-export function selectDayView() {
+// 🔹 Select Day View
+export function selectDayView(): ViewResult {
   const today = new Date();
-  const buttons = [];
+  const buttons: Button[] = [];
 
   for (let i = 0; i < DAYS_TO_SHOW; i++) {
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + i));
     const label = formatButtonDate(date.getUTCDate(), date.getUTCMonth() + 1);
-    const action = `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`;
-    buttons.push({ label, action, style: "primary" });
+    buttons.push({
+      label,
+      action: `events.create.selectTime|day=${date.getUTCDate()}&month=${date.getUTCMonth() + 1}`,
+      style: "primary",
+    });
   }
 
   buttons.push({ label: "⬅ Back", action: "events.create.start", style: "secondary" });
@@ -89,7 +117,8 @@ export function selectDayView() {
   };
 }
 
-export function selectTimeView(day: number, month: number, eventName: string) {
+// 🔹 Select Time View
+export function selectTimeView(day: number, month: number, eventName: string): ModalView {
   return {
     title: `⏰ Set time for **${eventName}** on ${day}/${month} UTC`,
     customId: `events.create.selectTime.submit|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`,
@@ -100,19 +129,24 @@ export function selectTimeView(day: number, month: number, eventName: string) {
   };
 }
 
-export function submitEventView(day: number, month: number, hours: number, minutes: number, eventName: string) {
+// 🔹 Submit Event View
+export function submitEventView(day: number, month: number, hours: number, minutes: number, eventName: string): ViewResult {
   const formatted = formatEventUTC(day, month, hours, minutes);
 
-  const buttons = [
+  const buttons: Button[] = [
     { label: "Yes, create & Notify", action: `events.create.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true&eventName=${encodeURIComponent(eventName)}`, style: "primary" },
     { label: "Yes, create without notification", action: `events.create.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=false&eventName=${encodeURIComponent(eventName)}`, style: "primary" },
     { label: "⬅ Back", action: `events.create.selectTime|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`, style: "secondary" },
   ];
 
-  return { content: `✅ You are about to create the event **${eventName}** scheduled for **${formatted}**.\nDo you want to notify the channel?`, buttons };
+  return {
+    content: `✅ You are about to create the event **${eventName}** scheduled for **${formatted}**.\nDo you want to notify the channel?`,
+    buttons,
+  };
 }
 
-export function confirmEventView(day: number, month: number, hours: number, minutes: number) {
+// 🔹 Confirm Event View
+export function confirmEventView(day: number, month: number, hours: number, minutes: number): ViewResult {
   const formatted = formatEventUTC(day, month, hours, minutes);
 
   return {
