@@ -1,24 +1,100 @@
+// =====================================
+// 📁 src/systems/events/create/steps/birthdayForm.step.ts
+// =====================================
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
+import { Interaction, ButtonInteraction } from "discord.js";
 
+// =====================================
+// 🧠 VIEW
+// =====================================
+export function birthdayFormView() {
+  return {
+    content: "🎉 **Birthday Event**\n\nConfigure your event:",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            label: "Set Date (DD/MM)",
+            style: 1,
+            custom_id: "events.create.birthdayForm.setDate",
+          },
+          {
+            type: 2,
+            label: "Set Time (HH:MM)",
+            style: 1,
+            custom_id: "events.create.birthdayForm.setTime",
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            label: "Submit",
+            style: 3,
+            custom_id: "events.create.birthdayForm.submit",
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            label: "⬅ Back",
+            style: 2,
+            custom_id: "events.create.backToMain",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+// =====================================
+// 🚀 REGISTER STEP
+// =====================================
 export function registerBirthdayFormStep() {
+  // 🔹 OPEN FORM
+  registerUIAction("events.create.birthdayForm", {
+    system: "events",
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const button = interaction as ButtonInteraction;
+
+      const view = birthdayFormView();
+
+      await button.update({
+        content: view.content,
+        components: view.components,
+      });
+    },
+  });
+
+  // 🔹 SUBMIT
   registerUIAction("events.create.birthdayForm.submit", {
     system: "events",
-    handler: async (interaction) => {
-      if (!interaction.isModalSubmit()) return;
+    handler: async (interaction: Interaction) => {
+      if (!interaction.isButton()) return;
+      const button = interaction as ButtonInteraction;
 
-      const day = Number(interaction.fields.getTextInputValue("day"));
-      const month = Number(interaction.fields.getTextInputValue("month"));
-      const hours = Number(interaction.fields.getTextInputValue("hours"));
-      const minutes = Number(interaction.fields.getTextInputValue("minutes"));
-      const name = interaction.fields.getTextInputValue("name");
-      const notify = interaction.fields.getTextInputValue("notify") === "yes";
+      // 🔴 Placeholder – później podmienisz na state
+      const day = 1;
+      const month = 1;
+      const hours = 12;
+      const minutes = 0;
+      const name = "User";
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await interaction.reply({
-        content: `🎉 Birthday Event for **${name}** set on **${formatted}**${notify ? " (notification enabled)" : ""}`,
-        ephemeral: true,
+      await button.update({
+        content: `🎉 Birthday Event for **${name}** set on **${formatted}**`,
+        components: [],
       });
     },
   });
