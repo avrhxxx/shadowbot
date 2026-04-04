@@ -1,33 +1,20 @@
+
 // =====================================
 // 📁 src/foundation/logger/loggerFactory.ts
 // =====================================
 
 import { baseLogger } from "./loggerCore";
-
 import type { LogPayload, LogLevel } from "./loggerTypes";
 import type { TraceContext } from "@/trace";
 
-// =====================================
-// 🔧 HELPERS
-// =====================================
-
+// HELPERS
 function normalizeError(err: unknown) {
   if (!err) return undefined;
-
-  if (err instanceof Error) {
-    return {
-      message: err.message,
-      stack: err.stack,
-    };
-  }
-
+  if (err instanceof Error) return { message: err.message, stack: err.stack };
   return { message: String(err) };
 }
 
-// =====================================
-// 🔹 TYPES
-// =====================================
-
+// TYPES
 type LogInput = Partial<LogPayload>;
 
 type FlowLogger = {
@@ -46,50 +33,30 @@ type Logger = {
   warn(event: string, payload?: LogInput): void;
   error(event: string, error?: unknown, payload?: LogInput): void;
   fatal(event: string, error?: unknown, payload?: LogInput): void;
-
   flow(flowName: string): FlowLogger;
 };
 
-// =====================================
-// 🏭 FACTORY
-// =====================================
-
+// FACTORY
 export function createLogger(ctx?: TraceContext): Logger {
-  function baseLog(
-    level: LogLevel,
-    event: string,
-    payload?: LogInput
-  ) {
+  function baseLog(level: LogLevel, event: string, payload?: LogInput) {
     baseLogger[level]({
       event,
-
-      // 🔥 TRACE (SOURCE OF TRUTH)
       traceId: ctx?.traceId,
       correlationId: ctx?.correlationId,
       flowId: ctx?.flowId,
+      uiId: ctx?.uiId, // 🔹 NEW
       system: ctx?.system ?? "app",
-
-      // 🔥 PAYLOAD
       ...(payload ?? {}),
-
-      // 🔥 ERROR
       error: normalizeError(payload?.error),
     });
   }
 
   const raw = {
-    debug: (event: string, payload?: LogInput) =>
-      baseLog("debug", event, payload),
-
-    info: (event: string, payload?: LogInput) =>
-      baseLog("info", event, payload),
-
-    warn: (event: string, payload?: LogInput) =>
-      baseLog("warn", event, payload),
-
+    debug: (event: string, payload?: LogInput) => baseLog("debug", event, payload),
+    info: (event: string, payload?: LogInput) => baseLog("info", event, payload),
+    warn: (event: string, payload?: LogInput) => baseLog("warn", event, payload),
     error: (event: string, error?: unknown, payload?: LogInput) =>
       baseLog("error", event, { ...(payload ?? {}), error }),
-
     fatal: (event: string, error?: unknown, payload?: LogInput) =>
       baseLog("fatal", event, { ...(payload ?? {}), error }),
   };
@@ -98,47 +65,20 @@ export function createLogger(ctx?: TraceContext): Logger {
     const base = flowName;
 
     return {
-      start: (payload?: LogInput) =>
-        baseLog("info", `${base}.start`, payload),
-
+      start: (payload?: LogInput) => baseLog("info", `${base}.start`, payload),
       stepDebug: (step: string, payload?: LogInput) =>
-        baseLog("debug", `${base}.${step}`, {
-          ...payload,
-          flow: { step },
-        }),
-
+        baseLog("debug", `${base}.${step}`, { ...payload, flow: { step } }),
       stepInfo: (step: string, payload?: LogInput) =>
-        baseLog("info", `${base}.${step}`, {
-          ...payload,
-          flow: { step },
-        }),
-
+        baseLog("info", `${base}.${step}`, { ...payload, flow: { step } }),
       stepWarn: (step: string, payload?: LogInput) =>
-        baseLog("warn", `${base}.${step}`, {
-          ...payload,
-          flow: { step },
-        }),
-
+        baseLog("warn", `${base}.${step}`, { ...payload, flow: { step } }),
       stepError: (step: string, error?: unknown, payload?: LogInput) =>
-        baseLog("error", `${base}.${step}`, {
-          ...payload,
-          flow: { step },
-          error,
-        }),
-
-      success: (payload?: LogInput) =>
-        baseLog("info", `${base}.success`, payload),
-
+        baseLog("error", `${base}.${step}`, { ...payload, flow: { step }, error }),
+      success: (payload?: LogInput) => baseLog("info", `${base}.success`, payload),
       fail: (error?: unknown, payload?: LogInput) =>
-        baseLog("error", `${base}.fail`, {
-          ...(payload ?? {}),
-          error,
-        }),
+        baseLog("error", `${base}.fail`, { ...(payload ?? {}), error }),
     };
   }
 
-  return {
-    ...raw,
-    flow,
-  };
+  return { ...raw, flow };
 }
