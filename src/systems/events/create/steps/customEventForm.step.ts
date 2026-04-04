@@ -4,7 +4,6 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
-import { Interaction } from "discord.js";
 
 // =====================================
 // 🧠 VIEW
@@ -35,30 +34,26 @@ export function registerCustomEventFormStep() {
   // 🔹 Otwarcie formularza Custom Event
   registerUIAction("events.create.customEventForm", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      // upewniamy się, że to button
-      if (!("isButton" in interaction) || !interaction.isButton()) return;
-
-      await interaction.showModal(customEventFormView());
+    handler: async (interaction, ctx) => {
+      // renderujemy modal poprzez UI Engine
+      await interaction.showModal?.(customEventFormView());
     },
   });
 
   // 🔹 Submit formularza Custom Event
   registerUIAction("events.create.customForm.submit", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      // upewniamy się, że to modal
-      if (!("isModalSubmit" in interaction) || !interaction.isModalSubmit()) return;
-
-      const eventName = interaction.fields.getTextInputValue("eventName");
-      const day = Number(interaction.fields.getTextInputValue("day"));
-      const month = Number(interaction.fields.getTextInputValue("month"));
-      const hours = Number(interaction.fields.getTextInputValue("hours"));
-      const minutes = Number(interaction.fields.getTextInputValue("minutes"));
+    handler: async (interaction, ctx, payload) => {
+      // 🔹 Parametry formularza z payload
+      const eventName = payload?.eventName ?? "Unnamed Event";
+      const day = Number(payload?.day ?? 1);
+      const month = Number(payload?.month ?? 1);
+      const hours = Number(payload?.hours ?? 12);
+      const minutes = Number(payload?.minutes ?? 0);
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await interaction.reply({
+      await interaction.reply?.({
         content: `**${formatted}** 📝 Custom Event: **${eventName}**`,
         ephemeral: true,
       });
