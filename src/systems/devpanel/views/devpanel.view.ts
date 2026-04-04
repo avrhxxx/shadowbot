@@ -18,9 +18,8 @@ export const devpanelMainView: View = {
 
   render: async (_ctx: TraceContext) => ({
     content: `⚙️ **Dev Panel**\n\nSelect category:`,
-
     buttons: [
-      button.create("Systems", "devpanel.systems"),
+      button.create("Systems", "devpanel.systems"), // przejście do systemów
     ],
   }),
 };
@@ -36,8 +35,9 @@ export const devpanelSystemsView: View = {
     const lines: string[] = [];
     const buttons = [];
 
+    // generowanie listy systemów z przyciskami toggle
     for (const system of SYSTEM_REGISTRY) {
-      if (system.name === "devpanel") continue;
+      if (system.name === "devpanel") continue; // pomijamy sam devpanel
 
       const enabled = await isSystemEnabled(system.name);
       const status = enabled ? "🟢 ON" : "🔴 OFF";
@@ -46,15 +46,15 @@ export const devpanelSystemsView: View = {
 
       buttons.push(
         button.create(
-          system.name,
-          "devpanel.toggle",
-          enabled ? "primary" : "secondary",
-          { system: system.name }
+          system.name,           // label
+          "devpanel.toggle",     // action
+          enabled ? "primary" : "secondary", // style
+          { system: system.name } // state / payload
         )
       );
     }
 
-    // 🔙 Back
+    // 🔙 Back button
     buttons.push(button.back("devpanel.main"));
 
     return {
