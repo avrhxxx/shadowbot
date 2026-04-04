@@ -1,12 +1,23 @@
+// =====================================
+// 📁 src/systems/events/create/steps/selectDay.step.ts
+// =====================================
+
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatButtonDate } from "@/shared/utils/timeUtils";
+import { ButtonInteraction } from "discord.js";
 
+// -------------------------------
+// MAX dni do wyświetlenia
+// -------------------------------
 const DAYS_TO_SHOW = 8;
 
+// ----------------------------
+// REGISTER STEP: SELECT DAY
+// ----------------------------
 export function registerSelectDayStep() {
   registerUIAction("events.create.selectDay", {
     system: "events",
-    handler: async (interaction) => {
+    handler: async (interaction: ButtonInteraction) => {
       if (!interaction.isButton()) return;
 
       const today = new Date();
@@ -20,16 +31,18 @@ export function registerSelectDayStep() {
         buttons.push({
           type: 2,
           label,
-          style: 1,
+          style: 1, // primary
           custom_id,
         });
       }
 
+      // Podział na rzędy max 5 przycisków
       const rows = [];
       for (let i = 0; i < buttons.length; i += 5) {
-        rows.push({ type: 1, components: buttons.slice(i, i + 5) });
+        rows.push({ type: 1, components: buttons.slice(i, i + 5).map(btn => ({ ...btn })) });
       }
 
+      // Dodaj przycisk back
       rows.push({
         type: 1,
         components: [
@@ -37,9 +50,10 @@ export function registerSelectDayStep() {
         ],
       });
 
+      // Mutowalna kopia komponentów dla Discord.js
       await interaction.update({
         content: "📅 **Select a day for your event:**",
-        components: rows,
+        components: rows.map(row => ({ ...row, components: row.components.map(c => ({ ...c })) })),
       });
     },
   });
