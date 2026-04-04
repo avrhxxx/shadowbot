@@ -1,17 +1,27 @@
+// =====================================
+// 📁 src/systems/devpanel/commands/devpanel.command.ts
+// =====================================
+
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
-import { devpanelMainView } from "../views/devpanel.view";
-import { renderView } from "@/ui/core/uiEngine";
-import { nanoid } from "nanoid";
+import { createRootContext } from "@/trace";
+import { renderViewInternal } from "@/ui/engine/engine";
 
-// Minimalny placeholder TraceContext
-const minimalTraceContext = {
-  traceId: nanoid(),
-  correlationId: nanoid(),
-  source: "devpanel.command",
-};
+// =====================================
+// 🔹 COMMAND
+// =====================================
 
-export async function handleDevpanelCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  const view = await renderView(minimalTraceContext, devpanelMainView.id);
+export async function handleDevpanelCommand(
+  interaction: ChatInputCommandInteraction<CacheType>
+) {
+  const ctx = createRootContext({
+    source: "discord",
+    system: "devpanel",
+    userId: interaction.user.id,
+    guildId: interaction.guildId ?? undefined,
+    channelId: interaction.channelId ?? undefined,
+  });
+
+  const view = await renderViewInternal(ctx, "devpanel.main");
 
   await interaction.reply({
     content: view.content,
