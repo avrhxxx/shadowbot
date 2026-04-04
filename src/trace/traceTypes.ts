@@ -2,11 +2,6 @@
 // 📁 src/trace/traceTypes.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Defines TraceContext structure (system flow identity)
- */
-
 import type {
   TraceId,
   CorrelationId,
@@ -15,12 +10,10 @@ import type {
   InteractionId,
   JobId,
   ExternalId,
+  UIId, // 🔹 NEW
 } from "@/foundation/ids/idTypes";
 
-// =====================================
 // 🔹 RE-EXPORT
-// =====================================
-
 export type {
   TraceId,
   CorrelationId,
@@ -29,12 +22,10 @@ export type {
   InteractionId,
   JobId,
   ExternalId,
+  UIId, // 🔹 NEW
 };
 
-// =====================================
 // 🔹 SOURCE
-// =====================================
-
 export type TraceSource =
   | "discord"
   | "system"
@@ -44,39 +35,27 @@ export type TraceSource =
   | "external"
   | "interaction";
 
-// =====================================
-// 🔹 SYSTEM (🔥 ROZSZERZONE)
-// =====================================
-
+// 🔹 SYSTEM
 export type TraceSystem =
-  // 🔹 APP / CORE
   | "app"
-
-  // 🔹 INFRA / RUNTIME
   | "runtime"
   | "google"
-
-  // 🔹 UI LAYER
-  | "ui"
-
-  // 🔹 FEATURES
+  | "ui" // 🔹 UI LAYER
   | "events"
   | "absence"
   | "points"
   | "quickadd"
   | "test"
-  | "translation"; // ✅ 🔥 DODANE
+  | "translation";
 
-// =====================================
 // 🔹 TRACE CONTEXT
-// =====================================
-
 export type TraceContext = Readonly<{
   traceId: TraceId;
   parentTraceId?: TraceId;
 
   correlationId: CorrelationId;
   flowId?: FlowId;
+  uiId?: UIId; // 🔹 NEW
 
   source: TraceSource;
   system?: TraceSystem;
@@ -91,6 +70,5 @@ export type TraceContext = Readonly<{
   interactionId?: InteractionId;
 
   jobId?: JobId;
-
   externalId?: ExternalId;
 }>;
