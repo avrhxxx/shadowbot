@@ -18,14 +18,10 @@
  */
 
 // =====================================
-// 🔹 LENGTH
+// 📁 src/foundation/ids/idConfig.ts
 // =====================================
 
 export const ID_LENGTH = 8;
-
-// =====================================
-// 🔹 ID TYPES (FULL NAMES)
-// =====================================
 
 export const ID_TYPES = {
   trace: "trace",
@@ -40,13 +36,12 @@ export const ID_TYPES = {
   external: "external",
 
   runtime: "runtime",
+
+  // 🔹 NEW: UI
+  ui: "ui",
 } as const;
 
 export type IdType = keyof typeof ID_TYPES;
-
-// =====================================
-// 🔹 VALIDATION REGEX
-// =====================================
 
 export const ID_REGEX = new RegExp(
   `^(${Object.keys(ID_TYPES).join("|")}):[A-Za-z0-9_-]{${ID_LENGTH}}$`
