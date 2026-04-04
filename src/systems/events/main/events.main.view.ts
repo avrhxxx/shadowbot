@@ -23,7 +23,7 @@ export async function eventsMainView(): Promise<View> {
             type: 2,
             label: "Create Event",
             style: 1,
-            custom_id: "events.main.create",
+            custom_id: "events.create.start", // <- zmienione ID
           },
           {
             type: 2,
