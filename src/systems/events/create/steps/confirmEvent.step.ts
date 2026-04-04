@@ -19,40 +19,26 @@ export function confirmEventView(params: {
 
   return {
     content: `✅ **Confirm Event**\n\nEvent date: **${formatted}**\n\nDo you want to notify the channel?`,
-    components: [
+    buttons: [
       {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "📢 Create & Notify",
-            style: 3,
-            action: `events.create.submit|notify=true&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
-          },
-          {
-            type: 2,
-            label: "✅ Create (silent)",
-            style: 1,
-            action: `events.create.submit|notify=false&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
-          },
-        ],
+        label: "📢 Create & Notify",
+        action: `events.create.submit|notify=true&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
+        style: "danger",
       },
       {
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: "⬅ Back",
-            style: 2,
-            action: `events.create.selectTime|day=${day}&month=${month}`,
-          },
-          {
-            type: 2,
-            label: "🏠 Menu",
-            style: 2,
-            action: "events.create.backToMain",
-          },
-        ],
+        label: "✅ Create (silent)",
+        action: `events.create.submit|notify=false&day=${day}&month=${month}&hours=${hours}&minutes=${minutes}`,
+        style: "primary",
+      },
+      {
+        label: "⬅ Back",
+        action: `events.create.selectTime|day=${day}&month=${month}`,
+        style: "secondary",
+      },
+      {
+        label: "🏠 Menu",
+        action: "events.create.backToMain",
+        style: "secondary",
       },
     ],
   };
@@ -64,7 +50,7 @@ export function confirmEventView(params: {
 export function registerConfirmEventStep() {
   registerUIAction("events.create.confirmEvent", {
     system: "events",
-    handler: async (ctx, payload) => {
+    handler: async (ctx, _unused, payload) => {
       // 🔹 Pobieramy parametry z payload, które UI Router już sparsował
       const day = Number(payload?.day ?? 1);
       const month = Number(payload?.month ?? 1);
@@ -73,8 +59,8 @@ export function registerConfirmEventStep() {
 
       const view = confirmEventView({ day, month, hours, minutes });
 
-      // 🔹 Renderujemy przez UI Router / Engine
-      await ctx.renderView(view, payload);
+      // 🔹 Renderujemy przez UI Engine z unikalnym viewId
+      await ctx.renderView("events.create.confirmEvent.result", view);
     },
   });
 }
