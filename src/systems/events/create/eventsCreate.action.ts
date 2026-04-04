@@ -16,8 +16,8 @@ export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
     handler: async (ctx) => {
-      const view = eventsCreateView()(ctx);
-      await ctx.renderView("events.create", view);
+      const view = eventsCreateView();
+      await ctx.renderView(view);
     },
   });
 
@@ -35,16 +35,15 @@ export function registerEventsCreateActions() {
       else nextStepId = "selectDay";
 
       const stepEntry = StepsMap[nextStepId];
+      if (!stepEntry || !stepEntry.view) return;
 
-      if (!stepEntry) return;
-
-      if (nextStepId === "customEventForm" && stepEntry.view) {
-        // 🔹 Modal
-        await ctx.showModal(stepEntry.view()(ctx));
-      } else if (stepEntry.view) {
+      // 🔹 Modal
+      if (nextStepId === "customEventForm" || nextStepId === "birthdayForm") {
+        await ctx.showModal(stepEntry.view());
+      } else {
         // 🔹 Zwykły widok
-        const view = stepEntry.view()(ctx);
-        await ctx.renderView(stepEntry.id, view);
+        const view = stepEntry.view();
+        await ctx.renderView(view);
       }
     },
   });
@@ -60,8 +59,13 @@ export function registerEventsCreateActions() {
     registerUIAction(actionId, {
       system: "events",
       handler: async (ctx) => {
-        const view = stepEntry.view()(ctx);
-        await ctx.renderView(stepEntry.id, view);
+        // 🔹 Jeśli krok jest modalem
+        if (key === "birthdayForm" || key === "customEventForm") {
+          await ctx.showModal(stepEntry.view());
+        } else {
+          const view = stepEntry.view();
+          await ctx.renderView(view);
+        }
       },
     });
   }
