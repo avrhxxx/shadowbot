@@ -4,7 +4,7 @@
 
 import { SYSTEM_REGISTRY } from "@/runtime/runtimeRegistry";
 import { isSystemEnabled } from "@/runtime/runtimeState";
-import { View, createButton, createBackButton } from "@/core/ui/uiEngine";
+import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
 
 // =====================================
 // 🧠 MAIN VIEW
