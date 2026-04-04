@@ -1,12 +1,8 @@
-// =====================================
-// 📁 src/ui/core/uiDiscordAdapter.ts
-// =====================================
-
-import {
-  Interaction,
-  ButtonInteraction,
+import type {
+  Interaction as BaseInteraction,
+  ButtonInteraction as BaseButtonInteraction,
+  ModalSubmitInteraction as BaseModalSubmitInteraction,
   CacheType,
-  ModalSubmitInteraction,
 } from "discord.js";
 
 import {
@@ -18,11 +14,28 @@ import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
 // =====================================
+// 🔹 TYPOWE ROZSZERZENIE (dla TS)
+// =====================================
+
+type ExtendedInteraction = BaseInteraction<CacheType> & {
+  update?: (payload: any) => Promise<any>;
+  send?: (payload: any) => Promise<any>;
+  showModal?: (modal: any) => Promise<any>;
+  reply?: (payload: any) => Promise<any>;
+  followUp?: (payload: any) => Promise<any>;
+  deferred?: boolean;
+  replied?: boolean;
+};
+
+type ExtendedButtonInteraction = BaseButtonInteraction<CacheType> & ExtendedInteraction;
+type ExtendedModalSubmitInteraction = BaseModalSubmitInteraction<CacheType> & ExtendedInteraction;
+
+// =====================================
 // 🧠 MAIN HANDLER
 // =====================================
 
 export async function handleUIInteraction(
-  interaction: Interaction<CacheType>,
+  interaction: ExtendedInteraction,
   ctx: TraceContext
 ): Promise<boolean> {
   const log = createLogger(ctx);
@@ -33,7 +46,7 @@ export async function handleUIInteraction(
     // 🔘 BUTTON INTERACTIONS
     // =====================================
     if (interaction.isButton()) {
-      const button = interaction as ButtonInteraction;
+      const button = interaction as ExtendedButtonInteraction;
 
       flow.stepDebug("interaction.received", {
         meta: { id: button.customId },
@@ -70,7 +83,7 @@ export async function handleUIInteraction(
     // 🔘 MODAL SUBMIT INTERACTIONS
     // =====================================
     if (interaction.isModalSubmit()) {
-      const modal = interaction as ModalSubmitInteraction;
+      const modal = interaction as ExtendedModalSubmitInteraction;
 
       flow.stepDebug("interaction.received_modal", {
         meta: { id: modal.customId },
@@ -117,9 +130,9 @@ export async function handleUIInteraction(
       };
 
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(payload);
+        await interaction.followUp?.(payload);
       } else {
-        await interaction.reply(payload);
+        await interaction.reply?.(payload);
       }
     }
 
