@@ -14,13 +14,13 @@ export type Button = {
   label: string;
   action: string;
   state?: any;
-  style?: "primary" | "secondary" | "danger";
+  style?: "primary" | "secondary" | "danger"; // mapowane na Discord style
 };
 
 export type ViewResult = {
   content?: string;
   buttons?: Button[];
-  embed?: any; // discord embed opcjonalny
+  embed?: any;
   ephemeral?: boolean;
 };
 
@@ -67,8 +67,20 @@ export function registerAction(action: Action) {
 }
 
 // =====================================
-// 🔹 INTERNAL HELPERS
+// 🔹 HELPERS
 // =====================================
+
+export function createButton(label: string, action: string, style?: Button["style"], state?: any) {
+  return { label, action, style, state };
+}
+
+export function createBackButton(targetView: string) {
+  return createButton("⬅ Back", targetView, "secondary");
+}
+
+export function createGuideButton(targetAction: string) {
+  return createButton("Guide", targetAction, "secondary");
+}
 
 function isExpired(entry: StoreEntry) {
   return Date.now() - entry.createdAt > TTL;
@@ -80,17 +92,30 @@ function createCustomId(action: string, state?: any) {
   return id;
 }
 
-// helper do generowania standardowych buttonów
-export function createButton(label: string, action: string, style?: Button["style"], state?: any) {
-  return { label, action, style, state };
+// 🔹 mapowanie style -> discord
+function mapStyle(style: Button["style"]): number {
+  switch (style) {
+    case "secondary": return 2;
+    case "danger": return 4;
+    default: return 1; // primary
+  }
 }
 
-export function createBackButton(targetView: string) {
-  return createButton("⬅ Back", targetView, "secondary");
-}
-
-export function createGuideButton(targetAction: string) {
-  return createButton("Guide", targetAction, "secondary");
+// 🔹 map buttons -> discord rows (po 5 przycisków)
+export function mapButtonsToRows(buttons: Button[]): any[] {
+  const rows: any[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push({
+      type: 1,
+      components: buttons.slice(i, i + 5).map((btn) => ({
+        type: 2,
+        label: btn.label,
+        style: mapStyle(btn.style),
+        custom_id: createCustomId(btn.action, btn.state ?? {}),
+      })),
+    });
+  }
+  return rows;
 }
 
 // =====================================
@@ -110,15 +135,10 @@ export async function renderView(ctx: TraceContext, viewId: string, state?: any)
 
   try {
     const result = await view.render(ctx, state ?? {});
-    const buttons =
-      result.buttons?.map((btn) => ({
-        label: btn.label,
-        style: btn.style ?? "primary",
-        customId: createCustomId(btn.action, btn.state ?? {}),
-      })) ?? [];
+    const rows = mapButtonsToRows(result.buttons ?? []);
 
-    flow.success({ stats: { buttons: buttons.length } });
-    return { content: result.content, buttons, embed: result.embed, ephemeral: result.ephemeral };
+    flow.success({ stats: { buttons: result.buttons?.length ?? 0 } });
+    return { content: result.content, components: rows, embed: result.embed, ephemeral: result.ephemeral };
   } catch (err) {
     flow.fail(err);
     throw err;
