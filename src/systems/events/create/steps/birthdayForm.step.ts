@@ -4,7 +4,6 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { formatEventUTC } from "@/shared/utils/timeUtils";
-import { Interaction, ButtonInteraction } from "discord.js";
 
 // =====================================
 // 🧠 VIEW
@@ -63,13 +62,11 @@ export function registerBirthdayFormStep() {
   // 🔹 OPEN FORM
   registerUIAction("events.create.birthdayForm", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      if (!interaction.isButton()) return;
-      const button = interaction as ButtonInteraction;
-
+    handler: async (interaction, ctx) => {
       const view = birthdayFormView();
 
-      await button.update({
+      // UI Router już daje nam interaction.update
+      await interaction.update({
         content: view.content,
         components: view.components,
       });
@@ -79,11 +76,8 @@ export function registerBirthdayFormStep() {
   // 🔹 SUBMIT
   registerUIAction("events.create.birthdayForm.submit", {
     system: "events",
-    handler: async (interaction: Interaction) => {
-      if (!interaction.isButton()) return;
-      const button = interaction as ButtonInteraction;
-
-      // 🔴 Placeholder – później podmienisz na state
+    handler: async (interaction, ctx) => {
+      // 🔴 Placeholder – później będzie dynamiczny state
       const day = 1;
       const month = 1;
       const hours = 12;
@@ -92,7 +86,7 @@ export function registerBirthdayFormStep() {
 
       const formatted = formatEventUTC(day, month, hours, minutes);
 
-      await button.update({
+      await interaction.update({
         content: `🎉 Birthday Event for **${name}** set on **${formatted}**`,
         components: [],
       });
