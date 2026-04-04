@@ -5,14 +5,16 @@
 import { registerEventsCreateActions } from "./eventsCreate.action";
 
 // ----------------------------
-// IMPORT STEPOW
+// IMPORT STEPOW Z JEDNEGO PUNKTU
 // ----------------------------
-import { registerSelectDayStep } from "./steps/selectDay.step";
-import { registerSelectTimeStep } from "./steps/selectTime.step";
-import { registerSubmitEventStep } from "./steps/submitEvent.step";
-import { registerBirthdayFormStep } from "./steps/birthdayForm.step";
-import { registerCustomEventFormStep } from "./steps/customEventForm.step";
-import { registerConfirmEventStep } from "./steps/confirmEvent.step";
+import {
+  registerSelectDayStep,
+  registerSelectTimeStep,
+  registerSubmitEventStep,
+  registerBirthdayFormStep,
+  registerCustomEventFormStep,
+  registerConfirmEventStep,
+} from "./steps";
 
 // ----------------------------
 // INIT CREATE FEATURE
