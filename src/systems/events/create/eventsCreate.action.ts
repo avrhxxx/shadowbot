@@ -1,82 +1,142 @@
-// =====================================
-// 📁 src/systems/events/create/eventsCreate.action.ts
-// =====================================
-
 import { registerUIAction } from "@/ui/core/uiRouter";
-import { eventsCreateView } from "./eventsCreate.view";
-import { StepsMap } from "./steps";
+import {
+  eventsCreateView,
+  birthdayFormModal,
+  customEventFormView,
+  selectDayView,
+  selectTimeView,
+  submitEventView,
+  confirmEventView,
+} from "./eventsCreate.view";
 
-// 🔹 Typ kontekstu UI z potrzebnymi metodami
 interface UIContext {
   renderView: (view: any, payload?: any) => Promise<void>;
   showModal: (modal: any, payload?: any) => Promise<void>;
   navigate: (destination: string, options?: Record<string, any>) => Promise<void>;
 }
 
-/**
- * 🔹 Rejestruje wszystkie akcje flow tworzenia eventu
- */
+// 🔹 Rejestracja wszystkich akcji flow Create Event
 export function registerEventsCreateActions() {
-  // =====================================
-  // START CREATE EVENT
-  // =====================================
+  // START CREATE
   registerUIAction("events.create.start", {
     system: "events",
     handler: async (ctx: UIContext) => {
-      const view = eventsCreateView();
-      await ctx.renderView(view);
+      await ctx.renderView(eventsCreateView());
     },
   });
 
-  // =====================================
-  // SELECT TYPE BUTTON (BD = Birthday, C = Custom, else = normal day select)
-  // =====================================
+  // SELECT TYPE
   registerUIAction("events.create.selectType", {
     system: "events",
     handler: async (ctx: UIContext, _unused, payload: any) => {
       const target = payload?.target;
-      let nextStepId: keyof typeof StepsMap;
-
-      if (target === "BD") nextStepId = "birthdayForm";
-      else if (target === "C") nextStepId = "customEventForm";
-      else nextStepId = "selectDay";
-
-      const stepEntry = StepsMap[nextStepId];
-      if (!stepEntry || !stepEntry.view) return;
-
-      if (nextStepId === "customEventForm" || nextStepId === "birthdayForm") {
-        await ctx.showModal(stepEntry.view(payload), payload);
-      } else {
-        const view = stepEntry.view(payload);
-        await ctx.renderView(view, payload);
-      }
+      if (target === "BD") await ctx.showModal(birthdayFormModal());
+      else if (target === "C") await ctx.showModal(customEventFormView());
+      else await ctx.renderView(selectDayView());
     },
   });
 
-  // =====================================
-  // AUTOMATYCZNE REJESTROWANIE KROKÓW (TYLKO TE, KTÓRE MAJĄ VIEW BEZ PARAMETRÓW)
-  // =====================================
-  for (const [key, stepEntry] of Object.entries(StepsMap)) {
-    if (!stepEntry.view) continue;
-    if (key === "confirmEvent") continue; // wymaga parametrów
+  // BIRTHDAY FORM SUBMIT
+  registerUIAction("events.create.birthdayForm.submit", {
+    system: "events",
+    handler: async (ctx: UIContext, _unused, payload: any) => {
+      const day = Number(payload?.day ?? 1);
+      const month = Number(payload?.month ?? 1);
+      const hours = Number(payload?.hours ?? 12);
+      const minutes = Number(payload?.minutes ?? 0);
+      const nickname = payload?.nickname ?? "User";
+      const formatted = `${nickname} on ${day}/${month} ${hours}:${minutes} UTC`;
 
-    const actionId = `events.create.${key}`;
-    registerUIAction(actionId, {
-      system: "events",
-      handler: async (ctx: UIContext, _unused, payload: any) => {
-        if (key === "birthdayForm" || key === "customEventForm") {
-          await ctx.showModal(stepEntry.view(payload), payload);
-        } else {
-          const view = stepEntry.view(payload);
-          await ctx.renderView(view, payload);
-        }
-      },
-    });
-  }
+      await ctx.renderView({
+        content: `🎉 Birthday Event for **${nickname}** set on **${formatted}**`,
+        buttons: [{ label: "⬅ Back", action: "events.create.backToMain", style: "secondary" }],
+      });
+    },
+  });
 
-  // =====================================
-  // BACK TO EVENT PANEL (z każdego step)
-  // =====================================
+  // CUSTOM EVENT FORM SUBMIT
+  registerUIAction("events.create.customForm.submit", {
+    system: "events",
+    handler: async (ctx: UIContext, _unused, payload: any) => {
+      const name = payload?.name ?? "Unnamed Event";
+      const day = Number(payload?.day ?? 1);
+      const month = Number(payload?.month ?? 1);
+      const hours = Number(payload?.hours ?? 12);
+      const minutes = Number(payload?.minutes ?? 0);
+      const formatted = `${name} on ${day}/${month} ${hours}:${minutes} UTC`;
+
+      await ctx.renderView({
+        content: `📝 Event: **${name}**\n📅 Date: **${formatted}**`,
+        buttons: [{ label: "⬅ Back", action: "events.create.backToMain", style: "secondary" }],
+      });
+    },
+  });
+
+  // SELECT DAY
+  registerUIAction("events.create.selectDay", {
+    system: "events",
+    handler: async (ctx: UIContext) => {
+      await ctx.renderView(selectDayView());
+    },
+  });
+
+  // SELECT TIME
+  registerUIAction("events.create.selectTime", {
+    system: "events",
+    handler: async (ctx: UIContext, _unused, payload: any) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
+      const eventName = payload?.eventName ?? "Event";
+      await ctx.showModal(selectTimeView(day, month, eventName), payload);
+    },
+  });
+
+  // SELECT TIME SUBMIT
+  registerUIAction("events.create.selectTime.submit", {
+    system: "events",
+    handler: async (ctx: UIContext, payload: any) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
+      const eventName = payload?.eventName ?? "Event";
+      const hours = Number(payload?.hours);
+      const minutes = Number(payload?.minutes);
+      await ctx.renderView({
+        content: `⏰ **${eventName}** time set for **${formatEventUTC(day, month, hours, minutes)}**`,
+        buttons: [
+          { label: "⬅ Back", action: `events.create.selectDay`, style: "secondary" },
+          { label: "🏠 Menu", action: "events.create.backToMain", style: "secondary" },
+        ],
+      });
+    },
+  });
+
+  // SUBMIT EVENT
+  registerUIAction("events.create.submit", {
+    system: "events",
+    handler: async (ctx: UIContext, payload: any) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
+      const hours = Number(payload?.hours);
+      const minutes = Number(payload?.minutes);
+      const eventName = payload?.eventName ?? "Event";
+
+      await ctx.renderView(submitEventView(day, month, hours, minutes, eventName));
+    },
+  });
+
+  // CONFIRM EVENT
+  registerUIAction("events.create.confirm", {
+    system: "events",
+    handler: async (ctx: UIContext, payload: any) => {
+      const day = Number(payload?.day);
+      const month = Number(payload?.month);
+      const hours = Number(payload?.hours);
+      const minutes = Number(payload?.minutes);
+      await ctx.renderView(confirmEventView(day, month, hours, minutes));
+    },
+  });
+
+  // BACK TO MAIN
   registerUIAction("events.create.backToMain", {
     system: "events",
     handler: async (ctx: UIContext, _unused, payload: any) => {
