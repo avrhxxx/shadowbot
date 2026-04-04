@@ -4,17 +4,17 @@
 
 import type { Interaction } from "discord.js";
 import type { TraceContext } from "@/trace";
+
 import { isSystemEnabled } from "@/runtime/runtimeState";
 
 // =====================================
 // 🔹 TYPES
 // =====================================
 
-// Parametry opcjonalne, żeby stary kod nadal działał
 export type UIActionHandler = (
-  interaction?: Interaction,
-  ctx?: TraceContext,
-  payload?: any
+  interaction: Interaction,
+  ctx: TraceContext,
+  payload?: any // opcjonalne
 ) => Promise<void>;
 
 export type UIActionDefinition = {
@@ -34,10 +34,7 @@ const registry: Registry = new Map();
 // 🔹 REGISTER
 // =====================================
 
-export function registerUIAction(
-  id: string,
-  def: UIActionDefinition
-) {
+export function registerUIAction(id: string, def: UIActionDefinition) {
   registry.set(id, def);
 }
 
@@ -47,20 +44,15 @@ export function registerUIAction(
 
 export async function executeUIAction(
   id: string,
-  interaction?: Interaction,
-  ctx?: TraceContext,
-  payload?: any
+  interaction: Interaction,
+  ctx: TraceContext,
+  payload?: any // opcjonalne
 ): Promise<boolean> {
   const action = registry.get(id);
-
   if (!action) return false;
 
   const enabled = await isSystemEnabled(action.system);
-
-  if (!enabled) {
-    // system OFF → blokujemy akcję
-    return true;
-  }
+  if (!enabled) return true; // system OFF → blokujemy akcję
 
   await action.handler(interaction, ctx, payload);
 
@@ -75,22 +67,15 @@ export function parseCustomId(customId: string): {
   action: string;
   payload?: Record<string, string>;
 } {
-  // 🔹 FORMAT: action|key=value|key=value
-
+  // FORMAT: action|key=value|key=value
   const [action, ...parts] = customId.split("|");
 
-  if (parts.length === 0) {
-    return { action };
-  }
+  if (parts.length === 0) return { action };
 
   const payload: Record<string, string> = {};
-
   for (const part of parts) {
     const [key, value] = part.split("=");
-
-    if (key && value) {
-      payload[key] = value;
-    }
+    if (key && value) payload[key] = value;
   }
 
   return { action, payload };
