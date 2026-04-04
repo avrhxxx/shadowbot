@@ -9,11 +9,7 @@ import type {
   CacheType,
 } from "discord.js";
 
-import {
-  parseCustomId,
-  executeUIAction,
-} from "./uiRouter";
-
+import { parseCustomId, executeUIAction } from "./uiRouter";
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
@@ -35,111 +31,60 @@ type ExtendedButtonInteraction = BaseButtonInteraction<CacheType> & ExtendedInte
 type ExtendedModalSubmitInteraction = BaseModalSubmitInteraction<CacheType> & ExtendedInteraction;
 
 // =====================================
+// 🔹 CREATE UI CONTEXT
+// =====================================
+
+function createUIContext(interaction: ExtendedInteraction) {
+  return {
+    interaction,
+    renderView: async (viewId: string, state?: any) => {
+      const { renderView } = await import("./uiEngine");
+      return renderView({ interaction } as any, viewId, state);
+    },
+    showModal: async (modal: any, payload?: any) => {
+      if (!interaction.showModal) throw new Error("Interaction can't show modal");
+      return interaction.showModal(modal);
+    },
+    navigate: async (destination: string, options?: any) => {
+      await interaction.reply?.({
+        content: `Navigating to ${destination}`,
+        ephemeral: true,
+      });
+    },
+  };
+}
+
+// =====================================
 // 🧠 MAIN HANDLER
 // =====================================
 
 export async function handleUIInteraction(
   interaction: ExtendedInteraction,
-  ctx: TraceContext
+  ctxTrace: TraceContext
 ): Promise<boolean> {
-  const log = createLogger(ctx);
+  const log = createLogger(ctxTrace);
   const flow = log.flow("ui.router");
 
+  const ctx = createUIContext(interaction);
+
   try {
-    // =====================================
-    // 🔘 BUTTON INTERACTIONS
-    // =====================================
-    if (interaction.isButton()) {
-      const button = interaction as ExtendedButtonInteraction;
-
-      flow.stepDebug("interaction.received", {
-        meta: { id: button.customId },
-      });
-
-      const { action, payload } = parseCustomId(button.customId);
-
-      flow.stepDebug("interaction.parsed", {
-        meta: { action, payload },
-      });
-
-      const handled = await executeUIAction(
-        action,
-        button,
-        ctx,
-        payload
-      );
-
-      if (!handled) {
-        flow.stepWarn("action.not_found", {
-          meta: { action },
-        });
-        return false;
-      }
-
-      flow.stepDebug("action.executed", {
-        meta: { action },
-      });
-
-      return true;
+    if (interaction.isButton() || interaction.isModalSubmit()) {
+      const { action, payload } = parseCustomId(interaction.customId);
+      const handled = await executeUIAction(action, ctx, payload);
+      return handled;
     }
 
-    // =====================================
-    // 🔘 MODAL SUBMIT INTERACTIONS
-    // =====================================
-    if (interaction.isModalSubmit()) {
-      const modal = interaction as ExtendedModalSubmitInteraction;
-
-      flow.stepDebug("interaction.received_modal", {
-        meta: { id: modal.customId },
-      });
-
-      const { action, payload } = parseCustomId(modal.customId);
-
-      flow.stepDebug("interaction.parsed_modal", {
-        meta: { action, payload },
-      });
-
-      const handled = await executeUIAction(
-        action,
-        modal,
-        ctx,
-        payload
-      );
-
-      if (!handled) {
-        flow.stepWarn("modal.action.not_found", {
-          meta: { action },
-        });
-        return false;
-      }
-
-      flow.stepDebug("modal.action.executed", {
-        meta: { action },
-      });
-
-      return true;
-    }
-
-    // =====================================
-    // 🔘 OTHER INTERACTIONS (IGNORED)
-    // =====================================
     return false;
   } catch (err) {
     flow.fail(err);
-
     if (interaction.isRepliable()) {
-      const payload = {
-        content: "❌ UI error occurred.",
-        ephemeral: true,
-      };
-
+      const payload = { content: "❌ UI error occurred.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp?.(payload);
       } else {
         await interaction.reply?.(payload);
       }
     }
-
     return true;
   }
 }
