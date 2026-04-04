@@ -2,21 +2,11 @@
 // 📁 src/trace/traceFactory.ts
 // =====================================
 
-/**
- * 🧠 ROLE:
- * Creates and propagates TraceContext
- *
- * INPUT:
- * - optional metadata
- *
- * OUTPUT:
- * - fully formed TraceContext
- */
-
 import {
   createTraceId,
   createCorrelationId,
   createFlowId,
+  createUIId, // 🔹 NEW
 } from "@/foundation/ids/idGenerator";
 
 import type {
@@ -24,39 +14,32 @@ import type {
   TraceId,
   CorrelationId,
   FlowId,
+  UIId, // 🔹 NEW
 } from "./traceTypes";
 
-// =====================================
-// 🔧 CAST HELPERS (BRANDING)
-// =====================================
-
+// 🔧 CAST HELPERS
 const toTraceId = (v: string): TraceId => v as TraceId;
-const toCorrelationId = (v: string): CorrelationId =>
-  v as CorrelationId;
+const toCorrelationId = (v: string): CorrelationId => v as CorrelationId;
 const toFlowId = (v: string): FlowId => v as FlowId;
+const toUIId = (v: string): UIId => v as UIId; // 🔹 NEW
 
-// =====================================
 // 🚀 ROOT CONTEXT
-// =====================================
-
 export function createRootContext(
   data: Omit<
     TraceContext,
-    "traceId" | "parentTraceId" | "correlationId" | "flowId"
+    "traceId" | "parentTraceId" | "correlationId" | "flowId" | "uiId"
   >
 ): TraceContext {
   return {
-    traceId: toTraceId(createTraceId()), // ✅ FIX
-    correlationId: toCorrelationId(createCorrelationId()), // ✅ FIX
-    flowId: toFlowId(createFlowId()), // ✅ FIX
+    traceId: toTraceId(createTraceId()),
+    correlationId: toCorrelationId(createCorrelationId()),
+    flowId: toFlowId(createFlowId()),
+    uiId: toUIId(createUIId()), // 🔹 NEW
     ...data,
   };
 }
 
-// =====================================
-// 🌍 APP CONTEXT (ENTRYPOINT)
-// =====================================
-
+// 🌍 APP CONTEXT
 export function createAppContext(): TraceContext {
   return createRootContext({
     source: "system",
@@ -64,10 +47,7 @@ export function createAppContext(): TraceContext {
   });
 }
 
-// =====================================
 // 🌿 CHILD CONTEXT
-// =====================================
-
 export function createChildContext(
   parent: TraceContext,
   overrides: Partial<TraceContext> = {}
@@ -75,17 +55,15 @@ export function createChildContext(
   return {
     ...parent,
 
-    traceId: toTraceId(createTraceId()), // ✅ FIX
+    traceId: toTraceId(createTraceId()),
     parentTraceId: parent.traceId,
+    uiId: toUIId(createUIId()), // 🔹 NEW
 
     ...overrides,
   };
 }
 
-// =====================================
-// 🧩 FORK CONTEXT (NEW FLOW)
-// =====================================
-
+// 🧩 FORK CONTEXT
 export function forkContext(
   parent: TraceContext,
   overrides: Partial<TraceContext> = {}
@@ -93,11 +71,12 @@ export function forkContext(
   return {
     ...parent,
 
-    traceId: toTraceId(createTraceId()), // ✅ FIX
+    traceId: toTraceId(createTraceId()),
     parentTraceId: parent.traceId,
 
-    correlationId: toCorrelationId(createCorrelationId()), // ✅ FIX
-    flowId: toFlowId(createFlowId()), // ✅ FIX
+    correlationId: toCorrelationId(createCorrelationId()),
+    flowId: toFlowId(createFlowId()),
+    uiId: toUIId(createUIId()), // 🔹 NEW
 
     ...overrides,
   };
