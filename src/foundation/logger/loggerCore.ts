@@ -14,19 +14,13 @@ const colors = {
   magenta: "\x1b[35m",
 };
 
-// =====================================
-// 🔹 SYSTEM FORMATTER
-// =====================================
-
+// SYSTEM FORMATTER
 function formatSystem(system?: string) {
   if (!system) return "APP";
   return system.toUpperCase();
 }
 
-// =====================================
-// 🔹 HELPERS
-// =====================================
-
+// HELPERS
 function simplifyEvent(event?: string): string {
   if (!event) return "log";
   return event;
@@ -65,46 +59,35 @@ function getHeader(level: string, system?: string) {
   return `${colors.gray}──────── ${level} | ${colors.cyan}${systemLabel}${colors.reset} ${colors.gray}────────${colors.reset}`;
 }
 
-// =====================================
-// 🔹 FORMATTER
-// =====================================
-
+// FORMATTER
 function formatLog(log: any) {
   const level = colorLevel(log.level ?? "info");
   const event = simplifyEvent(log.event);
 
   const lines: (string | null)[] = [
     getHeader(level, log.system),
-
     `${colors.green}EVENT${colors.reset} : ${event}`,
-
     log.flow?.step
       ? `${colors.yellow}STEP${colors.reset}  : ${log.flow.step}`
       : null,
-
     formatObjectBlock("META", log.meta),
     formatObjectBlock("INPUT", log.input),
     formatObjectBlock("RESULT", log.result),
-
     log.stats ? formatObjectBlock("STATS", log.stats) : null,
-
     log.error
       ? [
           `${colors.red}ERROR${colors.reset}:`,
           `  ${log.error.message || log.error}`,
         ].join("\n")
       : null,
-
+    log.uiId ? `${colors.cyan}UIID${colors.reset} : ${log.uiId}` : null, // 🔹 NEW
     "",
   ];
 
   return lines.filter(Boolean).join("\n");
 }
 
-// =====================================
-// 🔹 LOGGER
-// =====================================
-
+// LOGGER
 export const baseLogger = pino({
   level: "debug",
 
