@@ -64,7 +64,7 @@ export function registerEventsCreateActions() {
   });
 
   // =====================================
-  // STEPS
+  // STEPS - automatyczne rejestrowanie widoków
   // =====================================
   const steps = {
     "events.create.selectDay": selectDayView,
