@@ -7,7 +7,7 @@ import { eventsCreateView } from "./eventsCreate.view";
 import { StepsMap } from "./steps";
 
 /**
- * 🔹 Funkcja rejestrująca wszystkie akcje dla flow tworzenia eventu
+ * 🔹 Rejestruje wszystkie akcje flow tworzenia eventu
  */
 export function registerEventsCreateActions() {
   // =====================================
@@ -16,16 +16,8 @@ export function registerEventsCreateActions() {
   registerUIAction("events.create.start", {
     system: "events",
     handler: async (ctx) => {
-      const view = eventsCreateView();
-      const mutableComponents = view.components.map(row => ({
-        ...row,
-        components: row.components.map(btn => ({ ...btn })),
-      }));
-
-      await ctx.renderView({
-        content: view.content,
-        components: mutableComponents,
-      });
+      const view = eventsCreateView()(ctx);
+      await ctx.renderView("events.create", view);
     },
   });
 
@@ -44,16 +36,15 @@ export function registerEventsCreateActions() {
 
       const stepEntry = StepsMap[nextStepId];
 
-      // 🔹 Modale (customEventForm) używamy showModal
+      if (!stepEntry) return;
+
       if (nextStepId === "customEventForm" && stepEntry.view) {
-        await ctx.showModal(stepEntry.view());
+        // 🔹 Modal
+        await ctx.showModal(stepEntry.view()(ctx));
       } else if (stepEntry.view) {
-        // 🔹 Zwykłe widoki
-        const view = stepEntry.view();
-        await ctx.renderView({
-          content: view.content,
-          components: view.components,
-        });
+        // 🔹 Zwykły widok
+        const view = stepEntry.view()(ctx);
+        await ctx.renderView(stepEntry.id, view);
       }
     },
   });
@@ -63,17 +54,14 @@ export function registerEventsCreateActions() {
   // =====================================
   for (const [key, stepEntry] of Object.entries(StepsMap)) {
     if (!stepEntry.view) continue;
-    if (key === "confirmEvent") continue; // wymaga parametrów – wywoływane ręcznie
+    if (key === "confirmEvent") continue; // wymaga parametrów
 
     const actionId = `events.create.${key}`;
     registerUIAction(actionId, {
       system: "events",
       handler: async (ctx) => {
-        const view = stepEntry.view();
-        await ctx.renderView({
-          content: view.content,
-          components: view.components,
-        });
+        const view = stepEntry.view()(ctx);
+        await ctx.renderView(stepEntry.id, view);
       },
     });
   }
@@ -84,7 +72,6 @@ export function registerEventsCreateActions() {
   registerUIAction("events.create.backToMain", {
     system: "events",
     handler: async (ctx, _unused, payload) => {
-      // 🔹 Przechodzimy do głównego panelu poprzez UI Router
       await ctx.navigate("events.main.create", {
         user: payload?.user,
         channel: payload?.channel,
