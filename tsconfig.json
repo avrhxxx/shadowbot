@@ -22,7 +22,7 @@
     "moduleDetection": "force",
     "isolatedModules": true,
 
-    "baseUrl": ".",
+    "baseUrl": "src",
     "paths": {
       "@/*": ["*"]
     },
