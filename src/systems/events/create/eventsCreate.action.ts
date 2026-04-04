@@ -22,7 +22,7 @@ export function registerEventsCreateActions() {
         components: row.components.map(btn => ({ ...btn })),
       }));
 
-      await interaction.update({
+      await interaction.update?.({
         content: view.content,
         components: mutableComponents,
       });
@@ -34,8 +34,8 @@ export function registerEventsCreateActions() {
   // =====================================
   registerUIAction("events.create.selectType", {
     system: "events",
-    handler: async (interaction) => {
-      const target = interaction.customId.split("target=")[1];
+    handler: async (interaction, ctx, payload) => {
+      const target = payload?.target;
       let nextStepId: keyof typeof StepsMap;
 
       if (target === "BD") nextStepId = "birthdayForm";
@@ -46,11 +46,11 @@ export function registerEventsCreateActions() {
 
       // 🔹 Modale (customEventForm) używamy showModal
       if (nextStepId === "customEventForm" && stepEntry.view) {
-        await interaction.showModal(stepEntry.view());
+        await interaction.showModal?.(stepEntry.view());
       } else if (stepEntry.view) {
         // 🔹 Zwykłe widoki
         const view = stepEntry.view();
-        await interaction.update({
+        await interaction.update?.({
           content: view.content,
           components: view.components,
         });
@@ -70,7 +70,7 @@ export function registerEventsCreateActions() {
       system: "events",
       handler: async (interaction) => {
         const view = stepEntry.view();
-        await interaction.update({
+        await interaction.update?.({
           content: view.content,
           components: view.components,
         });
@@ -84,12 +84,11 @@ export function registerEventsCreateActions() {
   registerUIAction("events.create.backToMain", {
     system: "events",
     handler: async (interaction) => {
-      // 🔹 Emitujemy event do głównego panelu eventów
       await interaction.client.emit("ui.router.interaction.received", {
         id: "events.main.create",
-        user: interaction.user,
-        channel: interaction.channel,
-        message: interaction.message,
+        user: payload?.user || interaction.user,
+        channel: payload?.channel || interaction.channel,
+        message: payload?.message || interaction.message,
         interaction,
       });
     },
