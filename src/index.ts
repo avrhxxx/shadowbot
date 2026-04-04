@@ -2,11 +2,7 @@
 // 📁 src/index.ts
 // =====================================
 
-import {
-  Client,
-  GatewayIntentBits,
-  Partials,
-} from "discord.js";
+import { Client, GatewayIntentBits, Partials } from "discord.js";
 
 import { createLogger } from "@/foundation/logger";
 import { createAppContext, createRootContext } from "@/trace";
@@ -52,11 +48,7 @@ export const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
-  partials: [
-    Partials.Channel,
-    Partials.Message,
-    Partials.Reaction,
-  ],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
 
 // =====================================
@@ -92,22 +84,31 @@ process.on("uncaughtException", (err) => {
 client.on("interactionCreate", async (interaction) => {
   const ctx = createRootContext({ source: "discord" });
 
+  // 🔹 HANDLE UI ENGINE INTERACTIONS
   const handled = await handleUIInteraction(interaction, ctx);
   if (handled) return;
 
-  if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === "devpanel") {
+  // 🔹 HANDLE SLASH COMMANDS
+  if (!interaction.isChatInputCommand()) return;
+
+  switch (interaction.commandName) {
+    case "devpanel":
       await handleDevpanelCommand(interaction);
-      return;
-    }
-    if (interaction.commandName === "moderator") {
+      break;
+
+    case "moderator":
       await handleModeratorCommand(interaction);
-      return;
-    }
-    if (interaction.commandName === "events") {
+      break;
+
+    case "events":
       await handleEventMainCommand(interaction);
-      return;
-    }
+      break;
+
+    default:
+      await interaction.reply({
+        content: "❌ Unknown command",
+        ephemeral: true,
+      });
   }
 });
 
@@ -117,12 +118,13 @@ client.on("interactionCreate", async (interaction) => {
 
 client.once("ready", async () => {
   const discordFlow = appLog.flow("discord");
-  discordFlow.stepInfo("ready", { meta: { user: client.user?.tag } });
+  discordFlow.stepInfo("ready", {
+    meta: { user: client.user?.tag, guilds: client.guilds.cache.size },
+  });
 
   // =============================
   // 🧠 REGISTER COMMANDS (DEV + MODERATOR + EVENTS)
   // =============================
-
   const commandsFlow = appLog.flow("commands");
   commandsFlow.start();
   try {
@@ -133,13 +135,12 @@ client.once("ready", async () => {
     ]);
     commandsFlow.success();
   } catch (err) {
-    commandsFlow.fail(err);
+    commandsFlow.fail(err instanceof Error ? err.message : err);
   }
 
   // =============================
   // 🧠 GOOGLE INIT
   // =============================
-
   const googleCtx = createRootContext({ source: "system", system: "google" });
   const googleLog = createLogger(googleCtx);
   const googleFlow = googleLog.flow("init");
@@ -149,14 +150,12 @@ client.once("ready", async () => {
     await ensureAllSheets();
     googleFlow.success();
   } catch (err) {
-    googleFlow.fail(err);
-    return;
+    googleFlow.fail(err instanceof Error ? err.message : err);
   }
 
   // =============================
-  // 🧠 RUNTIME
+  // 🧠 RUNTIME INIT
   // =============================
-
   const runtimeCtx = createRootContext({ source: "system", system: "runtime" });
   const runtimeLog = createLogger(runtimeCtx);
   const runtimeLoadFlow = runtimeLog.flow("load");
@@ -166,13 +165,12 @@ client.once("ready", async () => {
     await loadAllSystems();
     runtimeLoadFlow.success();
   } catch (err) {
-    runtimeLoadFlow.fail(err);
+    runtimeLoadFlow.fail(err instanceof Error ? err.message : err);
   }
 
   // =============================
   // 🔹 INIT DEV PANEL + MODERATOR PANEL
   // =============================
-
   const guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) {
     discordFlow.stepInfo("ready", { meta: { msg: `Guild ${GUILD_ID} not found` } });
@@ -183,18 +181,21 @@ client.once("ready", async () => {
     await initDevPanelForGuild(guild);
     await initModeratorPanelForGuild(guild);
   } catch (err) {
-    discordFlow.stepInfo("ready", { meta: { msg: "Failed to init panels", err } });
+    discordFlow.stepInfo("ready", {
+      meta: { msg: "Failed to init panels", err: err instanceof Error ? err.message : err },
+    });
   }
 
   // =============================
-  // 🔹 INIT EVENTS SYSTEM
+  // 🔹 INIT EVENTS SYSTEM (bez dedykowanego kanału)
   // =============================
-
   try {
     await registerEventMainActions();
     discordFlow.stepInfo("ready", { meta: { msg: "Events system initialized" } });
   } catch (err) {
-    discordFlow.stepInfo("ready", { meta: { msg: "Failed to init events system", err } });
+    discordFlow.stepInfo("ready", {
+      meta: { msg: "Failed to init events system", err: err instanceof Error ? err.message : err },
+    });
   }
 });
 
@@ -207,4 +208,4 @@ loginFlow.start();
 
 client.login(BOT_TOKEN)
   .then(() => loginFlow.success())
-  .catch((err) => loginFlow.fail(err));
+  .catch((err) => loginFlow.fail(err instanceof Error ? err.message : err));
