@@ -4,7 +4,7 @@
 
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
 import { createRootContext } from "@/trace";
-import { renderViewInternal } from "@/ui/engine/engine";
+import { view as uiView } from "@/ui/api";
 
 // =====================================
 // 🔹 COMMAND
@@ -13,6 +13,7 @@ import { renderViewInternal } from "@/ui/engine/engine";
 export async function handleDevpanelCommand(
   interaction: ChatInputCommandInteraction<CacheType>
 ) {
+  // 🔹 Tworzymy TraceContext dla logowania i UIId
   const ctx = createRootContext({
     source: "discord",
     system: "devpanel",
@@ -21,11 +22,9 @@ export async function handleDevpanelCommand(
     channelId: interaction.channelId ?? undefined,
   });
 
-  const view = await renderViewInternal(ctx, "devpanel.main");
-
-  await interaction.reply({
-    content: view.content,
-    components: view.components,
+  // 🔹 Pokazujemy widok przy użyciu publicznego UI API
+  await uiView.show(ctx, "devpanel.main", undefined, {
     ephemeral: true,
+    interaction, // podajemy obiekt interakcji, żeby UI API mogło wysłać reply
   });
 }
