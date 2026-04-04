@@ -4,7 +4,7 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { Interaction } from "discord.js";
-import { renderView } from "@/core/ui/uiEngine";
+import { renderView } from "@/ui/core/uiEngine";
 
 import {
   moderatorHubView,
