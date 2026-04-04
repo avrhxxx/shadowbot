@@ -22,27 +22,27 @@ export { confirmEventView } from "./confirmEvent.step";
 export const StepsMap = {
   selectDay: {
     step: registerSelectDayStep,
-    view: selectDayView,
+    view: () => selectDayView(),
   },
   selectTime: {
     step: registerSelectTimeStep,
-    view: selectTimeView,
+    view: (params: { day: number; month: number }) => selectTimeView(params.day, params.month),
   },
   submitEvent: {
     step: registerSubmitEventStep,
-    view: submitEventView,
+    view: (params: { day: number; month: number; hours: number; minutes: number }) =>
+      submitEventView(params.day, params.month, params.hours, params.minutes),
   },
   birthdayForm: {
     step: registerBirthdayFormStep,
-    view: birthdayFormView,
+    view: () => birthdayFormView(),
   },
   customEventForm: {
     step: registerCustomEventFormStep,
-    view: customEventFormView,
+    view: () => customEventFormView(),
   },
   confirmEvent: {
     step: registerConfirmEventStep,
-    // wrapper wymuszający przekazanie parametrów
     view: (params: { day: number; month: number; hours: number; minutes: number }) =>
       confirmEventView(params),
   },
