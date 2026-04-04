@@ -5,8 +5,8 @@
 import {
   Interaction,
   ButtonInteraction,
-  ModalSubmitInteraction,
   CacheType,
+  ModalSubmitInteraction,
 } from "discord.js";
 
 import {
@@ -17,20 +17,6 @@ import {
 import { createLogger } from "@/foundation/logger";
 import type { TraceContext } from "@/trace";
 
-// =====================================
-// 🔹 TYPOWE ROZSZERZENIE (dla TS)
-// =====================================
-
-type ExtendedInteraction = Interaction<CacheType> & {
-  showModal?: (modal: any) => Promise<any>;
-  renderView?: (viewId: string, state?: any) => Promise<any>;
-  navigate?: (destination: string, options?: any) => Promise<void>;
-};
-
-// =====================================
-// 🧠 MAIN HANDLER
-// =====================================
-
 export async function handleUIInteraction(
   interaction: Interaction<CacheType>,
   ctx: TraceContext
@@ -38,41 +24,27 @@ export async function handleUIInteraction(
   const log = createLogger(ctx);
   const flow = log.flow("ui.router");
 
-  const extInteraction = interaction as ExtendedInteraction;
-
-  // dodajemy UIContext funkcje
-  const ctxUI = {
-    ...extInteraction,
-    showModal: extInteraction.showModal,
-    renderView: async (viewId: string, state?: any) => {
-      const { renderView } = await import("./uiEngine");
-      return renderView(ctx, viewId, state);
-    },
-    navigate: async (destination: string, options?: any) => {
-      await extInteraction.reply?.({
-        content: `Navigating to ${destination}`,
-        ephemeral: true,
-      });
-    },
-  };
-
   try {
-    // =====================================
     // 🔘 BUTTON INTERACTIONS
-    // =====================================
     if (interaction.isButton()) {
       const button = interaction as ButtonInteraction;
 
-      flow.stepDebug("interaction.received", { meta: { id: button.customId } });
+      flow.stepDebug("interaction.received", {
+        meta: { id: button.customId },
+      });
 
       const { action, payload } = parseCustomId(button.customId);
 
-      flow.stepDebug("interaction.parsed", { meta: { action, payload } });
+      flow.stepDebug("interaction.parsed", {
+        meta: { action, payload: payload ?? {} },
+      });
 
-      const handled = await executeUIAction(action, ctxUI, payload);
+      const handled = await executeUIAction(action, button, ctx, payload);
 
       if (!handled) {
-        flow.stepWarn("action.not_found", { meta: { action } });
+        flow.stepWarn("action.not_found", {
+          meta: { action },
+        });
         return false;
       }
 
@@ -80,19 +52,21 @@ export async function handleUIInteraction(
       return true;
     }
 
-    // =====================================
     // 🔘 MODAL SUBMIT INTERACTIONS
-    // =====================================
     if (interaction.isModalSubmit()) {
       const modal = interaction as ModalSubmitInteraction;
 
-      flow.stepDebug("interaction.received_modal", { meta: { id: modal.customId } });
+      flow.stepDebug("interaction.received_modal", {
+        meta: { id: modal.customId },
+      });
 
       const { action, payload } = parseCustomId(modal.customId);
 
-      flow.stepDebug("interaction.parsed_modal", { meta: { action, payload } });
+      flow.stepDebug("interaction.parsed_modal", {
+        meta: { action, payload: payload ?? {} },
+      });
 
-      const handled = await executeUIAction(action, ctxUI, payload);
+      const handled = await executeUIAction(action, modal, ctx, payload);
 
       if (!handled) {
         flow.stepWarn("modal.action.not_found", { meta: { action } });
@@ -103,15 +77,21 @@ export async function handleUIInteraction(
       return true;
     }
 
-    // =====================================
-    // 🔘 OTHER INTERACTIONS (IGNORED)
-    // =====================================
+    // 🔘 OTHER INTERACTIONS → currently ignored, could extend later
+    flow.stepDebug("interaction.ignored", {
+      meta: { type: interaction.type },
+    });
+
     return false;
   } catch (err) {
     flow.fail(err);
 
     if (interaction.isRepliable()) {
-      const payload = { content: "❌ UI error occurred.", ephemeral: true };
+      const payload = {
+        content: "❌ UI error occurred.",
+        ephemeral: true,
+      };
+
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload);
       } else {
