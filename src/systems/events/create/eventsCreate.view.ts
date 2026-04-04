@@ -1,3 +1,7 @@
+// =====================================
+// 📁 src/systems/events/create/eventsCreate.view.ts
+// =====================================
+
 import type { TraceContext } from "@/trace";
 import type { ViewResult } from "@/core/ui/uiEngine";
 import { formatEventUTC, formatButtonDate } from "@/shared/utils/timeUtils";
@@ -5,7 +9,7 @@ import { formatEventUTC, formatButtonDate } from "@/shared/utils/timeUtils";
 const DAYS_TO_SHOW = 8;
 
 export function eventsCreateView(): (ctx: TraceContext, state?: any) => ViewResult {
-  return (ctx: TraceContext, state?: any) => {
+  return (_ctx: TraceContext, _state?: any) => {
     const STANDARD_EVENT_TYPES = [
       { label: "Arcadian Conquest", value: "AC" },
       { label: "City Contest", value: "CC" },
@@ -100,7 +104,7 @@ export function submitEventView(day: number, month: number, hours: number, minut
   const formatted = formatEventUTC(day, month, hours, minutes);
 
   const buttons = [
-    { label: "Yes, create & notify", action: `events.create.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true&eventName=${encodeURIComponent(eventName)}`, style: "primary" },
+    { label: "Yes, create & Notify", action: `events.create.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=true&eventName=${encodeURIComponent(eventName)}`, style: "primary" },
     { label: "Yes, create without notification", action: `events.create.confirm|day=${day}&month=${month}&hours=${hours}&minutes=${minutes}&notify=false&eventName=${encodeURIComponent(eventName)}`, style: "primary" },
     { label: "⬅ Back", action: `events.create.selectTime|day=${day}&month=${month}&eventName=${encodeURIComponent(eventName)}`, style: "secondary" },
   ];
