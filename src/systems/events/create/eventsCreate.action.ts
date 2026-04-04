@@ -4,15 +4,13 @@
 
 import { registerUIAction } from "@/ui/core/uiRouter";
 import { eventsCreateView } from "./eventsCreate.view";
-import {
-  selectDayView,
-  birthdayFormView,
-  customEventFormView,
-  confirmEventView,
-} from "./steps";
+import { StepsMap } from "./steps";
 import { Interaction, ButtonInteraction } from "discord.js";
 
-// 🔹 Funkcja rejestrująca wszystkie akcje dla flow tworzenia eventu
+/**
+ * 🔹 Funkcja rejestrująca wszystkie akcje dla flow tworzenia eventu
+ * Plik: src/systems/events/create/eventsCreate.action.ts
+ */
 export function registerEventsCreateActions() {
   // =====================================
   // START CREATE EVENT
@@ -23,7 +21,6 @@ export function registerEventsCreateActions() {
       if (!interaction.isButton()) return;
 
       const buttonInteraction = interaction as ButtonInteraction;
-
       const view = eventsCreateView();
       const mutableComponents = view.components.map(row => ({
         ...row,
@@ -44,43 +41,49 @@ export function registerEventsCreateActions() {
     system: "events",
     handler: async (interaction: Interaction) => {
       if (!interaction.isButton()) return;
-
       const buttonInteraction = interaction as ButtonInteraction;
       const target = buttonInteraction.customId.split("target=")[1];
 
-      let nextStepId: string;
-      if (target === "BD") nextStepId = "events.create.birthdayForm";
-      else if (target === "C") nextStepId = "events.create.customEventForm";
-      else nextStepId = "events.create.selectDay";
+      let nextStepId: keyof typeof StepsMap;
+      if (target === "BD") nextStepId = "birthdayForm";
+      else if (target === "C") nextStepId = "customEventForm";
+      else nextStepId = "selectDay";
 
-      await buttonInteraction.client.emit("ui.router.interaction.received", {
-        id: nextStepId,
-        user: buttonInteraction.user,
-        channel: buttonInteraction.channel,
-        message: buttonInteraction.message,
-        interaction: buttonInteraction,
-      });
+      const stepEntry = StepsMap[nextStepId];
+
+      if (nextStepId === "customEventForm") {
+        // 🔹 Dla modali wywołujemy showModal
+        if (stepEntry.view) {
+          await buttonInteraction.showModal(stepEntry.view());
+        }
+      } else {
+        // 🔹 Dla zwykłych widoków
+        if (stepEntry.view) {
+          const view = stepEntry.view();
+          await buttonInteraction.update({
+            content: view.content,
+            components: view.components,
+          });
+        }
+      }
     },
   });
 
   // =====================================
-  // STEPS - automatyczne rejestrowanie widoków
+  // STEPS MAP AUTOMATYCZNE (TYLKO TE, KTÓRE MAJĄ VIEW BEZ PARAMETRÓW)
   // =====================================
-  const steps = {
-    "events.create.selectDay": selectDayView,
-    "events.create.birthdayForm": birthdayFormView,
-    "events.create.customEventForm": customEventFormView,
-    "events.create.confirmEvent": confirmEventView,
-  } as const;
+  for (const [key, stepEntry] of Object.entries(StepsMap)) {
+    if (!stepEntry.view) continue; // brak widoku do automatycznego update (np. modal lub view z parametrami)
+    if (key === "confirmEvent") continue; // wymaga parametrów – wywoływane ręcznie po wyborze czasu
 
-  for (const [actionId, viewFn] of Object.entries(steps)) {
+    const actionId = `events.create.${key}`;
     registerUIAction(actionId, {
       system: "events",
       handler: async (interaction: Interaction) => {
         if (!interaction.isButton()) return;
         const buttonInteraction = interaction as ButtonInteraction;
 
-        const view = viewFn();
+        const view = stepEntry.view();
         await buttonInteraction.update({
           content: view.content,
           components: view.components,
