@@ -2,7 +2,7 @@
 // 📁 src/systems/events/main/event.main.view.ts
 // =====================================
 
-import { View, createButton, createBackButton } from "@/core/ui/uiEngine";
+import { View, createButton, createBackButton } from "@/ui/core/uiEngine";
 
 export const eventMainPanel: View = {
   id: "events.main",
